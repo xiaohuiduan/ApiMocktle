@@ -120,7 +120,12 @@ function buildDataJsonForUpsert(
   return JSON.stringify(item.data)
 }
 
-function mergeOpenApiUpsert(projectId: string, menuItems: ApiMenuData[], snapshot: ApiMenuData[]) {
+interface ImportCounts {
+  created: number
+  updated: number
+}
+
+function mergeOpenApiUpsert(projectId: string, menuItems: ApiMenuData[], snapshot: ApiMenuData[]): ImportCounts {
   const occupiedIds = new Set(listMenuItems(projectId).map(({ id }) => id))
 
   const endpointToMenuId = new Map<string, string>()
@@ -286,6 +291,8 @@ function mergeOpenApiUpsert(projectId: string, menuItems: ApiMenuData[], snapsho
       })
     }
   }
+
+  return { created: menuItems.length - updateTargets.size, updated: updateTargets.size }
 }
 
 export function mergeProjectStateWithMenuItems(
@@ -296,11 +303,12 @@ export function mergeProjectStateWithMenuItems(
   assertUniqueImportedMenuIds(menuItems)
 
   const mergeMode = options?.mergeMode ?? 'append'
+  let counts: ImportCounts = { created: 0, updated: 0 }
 
   runInTransaction(() => {
     if (mergeMode === 'openapi-upsert') {
       const snapshot = getProjectState(projectId).menuRawList
-      mergeOpenApiUpsert(projectId, menuItems, snapshot)
+      counts = mergeOpenApiUpsert(projectId, menuItems, snapshot)
 
       return
     }
@@ -322,7 +330,9 @@ export function mergeProjectStateWithMenuItems(
         sortOrder,
       })
     })
+
+    counts = { created: menuItems.length, updated: 0 }
   })
 
-  return getProjectState(projectId)
+  return { state: getProjectState(projectId), ...counts }
 }

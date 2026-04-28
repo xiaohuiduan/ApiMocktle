@@ -7,7 +7,11 @@ import { type ProjectStateSnapshot, useMenuHelpersContext } from '@/contexts/men
 
 interface ImportApiResponse {
   ok: boolean
-  data: ProjectStateSnapshot | null
+  data: {
+    state: ProjectStateSnapshot
+    created: number
+    updated: number
+  } | null
   error: string | null
 }
 
@@ -188,14 +192,28 @@ export function ApiTransferPanel() {
       }
 
       if (payload.data) {
-        applyServerState(payload.data)
+        applyServerState(payload.data.state)
       }
       else {
         await reloadState()
       }
 
       setImportProgress(100)
-      msgApi.open({ key: 'api-import', type: 'success', content: '导入成功，已合并到当前项目' })
+
+      const created = payload.data?.created ?? 0
+      const updated = payload.data?.updated ?? 0
+      const parts: string[] = []
+
+      if (created > 0) {
+        parts.push(`新增 ${created} 个`)
+      }
+
+      if (updated > 0) {
+        parts.push(`更新 ${updated} 个`)
+      }
+
+      const summary = parts.length > 0 ? parts.join('，') : '已合并到当前项目'
+      msgApi.open({ key: 'api-import', type: 'success', content: `导入成功！${summary}` })
     }
     catch (error) {
       msgApi.open({
@@ -248,13 +266,26 @@ export function ApiTransferPanel() {
       const payload = await importApiDocumentFromUrl(projectId, trimmed)
 
       if (payload.data) {
-        applyServerState(payload.data)
+        applyServerState(payload.data.state)
       }
       else {
         await reloadState()
       }
 
-      msgApi.open({ key: 'api-import-url', type: 'success', content: '导入成功，已合并到当前项目' })
+      const created = payload.data?.created ?? 0
+      const updated = payload.data?.updated ?? 0
+      const parts: string[] = []
+
+      if (created > 0) {
+        parts.push(`新增 ${created} 个`)
+      }
+
+      if (updated > 0) {
+        parts.push(`更新 ${updated} 个`)
+      }
+
+      const summary = parts.length > 0 ? parts.join('，') : '已合并到当前项目'
+      msgApi.open({ key: 'api-import-url', type: 'success', content: `导入成功！${summary}` })
     }
     catch (error) {
       msgApi.open({
@@ -278,7 +309,7 @@ export function ApiTransferPanel() {
       >
         <Typography.Title level={4}>导入接口</Typography.Title>
         <Typography.Paragraph type="secondary">
-          支持导入 OpenAPI 3.x 的 JSON 或 YAML，以及 Postman Collection v2/v2.1 的 JSON 文件。
+          支持导入 OpenAPI 3.x / Swagger 2.0 的 JSON 或 YAML，以及 Postman Collection v2/v2.1 的 JSON 文件。
           导入后会静默合并到当前项目里的接口、请求目录与模型数据，不会清空已有内容。
         </Typography.Paragraph>
         <Typography.Paragraph className="!mb-4" type="secondary">
@@ -288,7 +319,7 @@ export function ApiTransferPanel() {
         <Space className="w-full max-w-2xl" direction="vertical" size={12}>
           <div>
             <Typography.Text className="mb-2 block text-sm" type="secondary">
-              通过文档链接导入（GET 返回 JSON 或 YAML 正文，如 SpringDoc 的 /v3/api-docs）
+              通过文档链接导入（GET 返回 JSON 或 YAML 正文，如 SpringDoc 的 /v3/api-docs 或 Swagger 的 /v2/api-docs）
             </Typography.Text>
             <Space.Compact className="w-full">
               <Input

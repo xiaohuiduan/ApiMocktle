@@ -25,14 +25,15 @@ function mergeImportedDocument(
       `${routeTag} step=import_document projectId=${projectId} userId=${userId} `
       + `elapsedMs=${parseMs} menuItems=${menuItems.length} mergeMode=${mergeMode}`,
     )
-    const nextState = mergeProjectStateWithMenuItems(projectId, menuItems, { mergeMode })
+    const { state: nextState, created, updated } = mergeProjectStateWithMenuItems(projectId, menuItems, { mergeMode })
     const mergeMs = Date.now() - afterParse
     console.warn(
-      `${routeTag} step=merge_project_state projectId=${projectId} userId=${userId} elapsedMs=${mergeMs}`,
+      `${routeTag} step=merge_project_state projectId=${projectId} userId=${userId} elapsedMs=${mergeMs} `
+      + `created=${created} updated=${updated}`,
     )
     console.warn(`${routeTag} step=done projectId=${projectId} userId=${userId} totalMs=${Date.now() - startedAt}`)
 
-    return ok(nextState)
+    return ok({ state: nextState, created, updated })
   }
   catch (error) {
     console.error(`${routeTag} step=failed projectId=${projectId} userId=${userId} totalMs=${Date.now() - startedAt}`, error)

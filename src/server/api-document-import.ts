@@ -4,6 +4,7 @@ import { parseDocumentFromFile } from './document-import-utils'
 import { importOpenApiDocumentToMenuItems } from './openapi'
 import { importPostmanCollectionDocumentToMenuItems, isPostmanCollectionDocument } from './postman-import'
 import type { ImportMergeMode } from './project-import'
+import { swaggerToOpenApi } from './swagger-to-openapi'
 
 function isOpenApiDocument(doc: Record<string, unknown>) {
   return typeof doc.openapi === 'string'
@@ -26,6 +27,15 @@ export function importApiDocumentToMenuItems(
     }
   }
 
+  if (isSwaggerDocument(doc)) {
+    const openApiDoc = swaggerToOpenApi(doc)
+
+    return {
+      menuItems: importOpenApiDocumentToMenuItems(openApiDoc),
+      mergeMode: 'openapi-upsert',
+    }
+  }
+
   if (isPostmanCollectionDocument(doc)) {
     return {
       menuItems: importPostmanCollectionDocumentToMenuItems(doc),
@@ -33,9 +43,5 @@ export function importApiDocumentToMenuItems(
     }
   }
 
-  if (isSwaggerDocument(doc)) {
-    throw new Error('暂不支持 Swagger 2.0，请先转换为 OpenAPI 3.x 或导出 Postman Collection')
-  }
-
-  throw new Error('仅支持 OpenAPI 3.x 或 Postman Collection v2/v2.1')
+  throw new Error('仅支持 OpenAPI 3.x / Swagger 2.0 或 Postman Collection v2/v2.1')
 }
