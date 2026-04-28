@@ -111,4 +111,16 @@ export default [
     'api/v1/projects/:projectId/shared-docs/:docId/presence',
     'app/api/v1/projects/[projectId]/shared-docs/[docId]/presence/route.ts',
   ),
+  route(
+    'api/v1/projects/:projectId/share-links',
+    'app/api/v1/projects/[projectId]/share-links/route.ts',
+  ),
+  route(
+    'api/v1/public/shares/:shareId',
+    'app/api/v1/public/shares/[shareId]/route.ts',
+  ),
+  route(
+    'share/:shareId',
+    'app/share/[shareId]/page.tsx',
+  ),
 ] satisfies RouteConfig

@@ -18,6 +18,7 @@ import { useLocation } from 'react-router'
 import { ProjectEnvironmentsPanel } from '@/components/project-settings/ProjectEnvironmentsPanel'
 import { ApiTransferPanel } from '@/components/project-settings/ApiTransferPanel'
 import { SharedWorkspacePanel } from '@/components/project-settings/SharedWorkspacePanel'
+import { SharePanel } from '@/components/project-settings/SharePanel'
 import {
   ProjectMembersSection,
   type InvitationItem,
@@ -34,6 +35,7 @@ const enum SettingsSectionKey {
   Environments = 'environments',
   ImportApi = 'import-api',
   SharedWorkspace = 'shared-workspace',
+  ShareLinks = 'share-links',
 }
 
 interface ProjectInfo {
@@ -78,7 +80,10 @@ const items: MenuItem[] = [
       </div>
     ),
     type: 'group',
-    children: [{ key: SettingsSectionKey.SharedWorkspace, label: '共享文件与在线文档' }],
+    children: [
+      { key: SettingsSectionKey.SharedWorkspace, label: '共享文件与在线文档' },
+      { key: SettingsSectionKey.ShareLinks, label: '接口分享' },
+    ],
   },
 ]
 
@@ -101,6 +106,13 @@ function sectionMeta(section: SettingsSectionKey) {
     return {
       title: '共享文件与在线文档',
       description: '项目成员可上传下载共享文件，并在同一空间协作在线文档。',
+    }
+  }
+
+  if (section === SettingsSectionKey.ShareLinks) {
+    return {
+      title: '接口分享',
+      description: '创建分享链接，让其他人通过只读页面查看指定接口的文档。',
     }
   }
 
@@ -141,6 +153,10 @@ export default function SettingsPage() {
 
     if (section === SettingsSectionKey.SharedWorkspace) {
       return SettingsSectionKey.SharedWorkspace
+    }
+
+    if (section === SettingsSectionKey.ShareLinks) {
+      return SettingsSectionKey.ShareLinks
     }
 
     return SettingsSectionKey.Members
@@ -247,6 +263,11 @@ export default function SettingsPage() {
       return
     }
 
+    if (section === SettingsSectionKey.ShareLinks) {
+      setSelectedSection(SettingsSectionKey.ShareLinks)
+      return
+    }
+
     setSelectedSection(SettingsSectionKey.Members)
   }, [search])
 
@@ -316,7 +337,11 @@ export default function SettingsPage() {
                 ? (
                 <ApiTransferPanel />
                   )
-                : (
+                : selectedSection === SettingsSectionKey.ShareLinks
+                  ? (
+                      <SharePanel projectId={projectId} />
+                    )
+                  : (
                     <SharedWorkspacePanel editable={canEditSharedWorkspace} projectId={projectId} />
                   )}
         </div>

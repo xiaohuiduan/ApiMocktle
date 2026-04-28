@@ -13,6 +13,7 @@ export interface PrimitiveSchema extends BaseSchema {
     | SchemaType.Integer
     | SchemaType.String
     | SchemaType.Null
+    | SchemaType.Any
 }
 
 export interface ObjectSchema extends BaseSchema {
@@ -22,7 +23,7 @@ export interface ObjectSchema extends BaseSchema {
 
 export interface ArraySchema extends BaseSchema {
   type: SchemaType.Array
-  items: PrimitiveSchema | ObjectSchema | ArraySchema
+  items: PrimitiveSchema | ObjectSchema | ArraySchema | RefSchema
 }
 
 export interface RefSchema extends BaseSchema {

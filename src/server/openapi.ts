@@ -43,7 +43,7 @@ function toApiParameter(input: Record<string, unknown>): Parameter {
   }
 }
 
-function buildRequestBody(requestBodyRaw: unknown): ApiDetails['requestBody'] {
+function buildRequestBody(requestBodyRaw: unknown, schemasMap?: Record<string, unknown>): ApiDetails['requestBody'] {
   if (!requestBodyRaw || typeof requestBodyRaw !== 'object') {
     return undefined
   }
@@ -72,11 +72,11 @@ function buildRequestBody(requestBodyRaw: unknown): ApiDetails['requestBody'] {
   }
 
   if (contentType === 'application/json') {
-    return { type: BodyType.Json, jsonSchema: toInternalJsonSchema(schema) }
+    return { type: BodyType.Json, jsonSchema: toInternalJsonSchema(schema, schemasMap) }
   }
 
   if (contentType === 'application/xml') {
-    return { type: BodyType.Xml, jsonSchema: toInternalJsonSchema(schema) }
+    return { type: BodyType.Xml, jsonSchema: toInternalJsonSchema(schema, schemasMap) }
   }
 
   if (contentType === 'application/x-www-form-urlencoded' || contentType === 'multipart/form-data') {
@@ -132,7 +132,7 @@ function buildRequestBody(requestBodyRaw: unknown): ApiDetails['requestBody'] {
   return { type: BodyType.Raw }
 }
 
-function buildResponses(responsesRaw: unknown) {
+function buildResponses(responsesRaw: unknown, schemasMap?: Record<string, unknown>) {
   if (!responsesRaw || typeof responsesRaw !== 'object') {
     return [] as ApiDetailsResponse[]
   }
@@ -151,7 +151,7 @@ function buildResponses(responsesRaw: unknown) {
       code: parsedCode,
       name: typeof rawResponse.description === 'string' ? rawResponse.description : '响应',
       contentType: mapContentType(contentType),
-      jsonSchema: schema ? toInternalJsonSchema(schema) : undefined,
+      jsonSchema: schema ? toInternalJsonSchema(schema, schemasMap) : undefined,
     }
   })
 }
@@ -164,6 +164,9 @@ export function importOpenApiDocumentToMenuItems(doc: Record<string, unknown>) {
   }
 
   const paths = (doc.paths ?? {}) as Record<string, unknown>
+  const schemas
+    = ((doc.components as { schemas?: Record<string, unknown> } | undefined)?.schemas) ?? {}
+
   const menuItems: ApiMenuData[] = []
   const folderIdByController = new Map<string, string>()
   const schemaFolderId = randomUUID()
@@ -246,15 +249,13 @@ export function importOpenApiDocumentToMenuItems(doc: Record<string, unknown>) {
             header: header.length > 0 ? header : undefined,
             cookie: cookie.length > 0 ? cookie : undefined,
           },
-          requestBody: buildRequestBody(op.requestBody),
-          responses: buildResponses(op.responses),
+          requestBody: buildRequestBody(op.requestBody, schemas),
+          responses: buildResponses(op.responses, schemas),
         } as ApiDetails,
       })
     })
   })
 
-  const schemas
-    = ((doc.components as { schemas?: Record<string, unknown> } | undefined)?.schemas) ?? {}
   Object.entries(schemas).forEach(([schemaName, schemaDef]) => {
     menuItems.push({
       id: randomUUID(),
@@ -262,7 +263,7 @@ export function importOpenApiDocumentToMenuItems(doc: Record<string, unknown>) {
       name: schemaName,
       type: MenuItemType.ApiSchema,
       data: {
-        jsonSchema: toInternalJsonSchema(schemaDef),
+        jsonSchema: toInternalJsonSchema(schemaDef, schemas),
       },
     })
   })
@@ -275,3 +276,4 @@ export function importOpenApiToMenuItems(fileContent: string, filename: string) 
 }
 
 export { exportMenuItemsToOpenApi } from './openapi-export'
+export { exportMenuItemsToSwagger } from './swagger-export'

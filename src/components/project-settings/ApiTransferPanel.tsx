@@ -1,8 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router'
 
-import { Button, Input, message, Progress, Space, theme, Typography } from 'antd'
+import { Button, Checkbox, Input, message, Modal, Progress, Space, theme, Tree, Typography } from 'antd'
+import type { CheckboxChangeEvent } from 'antd/es/checkbox'
+import type { DataNode } from 'antd/es/tree'
 
+import { MenuItemType } from '@/enums'
+import type { ApiMenuData } from '@/components/ApiMenu'
 import { type ProjectStateSnapshot, useMenuHelpersContext } from '@/contexts/menu-helpers'
 
 interface ImportApiResponse {
@@ -129,7 +133,7 @@ function uploadApiFile(props: UploadApiFileOptions) {
 export function ApiTransferPanel() {
   const { token } = theme.useToken()
   const { pathname } = useLocation()
-  const { applyServerState, reloadState } = useMenuHelpersContext()
+  const { applyServerState, reloadState, menuRawList } = useMenuHelpersContext()
   const [msgApi, contextHolder] = message.useMessage()
   const [isImporting, setIsImporting] = useState(false)
   const [importProgress, setImportProgress] = useState(0)
@@ -137,7 +141,95 @@ export function ApiTransferPanel() {
   const [importUrl, setImportUrl] = useState('')
   const [isUrlImporting, setIsUrlImporting] = useState(false)
 
+  // 选择性导出
+  const [selectModalOpen, setSelectModalOpen] = useState(false)
+  const [checkedApiIds, setCheckedApiIds] = useState<Set<string>>(new Set())
+  const [isExporting, setIsExporting] = useState(false)
+
   const projectId = useMemo(() => resolveProjectId(pathname), [pathname])
+
+  // 构建 API 接口树
+  const apiTreeData = useMemo((): DataNode[] => {
+    if (!menuRawList) return []
+
+    const apis = menuRawList.filter((item) => item.type === MenuItemType.ApiDetail)
+    const childrenMap = new Map<string, ApiMenuData[]>()
+    const topLevel: ApiMenuData[] = []
+
+    for (const api of apis) {
+      if (api.parentId) {
+        const children = childrenMap.get(api.parentId) ?? []
+        children.push(api)
+        childrenMap.set(api.parentId, children)
+      } else {
+        topLevel.push(api)
+      }
+    }
+
+    function buildNodes(items: ApiMenuData[]): DataNode[] {
+      return items.map((item) => ({
+        key: item.id,
+        title: `${(item.data as { method?: string; path?: string }).method ?? 'GET'} ${(item.data as { path?: string }).path ?? item.name}`,
+      }))
+    }
+
+    const folders = menuRawList.filter((f) => f.type === MenuItemType.ApiDetailFolder)
+    const folderNodes = folders.map((folder) => ({
+      key: folder.id,
+      title: folder.name,
+      selectable: false,
+      checkable: false,
+      children: buildNodes(childrenMap.get(folder.id) ?? []),
+    }))
+
+    return [...folderNodes, ...buildNodes(topLevel)]
+  }, [menuRawList])
+
+  const allApiIds = useMemo(() => {
+    if (!menuRawList) return []
+    return menuRawList.filter((i) => i.type === MenuItemType.ApiDetail).map((i) => i.id)
+  }, [menuRawList])
+
+  const isAllChecked = allApiIds.length > 0 && checkedApiIds.size === allApiIds.length
+  const isIndeterminate = checkedApiIds.size > 0 && checkedApiIds.size < allApiIds.length
+
+  const initSelectiveExport = () => {
+    setCheckedApiIds(new Set(allApiIds))
+    setSelectModalOpen(true)
+  }
+
+  const handleCheckAll = (e: CheckboxChangeEvent) => {
+    setCheckedApiIds(e.target.checked ? new Set(allApiIds) : new Set())
+  }
+
+  const handleSelectiveExport = async (specFormat: 'openapi' | 'swagger') => {
+    if (!projectId) {
+      msgApi.error('请在项目页面执行导出')
+      return
+    }
+    if (checkedApiIds.size === 0) {
+      msgApi.error('请至少选择一个接口')
+      return
+    }
+    setIsExporting(true)
+    try {
+      const menuIds = Array.from(checkedApiIds).join(',')
+      const formatParam = specFormat === 'swagger' ? 'swagger' : 'json'
+      const response = await fetch(
+        `/api/v1/projects/${projectId}/openapi/export?format=${formatParam}&menuIds=${menuIds}`,
+        { method: 'GET', credentials: 'include' },
+      )
+      if (!response.ok) {
+        msgApi.error('导出失败')
+        return
+      }
+      const specName = specFormat === 'swagger' ? 'swagger' : 'openapi'
+      downloadFile(await response.blob(), `${specName}.json`)
+      setSelectModalOpen(false)
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   const handleExport = async (format: 'json' | 'yaml') => {
     if (!projectId) {
@@ -371,16 +463,103 @@ export function ApiTransferPanel() {
         className="rounded-xl border border-solid p-5"
         style={{ borderColor: token.colorBorderSecondary }}
       >
-        <Typography.Title level={5}>导出 OpenAPI</Typography.Title>
+        <Typography.Title level={5}>导出文档</Typography.Title>
         <Typography.Paragraph className="!mb-4" type="secondary">
-          如果需要备份或迁移当前项目，也可以直接导出 OpenAPI 文档。
+          导出 OpenAPI 3.0 或 Swagger 2.0 格式文档。也可通过"选择性导出"仅导出指定接口。
         </Typography.Paragraph>
 
-        <Space wrap size={12}>
-          <Button onClick={() => void handleExport('json')}>导出 OpenAPI JSON</Button>
-          <Button onClick={() => void handleExport('yaml')}>导出 OpenAPI YAML</Button>
-        </Space>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Typography.Text className="text-xs" type="secondary">OpenAPI 3.0：</Typography.Text>
+            <Space size={8}>
+              <Button size="small" onClick={() => void handleExport('json')}>导出 JSON</Button>
+              <Button size="small" onClick={() => void handleExport('yaml')}>导出 YAML</Button>
+            </Space>
+          </div>
+          <div className="flex items-center gap-2">
+            <Typography.Text className="text-xs" type="secondary">Swagger 2.0：</Typography.Text>
+            <Space size={8}>
+              <Button
+                size="small"
+                onClick={() => {
+                  void (async () => {
+                    if (!projectId) return
+                    const res = await fetch(`/api/v1/projects/${projectId}/openapi/export?format=swagger`, { credentials: 'include' })
+                    if (res.ok) downloadFile(await res.blob(), 'swagger.json')
+                    else msgApi.error('导出失败')
+                  })()
+                }}
+              >
+                导出 JSON
+              </Button>
+            </Space>
+          </div>
+          <div>
+            <Button type="primary" size="small" onClick={initSelectiveExport}>
+              选择性导出
+            </Button>
+          </div>
+        </div>
       </section>
+
+      <Modal
+        destroyOnClose
+        open={selectModalOpen}
+        title="选择要导出的接口"
+        width={640}
+        onCancel={() => setSelectModalOpen(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setSelectModalOpen(false)}>
+            取消
+          </Button>,
+          <Button
+            key="openapi"
+            loading={isExporting}
+            type="primary"
+            onClick={() => void handleSelectiveExport('openapi')}
+          >
+            导出 OpenAPI 3.0
+          </Button>,
+          <Button
+            key="swagger"
+            loading={isExporting}
+            type="primary"
+            onClick={() => void handleSelectiveExport('swagger')}
+          >
+            导出 Swagger 2.0
+          </Button>,
+        ]}
+      >
+        <div className="mb-3">
+          <Checkbox
+            checked={isAllChecked}
+            indeterminate={isIndeterminate}
+            onChange={handleCheckAll}
+          >
+            <span className="text-sm">全选 / 取消全选</span>
+          </Checkbox>
+        </div>
+        {apiTreeData.length > 0
+          ? (
+              <Tree
+                checkable
+                blockNode
+                checkedKeys={Array.from(checkedApiIds)}
+                defaultExpandAll
+                treeData={apiTreeData}
+                onCheck={(_keys, info) => {
+                  // Filter to only leaf node keys (ApiDetail items)
+                  const leafKeys = info.checkedNodes
+                    .filter((n) => n.isLeaf)
+                    .map((n) => n.key as string)
+                  setCheckedApiIds(new Set(leafKeys))
+                }}
+              />
+            )
+          : (
+              <Typography.Text type="secondary">暂无接口数据</Typography.Text>
+            )}
+      </Modal>
     </div>
   )
 }

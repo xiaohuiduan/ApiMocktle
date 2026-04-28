@@ -29,10 +29,13 @@ function getSchemaType(value: unknown) {
     return SchemaType.Object
   }
 
-  return SchemaType.String
+  return SchemaType.Any
 }
 
-export function toInternalJsonSchema(schema: unknown): JsonSchema {
+export function toInternalJsonSchema(
+  schema: unknown,
+  schemasMap?: Record<string, unknown>,
+): JsonSchema {
   if (!schema || typeof schema !== 'object') {
     return { type: SchemaType.String }
   }
@@ -47,6 +50,47 @@ export function toInternalJsonSchema(schema: unknown): JsonSchema {
     return {
       type: SchemaType.Refer,
       $ref: refName,
+      description,
+    }
+  }
+
+  // 处理 allOf 合成 schema（Swagger 2.0 中常见，如继承 BaseResponse）
+  if (Array.isArray(raw.allOf) && schemasMap) {
+    const mergedProperties: JsonSchema[] = []
+
+    for (const item of raw.allOf) {
+      const resolved = toInternalJsonSchema(item, schemasMap)
+
+      if (resolved.type === SchemaType.Refer) {
+        const refSchema = schemasMap[resolved.$ref]
+        if (refSchema) {
+          const refResolved = toInternalJsonSchema(refSchema, schemasMap)
+          if (refResolved.type === SchemaType.Object && refResolved.properties) {
+            for (const prop of refResolved.properties) {
+              const existingIdx = mergedProperties.findIndex((p) => p.name === prop.name)
+              if (existingIdx >= 0) {
+                mergedProperties[existingIdx] = prop
+              } else {
+                mergedProperties.push(prop)
+              }
+            }
+          }
+        }
+      } else if (resolved.type === SchemaType.Object && resolved.properties) {
+        for (const prop of resolved.properties) {
+          const existingIdx = mergedProperties.findIndex((p) => p.name === prop.name)
+          if (existingIdx >= 0) {
+            mergedProperties[existingIdx] = prop
+          } else {
+            mergedProperties.push(prop)
+          }
+        }
+      }
+    }
+
+    return {
+      type: SchemaType.Object,
+      properties: mergedProperties,
       description,
     }
   }
@@ -80,9 +124,7 @@ export function toInternalJsonSchema(schema: unknown): JsonSchema {
 
     return {
       type: SchemaType.Array,
-      items: itemSchema.type === SchemaType.Refer
-        ? { type: SchemaType.String }
-        : itemSchema,
+      items: itemSchema,
       description,
     }
   }

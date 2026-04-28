@@ -156,6 +156,21 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS idx_shared_files_linked_doc_id ON shared_files(linked_doc_id);
     CREATE INDEX IF NOT EXISTS idx_shared_docs_project_updated_at ON shared_docs(project_id, updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_shared_doc_presence_seen_at ON shared_doc_presence(last_seen_at);
+
+    CREATE TABLE IF NOT EXISTS share_links (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      creator_user_id TEXT NOT NULL,
+      api_menu_ids TEXT NOT NULL DEFAULT '[]',
+      password_hash TEXT,
+      expires_at TEXT,
+      title TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (creator_user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_share_links_project_id ON share_links(project_id);
   `)
 
   const hasDocType = db.prepare(`

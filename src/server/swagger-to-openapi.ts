@@ -226,7 +226,14 @@ function convertOperationParams(
     }
 
     // path, query, header, cookie 等标准参数 -> 转换 refs 后保留
-    standardParams.push(convertRefsDeep(param) as Record<string, unknown>)
+    const converted = convertRefsDeep(param) as Record<string, unknown>
+
+    // 归一化 Swagger 2.0 的 x-example → OpenAPI 3.0 的 example
+    if (converted['x-example'] !== undefined && converted.example === undefined) {
+      converted.example = converted['x-example']
+    }
+
+    standardParams.push(converted)
   }
 
   let requestBody: Record<string, unknown> | undefined

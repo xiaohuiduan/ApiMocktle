@@ -238,7 +238,10 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
     case SchemaType.Integer:
       // fall through
 
-    case SchemaType.String: {
+    case SchemaType.String:
+      // fall through
+
+    case SchemaType.Any: {
       return <JsonSchemaNodeRow {...rowProps} />
     }
 

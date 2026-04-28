@@ -72,6 +72,21 @@ export function getMenuItemsByIds(payload: { projectId: string, ids: string[] })
   return stmt.all(payload.projectId, ...payload.ids) as MenuItemRow[]
 }
 
+export function getApiSchemasByNames(projectId: string, names: string[]) {
+  if (names.length === 0) {
+    return [] as MenuItemRow[]
+  }
+
+  const placeholders = names.map(() => '?').join(', ')
+  const stmt = db.prepare(`
+    SELECT project_id, id, parent_id, name, type, data_json, sort_order, created_at, updated_at
+    FROM menu_items
+    WHERE project_id = ? AND type = 'apiSchema' AND name IN (${placeholders})
+  `)
+
+  return stmt.all(projectId, ...names) as MenuItemRow[]
+}
+
 export function getMaxSortOrder(projectId: string) {
   const row = db.prepare(`
     SELECT MAX(sort_order) AS max_sort

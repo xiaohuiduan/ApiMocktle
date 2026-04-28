@@ -3,7 +3,7 @@ import { type LoaderFunctionArgs } from 'react-router'
 import { fail } from '@/server/api-response'
 import { requireRouteParam } from '@/router/route-param'
 import { getSessionUserFromRequest } from '@/server/auth'
-import { exportMenuItemsToOpenApi } from '@/server/openapi'
+import { exportMenuItemsToOpenApi, exportMenuItemsToSwagger } from '@/server/openapi'
 import { ensureProjectPermission } from '@/server/project-access'
 import { getProjectState } from '@/server/project-state'
 
@@ -26,15 +26,28 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   }
 
   const requestUrl = new URL(request.url)
-  const format = requestUrl.searchParams.get('format') === 'yaml' ? 'yaml' : 'json'
+  const docFormat = requestUrl.searchParams.get('format')
+
+  // swagger: Swagger 2.0; 其他: OpenAPI 3.0
+  const isSwagger = docFormat === 'swagger' || docFormat === 'swagger2'
+  const textFormat = requestUrl.searchParams.get('textFormat') === 'yaml' ? 'yaml' : 'json'
+
+  // 选择性导出：menuIds 以逗号分隔
+  const menuIdsRaw = requestUrl.searchParams.get('menuIds')
+  const menuIds = menuIdsRaw ? menuIdsRaw.split(',').filter(Boolean) : undefined
+
   const state = getProjectState(projectId)
-  const text = exportMenuItemsToOpenApi(state.menuRawList, format)
-  const filename = `openapi.${format === 'yaml' ? 'yaml' : 'json'}`
+  const text = isSwagger
+    ? exportMenuItemsToSwagger(state.menuRawList, textFormat, menuIds)
+    : exportMenuItemsToOpenApi(state.menuRawList, textFormat, menuIds)
+
+  const specName = isSwagger ? 'swagger' : 'openapi'
+  const filename = `${specName}.${textFormat === 'yaml' ? 'yaml' : 'json'}`
 
   return new Response(text, {
     status: 200,
     headers: {
-      'Content-Type': format === 'yaml' ? 'application/yaml; charset=utf-8' : 'application/json; charset=utf-8',
+      'Content-Type': textFormat === 'yaml' ? 'application/yaml; charset=utf-8' : 'application/json; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename}"`,
     },
   })

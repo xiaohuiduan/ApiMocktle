@@ -52,12 +52,67 @@ export function getNodeLevelInfo(fieldPath: FieldPath[]): { level: number; inden
 
 export function getRefJsonSchema(
   menuRawList: ApiMenuData[],
-  modelId: string
+  refName: string
 ): JsonSchema | undefined {
-  const menuData = menuRawList.find(({ id }) => id === modelId)
+  const menuData = menuRawList.find(
+    (item) => item.name === refName && item.type === MenuItemType.ApiSchema
+  )
 
   const jsonSchema =
     menuData?.type === MenuItemType.ApiSchema ? menuData.data?.jsonSchema : undefined
+
+  return jsonSchema
+}
+
+/**
+ * 递归解析 JsonSchema 中的 `$ref` 引用，将 RefSchema 替换为实际引用的模型定义。
+ * 使用 visited Set 检测循环引用。
+ */
+export function resolveRefSchema(
+  jsonSchema: JsonSchema,
+  menuRawList: ApiMenuData[],
+  visited: Set<string> = new Set(),
+): JsonSchema {
+  if (jsonSchema.type === SchemaType.Refer) {
+    const refName = jsonSchema.$ref
+
+    if (visited.has(refName)) {
+      return jsonSchema
+    }
+
+    const resolved = getRefJsonSchema(menuRawList, refName)
+
+    if (!resolved) {
+      return jsonSchema
+    }
+
+    const newVisited = new Set(visited)
+    newVisited.add(refName)
+
+    const fullyResolved = resolveRefSchema(resolved, menuRawList, newVisited)
+
+    return {
+      ...fullyResolved,
+      name: jsonSchema.name ?? fullyResolved.name,
+      description: jsonSchema.description ?? fullyResolved.description,
+    }
+  }
+
+  if (jsonSchema.type === SchemaType.Object && jsonSchema.properties) {
+    return {
+      ...jsonSchema,
+      properties: jsonSchema.properties.map((prop) =>
+        resolveRefSchema(prop, menuRawList, visited),
+      ),
+    }
+  }
+
+  if (jsonSchema.type === SchemaType.Array) {
+    return {
+      ...jsonSchema,
+      items: resolveRefSchema(jsonSchema.items, menuRawList, visited),
+    }
+  }
 
   return jsonSchema
 }

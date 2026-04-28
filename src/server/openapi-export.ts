@@ -123,14 +123,20 @@ function toOpenApiRequestBody(data: ApiDetails) {
   }
 }
 
-export function exportMenuItemsToOpenApi(menuItems: ApiMenuData[], format: 'json' | 'yaml') {
+export function exportMenuItemsToOpenApi(
+  menuItems: ApiMenuData[],
+  format: 'json' | 'yaml',
+  menuIds?: string[],
+) {
   const stringifyYaml = getYamlStringify()
   const menuNameMap = new Map(menuItems.map((item) => [item.id, item.name]))
+  const idSet = menuIds ? new Set(menuIds) : undefined
   const pathObject: Record<string, Record<string, unknown>> = {}
   const componentsSchemas: Record<string, unknown> = {}
 
   menuItems.forEach((item) => {
     if (item.type === MenuItemType.ApiDetail && item.data) {
+      if (idSet && !idSet.has(item.id)) return
       const data = item.data as ApiDetails
       const pathName = data.path ?? '/'
       const method = (data.method ?? 'GET').toLowerCase()
