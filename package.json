@@ -28,6 +28,7 @@
     "@react-router/serve": "^7.13.2",
     "antd": "^5.21.2",
     "array-to-tree": "^3.3.2",
+    "bytemd": "^1.22.0",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.13",
     "foxact": "^0.2.38",
@@ -46,6 +47,7 @@
     "serialize-javascript": "^6.0.2",
     "use-resize-observer": "^9.1.0",
     "xlsx": "^0.18.5",
+    "yaml": "^2.8.3",
     "yjs": "^13.6.30"
   },
   "devDependencies": {
