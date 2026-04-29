@@ -100,8 +100,9 @@ function buildSchemaExampleForCurl(schema: unknown): unknown {
 function buildBodyExample(apiDetails: ApiDetails): string {
   const body = apiDetails.requestBody
   if (!body || body.type === BodyType.None) return ''
-  if (body.rawText?.trim()) return body.rawText
+  // Prefer generating example from schema (avoids showing raw schema definition as body)
   if (body.jsonSchema) return JSON.stringify(buildSchemaExampleForCurl(body.jsonSchema), null, 2)
+  if (body.rawText?.trim()) return body.rawText
   return ''
 }
 
@@ -164,7 +165,7 @@ export function RunTab() {
     return cloneApiDetails(docValue)
   })
 
-  const [bodyRawText, setBodyRawText] = useState('')
+  const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
   const [bodyError, setBodyError] = useState<string>()
 
   // docValue 变化时重新初始化
@@ -217,7 +218,7 @@ export function RunTab() {
         if (!docValue) return
         const fresh = cloneApiDetails(docValue)
         setWorkCopy(fresh)
-        setBodyRawText('')
+        setBodyRawText(undefined)
         setBodyError(undefined)
         resetResult()
         try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
@@ -247,17 +248,20 @@ export function RunTab() {
   const handleRun = async () => {
     if (!workCopy) return
 
-    // 如果是 JSON/XML body 且有 rawText，更新 requestBody
+    // 如果是 JSON/XML body，同步编辑器内容到 requestBody
     const body = workCopy.requestBody
-    if (body && (body.type === BodyType.Json || body.type === BodyType.Xml) && bodyRawText.trim()) {
-      try {
-        JSON.parse(bodyRawText)
-        setBodyError(undefined)
-      } catch {
-        setBodyError('JSON 格式错误')
-        return
+    const currentBodyText = bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy)
+    if (body && (body.type === BodyType.Json || body.type === BodyType.Xml)) {
+      if (currentBodyText.trim()) {
+        try {
+          JSON.parse(currentBodyText)
+          setBodyError(undefined)
+        } catch {
+          setBodyError('JSON 格式错误')
+          return
+        }
       }
-      workCopy.requestBody = { ...body, rawText: bodyRawText }
+      workCopy.requestBody = { ...body, rawText: currentBodyText }
     }
 
     await run(workCopy)
@@ -439,14 +443,22 @@ export function RunTab() {
 
                   {showBodyTextarea && (
                     <div>
-                      <Input.TextArea
-                        rows={8}
-                        placeholder="输入请求体内容..."
-                        style={{ fontFamily: 'monospace' }}
-                        value={bodyRawText || buildBodyExample(workCopy)}
-                        onChange={(e) => {
-                          setBodyRawText(e.target.value)
+                      <MonacoEditor
+                        height="200px"
+                        language="json"
+                        value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy)}
+                        onChange={(val) => {
+                          const text = typeof val === 'string' ? val : (val != null ? JSON.stringify(val, null, 2) : '')
+                          setBodyRawText(text)
                           setBodyError(undefined)
+                        }}
+                        onMount={(editor, monaco) => {
+                          // Disable JS/TS diagnostics to prevent spurious errors on JSON content
+                          monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
+                          monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
+                          setTimeout(() => {
+                            editor.getAction('editor.action.formatDocument')?.run()
+                          }, 100)
                         }}
                       />
                       {bodyError && (

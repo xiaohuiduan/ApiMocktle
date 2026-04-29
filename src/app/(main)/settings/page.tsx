@@ -19,6 +19,7 @@ import { ProjectEnvironmentsPanel } from '@/components/project-settings/ProjectE
 import { ApiTransferPanel } from '@/components/project-settings/ApiTransferPanel'
 import { SharedWorkspacePanel } from '@/components/project-settings/SharedWorkspacePanel'
 import { SharePanel } from '@/components/project-settings/SharePanel'
+import { TokenPanel } from '@/components/project-settings/TokenPanel'
 import {
   ProjectMembersSection,
   type InvitationItem,
@@ -36,6 +37,7 @@ const enum SettingsSectionKey {
   ImportApi = 'import-api',
   SharedWorkspace = 'shared-workspace',
   ShareLinks = 'share-links',
+  TokenConfig = 'token-config',
 }
 
 interface ProjectInfo {
@@ -58,6 +60,7 @@ const items: MenuItem[] = [
     children: [
       { key: SettingsSectionKey.Members, label: '成员管理' },
       { key: SettingsSectionKey.Environments, label: '环境管理' },
+      { key: SettingsSectionKey.TokenConfig, label: 'Token 配置' },
     ],
   },
   {
@@ -122,6 +125,13 @@ function sectionMeta(section: SettingsSectionKey) {
   }
 }
 
+function tokenSectionMeta() {
+  return {
+    title: 'Token 配置',
+    description: '管理项目 API Token，用于 EasyAPI 等第三方插件的接口导入。',
+  }
+}
+
 function roleText(role: Role) {
   if (role === 'owner') {
     return '拥有者'
@@ -159,6 +169,10 @@ export default function SettingsPage() {
       return SettingsSectionKey.ShareLinks
     }
 
+    if (section === SettingsSectionKey.TokenConfig) {
+      return SettingsSectionKey.TokenConfig
+    }
+
     return SettingsSectionKey.Members
   })
   const [members, setMembers] = useState<MemberItem[]>([])
@@ -177,7 +191,9 @@ export default function SettingsPage() {
   const canEditSharedWorkspace = projectRole === 'owner' || projectRole === 'editor'
   const isMembersSection = selectedSection === SettingsSectionKey.Members
   const isEnvironmentsSection = selectedSection === SettingsSectionKey.Environments
-  const currentSectionMeta = sectionMeta(selectedSection)
+  const currentSectionMeta = selectedSection === SettingsSectionKey.TokenConfig
+    ? tokenSectionMeta()
+    : sectionMeta(selectedSection)
 
   const fetchData = useCallback(async () => {
     if (!projectId) {
@@ -268,6 +284,11 @@ export default function SettingsPage() {
       return
     }
 
+    if (section === SettingsSectionKey.TokenConfig) {
+      setSelectedSection(SettingsSectionKey.TokenConfig)
+      return
+    }
+
     setSelectedSection(SettingsSectionKey.Members)
   }, [search])
 
@@ -341,9 +362,13 @@ export default function SettingsPage() {
                   ? (
                       <SharePanel projectId={projectId} />
                     )
-                  : (
-                    <SharedWorkspacePanel editable={canEditSharedWorkspace} projectId={projectId} />
-                  )}
+                  : selectedSection === SettingsSectionKey.TokenConfig
+                    ? (
+                        <TokenPanel projectId={projectId} />
+                      )
+                    : (
+                      <SharedWorkspacePanel editable={canEditSharedWorkspace} projectId={projectId} />
+                    )}
         </div>
       )}
     />

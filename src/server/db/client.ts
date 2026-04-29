@@ -172,6 +172,17 @@ function createDb() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_share_links_project_id ON share_links(project_id);
+
+    CREATE TABLE IF NOT EXISTS project_tokens (
+      id          TEXT PRIMARY KEY,
+      project_id  TEXT NOT NULL,
+      token       TEXT NOT NULL UNIQUE,
+      name        TEXT NOT NULL DEFAULT 'default',
+      created_at  TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_project_tokens_token ON project_tokens(token);
   `)
 
   const hasDocType = db.prepare(`

@@ -116,6 +116,10 @@ export default [
     'app/api/v1/projects/[projectId]/share-links/route.ts',
   ),
   route(
+    'api/v1/projects/:projectId/tokens',
+    'app/api/v1/projects/[projectId]/tokens/route.ts',
+  ),
+  route(
     'api/v1/public/shares/:shareId',
     'app/api/v1/public/shares/[shareId]/route.ts',
   ),
@@ -123,4 +127,5 @@ export default [
     'share/:shareId',
     'app/share/[shareId]/page.tsx',
   ),
+  route('api/*', 'app/api/[...openapi]/route.ts'),
 ] satisfies RouteConfig
