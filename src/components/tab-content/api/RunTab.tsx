@@ -1,15 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import {
   Button,
-  Collapse,
-  type CollapseProps,
   Form,
   type FormProps,
   Input,
   Modal,
   Select,
   Space,
+  Table,
+  Tabs,
   Tag,
   Typography,
   theme,
@@ -17,7 +17,7 @@ import {
 import { PlayIcon, RotateCcwIcon, SaveIcon, TerminalIcon } from 'lucide-react'
 
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
-import { JsonViewer } from '@/components/JsonViewer'
+import { MonacoEditor } from '@/components/MonacoEditor'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
@@ -112,6 +112,29 @@ function getStatusColor(code: number) {
   return 'success'
 }
 
+function detectLanguage(contentType?: string): string {
+  if (!contentType) return 'plaintext'
+  const ct = contentType.toLowerCase()
+  if (ct.includes('json')) return 'json'
+  if (ct.includes('html')) return 'html'
+  if (ct.includes('xml')) return 'xml'
+  if (ct.includes('javascript')) return 'javascript'
+  if (ct.includes('css')) return 'css'
+  return 'plaintext'
+}
+
+function calcBodySize(body?: string): string {
+  if (!body) return ''
+  const bytes = new Blob([body]).size
+  if (bytes < 1024) return `${bytes}B`
+  return `${(bytes / 1024).toFixed(1)}KB`
+}
+
+const headerTableColumns = [
+  { title: 'Name', dataIndex: 'name', key: 'name', width: 200 },
+  { title: 'Value', dataIndex: 'value', key: 'value' },
+]
+
 export function RunTab() {
   const { token } = theme.useToken()
   const { tabData } = useTabContentContext()
@@ -120,6 +143,7 @@ export function RunTab() {
     menuRawList,
     projectEnvironments,
     currentProjectEnvironmentId,
+    updateMenuItem,
   } = useMenuHelpersContext()
 
   const docValue = useMemo(() => {
@@ -207,26 +231,14 @@ export function RunTab() {
     Modal.confirm({
       title: '覆盖到文档',
       content: '确定要用当前运行 Tab 中的参数覆盖文档定义吗？此操作不可撤销。',
-      onOk: async () => {
+      onOk: () => {
         if (!workCopy) return
-        try {
-          const projectId = window.location.pathname.split('/').filter(Boolean).at(1)
-          if (!projectId) return
-          const resp = await fetch(`/api/v1/projects/${projectId}/menu-items/${workCopy.id}`, {
-            method: 'PATCH',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: workCopy.id,
-              name: workCopy.name,
-              data: workCopy,
-            }),
-          })
-          if (!resp.ok) throw new Error('更新失败')
-          messageApi.success('已覆盖到文档')
-        } catch (err) {
-          messageApi.error((err as Error).message)
-        }
+        updateMenuItem({
+          id: tabData.key,
+          name: workCopy.name,
+          data: workCopy,
+        })
+        messageApi.success('已覆盖到文档')
       },
     })
   }
@@ -393,7 +405,7 @@ export function RunTab() {
         {/* Body 区域 */}
         <div className="px-3 pb-3">
           <Typography.Text strong className="mb-2 block text-sm">Body</Typography.Text>
-          {workCopy.requestBody && workCopy.requestBody.type !== BodyType.None
+          {workCopy.requestBody
             ? (
                 <div>
                   <div className="mb-2 flex flex-wrap items-center gap-1">
@@ -462,98 +474,110 @@ export function RunTab() {
         {/* 运行结果 */}
         {(result || error) && (
           <div className="border-t px-3 py-3" style={{ borderColor: token.colorBorderSecondary }}>
-            <Typography.Text strong className="mb-3 block">运行结果</Typography.Text>
-
             {error && !result
               ? (
-                  <Typography.Text type="danger">{error}</Typography.Text>
+                  <>
+                    <Typography.Text strong className="mb-2 block">运行结果</Typography.Text>
+                    <Typography.Text type="danger">{error}</Typography.Text>
+                  </>
                 )
               : result
                 ? (
-                    <div>
+                    <>
                       <div className="mb-3 flex flex-wrap items-center gap-3">
-                        <Tag color={getStatusColor(result.status)}>{result.status}</Tag>
+                        <Tag color={getStatusColor(result.status)}>{result.status} {result.statusText}</Tag>
                         <span className="text-xs opacity-50">
                           {result.method?.toUpperCase()} | {result.durationMs}ms
-                          {result.responseSizeBytes ? ` | ${(result.responseSizeBytes / 1024).toFixed(1)}KB` : ''}
+                          {result.body ? ` | ${calcBodySize(result.body)}` : ''}
                         </span>
                       </div>
 
-                      <Collapse
+                      <Tabs
+                        size="small"
                         className="mb-3"
-                        ghost
                         items={[
                           {
-                            key: 'req',
-                            label: `请求 URL: ${result.url ?? '-'}`,
+                            key: 'reqContent',
+                            label: '请求内容',
                             children: (
-                              <code className="break-all text-xs">{result.url}</code>
+                              <div className="flex flex-col gap-2">
+                                <div className="rounded bg-gray-50 p-2 text-xs" style={{ fontFamily: 'monospace' }}>
+                                  <span className="font-medium opacity-60">URL: </span>
+                                  <span className="break-all">{result.url ?? '-'}</span>
+                                </div>
+                                {result.requestBodyText && (
+                                  <MonacoEditor
+                                    height={`${Math.min((result.requestBodyText.split('\n').length) * 18, 300)}px`}
+                                    language={detectLanguage(result.contentType)}
+                                    value={result.requestBodyText}
+                                    options={{ readOnly: true, lineNumbers: 'on', minimap: { enabled: false }, scrollBeyondLastLine: false }}
+                                  />
+                                )}
+                                {result.requestBodyParameters && result.requestBodyParameters.length > 0 && (
+                                  <Table
+                                    size="small"
+                                    dataSource={result.requestBodyParameters}
+                                    columns={headerTableColumns}
+                                    pagination={false}
+                                    rowKey="name"
+                                  />
+                                )}
+                                {!result.requestBodyText && (!result.requestBodyParameters || result.requestBodyParameters.length === 0) && (
+                                  <Typography.Text type="secondary" className="text-xs">无请求体</Typography.Text>
+                                )}
+                              </div>
                             ),
                           },
-                          result.requestHeaders && result.requestHeaders.length > 0 && {
+                          {
                             key: 'reqHeaders',
-                            label: `请求头 (${result.requestHeaders.length})`,
-                            children: (
-                              <div className="grid gap-1 text-xs" style={{ gridTemplateColumns: '180px 1fr' }}>
-                                {result.requestHeaders.map((h, i) => (
-                                  <React.Fragment key={i}>
-                                    <span className="truncate font-medium opacity-60">{h.name}</span>
-                                    <span className="break-all">{h.value}</span>
-                                  </React.Fragment>
-                                ))}
-                              </div>
-                            ),
+                            label: `请求头${result.requestHeaders?.length ? ` (${result.requestHeaders.length})` : ''}`,
+                            children: result.requestHeaders && result.requestHeaders.length > 0
+                              ? (
+                                  <Table
+                                    size="small"
+                                    dataSource={result.requestHeaders}
+                                    columns={headerTableColumns}
+                                    pagination={false}
+                                    rowKey="name"
+                                  />
+                                )
+                              : <Typography.Text type="secondary" className="text-xs">无请求头</Typography.Text>,
                           },
-                          result.requestBody && {
-                            key: 'reqBody',
-                            label: '请求体',
-                            children: (
-                              typeof result.requestBody === 'string'
-                                ? /^\s*[{\[]/.test(result.requestBody)
-                                  ? <JsonViewer value={result.requestBody} />
-                                  : <pre className="m-0 whitespace-pre-wrap break-all text-xs">{result.requestBody}</pre>
-                                : <pre className="m-0 whitespace-pre-wrap break-all text-xs">{JSON.stringify(result.requestBody, null, 2)}</pre>
-                            ),
+                          {
+                            key: 'resContent',
+                            label: '响应内容',
+                            children: result.body != null
+                              ? (
+                                  <MonacoEditor
+                                    height={`${Math.min((result.body.split('\n').length) * 18, 400)}px`}
+                                    language={detectLanguage(result.contentType)}
+                                    value={result.body}
+                                    options={{ readOnly: true, lineNumbers: 'on', minimap: { enabled: false }, scrollBeyondLastLine: false }}
+                                  />
+                                )
+                              : <Typography.Text type="secondary" className="text-xs">无响应体</Typography.Text>,
                           },
-                          result.headers && result.headers.length > 0 && {
+                          {
                             key: 'resHeaders',
-                            label: `响应头 (${result.headers.length})`,
-                            children: (
-                              <div className="grid gap-1 text-xs" style={{ gridTemplateColumns: '180px 1fr' }}>
-                                {result.headers.map((h, i) => (
-                                  <React.Fragment key={i}>
-                                    <span className="truncate font-medium opacity-60">{h.name}</span>
-                                    <span className="break-all">{h.value}</span>
-                                  </React.Fragment>
-                                ))}
-                              </div>
-                            ),
+                            label: `响应头${result.headers?.length ? ` (${result.headers.length})` : ''}`,
+                            children: result.headers && result.headers.length > 0
+                              ? (
+                                  <Table
+                                    size="small"
+                                    dataSource={result.headers}
+                                    columns={headerTableColumns}
+                                    pagination={false}
+                                    rowKey="name"
+                                  />
+                                )
+                              : <Typography.Text type="secondary" className="text-xs">无响应头</Typography.Text>,
                           },
-                          result.body != null && {
-                            key: 'resBody',
-                            label: '响应体',
-                            children: (
-                              typeof result.body === 'string'
-                                ? /^\s*[{\[]/.test(result.body)
-                                  ? <JsonViewer value={result.body} />
-                                  : <pre className="m-0 whitespace-pre-wrap break-all text-xs">{result.body}</pre>
-                                : <pre className="m-0 whitespace-pre-wrap break-all text-xs">{JSON.stringify(result.body, null, 2)}</pre>
-                            ),
-                          },
-                        ].filter(Boolean) as CollapseProps['items']}
-                        size="small"
-                      />
-
-                      {/* cURL */}
-                      <Collapse
-                        ghost
-                        items={[
                           {
                             key: 'curl',
                             label: (
                               <span className="flex items-center gap-1">
                                 <TerminalIcon size={14} />
-                                cURL 命令
+                                cURL
                               </span>
                             ),
                             children: (
@@ -574,9 +598,8 @@ export function RunTab() {
                             ),
                           },
                         ]}
-                        size="small"
                       />
-                    </div>
+                    </>
                   )
                 : null}
           </div>

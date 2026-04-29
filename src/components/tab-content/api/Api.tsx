@@ -32,20 +32,20 @@ export function Api() {
         ),
       },
       {
-        key: 'run',
-        label: '运行',
-        children: (
-          <ApiTabContentWrapper>
-            <RunTab />
-          </ApiTabContentWrapper>
-        ),
-      },
-      {
         key: 'docEdit',
         label: '修改文档',
         children: (
           <ApiTabContentWrapper>
             <ApiDocEditing />
+          </ApiTabContentWrapper>
+        ),
+      },
+      {
+        key: 'run',
+        label: '运行',
+        children: (
+          <ApiTabContentWrapper>
+            <RunTab />
           </ApiTabContentWrapper>
         ),
       },
