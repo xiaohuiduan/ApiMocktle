@@ -9,8 +9,6 @@ import { findFolders } from '@/helpers'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 import type { ApiDetails, ApiEnvironment, ApiFolder, ApiRunResult } from '@/types'
 
-import { RunRequestResult } from './RunRequestResult'
-
 const ABSOLUTE_URL_REGEX = /^https?:\/\//i
 
 interface ApiResponse<T> {
@@ -59,12 +57,14 @@ function getExplicitEnvironmentId(serverId?: string) {
   return normalized
 }
 
-export function useApiRequestRunner() {
+export function useApiRequestRunner(apiId?: string) {
   const [running, setRunning] = useState(false)
+  const [result, setResult] = useState<ApiRunResult>()
+  const [error, setError] = useState<string>()
 
   const { projectId } = useParams()
   const { tabData } = useTabContentContext()
-  const { messageApi, modal } = useGlobalContext()
+  const { messageApi } = useGlobalContext()
   const {
     menuRawList,
     projectEnvironments,
@@ -72,12 +72,13 @@ export function useApiRequestRunner() {
   } = useMenuHelpersContext()
 
   const resolveParentFolders = useCallback(() => {
-    const currentMenu = menuRawList?.find(({ id }) => id === tabData.key)
+    const currentMenuId = apiId ?? tabData.key
+    const currentMenu = menuRawList?.find(({ id }) => id === currentMenuId)
 
     return currentMenu?.parentId
       ? findFolders(menuRawList ?? [], [], currentMenu.parentId)
       : []
-  }, [menuRawList, tabData.key])
+  }, [menuRawList, tabData.key, apiId])
 
   const resolveEnvironmentId = useCallback((apiDetails: ApiDetails) => {
     const explicitEnvironmentId = getExplicitEnvironmentId(apiDetails.serverId)
@@ -147,12 +148,16 @@ export function useApiRequestRunner() {
 
   const run = useCallback(async (apiDetails: ApiDetails) => {
     if (!projectId) {
-      messageApi.error('当前不在项目页面，无法运行请求')
+      const msg = '当前不在项目页面，无法运行请求'
+      messageApi.error(msg)
+      setError(msg)
 
       return
     }
 
     setRunning(true)
+    setError(undefined)
+    setResult(undefined)
 
     try {
       const environmentId = resolveEnvironmentId(apiDetails)
@@ -169,25 +174,28 @@ export function useApiRequestRunner() {
         throw new Error(payload.error ?? '运行失败')
       }
 
-      modal.info({
-        title: '运行结果',
-        icon: null,
-        width: 960,
-        okText: '关闭',
-        content: <RunRequestResult result={payload.data} />,
-      })
+      setResult(payload.data)
     }
-    catch (error) {
-      const message = error instanceof Error ? error.message : '运行失败'
-      messageApi.error(message)
+    catch (err) {
+      const msg = err instanceof Error ? err.message : '运行失败'
+      messageApi.error(msg)
+      setError(msg)
     }
     finally {
       setRunning(false)
     }
-  }, [messageApi, modal, projectId, resolveBaseUrlOverride, resolveEnvironmentId])
+  }, [messageApi, projectId, resolveBaseUrlOverride, resolveEnvironmentId])
+
+  const resetResult = useCallback(() => {
+    setResult(undefined)
+    setError(undefined)
+  }, [])
 
   return {
     run,
     running,
+    result,
+    error,
+    resetResult,
   }
 }

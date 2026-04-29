@@ -3,10 +3,8 @@ import { useMemo } from 'react'
 import { Viewer } from '@bytemd/react'
 import { Button, Card, Select, type SelectProps, Space, Tabs, theme, Tooltip } from 'antd'
 import dayjs from 'dayjs'
-import { Code2Icon, ZapIcon } from 'lucide-react'
 
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
-import { IconText } from '@/components/IconText'
 import { ApiRemoveButton } from '@/components/tab-content/api/ApiRemoveButton'
 import { API_STATUS_CONFIG, HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
@@ -21,7 +19,6 @@ import type { ApiDetails, Parameter } from '@/types'
 
 import { css } from '@emotion/css'
 
-import { useApiRequestRunner } from './useApiRequestRunner'
 
 const statusOptions: SelectProps['options'] = Object.entries(API_STATUS_CONFIG).map(
   ([method, { text, color }]) => {
@@ -329,7 +326,6 @@ export function ApiDoc() {
   const { messageApi } = useGlobalContext()
   const { menuRawList } = useMenuHelpersContext()
   const { tabData } = useTabContentContext()
-  const { run, running } = useApiRequestRunner()
 
   const { docValue, methodConfig } = useMemo(() => {
     const apiDetails = menuRawList?.find(({ id }) => id === tabData.key)?.data as
@@ -547,20 +543,6 @@ export function ApiDoc() {
         </Space>
 
         <Space className="ml-auto pl-2">
-          <Button
-            loading={running}
-            type="primary"
-            onClick={() => {
-              void run(docValue)
-            }}
-          >
-            <IconText icon={<ZapIcon size={14} />} text="运行" />
-          </Button>
-
-          <Button>
-            <IconText icon={<Code2Icon size={14} />} text="生成代码" />
-          </Button>
-
           <ApiRemoveButton tabKey={tabData.key} />
         </Space>
       </div>

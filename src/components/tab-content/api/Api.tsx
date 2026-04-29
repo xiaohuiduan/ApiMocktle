@@ -11,6 +11,7 @@ import { IconText } from '@/components/IconText'
 import { ApiDoc } from './ApiDoc'
 import { ApiDocEditing } from './ApiDocEditing'
 import { ApiSidePanel } from './ApiSidePanel'
+import { RunTab } from './RunTab'
 
 export function Api() {
   const { token } = theme.useToken()
@@ -27,6 +28,15 @@ export function Api() {
         children: (
           <ApiTabContentWrapper>
             <ApiDoc />
+          </ApiTabContentWrapper>
+        ),
+      },
+      {
+        key: 'run',
+        label: '运行',
+        children: (
+          <ApiTabContentWrapper>
+            <RunTab />
           </ApiTabContentWrapper>
         ),
       },
