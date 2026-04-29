@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
 
 import { getUserById } from './db/auth-repo'
 import {
@@ -34,6 +34,7 @@ function toShareLinkItem(row: ReturnType<typeof listShareLinksRows>[number]) {
     creatorUsername: creator?.username ?? 'unknown',
     apiMenuIds: JSON.parse(row.api_menu_ids) as string[],
     hasPassword: !!row.password_hash,
+    accessKey: row.access_key ?? undefined,
     expiresAt: row.expires_at,
     title: row.title,
     createdAt: row.created_at,
@@ -53,11 +54,13 @@ export function createShareLink(payload: {
   title?: string
 }) {
   const passwordHash = payload.password ? toPasswordHash(payload.password) : undefined
+  const accessKey = payload.password ? randomUUID() : undefined
   const id = insertShareLink({
     projectId: payload.projectId,
     creatorUserId: payload.creatorUserId,
     apiMenuIds: payload.apiMenuIds,
     passwordHash,
+    accessKey,
     expiresAt: payload.expiresAt,
     title: payload.title,
   })
@@ -106,7 +109,25 @@ export interface ShareLinkAccessResult {
   }
 }
 
-export function accessShareLink(shareId: string, password?: string): ShareLinkAccessResult {
+/**
+ * 仅检查分享是否存在及是否过期，不验证密码
+ */
+export function getShareMeta(shareId: string) {
+  const row = getShareLinkRow(shareId)
+  if (!row) return null
+
+  const expired = row.expires_at ? Date.now() > new Date(row.expires_at).getTime() : false
+
+  return {
+    id: row.id,
+    title: row.title,
+    expiresAt: row.expires_at,
+    needsPassword: !!row.password_hash,
+    expired,
+  }
+}
+
+export function accessShareLink(shareId: string, password?: string, accessKey?: string): ShareLinkAccessResult {
   const row = getShareLinkRow(shareId)
 
   if (!row) {
@@ -121,7 +142,24 @@ export function accessShareLink(shareId: string, password?: string): ShareLinkAc
     }
   }
 
-  // 检查密码
+  // access_key 验证（优先，无需密码）
+  if (row.password_hash && accessKey && row.access_key) {
+    if (accessKey === row.access_key) {
+      return {
+        valid: true,
+        shareData: {
+          id: row.id,
+          projectId: row.project_id,
+          title: row.title,
+          apiMenuIds: JSON.parse(row.api_menu_ids) as string[],
+          expiresAt: row.expires_at,
+        },
+      }
+    }
+    return { valid: false, error: '密码错误' }
+  }
+
+  // 密码验证
   if (row.password_hash) {
     if (!password) {
       return { valid: false, error: '需要密码' }

@@ -8,6 +8,7 @@ export interface ShareLinkRow {
   creator_user_id: string
   api_menu_ids: string // JSON array
   password_hash: string | null
+  access_key: string | null
   expires_at: string | null
   title: string
   created_at: string
@@ -15,7 +16,7 @@ export interface ShareLinkRow {
 
 export function listShareLinks(projectId: string) {
   return db.prepare(`
-    SELECT id, project_id, creator_user_id, api_menu_ids, password_hash, expires_at, title, created_at
+    SELECT id, project_id, creator_user_id, api_menu_ids, password_hash, access_key, expires_at, title, created_at
     FROM share_links
     WHERE project_id = ?
     ORDER BY created_at DESC
@@ -24,7 +25,7 @@ export function listShareLinks(projectId: string) {
 
 export function getShareLink(shareId: string) {
   return db.prepare(`
-    SELECT id, project_id, creator_user_id, api_menu_ids, password_hash, expires_at, title, created_at
+    SELECT id, project_id, creator_user_id, api_menu_ids, password_hash, access_key, expires_at, title, created_at
     FROM share_links
     WHERE id = ?
   `).get(shareId) as ShareLinkRow | undefined
@@ -35,6 +36,7 @@ export function insertShareLink(payload: {
   creatorUserId: string
   apiMenuIds: string[] // will be JSON.stringify'd
   passwordHash?: string
+  accessKey?: string
   expiresAt?: string
   title?: string
 }) {
@@ -42,14 +44,15 @@ export function insertShareLink(payload: {
   const now = new Date().toISOString()
 
   db.prepare(`
-    INSERT INTO share_links (id, project_id, creator_user_id, api_menu_ids, password_hash, expires_at, title, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO share_links (id, project_id, creator_user_id, api_menu_ids, password_hash, access_key, expires_at, title, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     payload.projectId,
     payload.creatorUserId,
     JSON.stringify(payload.apiMenuIds),
     payload.passwordHash ?? null,
+    payload.accessKey ?? null,
     payload.expiresAt ?? null,
     payload.title ?? '',
     now,

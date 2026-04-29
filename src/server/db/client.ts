@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -186,6 +187,26 @@ function createDb() {
       ADD COLUMN doc_type TEXT NOT NULL DEFAULT 'markdown'
       CHECK (doc_type IN ('markdown', 'excel'));
     `)
+  }
+
+  const hasShareAccessKey = db.prepare(`
+    SELECT 1 AS yes
+    FROM pragma_table_info('share_links')
+    WHERE name = 'access_key'
+    LIMIT 1
+  `).get() as { yes: number } | undefined
+
+  if (!hasShareAccessKey) {
+    db.exec(`ALTER TABLE share_links ADD COLUMN access_key TEXT`)
+
+    // 为已有密码链接生成 access_key
+    const rows = db.prepare(`
+      SELECT id FROM share_links
+      WHERE password_hash IS NOT NULL AND access_key IS NULL
+    `).all() as { id: string }[]
+    for (const row of rows) {
+      db.prepare(`UPDATE share_links SET access_key = ? WHERE id = ?`).run(randomUUID(), row.id)
+    }
   }
 
   return db

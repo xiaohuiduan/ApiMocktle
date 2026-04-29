@@ -438,8 +438,11 @@ export default function SharePage() {
           await fetchApiData()
         } else {
           const urlParams = new URLSearchParams(window.location.search)
+          const key = urlParams.get('key')
           const pwd = urlParams.get('pwd')
-          if (pwd) {
+          if (key) {
+            await fetchApiData(undefined, key)
+          } else if (pwd) {
             setPassword(pwd)
             await fetchApiData(pwd)
           }
@@ -451,13 +454,16 @@ export default function SharePage() {
       }
     }
 
-    const fetchApiData = async (pwd?: string) => {
+    const fetchApiData = async (pwd?: string, key?: string) => {
       try {
         setVerifying(true)
+        const body: Record<string, string> = {}
+        if (key) body.key = key
+        else if (pwd) body.password = pwd
         const response = await fetch(`/api/v1/public/shares/${shareId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(pwd ? { password: pwd } : {}),
+          body: JSON.stringify(body),
         })
         const payload = await response.json() as ApiResponse & { data?: ShareApiData }
 

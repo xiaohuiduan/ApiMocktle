@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   DatePicker,
+  Dropdown,
   Input,
   List,
   Modal,
@@ -27,6 +28,7 @@ interface ShareLinkItem {
   creatorUsername: string
   apiMenuIds: string[]
   hasPassword: boolean
+  accessKey?: string
   expiresAt: string | null
   title: string
   createdAt: string
@@ -214,11 +216,11 @@ export function SharePanel({ projectId }: { projectId?: string }) {
   const [resultShareId, setResultShareId] = useState<string>()
   const [resultPwd, setResultPwd] = useState('')
 
-  const copyShareUrl = (shareId: string, withPwd?: string) => {
+  const copyShareUrl = (shareId: string, withPwd?: string, withKey?: string) => {
     const baseUrl = getShareUrl(shareId)
-    const url = withPwd ? `${baseUrl}?pwd=${encodeURIComponent(withPwd)}` : baseUrl
+    const url = withKey ? `${baseUrl}?key=${encodeURIComponent(withKey)}` : withPwd ? `${baseUrl}?pwd=${encodeURIComponent(withPwd)}` : baseUrl
     void navigator.clipboard.writeText(url).then(() => {
-      msgApi.success(withPwd ? '已复制带密码的分享链接' : '已复制分享链接')
+      msgApi.success((withKey || withPwd) ? '已复制带密码的分享链接' : '已复制分享链接')
     })
   }
 
@@ -244,9 +246,30 @@ export function SharePanel({ projectId }: { projectId?: string }) {
         renderItem={(item) => (
           <List.Item
             actions={[
-              <Button key="copy" size="small" type="link" onClick={() => copyShareUrl(item.id)}>
-                复制链接
-              </Button>,
+              item.hasPassword
+                ? (
+                    <Dropdown
+                      key="copy"
+                      menu={{
+                        items: [
+                          { key: 'copy', label: '复制链接', onClick: () => copyShareUrl(item.id) },
+                          {
+                            key: 'copyKey',
+                            label: '复制带密码的链接',
+                            onClick: () => copyShareUrl(item.id, undefined, item.accessKey),
+                          },
+                        ],
+                      }}
+                      trigger={['click']}
+                    >
+                      <Button size="small" type="link">复制链接</Button>
+                    </Dropdown>
+                  )
+                : (
+                    <Button key="copy" size="small" type="link" onClick={() => copyShareUrl(item.id)}>
+                      复制链接
+                    </Button>
+                  ),
               <Button
                 key="delete"
                 danger
@@ -408,6 +431,7 @@ export function SharePanel({ projectId }: { projectId?: string }) {
           )}
         </div>
       </Modal>
+
     </div>
   )
 }
