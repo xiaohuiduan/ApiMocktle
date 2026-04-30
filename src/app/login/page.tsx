@@ -4,7 +4,7 @@ import { AuthForm } from '@/components/auth/AuthForm'
 import { redirectIfAuthenticated } from '@/router/page-auth'
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  redirectIfAuthenticated(request)
+  await redirectIfAuthenticated(request)
   return null
 }
 

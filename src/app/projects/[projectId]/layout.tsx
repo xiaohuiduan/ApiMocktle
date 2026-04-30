@@ -5,7 +5,7 @@ import { requireRouteParam } from '@/router/route-param'
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   const projectId = requireRouteParam(params.projectId, 'projectId')
-  resolveProjectAccess(request, projectId, 'viewer')
+  await resolveProjectAccess(request, projectId, 'viewer')
   return null
 }
 

@@ -1,6 +1,8 @@
 {
   "name": "apimocktle",
+  "version": "1.0.0",
   "private": true,
+  "main": "electron/main.mjs",
   "description": "ApiMocktle — Mock (模拟) + Turtle (龟)。本地优先的 API 管理台，基于 React Router, Vite, Ant Design.",
   "license": "UNLECENSED",
   "scripts": {
@@ -11,7 +13,11 @@
     "lint:css": "stylelint **/*.css",
     "lint:es": "eslint **/*.{ts,tsx}",
     "lint:ts": "tsc --noEmit --skipLibCheck",
-    "start": "react-router-serve ./build/server/index.js"
+    "start": "react-router-serve ./build/server/index.js",
+    "electron:dev": "node electron/dev.mjs",
+    "build:icons": "node scripts/build-icons.mjs",
+    "electron:build": "pnpm build && pnpm build:icons && electron-builder --config electron-builder.json5",
+    "electron:start": "electron ."
   },
   "dependencies": {
     "@ant-design/cssinjs": "^1.21.1",
@@ -39,7 +45,6 @@
     "nanoid": "^5.0.7",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-icons": "^5.6.0",
     "react-resizable": "^3.0.5",
     "react-resizable-panels": "^2.1.4",
     "react-router": "^7.13.2",
@@ -63,6 +68,7 @@
     "npm-run-all": "^4.1.5",
     "postcss": "^8.5.6",
     "prefer-code-style": "3.8.1",
+    "sharp": "^0.34.5",
     "stylelint": "^16.21.0",
     "stylelint-config-clean-order": "^7.0.0",
     "stylelint-config-standard": "^38.0.0",

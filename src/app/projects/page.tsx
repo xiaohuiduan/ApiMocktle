@@ -4,7 +4,7 @@ import { ProjectsClient } from '@/components/projects/ProjectsClient'
 import { requireAuthenticatedUser } from '@/router/page-auth'
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  requireAuthenticatedUser(request)
+  await requireAuthenticatedUser(request)
   return null
 }
 

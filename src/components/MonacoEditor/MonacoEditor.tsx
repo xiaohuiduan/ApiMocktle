@@ -1,7 +1,10 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 
-import { Editor, type EditorProps } from '@monaco-editor/react'
+import { Editor, type EditorProps, loader } from '@monaco-editor/react'
 import { merge } from 'lodash-es'
+
+// 使用本地打包的 Monaco Editor 资源，避免运行时从 CDN 加载（安全要求）
+loader.config({ paths: { vs: '/monaco-editor/vs' } })
 
 import { UnsafeAny } from '@/types'
 import { deserialize, isPureObject, serialize } from '@/utils'

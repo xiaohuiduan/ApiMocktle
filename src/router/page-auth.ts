@@ -1,12 +1,11 @@
 import { redirect } from 'react-router'
 
-import { getSessionUserFromRequest } from '@/server/auth'
-import { ensureProjectPermission } from '@/server/project-access'
 import { resolveAuthRedirectTarget } from './auth-redirect'
 
 import type { ProjectPermission } from '@/server/types'
 
-export function redirectIfAuthenticated(request: Request) {
+export async function redirectIfAuthenticated(request: Request) {
+  const { getSessionUserFromRequest } = await import('@/server/auth')
   const { user } = getSessionUserFromRequest(request)
 
   if (user) {
@@ -15,7 +14,8 @@ export function redirectIfAuthenticated(request: Request) {
   }
 }
 
-export function requireAuthenticatedUser(request: Request) {
+export async function requireAuthenticatedUser(request: Request) {
+  const { getSessionUserFromRequest } = await import('@/server/auth')
   const { user } = getSessionUserFromRequest(request)
 
   if (!user) {
@@ -25,12 +25,13 @@ export function requireAuthenticatedUser(request: Request) {
   return user
 }
 
-export function resolveProjectAccess(
+export async function resolveProjectAccess(
   request: Request,
   projectId: string,
   required: ProjectPermission,
 ) {
-  const user = requireAuthenticatedUser(request)
+  const user = await requireAuthenticatedUser(request)
+  const { ensureProjectPermission } = await import('@/server/project-access')
   const access = ensureProjectPermission({
     projectId,
     userId: user.id,

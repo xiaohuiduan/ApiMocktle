@@ -38,7 +38,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 .ace-tool/
-
+.claude
+.codebuddy
 # local editor settings
 .vscode/
 .idea/
@@ -51,3 +52,9 @@ runtime/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+# Monaco Editor local copy (generated from node_modules)
+/public/monaco-editor/
+
+# Electron build output
+/release/

@@ -1,0 +1,63 @@
+{
+  appId: "com.apimocktle.desktop",
+  productName: "ApiMocktle",
+  directories: {
+    output: "release"
+  },
+  files: [
+    "build/**/*",
+    "electron/**/*",
+    "node_modules/**/*",
+    "!node_modules/**/monaco-editor/esm/**",
+    "!node_modules/**/monaco-editor/min-maps/**",
+    "!**/*.map",
+    "!**/*.ts",
+    "!**/*.d.ts",
+    "!**/__tests__/**",
+    "!**/test/**",
+    "!**/tests/**",
+    "!**/*.test.*",
+    "!**/*.spec.*",
+    "!**/example/**",
+    "!**/examples/**",
+    "!**/*.md",
+    "!**/CHANGELOG*",
+    "!**/LICENSE*",
+    "!**/.github/**",
+    "!**/.eslintrc*",
+    "!**/.prettierrc*",
+    "!**/tsconfig*",
+    "!**/jest.config*",
+    "!**/vite.config*",
+    "!**/webpack.config*",
+    "!**/.babelrc*",
+    "!**/babel.config*",
+    "!**/rollup.config*",
+    "!**/*.flow",
+    "!**/@types/**",
+    "!**/types/*.d.ts"
+  ],
+  asar: true,
+  asarUnpack: [
+    "build/icons/**",
+  ],
+  win: {
+    target: ["nsis"],
+    icon: "build/icons/icon.png"
+  },
+  mac: {
+    target: ["dmg"],
+    icon: "build/icons/icon.png"
+  },
+  linux: {
+    target: ["AppImage"],
+    icon: "build/icons/icon.png"
+  },
+  nsis: {
+    oneClick: false,
+    allowToChangeInstallationDirectory: true,
+    createDesktopShortcut: true,
+    createStartMenuShortcut: true,
+    shortcutName: "ApiMocktle"
+  }
+}
