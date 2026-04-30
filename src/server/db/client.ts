@@ -4,7 +4,7 @@ import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 const runtimeDir = path.join(process.cwd(), 'runtime')
-const dbFilePath = path.join(runtimeDir, 'apifox-collab.sqlite')
+const dbFilePath = path.join(runtimeDir, 'apimocktle.sqlite')
 
 function ensureRuntimeDir() {
   if (!fs.existsSync(runtimeDir)) {

@@ -211,7 +211,7 @@ export function exportMenuItemsToSwagger(
   const doc: Record<string, unknown> = {
     swagger: '2.0',
     info: {
-      title: 'Apifox Collaborative Project',
+      title: 'ApiMocktle Project',
       version: '1.0.0',
     },
     host: 'localhost',

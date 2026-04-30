@@ -1,7 +1,7 @@
 {
-  "name": "apifox-ui",
+  "name": "apimocktle",
   "private": true,
-  "description": "Replicate the ApiFox UI with React Router, Vite, and Ant Design.",
+  "description": "ApiMocktle — Mock (模拟) + Turtle (龟)。本地优先的 API 管理台，基于 React Router, Vite, Ant Design.",
   "license": "UNLECENSED",
   "scripts": {
     "build": "react-router build",

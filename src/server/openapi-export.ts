@@ -184,7 +184,7 @@ export function exportMenuItemsToOpenApi(
   const doc = {
     openapi: '3.0.3',
     info: {
-      title: 'Apifox Collaborative Project',
+      title: 'ApiMocktle Project',
       version: '1.0.0',
     },
     paths: pathObject,

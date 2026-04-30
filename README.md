@@ -2,10 +2,12 @@
 > 该项目仍处于开发阶段。
 >
 > - 功能仍在持续补齐，数据结构和交互细节可能继续调整。
-> - 本地数据默认写入 `runtime/apifox-collab.sqlite`，调试前请注意备份。
+> - 本地数据默认写入 `runtime/apimocktle.sqlite`，调试前请注意备份。
 > - 导入接口文档会静默合并到当前项目资源，不会清空已有内容。
 
-# API 接口管理台
+# ApiMocktle
+
+**Mock**（模拟，鹦鹉学舌）+ **Turtle**（龟）→ **Mocktle**。突出 API 模拟能力，壳（shell）象征数据结构稳定。
 
 一个基于 React Router + Vite + TypeScript + Ant Design + SQLite 的本地优先 API 管理项目。它提供注册登录、项目协作、接口目录、文档与模型编辑、环境管理、请求调试、接口导入导出等能力，目标是把常用的接口管理工作流放到一个可审计、可运行、可自行改造的项目里。
 
@@ -55,7 +57,7 @@ src/
   content/        项目介绍等共享文案
   styles/         全局样式
 runtime/
-  apifox-collab.sqlite   启动后自动生成的本地数据库
+  apimocktle.sqlite   启动后自动生成的本地数据库
 ```
 
 ## 快速开始
@@ -99,7 +101,7 @@ pnpm lint
 
 ## 数据与运行方式
 
-- 数据库文件默认位于 `runtime/apifox-collab.sqlite`。
+- 数据库文件默认位于 `runtime/apimocktle.sqlite`。
 - 项目启动时会自动创建 `runtime/` 目录和所需表结构。
 - 当前数据表覆盖用户、会话、项目、项目成员、邀请、菜单项、回收站和项目级元数据。
 - 这是一个本地即可跑起来的完整应用，不是纯前端 mock 页面。
