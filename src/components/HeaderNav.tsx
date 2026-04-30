@@ -7,7 +7,6 @@ import { useNavigate } from 'react-router'
 
 import { IconLogo } from '@/components/icons/IconLogo'
 import { ModalSettings, SettingsMenuKey } from '@/components/modals/ModalSettings'
-import { ProjectEnvironmentSwitch } from '@/components/ProjectEnvironmentSwitch'
 import { ProjectQuickSwitch } from '@/components/ProjectQuickSwitch'
 
 const ABOUT_MENU_KEY = 'about'
@@ -92,7 +91,6 @@ export function HeaderNav() {
           </Button>
 
           <ProjectQuickSwitch />
-          <ProjectEnvironmentSwitch />
 
           {username && (
             <Dropdown menu={accountMenu}>

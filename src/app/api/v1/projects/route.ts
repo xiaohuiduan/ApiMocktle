@@ -27,14 +27,14 @@ export async function action({ request }: ActionFunctionArgs) {
     return fail('未登录', 401)
   }
 
-  const body = await request.json().catch(() => null) as { name?: string } | null
+  const body = await request.json().catch(() => null) as { name?: string, icon?: string } | null
   const name = body?.name?.trim()
 
   if (!name) {
     return fail('项目名称不能为空')
   }
 
-  const project = createProject({ name, ownerId: user.id })
+  const project = createProject({ name, ownerId: user.id, icon: body?.icon })
 
   return ok({ project }, { status: 201 })
 }

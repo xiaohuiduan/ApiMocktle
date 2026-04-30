@@ -4,6 +4,7 @@ export interface ProjectItem {
   role: 'owner' | 'editor' | 'viewer'
   ownerId: string
   createdAt: string
+  icon?: string
 }
 
 interface ApiResponse<T> {
@@ -39,7 +40,7 @@ export async function requestProjects() {
   return readPayload(response, payload, '加载项目失败').projects
 }
 
-export async function requestCreateProject(values: { name: string }) {
+export async function requestCreateProject(values: { name: string, icon?: string }) {
   const response = await fetch('/api/v1/projects', {
     method: 'POST',
     credentials: 'include',
@@ -51,7 +52,7 @@ export async function requestCreateProject(values: { name: string }) {
   return readPayload(response, payload, '创建项目失败').project
 }
 
-export async function requestUpdateProject(projectId: string, values: { name: string }) {
+export async function requestUpdateProject(projectId: string, values: { name: string, icon?: string }) {
   const response = await fetch(`/api/v1/projects/${projectId}`, {
     method: 'PATCH',
     credentials: 'include',

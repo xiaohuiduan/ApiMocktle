@@ -63,14 +63,14 @@ async function patchProject(request: Request, projectId: string) {
     return access.error
   }
 
-  const body = await request.json().catch(() => null) as { name?: string } | null
+  const body = await request.json().catch(() => null) as { name?: string, icon?: string } | null
   const name = body?.name?.trim()
 
   if (!name) {
     return fail('项目名称不能为空')
   }
 
-  const project = updateProject({ projectId, name })
+  const project = updateProject({ projectId, name, icon: body?.icon })
 
   if (!project) {
     return fail('项目不存在', 404)

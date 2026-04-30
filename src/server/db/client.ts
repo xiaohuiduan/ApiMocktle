@@ -185,6 +185,15 @@ function createDb() {
     CREATE INDEX IF NOT EXISTS idx_project_tokens_token ON project_tokens(token);
   `)
 
+  // Migration: add icon column to projects if missing
+  const hasIconCol = db.prepare(`
+    SELECT 1 AS yes FROM pragma_table_info('projects') WHERE name = 'icon'
+  `).get() as { yes: number } | undefined
+
+  if (!hasIconCol) {
+    db.exec(`ALTER TABLE projects ADD COLUMN icon TEXT NOT NULL DEFAULT ''`)
+  }
+
   const hasDocType = db.prepare(`
     SELECT 1 AS yes
     FROM pragma_table_info('shared_docs')

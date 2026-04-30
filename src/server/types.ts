@@ -26,6 +26,7 @@ export interface ProjectItem {
   role: ProjectRole
   ownerId: string
   createdAt: string
+  icon?: string
 }
 
 export interface ProjectInvitationItem {

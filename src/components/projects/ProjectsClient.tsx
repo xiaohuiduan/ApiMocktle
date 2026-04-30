@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Modal, Space, Spin, Typography, message } from 'antd'
 import { useNavigate } from 'react-router'
 
+import { ICON_OPTIONS, ProjectIcon } from '@/components/ProjectIcon'
 import {
   ApiRequestError,
   requestCreateProject,
@@ -16,6 +17,7 @@ import {
 
 interface ProjectFormValues {
   name: string
+  icon?: string
 }
 
 type ProjectDialogState
@@ -27,6 +29,28 @@ const roleText: Record<ProjectItem['role'], string> = {
   owner: '拥有者',
   editor: '编辑者',
   viewer: '查看者',
+}
+
+function IconPicker({ value, onChange }: { value?: string, onChange?: (val: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {ICON_OPTIONS.map((name) => (
+        <button
+          key={name}
+          type="button"
+          className="flex size-10 cursor-pointer items-center justify-center rounded-lg border-2 transition-colors"
+          style={{
+            borderColor: value === name ? '#1677ff' : 'transparent',
+            backgroundColor: value === name ? '#e6f4ff' : '#f5f5f5',
+          }}
+          onClick={() => onChange?.(value === name ? '' : name)}
+          title={name}
+        >
+          <ProjectIcon icon={name} size={28} />
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function isUnauthorized(error: unknown) {
@@ -87,7 +111,7 @@ export function ProjectsClient() {
   }
 
   const openEditDialog = (project: ProjectItem) => {
-    form.setFieldsValue({ name: project.name })
+    form.setFieldsValue({ name: project.name, icon: project.icon })
     setDialog({ mode: 'edit', project })
   }
 
@@ -220,10 +244,15 @@ export function ProjectsClient() {
                 navigate(`/projects/${project.id}/home`)
               }}
             >
-              <Typography.Title level={5}>{project.name}</Typography.Title>
-              <Typography.Text type="secondary">
-                角色：{roleText[project.role]}
-              </Typography.Text>
+              <div className="flex items-center gap-3">
+                <ProjectIcon icon={project.icon} size={40} />
+                <div>
+                  <Typography.Title level={5} className="!mb-0">{project.name}</Typography.Title>
+                  <Typography.Text type="secondary">
+                    角色：{roleText[project.role]}
+                  </Typography.Text>
+                </div>
+              </div>
             </Card>
           ))}
         </div>
@@ -245,6 +274,9 @@ export function ProjectsClient() {
             rules={[{ required: true, message: '请输入项目名称' }]}
           >
             <Input placeholder="请输入项目名称" />
+          </Form.Item>
+          <Form.Item label="项目图标" name="icon">
+            <IconPicker />
           </Form.Item>
         </Form>
       </Modal>

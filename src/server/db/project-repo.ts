@@ -9,6 +9,7 @@ interface ProjectRow {
   name: string
   owner_id: string
   created_at: string
+  icon: string
 }
 
 interface MemberRow {
@@ -26,26 +27,29 @@ function toProjectItem(row: ProjectRow, role: ProjectRole): ProjectItem {
     ownerId: row.owner_id,
     createdAt: row.created_at,
     role,
+    icon: row.icon || undefined,
   }
 }
 
-export function createProject(payload: { name: string, ownerId: string }) {
+export function createProject(payload: { name: string, ownerId: string, icon?: string }) {
   const id = randomUUID()
   const now = new Date().toISOString()
+  const icon = payload.icon ?? ''
   const projectRow: ProjectRow = {
     id,
     name: payload.name,
     owner_id: payload.ownerId,
     created_at: now,
+    icon,
   }
 
   db.exec('BEGIN')
 
   try {
     db.prepare(`
-      INSERT INTO projects (id, name, owner_id, created_at)
-      VALUES (?, ?, ?, ?)
-    `).run(id, payload.name, payload.ownerId, now)
+      INSERT INTO projects (id, name, owner_id, created_at, icon)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, payload.name, payload.ownerId, now, icon)
 
     db.prepare(`
       INSERT INTO project_members (project_id, user_id, role, created_at)
@@ -64,7 +68,7 @@ export function createProject(payload: { name: string, ownerId: string }) {
 
 export function getProject(projectId: string) {
   return db.prepare(`
-    SELECT id, name, owner_id, created_at
+    SELECT id, name, owner_id, created_at, icon
     FROM projects
     WHERE id = ?
   `).get(projectId) as ProjectRow | undefined
@@ -72,7 +76,7 @@ export function getProject(projectId: string) {
 
 export function getProjectsByUser(userId: string) {
   const rows = db.prepare(`
-    SELECT p.id, p.name, p.owner_id, p.created_at, m.role
+    SELECT p.id, p.name, p.owner_id, p.created_at, p.icon, m.role
     FROM projects p
     JOIN project_members m ON m.project_id = p.id
     WHERE m.user_id = ?
@@ -82,12 +86,20 @@ export function getProjectsByUser(userId: string) {
   return rows.map((row) => toProjectItem(row, row.role))
 }
 
-export function updateProject(payload: { projectId: string, name: string }) {
-  db.prepare(`
-    UPDATE projects
-    SET name = ?
-    WHERE id = ?
-  `).run(payload.name, payload.projectId)
+export function updateProject(payload: { projectId: string, name: string, icon?: string }) {
+  if (payload.icon !== undefined) {
+    db.prepare(`
+      UPDATE projects
+      SET name = ?, icon = ?
+      WHERE id = ?
+    `).run(payload.name, payload.icon, payload.projectId)
+  } else {
+    db.prepare(`
+      UPDATE projects
+      SET name = ?
+      WHERE id = ?
+    `).run(payload.name, payload.projectId)
+  }
 
   const project = getProject(payload.projectId)
 
