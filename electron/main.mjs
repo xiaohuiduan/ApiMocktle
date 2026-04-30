@@ -101,7 +101,7 @@ function createWindow(port) {
   })
 
   const url = isDev
-    ? 'http://localhost:5174'
+    ? 'http://localhost:49128'
     : `http://localhost:${port}`
 
   win.loadURL(url)
@@ -127,7 +127,7 @@ function setupCSP() {
 app.whenReady().then(async () => {
   setupCSP()
 
-  let port = 5174
+  let port = 49128
 
   if (!isDev) {
     console.log('[electron] Starting SSR server...')

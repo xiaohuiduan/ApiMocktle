@@ -176,7 +176,7 @@ export function TokenPanel({ projectId }: { projectId?: string }) {
           <Input
             size="small"
             className="w-24"
-            placeholder={window.location.port || '5174'}
+            placeholder={window.location.port || '49128'}
             value={customPort}
             onChange={(e) => setCustomPort(e.target.value)}
             onPressEnter={handleSavePort}

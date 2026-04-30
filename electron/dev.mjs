@@ -17,7 +17,7 @@ function tryStartElectron() {
 
 function poll() {
   if (electronStarted) return
-  const req = http.get('http://localhost:5174', () => {
+  const req = http.get('http://localhost:49128', () => {
     tryStartElectron()
   })
   req.on('error', () => {})

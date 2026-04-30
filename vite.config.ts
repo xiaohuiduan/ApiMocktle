@@ -79,7 +79,7 @@ export default defineConfig({
   // 允许局域网内其他设备通过本机 IP 访问（默认仅 localhost）
   server: {
     host: true,
-    port: 5174,
+    port: 49128,
     watch: {
       ignored: ['**/public/monaco-editor/**'],
     },
