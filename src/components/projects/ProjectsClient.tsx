@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { Button, Card, Form, Input, Modal, Space, Spin, Typography, message } from 'antd'
+import { Button, Card, Form, Input, Modal, Space, Spin, Typography, message, theme } from 'antd'
 import { useNavigate } from 'react-router'
 
 import { ICON_OPTIONS, ProjectIcon } from '@/components/ProjectIcon'
@@ -66,6 +66,7 @@ function getSubmitErrorTitle(dialog: ProjectDialogState) {
 }
 
 export function ProjectsClient() {
+  const { token } = theme.useToken()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -179,6 +180,7 @@ export function ProjectsClient() {
   }
 
   return (
+    <div style={{ minHeight: '100%', backgroundColor: token.colorFillTertiary }}>
     <div className="mx-auto max-w-5xl px-6 py-10">
       {contextHolder}
 
@@ -280,6 +282,7 @@ export function ProjectsClient() {
           </Form.Item>
         </Form>
       </Modal>
+    </div>
     </div>
   )
 }

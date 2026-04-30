@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { show } from '@ebay/nice-modal-react'
 import { Button, Dropdown, Space, type MenuProps } from 'antd'
-import { ArrowLeftIcon, InfoIcon, LogOutIcon, SettingsIcon, UserCircle2Icon } from 'lucide-react'
+import { ArrowLeftIcon, InfoIcon, LogOutIcon, RefreshCw, SettingsIcon, UserCircle2Icon } from 'lucide-react'
 import { useNavigate } from 'react-router'
+
+import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 
 import { IconLogo } from '@/components/icons/IconLogo'
 import { ModalSettings, SettingsMenuKey } from '@/components/modals/ModalSettings'
@@ -46,6 +48,8 @@ function useUsername() {
 export function HeaderNav() {
   const navigate = useNavigate()
   const username = useUsername()
+  const [refreshing, setRefreshing] = useState(false)
+  const { reloadState } = useMenuHelpersContext()
   const accountMenu = useMemo<MenuProps>(() => ({
     items: [
       {
@@ -80,6 +84,19 @@ export function HeaderNav() {
     <div className="flex h-full items-center">
       <div className="ml-auto">
         <Space size={4}>
+          <Button
+            icon={<RefreshCw size={14} />}
+            size="small"
+            loading={refreshing}
+            onClick={async () => {
+              setRefreshing(true)
+              await reloadState()
+              setRefreshing(false)
+            }}
+          >
+            刷新
+          </Button>
+
           <Button
             icon={<ArrowLeftIcon size={14} />}
             size="small"

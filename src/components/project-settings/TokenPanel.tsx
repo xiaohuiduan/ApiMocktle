@@ -253,7 +253,7 @@ export function TokenPanel({ projectId }: { projectId?: string }) {
           footer={<Button onClick={() => setNewlyCreated(null)}>关闭</Button>}
         >
           <Typography.Paragraph type="warning">
-            请立即复制 Token，关闭后将无法再次查看完整 Token。
+            该token需要放在IDEA插件中进行使用
           </Typography.Paragraph>
           <div className="flex items-center gap-2 rounded bg-gray-50 p-3">
             <Typography.Text code className="flex-1 text-sm">{newlyCreated.token}</Typography.Text>
