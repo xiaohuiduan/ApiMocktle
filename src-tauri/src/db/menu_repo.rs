@@ -2,7 +2,7 @@ use rusqlite::params;
 use uuid::Uuid;
 
 use crate::db::client::Db;
-use crate::models::{ApiMenuData, RecycleDataItem, ApiEnvironment, ProjectEnvironmentConfig};
+use crate::models::{ApiMenuData, RecycleDataItem, ProjectEnvironmentConfig};
 
 pub fn create_menu_item(
     db: &Db,

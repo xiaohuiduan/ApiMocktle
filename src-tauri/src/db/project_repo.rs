@@ -2,7 +2,7 @@ use rusqlite::params;
 use uuid::Uuid;
 
 use crate::db::client::Db;
-use crate::models::{ProjectItem, ProjectMember, ProjectInvitation, ProjectStateSnapshot, ApiMenuData, RecycleDataItem, ApiEnvironment, ProjectEnvironmentConfig};
+use crate::models::{ProjectItem, ProjectMember, ProjectInvitation, ProjectStateSnapshot, ApiMenuData, RecycleDataItem, ProjectEnvironmentConfig};
 
 pub fn list_projects(db: &Db, user_id: &str) -> Result<Vec<ProjectItem>, crate::errors::AppError> {
     let conn = db.0.lock().unwrap();
@@ -466,18 +466,7 @@ pub fn get_project_state(
             environments: vec![],
         });
 
-    let env_str: Option<String> = conn
-        .query_row(
-            "SELECT value FROM meta WHERE project_id = ?1 AND key = 'environments'",
-            params![project_id],
-            |row| row.get(0),
-        )
-        .ok();
-
-    let project_environments: Vec<ApiEnvironment> = env_str
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .or_else(|| serde_json::from_value(serde_json::Value::Array(project_environment_config.environments.clone())).ok())
-        .unwrap_or_default();
+    let project_environments = project_environment_config.environments.clone();
 
     Ok(ProjectStateSnapshot {
         menu_raw_list,

@@ -111,15 +111,6 @@ pub struct BatchDeletePayload {
 
 // Environments
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ApiEnvironment {
-    pub id: String,
-    pub name: String,
-    pub color: String,
-    #[serde(rename = "baseUrl")]
-    pub base_url: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProjectEnvironmentConfig {
     #[serde(rename = "globalParameters", default)]
     pub global_parameters: serde_json::Value,
@@ -168,7 +159,7 @@ pub struct ProjectStateSnapshot {
     #[serde(rename = "recyleRawData")]
     pub recyle_raw_data: Vec<RecycleDataItem>,
     #[serde(rename = "projectEnvironments")]
-    pub project_environments: Vec<ApiEnvironment>,
+    pub project_environments: Vec<serde_json::Value>,
     #[serde(rename = "projectEnvironmentConfig")]
     pub project_environment_config: ProjectEnvironmentConfig,
 }
