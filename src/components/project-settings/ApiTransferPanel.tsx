@@ -5,25 +5,11 @@ import { Button, Checkbox, Input, message, Modal, Progress, Space, theme, Tree, 
 import type { CheckboxChangeEvent } from 'antd/es/checkbox'
 import type { DataNode } from 'antd/es/tree'
 
+import { api } from '@/api-client'
+import { useAuth } from '@/contexts/auth'
 import { MenuItemType } from '@/enums'
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { type ProjectStateSnapshot, useMenuHelpersContext } from '@/contexts/menu-helpers'
-
-interface ImportApiResponse {
-  ok: boolean
-  data: {
-    state: ProjectStateSnapshot
-    created: number
-    updated: number
-  } | null
-  error: string | null
-}
-
-interface UploadApiFileOptions {
-  projectId: string
-  file: File
-  onProgress: (percent: number) => void
-}
 
 function resolveProjectId(pathname: string) {
   const parts = pathname.split('/').filter(Boolean)
@@ -56,83 +42,10 @@ function pickImportFile(onSelect: (file: File) => void) {
   input.click()
 }
 
-async function importApiDocumentFromUrl(
-  projectId: string,
-  url: string,
-): Promise<ImportApiResponse> {
-  const response = await fetch(`/api/v1/projects/${projectId}/imports`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ url }),
-  })
-
-  let payload: ImportApiResponse
-
-  try {
-    payload = await response.json() as ImportApiResponse
-  }
-  catch {
-    throw new Error('导入失败：服务端返回异常')
-  }
-
-  if (response.ok && payload.ok) {
-    return payload
-  }
-
-  throw new Error(payload.error ?? '导入失败')
-}
-
-function uploadApiFile(props: UploadApiFileOptions) {
-  const { projectId, file, onProgress } = props
-
-  return new Promise<ImportApiResponse>((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    const formData = new FormData()
-    formData.append('file', file)
-
-    xhr.open('POST', `/api/v1/projects/${projectId}/imports`)
-    xhr.withCredentials = true
-
-    xhr.upload.onprogress = (event) => {
-      if (!event.lengthComputable) {
-        return
-      }
-
-      const percent = Math.min(99, Math.round((event.loaded / event.total) * 100))
-      onProgress(percent)
-    }
-
-    xhr.onerror = () => {
-      reject(new Error('网络异常，请稍后重试'))
-    }
-
-    xhr.onload = () => {
-      try {
-        const payload = JSON.parse(xhr.responseText) as ImportApiResponse
-
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(payload)
-
-          return
-        }
-
-        reject(new Error(payload.error ?? '导入失败'))
-      }
-      catch {
-        reject(new Error('导入失败：服务端返回异常'))
-      }
-    }
-
-    xhr.send(formData)
-  })
-}
-
 export function ApiTransferPanel() {
   const { token } = theme.useToken()
   const { pathname } = useLocation()
+  const { sessionId } = useAuth()
   const { applyServerState, reloadState, menuRawList } = useMenuHelpersContext()
   const [msgApi, contextHolder] = message.useMessage()
   const [isImporting, setIsImporting] = useState(false)
@@ -169,7 +82,7 @@ export function ApiTransferPanel() {
     function buildNodes(items: ApiMenuData[]): DataNode[] {
       return items.map((item) => ({
         key: item.id,
-        title: `${(item.data as { method?: string; path?: string }).method ?? 'GET'} ${(item.data as { path?: string }).path ?? item.name}`,
+        title: `${(item.data as { method?: string })?.method ?? 'GET'} ${(item.data as { path?: string })?.path ?? item.name}`,
       }))
     }
 
@@ -203,7 +116,7 @@ export function ApiTransferPanel() {
   }
 
   const handleSelectiveExport = async (specFormat: 'openapi' | 'swagger') => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导出')
       return
     }
@@ -215,47 +128,46 @@ export function ApiTransferPanel() {
     try {
       const menuIds = Array.from(checkedApiIds).join(',')
       const formatParam = specFormat === 'swagger' ? 'swagger' : 'json'
-      const response = await fetch(
-        `/api/v1/projects/${projectId}/openapi/export?format=${formatParam}&menuIds=${menuIds}`,
-        { method: 'GET', credentials: 'include' },
-      )
-      if (!response.ok) {
-        msgApi.error('导出失败')
-        return
-      }
+      const payload = await api<{ content: string, format: string }>('export_openapi', {
+        sessionId,
+        projectId,
+        format: formatParam,
+        menuIds,
+      })
+      const blob = new Blob([payload.content], { type: 'application/json' })
       const specName = specFormat === 'swagger' ? 'swagger' : 'openapi'
-      downloadFile(await response.blob(), `${specName}.json`)
+      downloadFile(blob, `${specName}.json`)
       setSelectModalOpen(false)
+    } catch (err) {
+      msgApi.error((err as Error).message)
     } finally {
       setIsExporting(false)
     }
   }
 
   const handleExport = async (format: 'json' | 'yaml') => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导出')
-
       return
     }
 
-    const response = await fetch(`/api/v1/projects/${projectId}/openapi/export?format=${format}`, {
-      method: 'GET',
-      credentials: 'include',
-    })
-
-    if (!response.ok) {
-      msgApi.error('导出失败')
-
-      return
+    try {
+      const payload = await api<{ content: string, format: string }>('export_openapi', {
+        sessionId,
+        projectId,
+        format,
+      })
+      const mimeType = format === 'yaml' ? 'text/yaml' : 'application/json'
+      const blob = new Blob([payload.content], { type: mimeType })
+      downloadFile(blob, `openapi.${format}`)
+    } catch (err) {
+      msgApi.error((err as Error).message)
     }
-
-    downloadFile(await response.blob(), `openapi.${format}`)
   }
 
   const handleImport = async (file: File) => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导入')
-
       return
     }
 
@@ -265,47 +177,30 @@ export function ApiTransferPanel() {
     msgApi.open({ key: 'api-import', type: 'loading', content: '导入中 0%', duration: 0 })
 
     try {
-      const payload = await uploadApiFile({
+      const content = await file.text()
+      setImportProgress(50)
+      msgApi.open({ key: 'api-import', type: 'loading', content: '导入中 50%', duration: 0 })
+
+      const format = file.name.endsWith('.yaml') || file.name.endsWith('.yml')
+        ? 'yaml'
+        : file.name.endsWith('.json')
+          ? 'json'
+          : 'auto'
+
+      const payload = await api<{ imported: { format: string }, state: ProjectStateSnapshot }>('import_api_document', {
+        sessionId,
         projectId,
-        file,
-        onProgress: (percent) => {
-          setImportProgress(percent)
-          msgApi.open({
-            key: 'api-import',
-            type: 'loading',
-            content: `导入中 ${percent}%`,
-            duration: 0,
-          })
-        },
+        payload: { format, content },
       })
 
-      if (!payload.ok) {
-        throw new Error(payload.error ?? '导入失败')
-      }
-
-      if (payload.data) {
-        applyServerState(payload.data.state)
-      }
-      else {
+      if (payload.state) {
+        applyServerState(payload.state)
+      } else {
         await reloadState()
       }
 
       setImportProgress(100)
-
-      const created = payload.data?.created ?? 0
-      const updated = payload.data?.updated ?? 0
-      const parts: string[] = []
-
-      if (created > 0) {
-        parts.push(`新增 ${created} 个`)
-      }
-
-      if (updated > 0) {
-        parts.push(`更新 ${updated} 个`)
-      }
-
-      const summary = parts.length > 0 ? parts.join('，') : '已合并到当前项目'
-      msgApi.open({ key: 'api-import', type: 'success', content: `导入成功！${summary}` })
+      msgApi.open({ key: 'api-import', type: 'success', content: '导入成功！' })
     }
     catch (error) {
       msgApi.open({
@@ -320,9 +215,8 @@ export function ApiTransferPanel() {
   }
 
   const handleImportFromUrl = async () => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导入')
-
       return
     }
 
@@ -330,7 +224,6 @@ export function ApiTransferPanel() {
 
     if (!trimmed) {
       msgApi.error('请填写 OpenAPI 或 Postman 文档的 URL')
-
       return
     }
 
@@ -341,13 +234,11 @@ export function ApiTransferPanel() {
     }
     catch {
       msgApi.error('链接格式不正确')
-
       return
     }
 
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       msgApi.error('仅支持 http 或 https 链接')
-
       return
     }
 
@@ -355,29 +246,25 @@ export function ApiTransferPanel() {
     msgApi.open({ key: 'api-import-url', type: 'loading', content: '正在从链接拉取并导入…', duration: 0 })
 
     try {
-      const payload = await importApiDocumentFromUrl(projectId, trimmed)
-
-      if (payload.data) {
-        applyServerState(payload.data.state)
+      const response = await fetch(trimmed)
+      if (!response.ok) {
+        throw new Error(`下载失败: HTTP ${response.status}`)
       }
-      else {
+      const content = await response.text()
+
+      const payload = await api<{ imported: { format: string }, state: ProjectStateSnapshot }>('import_api_document', {
+        sessionId,
+        projectId,
+        payload: { format: 'auto', content },
+      })
+
+      if (payload.state) {
+        applyServerState(payload.state)
+      } else {
         await reloadState()
       }
 
-      const created = payload.data?.created ?? 0
-      const updated = payload.data?.updated ?? 0
-      const parts: string[] = []
-
-      if (created > 0) {
-        parts.push(`新增 ${created} 个`)
-      }
-
-      if (updated > 0) {
-        parts.push(`更新 ${updated} 个`)
-      }
-
-      const summary = parts.length > 0 ? parts.join('，') : '已合并到当前项目'
-      msgApi.open({ key: 'api-import-url', type: 'success', content: `导入成功！${summary}` })
+      msgApi.open({ key: 'api-import-url', type: 'success', content: '导入成功！' })
     }
     catch (error) {
       msgApi.open({
@@ -482,12 +369,7 @@ export function ApiTransferPanel() {
               <Button
                 size="small"
                 onClick={() => {
-                  void (async () => {
-                    if (!projectId) return
-                    const res = await fetch(`/api/v1/projects/${projectId}/openapi/export?format=swagger`, { credentials: 'include' })
-                    if (res.ok) downloadFile(await res.blob(), 'swagger.json')
-                    else msgApi.error('导出失败')
-                  })()
+                  void handleExport('json').catch(() => {})
                 }}
               >
                 导出 JSON

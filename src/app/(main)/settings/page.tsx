@@ -15,10 +15,12 @@ import {
 import { LayersIcon, SettingsIcon } from 'lucide-react'
 import { useLocation } from 'react-router'
 
+import { api } from '@/api-client'
+import { useAuth } from '@/contexts/auth'
 import { ProjectEnvironmentsPanel } from '@/components/project-settings/ProjectEnvironmentsPanel'
 import { ApiTransferPanel } from '@/components/project-settings/ApiTransferPanel'
 import { SharedWorkspacePanel } from '@/components/project-settings/SharedWorkspacePanel'
-import { SharePanel } from '@/components/project-settings/SharePanel'
+import { ExportPanel } from '@/components/project-settings/ExportPanel'
 import { TokenPanel } from '@/components/project-settings/TokenPanel'
 import {
   ProjectMembersSection,
@@ -36,7 +38,7 @@ const enum SettingsSectionKey {
   Environments = 'environments',
   ImportApi = 'import-api',
   SharedWorkspace = 'shared-workspace',
-  ShareLinks = 'share-links',
+  ShareApi = 'share-api',
   TokenConfig = 'token-config',
 }
 
@@ -85,7 +87,7 @@ const items: MenuItem[] = [
     type: 'group',
     children: [
       { key: SettingsSectionKey.SharedWorkspace, label: '共享文件与在线文档' },
-      { key: SettingsSectionKey.ShareLinks, label: '接口分享' },
+      { key: SettingsSectionKey.ShareApi, label: '接口分享' },
     ],
   },
 ]
@@ -112,10 +114,10 @@ function sectionMeta(section: SettingsSectionKey) {
     }
   }
 
-  if (section === SettingsSectionKey.ShareLinks) {
+  if (section === SettingsSectionKey.ShareApi) {
     return {
       title: '接口分享',
-      description: '创建分享链接，让其他人通过只读页面查看指定接口的文档。',
+      description: '选择接口导出为 MHTML 文档，可离线查看完整的 API 接口文档。',
     }
   }
 
@@ -147,6 +149,7 @@ function roleText(role: Role) {
 export default function SettingsPage() {
   const { token } = theme.useToken()
   const { pathname, search } = useLocation()
+  const { sessionId } = useAuth()
   const [msgApi, contextHolder] = message.useMessage()
   const [loading, setLoading] = useState(false)
   const [selectedSection, setSelectedSection] = useState<SettingsSectionKey>(() => {
@@ -165,8 +168,8 @@ export default function SettingsPage() {
       return SettingsSectionKey.SharedWorkspace
     }
 
-    if (section === SettingsSectionKey.ShareLinks) {
-      return SettingsSectionKey.ShareLinks
+    if (section === SettingsSectionKey.ShareApi) {
+      return SettingsSectionKey.ShareApi
     }
 
     if (section === SettingsSectionKey.TokenConfig) {
@@ -196,57 +199,39 @@ export default function SettingsPage() {
     : sectionMeta(selectedSection)
 
   const fetchData = useCallback(async () => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       return
     }
 
     setLoading(true)
 
     try {
-      const response = await fetch(`/api/v1/projects/${projectId}?includeMembers=true`, {
-        credentials: 'include',
+      const payload = await api<{
+        currentUserId: string
+        project: ProjectInfo
+        role: Role
+        members?: MemberItem[]
+      }>('get_project', {
+        sessionId,
+        projectId,
       })
 
-      const payload = await response.json() as {
-        ok: boolean
-        data?: {
-          currentUserId: string
-          project: ProjectInfo
-          role: Role
-          members?: MemberItem[]
-        }
-        error: string | null
-      }
+      setProject(payload.project)
+      setProjectRole(payload.role)
+      setCurrentUserId(payload.currentUserId)
+      setMembers(payload.members ?? [])
 
-      if (!response.ok || !payload.ok || !payload.data) {
-        throw new Error(payload.error ?? '加载失败')
-      }
-
-      setProject(payload.data.project)
-      setProjectRole(payload.data.role)
-      setCurrentUserId(payload.data.currentUserId)
-      setMembers(payload.data.members ?? [])
-
-      if (payload.data.project.ownerId !== payload.data.currentUserId) {
+      if (payload.project.ownerId !== payload.currentUserId) {
         setInvitations([])
         return
       }
 
-      const invitationResponse = await fetch(`/api/v1/projects/${projectId}/invitations`, {
-        credentials: 'include',
-      })
+      const invitationPayload = await api<{ invitations?: InvitationItem[] }>(
+        'list_project_invitations',
+        { sessionId, projectId },
+      )
 
-      const invitationPayload = await invitationResponse.json() as {
-        ok: boolean
-        data?: { invitations?: InvitationItem[] }
-        error: string | null
-      }
-
-      if (!invitationResponse.ok || !invitationPayload.ok || !invitationPayload.data) {
-        throw new Error(invitationPayload.error ?? '加载邀请失败')
-      }
-
-      setInvitations(invitationPayload.data.invitations ?? [])
+      setInvitations(invitationPayload.invitations ?? [])
     }
     catch (error) {
       msgApi.error((error as Error).message)
@@ -254,7 +239,7 @@ export default function SettingsPage() {
     finally {
       setLoading(false)
     }
-  }, [msgApi, projectId])
+  }, [msgApi, projectId, sessionId])
 
   useEffect(() => {
     void fetchData()
@@ -279,8 +264,8 @@ export default function SettingsPage() {
       return
     }
 
-    if (section === SettingsSectionKey.ShareLinks) {
-      setSelectedSection(SettingsSectionKey.ShareLinks)
+    if (section === SettingsSectionKey.ShareApi) {
+      setSelectedSection(SettingsSectionKey.ShareApi)
       return
     }
 
@@ -358,9 +343,9 @@ export default function SettingsPage() {
                 ? (
                 <ApiTransferPanel />
                   )
-                : selectedSection === SettingsSectionKey.ShareLinks
+                : selectedSection === SettingsSectionKey.ShareApi
                   ? (
-                      <SharePanel projectId={projectId} />
+                      <ExportPanel projectId={projectId} />
                     )
                   : selectedSection === SettingsSectionKey.TokenConfig
                     ? (

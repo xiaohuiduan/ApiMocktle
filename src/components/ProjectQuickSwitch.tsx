@@ -4,6 +4,7 @@ import { Button, Dropdown, theme, Typography, type MenuProps } from 'antd'
 import { CheckIcon, ChevronDownIcon, FolderIcon } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router'
 
+import { useAuth } from '@/contexts/auth'
 import {
   ApiRequestError,
   requestProjects,
@@ -79,12 +80,13 @@ export function ProjectQuickSwitch() {
   const { token } = theme.useToken()
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const { sessionId } = useAuth()
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [error, setError] = useState<string>()
   const projectId = useMemo(() => resolveProjectId(pathname), [pathname])
 
   useEffect(() => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       setProjects([])
       setError(undefined)
       return
@@ -94,7 +96,7 @@ export function ProjectQuickSwitch() {
 
     const loadProjects = async () => {
       try {
-        const nextProjects = await requestProjects()
+        const nextProjects = await requestProjects(sessionId)
 
         if (cancelled) {
           return
@@ -124,7 +126,7 @@ export function ProjectQuickSwitch() {
     return () => {
       cancelled = true
     }
-  }, [navigate, projectId])
+  }, [navigate, projectId, sessionId])
 
   const currentProject = useMemo(
     () => projects.find((project) => project.id === projectId),

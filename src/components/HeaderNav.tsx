@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { show } from '@ebay/nice-modal-react'
 import { Button, Dropdown, Space, type MenuProps } from 'antd'
 import { ArrowLeftIcon, InfoIcon, LogOutIcon, RefreshCw, SettingsIcon, UserCircle2Icon } from 'lucide-react'
 import { useNavigate } from 'react-router'
 
+import { useAuth } from '@/contexts/auth'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 
 import { IconLogo } from '@/components/icons/IconLogo'
@@ -13,43 +14,13 @@ import { ProjectQuickSwitch } from '@/components/ProjectQuickSwitch'
 
 const ABOUT_MENU_KEY = 'about'
 
-function useUsername() {
-  const [username, setUsername] = useState<string>()
-
-  useEffect(() => {
-    const fetchMe = async () => {
-      try {
-        const response = await fetch('/api/v1/auth/me', { credentials: 'include' })
-
-        if (!response.ok) {
-          return
-        }
-
-        const payload = await response.json() as {
-          ok: boolean
-          data?: { user?: { username?: string } }
-        }
-
-        if (payload.ok) {
-          setUsername(payload.data?.user?.username)
-        }
-      }
-      catch {
-        // ignore
-      }
-    }
-
-    void fetchMe()
-  }, [])
-
-  return username
-}
-
 export function HeaderNav() {
   const navigate = useNavigate()
-  const username = useUsername()
+  const { user, logout } = useAuth()
   const [refreshing, setRefreshing] = useState(false)
   const { reloadState } = useMenuHelpersContext()
+  const username = user?.username
+
   const accountMenu = useMemo<MenuProps>(() => ({
     items: [
       {
@@ -70,15 +41,12 @@ export function HeaderNav() {
       }
 
       if (key === 'logout') {
-        void fetch('/api/v1/auth/logout', {
-          method: 'POST',
-          credentials: 'include',
-        }).finally(() => {
+        void logout().finally(() => {
           navigate('/login', { replace: true })
         })
       }
     },
-  }), [navigate])
+  }), [navigate, logout])
 
   return (
     <div className="flex h-full items-center">

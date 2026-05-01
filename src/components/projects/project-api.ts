@@ -1,3 +1,5 @@
+import { api } from '@/api-client'
+
 export interface ProjectItem {
   id: string
   name: string
@@ -5,12 +7,6 @@ export interface ProjectItem {
   ownerId: string
   createdAt: string
   icon?: string
-}
-
-interface ApiResponse<T> {
-  ok: boolean
-  data: T
-  error: string | null
 }
 
 export class ApiRequestError extends Error {
@@ -22,54 +18,32 @@ export class ApiRequestError extends Error {
   }
 }
 
-function readPayload<T>(response: Response, payload: ApiResponse<T>, fallbackMessage: string) {
-  if (!response.ok || !payload.ok) {
-    throw new ApiRequestError(payload.error ?? fallbackMessage, response.status)
-  }
-
-  return payload.data
+export async function requestProjects(sessionId: string) {
+  const result = await api<{ projects: ProjectItem[] }>('list_projects', { sessionId })
+  return result.projects
 }
 
-export async function requestProjects() {
-  const response = await fetch('/api/v1/projects', {
-    method: 'GET',
-    credentials: 'include',
+export async function requestCreateProject(sessionId: string, values: { name: string, icon?: string }) {
+  const result = await api<{ project: ProjectItem }>('create_project', {
+    sessionId,
+    payload: values,
   })
-  const payload = await response.json() as ApiResponse<{ projects: ProjectItem[] }>
-
-  return readPayload(response, payload, '加载项目失败').projects
+  return result.project
 }
 
-export async function requestCreateProject(values: { name: string, icon?: string }) {
-  const response = await fetch('/api/v1/projects', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(values),
+export async function requestUpdateProject(sessionId: string, projectId: string, values: { name: string, icon?: string }) {
+  const result = await api<{ project: ProjectItem }>('update_project', {
+    sessionId,
+    projectId,
+    payload: values,
   })
-  const payload = await response.json() as ApiResponse<{ project: ProjectItem }>
-
-  return readPayload(response, payload, '创建项目失败').project
+  return result.project
 }
 
-export async function requestUpdateProject(projectId: string, values: { name: string, icon?: string }) {
-  const response = await fetch(`/api/v1/projects/${projectId}`, {
-    method: 'PATCH',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(values),
+export async function requestDeleteProject(sessionId: string, projectId: string) {
+  const result = await api<{ projectId: string }>('delete_project', {
+    sessionId,
+    projectId,
   })
-  const payload = await response.json() as ApiResponse<{ project: ProjectItem }>
-
-  return readPayload(response, payload, '更新项目失败').project
-}
-
-export async function requestDeleteProject(projectId: string) {
-  const response = await fetch(`/api/v1/projects/${projectId}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  })
-  const payload = await response.json() as ApiResponse<{ projectId: string }>
-
-  return readPayload(response, payload, '删除项目失败').projectId
+  return result.projectId
 }

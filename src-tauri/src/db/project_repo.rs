@@ -1,0 +1,488 @@
+use rusqlite::params;
+use uuid::Uuid;
+
+use crate::db::client::Db;
+use crate::models::{ProjectItem, ProjectMember, ProjectInvitation, ProjectStateSnapshot, ApiMenuData, RecycleDataItem, ApiEnvironment, ProjectEnvironmentConfig};
+
+pub fn list_projects(db: &Db, user_id: &str) -> Result<Vec<ProjectItem>, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    let mut stmt = conn.prepare(
+        "SELECT p.id, p.name, p.owner_id, p.created_at, COALESCE(p.icon, '') as icon,
+                pm.role,
+                (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count
+         FROM projects p
+         JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?1
+         ORDER BY p.created_at DESC",
+    )?;
+
+    let rows = stmt.query_map(params![user_id], |row| {
+        Ok(ProjectItem {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            owner_id: row.get(2)?,
+            created_at: row.get(3)?,
+            icon: row.get::<_, String>(4).unwrap_or_default(),
+            role: row.get(5)?,
+            member_count: row.get(6)?,
+        })
+    })?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.into())
+}
+
+pub fn create_project(
+    db: &Db,
+    name: &str,
+    icon: &str,
+    owner_id: &str,
+) -> Result<ProjectItem, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    let id = Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    conn.execute(
+        "INSERT INTO projects (id, name, owner_id, created_at, icon) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![id, name, owner_id, now, icon],
+    )?;
+
+    conn.execute(
+        "INSERT INTO project_members (project_id, user_id, role, created_at) VALUES (?1, ?2, 'owner', ?3)",
+        params![id, owner_id, now],
+    )?;
+
+    Ok(ProjectItem {
+        id,
+        name: name.to_string(),
+        owner_id: owner_id.to_string(),
+        created_at: now,
+        icon: icon.to_string(),
+        role: "owner".to_string(),
+        member_count: 1,
+    })
+}
+
+pub fn get_project(
+    db: &Db,
+    project_id: &str,
+    user_id: &str,
+) -> Result<Option<ProjectItem>, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    let result = conn.query_row(
+        "SELECT p.id, p.name, p.owner_id, p.created_at, COALESCE(p.icon, ''), pm.role,
+                (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count
+         FROM projects p
+         JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?2
+         WHERE p.id = ?1",
+        params![project_id, user_id],
+        |row| {
+            Ok(ProjectItem {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                owner_id: row.get(2)?,
+                created_at: row.get(3)?,
+                icon: row.get::<_, String>(4).unwrap_or_default(),
+                role: row.get(5)?,
+                member_count: row.get(6)?,
+            })
+        },
+    );
+
+    match result {
+        Ok(item) => Ok(Some(item)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub fn get_project_by_id(
+    db: &Db,
+    project_id: &str,
+) -> Result<Option<(String, String)>, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    let result = conn.query_row(
+        "SELECT id, name FROM projects WHERE id = ?1",
+        params![project_id],
+        |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+    );
+    match result {
+        Ok(item) => Ok(Some(item)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub fn update_project(
+    db: &Db,
+    project_id: &str,
+    name: &str,
+    icon: &str,
+) -> Result<(), crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    conn.execute(
+        "UPDATE projects SET name = ?1, icon = ?2 WHERE id = ?3",
+        params![name, icon, project_id],
+    )?;
+    Ok(())
+}
+
+pub fn delete_project(db: &Db, project_id: &str) -> Result<(), crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    conn.execute("DELETE FROM projects WHERE id = ?1", params![project_id])?;
+    Ok(())
+}
+
+pub fn get_project_member_role(
+    db: &Db,
+    project_id: &str,
+    user_id: &str,
+) -> Option<String> {
+    let conn = db.0.lock().unwrap();
+    conn.query_row(
+        "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+        params![project_id, user_id],
+        |row| row.get(0),
+    )
+    .ok()
+}
+
+pub fn get_project_owner_id(db: &Db, project_id: &str) -> Option<String> {
+    let conn = db.0.lock().unwrap();
+    conn.query_row(
+        "SELECT owner_id FROM projects WHERE id = ?1",
+        params![project_id],
+        |row| row.get(0),
+    )
+    .ok()
+}
+
+pub fn list_project_members(
+    db: &Db,
+    project_id: &str,
+) -> Result<Vec<ProjectMember>, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    let mut stmt = conn.prepare(
+        "SELECT u.id, u.username, pm.role, pm.created_at
+         FROM project_members pm JOIN users u ON u.id = pm.user_id
+         WHERE pm.project_id = ?1",
+    )?;
+
+    let rows = stmt.query_map(params![project_id], |row| {
+        Ok(ProjectMember {
+            id: row.get(0)?,
+            username: row.get(1)?,
+            role: row.get(2)?,
+            created_at: row.get(3)?,
+        })
+    })?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.into())
+}
+
+pub fn add_project_member(
+    db: &Db,
+    project_id: &str,
+    target_username: &str,
+    role: &str,
+) -> Result<(), crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+
+    let target_user: Option<(String,)> = conn
+        .query_row(
+            "SELECT id FROM users WHERE username = ?1",
+            params![target_username],
+            |row| Ok((row.get(0)?,)),
+        )
+        .ok();
+
+    let target_id = match target_user {
+        Some(u) => u.0,
+        None => return Err(crate::errors::AppError::NotFound("用户不存在".into())),
+    };
+
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT OR REPLACE INTO project_members (project_id, user_id, role, created_at) VALUES (?1, ?2, ?3, ?4)",
+        params![project_id, target_id, role, now],
+    )?;
+
+    Ok(())
+}
+
+pub fn update_member_role(
+    db: &Db,
+    project_id: &str,
+    user_id: &str,
+    role: &str,
+) -> Result<(), crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    conn.execute(
+        "UPDATE project_members SET role = ?1 WHERE project_id = ?2 AND user_id = ?3",
+        params![role, project_id, user_id],
+    )?;
+    Ok(())
+}
+
+pub fn remove_project_member(
+    db: &Db,
+    project_id: &str,
+    user_id: &str,
+) -> Result<(), crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    conn.execute(
+        "DELETE FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+        params![project_id, user_id],
+    )?;
+    Ok(())
+}
+
+pub fn list_project_invitations(
+    db: &Db,
+    project_id: &str,
+) -> Result<Vec<ProjectInvitation>, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    let mut stmt = conn.prepare(
+        "SELECT pi.id, pi.project_id, p.name, pi.inviter_user_id, inv.username,
+                pi.accepted_by_user_id, pi.role, pi.status, pi.expires_at, pi.accepted_at, pi.created_at
+         FROM project_invitations pi
+         JOIN projects p ON p.id = pi.project_id
+         JOIN users inv ON inv.id = pi.inviter_user_id
+         WHERE pi.project_id = ?1
+         ORDER BY pi.created_at DESC",
+    )?;
+
+    let rows = stmt.query_map(params![project_id], |row| {
+        Ok(ProjectInvitation {
+            id: row.get(0)?,
+            project_id: row.get(1)?,
+            project_name: row.get(2)?,
+            inviter_user_id: row.get(3)?,
+            inviter_username: row.get(4)?,
+            accepted_by_user_id: row.get(5)?,
+            role: row.get(6)?,
+            status: row.get(7)?,
+            expires_at: row.get(8)?,
+            accepted_at: row.get(9)?,
+            created_at: row.get(10)?,
+        })
+    })?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.into())
+}
+
+pub fn create_project_invitation(
+    db: &Db,
+    project_id: &str,
+    inviter_user_id: &str,
+    role: &str,
+    expires_in_hours: i32,
+) -> Result<ProjectInvitation, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    let id = Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    let expires_at = chrono::Utc::now().timestamp_millis() + (expires_in_hours as i64) * 60 * 60 * 1000;
+
+    conn.execute(
+        "INSERT INTO project_invitations (id, project_id, inviter_user_id, role, status, expires_at, created_at)
+         VALUES (?1, ?2, ?3, ?4, 'pending', ?5, ?6)",
+        params![id, project_id, inviter_user_id, role, expires_at, now],
+    )?;
+
+    Ok(ProjectInvitation {
+        id,
+        project_id: project_id.to_string(),
+        project_name: None,
+        inviter_user_id: inviter_user_id.to_string(),
+        inviter_username: None,
+        accepted_by_user_id: None,
+        role: role.to_string(),
+        status: "pending".to_string(),
+        expires_at,
+        accepted_at: None,
+        created_at: now,
+    })
+}
+
+pub fn get_project_invitation(
+    db: &Db,
+    invite_id: &str,
+) -> Option<ProjectInvitation> {
+    let conn = db.0.lock().unwrap();
+    conn.query_row(
+        "SELECT pi.id, pi.project_id, p.name, pi.inviter_user_id, inv.username,
+                pi.accepted_by_user_id, pi.role, pi.status, pi.expires_at, pi.accepted_at, pi.created_at
+         FROM project_invitations pi
+         JOIN projects p ON p.id = pi.project_id
+         JOIN users inv ON inv.id = pi.inviter_user_id
+         WHERE pi.id = ?1",
+        params![invite_id],
+        |row| {
+            Ok(ProjectInvitation {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                project_name: row.get(2)?,
+                inviter_user_id: row.get(3)?,
+                inviter_username: row.get(4)?,
+                accepted_by_user_id: row.get(5)?,
+                role: row.get(6)?,
+                status: row.get(7)?,
+                expires_at: row.get(8)?,
+                accepted_at: row.get(9)?,
+                created_at: row.get(10)?,
+            })
+        },
+    ).ok()
+}
+
+pub fn accept_project_invitation(
+    db: &Db,
+    invite_id: &str,
+    user_id: &str,
+) -> Result<InviteAcceptResult, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+
+    let invite = conn.query_row(
+        "SELECT id, project_id, role, status, expires_at FROM project_invitations WHERE id = ?1",
+        params![invite_id],
+        |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, i64>(4)?,
+            ))
+        },
+    ).map_err(|_| crate::errors::AppError::NotFound("邀请不存在".into()))?;
+
+    if invite.3 != "pending" {
+        return Err(crate::errors::AppError::BadRequest("邀请已处理".into()));
+    }
+
+    let now_millis = chrono::Utc::now().timestamp_millis();
+    if invite.4 <= now_millis {
+        return Err(crate::errors::AppError::BadRequest("邀请已过期".into()));
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE project_invitations SET status = 'accepted', accepted_by_user_id = ?1, accepted_at = ?2 WHERE id = ?3",
+        params![user_id, now, invite_id],
+    )?;
+
+    conn.execute(
+        "INSERT OR REPLACE INTO project_members (project_id, user_id, role, created_at) VALUES (?1, ?2, ?3, ?4)",
+        params![invite.1, user_id, invite.2, now],
+    )?;
+
+    Ok(InviteAcceptResult {
+        project_id: invite.1,
+        project_name: None,
+    })
+}
+
+pub struct InviteAcceptResult {
+    pub project_id: String,
+    pub project_name: Option<String>,
+}
+
+pub fn revoke_project_invitation(
+    db: &Db,
+    project_id: &str,
+    invite_id: &str,
+) -> Result<(), crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    conn.execute(
+        "DELETE FROM project_invitations WHERE id = ?1 AND project_id = ?2",
+        params![invite_id, project_id],
+    )?;
+    Ok(())
+}
+
+// Project State
+pub fn get_project_state(
+    db: &Db,
+    project_id: &str,
+) -> Result<ProjectStateSnapshot, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+
+    let mut stmt = conn.prepare(
+        "SELECT id, parent_id, name, type, data_json, sort_order, created_at, updated_at
+         FROM menu_items WHERE project_id = ?1 ORDER BY sort_order",
+    )?;
+    let menu_raw_list: Vec<ApiMenuData> = stmt
+        .query_map(params![project_id], |row| {
+            Ok(ApiMenuData {
+                id: row.get(0)?,
+                parent_id: row.get(1)?,
+                name: row.get(2)?,
+                menu_type: row.get(3)?,
+                data_json: row.get::<_, Option<String>>(4).ok().flatten()
+                    .and_then(|s| serde_json::from_str(&s).ok()),
+                sort_order: row.get(5)?,
+                created_at: row.get(6)?,
+                updated_at: row.get(7)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut stmt2 = conn.prepare(
+        "SELECT id, catalog_type, deleted_item_json, creator_json, expires_at, created_at
+         FROM recycle_items WHERE project_id = ?1 ORDER BY created_at DESC",
+    )?;
+    let recyle_raw_data: Vec<RecycleDataItem> = stmt2
+        .query_map(params![project_id], |row| {
+            Ok(RecycleDataItem {
+                id: row.get(0)?,
+                catalog_type: row.get(1)?,
+                deleted_item_json: serde_json::from_str(
+                    &row.get::<_, String>(2).unwrap_or_default(),
+                )
+                .unwrap_or_default(),
+                creator_json: serde_json::from_str(
+                    &row.get::<_, String>(3).unwrap_or_default(),
+                )
+                .unwrap_or_default(),
+                expires_at: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let env_config_str: Option<String> = conn
+        .query_row(
+            "SELECT value FROM meta WHERE project_id = ?1 AND key = 'environmentConfig'",
+            params![project_id],
+            |row| row.get(0),
+        )
+        .ok();
+
+    let project_environment_config: ProjectEnvironmentConfig = env_config_str
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or(ProjectEnvironmentConfig {
+            global_parameters: serde_json::json!({}),
+            legacy_global_parameters: vec![],
+            global_variables: vec![],
+            vault_secrets: vec![],
+            environments: vec![],
+        });
+
+    let env_str: Option<String> = conn
+        .query_row(
+            "SELECT value FROM meta WHERE project_id = ?1 AND key = 'environments'",
+            params![project_id],
+            |row| row.get(0),
+        )
+        .ok();
+
+    let project_environments: Vec<ApiEnvironment> = env_str
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .or_else(|| serde_json::from_value(serde_json::Value::Array(project_environment_config.environments.clone())).ok())
+        .unwrap_or_default();
+
+    Ok(ProjectStateSnapshot {
+        menu_raw_list,
+        recyle_raw_data,
+        project_environments,
+        project_environment_config,
+    })
+}

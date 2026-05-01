@@ -1,20 +1,22 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { Button, Input, Modal, Space, Table, Typography, message } from 'antd'
 import { CopyIcon, LinkIcon, PencilIcon, PlusIcon, TrashIcon } from 'lucide-react'
+
+import { api } from '@/api-client'
+import { useAuth } from '@/contexts/auth'
 
 interface TokenItem {
   id: string
   token: string
   name: string
-  created_at: string
+  createdAt: string
 }
 
-const PORT_STORAGE_KEY = 'token_panel_custom_port'
-
 export function TokenPanel({ projectId }: { projectId?: string }) {
+  const { sessionId } = useAuth()
   const [tokens, setTokens] = useState<TokenItem[]>([])
   const [loading, setLoading] = useState(false)
   const [msgApi, contextHolder] = message.useMessage()
@@ -22,80 +24,98 @@ export function TokenPanel({ projectId }: { projectId?: string }) {
   const [newTokenName, setNewTokenName] = useState('')
   const [creating, setCreating] = useState(false)
   const [newlyCreated, setNewlyCreated] = useState<TokenItem | null>(null)
+
+  // YApi server port state
+  const [yapiPort, setYapiPort] = useState<number>(0)
   const [editingPort, setEditingPort] = useState(false)
-  const [customPort, setCustomPort] = useState(() => {
-    try { return localStorage.getItem(PORT_STORAGE_KEY) ?? '' }
-    catch { return '' }
-  })
+  const [customPort, setCustomPort] = useState('')
+  const [restarting, setRestarting] = useState(false)
 
-  const serverUrl = useMemo(() => {
-    const loc = window.location
-    const port = customPort || loc.port || (loc.protocol === 'https:' ? '443' : '80')
-    return `${loc.protocol}//${loc.hostname}:${port}`
-  }, [customPort])
+  const serverUrl = yapiPort > 0 ? `http://127.0.0.1:${yapiPort}` : '服务器启动中...'
 
-  const handleSavePort = () => {
-    try { localStorage.setItem(PORT_STORAGE_KEY, customPort) }
-    catch { /* ignore */ }
-    setEditingPort(false)
+  // Fetch YApi server info
+  const fetchYapiInfo = useCallback(async () => {
+    try {
+      const info = await api<{ port: number; address: string }>('get_yapi_server_info')
+      if (info.port > 0) {
+        setYapiPort(info.port)
+      }
+    } catch {
+      // Server may not be ready yet
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchYapiInfo()
+  }, [fetchYapiInfo])
+
+  // Handle port change
+  const handleSavePort = async () => {
+    const portNum = parseInt(customPort, 10)
+    if (!portNum || portNum < 1 || portNum > 65535) {
+      msgApi.error('请输入有效的端口号 (1-65535)')
+      return
+    }
+
+    try {
+      setRestarting(true)
+      const info = await api<{ port: number; address: string }>('restart_yapi_server', { port: portNum })
+      setYapiPort(info.port)
+      setEditingPort(false)
+      msgApi.success(`服务器已切换至端口 ${info.port}`)
+    } catch (err) {
+      msgApi.error((err as Error).message)
+    } finally {
+      setRestarting(false)
+    }
   }
 
   const fetchTokens = useCallback(async () => {
-    if (!projectId) return
+    if (!projectId || !sessionId) return
 
     setLoading(true)
 
     try {
-      const resp = await fetch(`/api/v1/projects/${projectId}/tokens`, {
-        credentials: 'include',
+      const payload = await api<{ tokens?: TokenItem[] }>('list_project_tokens', {
+        sessionId,
+        projectId,
       })
-      const payload = await resp.json() as { ok: boolean, data?: TokenItem[], error?: string }
 
-      if (!resp.ok || !payload.ok) {
-        throw new Error(payload.error ?? '加载失败')
-      }
-
-      setTokens(payload.data ?? [])
-    }
-    catch (error) {
+      setTokens(payload.tokens ?? [])
+    } catch (error) {
       msgApi.error((error as Error).message)
-    }
-    finally {
+    } finally {
       setLoading(false)
     }
-  }, [projectId, msgApi])
+  }, [projectId, sessionId, msgApi])
 
   useEffect(() => {
     void fetchTokens()
   }, [fetchTokens])
 
   const handleCreate = async () => {
-    if (!projectId) return
+    if (!projectId || !sessionId) return
 
     setCreating(true)
 
     try {
-      const resp = await fetch(`/api/v1/projects/${projectId}/tokens`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newTokenName.trim() || 'default' }),
+      const payload = await api<{ token?: TokenItem }>('create_project_token', {
+        sessionId,
+        projectId,
+        payload: { name: newTokenName.trim() || 'default' },
       })
-      const payload = await resp.json() as { ok: boolean, data?: TokenItem, error?: string }
 
-      if (!resp.ok || !payload.ok || !payload.data) {
-        throw new Error(payload.error ?? '创建失败')
+      if (!payload.token) {
+        throw new Error('创建失败')
       }
 
-      setNewlyCreated(payload.data)
+      setNewlyCreated(payload.token)
       setCreateModalOpen(false)
       setNewTokenName('')
       void fetchTokens()
-    }
-    catch (error) {
+    } catch (error) {
       msgApi.error((error as Error).message)
-    }
-    finally {
+    } finally {
       setCreating(false)
     }
   }
@@ -105,24 +125,17 @@ export function TokenPanel({ projectId }: { projectId?: string }) {
       title: '删除 Token',
       content: '删除后使用此 Token 的第三方工具将无法访问项目。确定删除？',
       onOk: async () => {
-        if (!projectId) return
+        if (!projectId || !sessionId) return
 
         try {
-          const resp = await fetch(`/api/v1/projects/${projectId}/tokens`, {
-            method: 'DELETE',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id }),
+          await api('delete_project_token', {
+            sessionId,
+            projectId,
+            tokenId: id,
           })
-          const payload = await resp.json() as { ok: boolean, error?: string }
-
-          if (!resp.ok || !payload.ok) {
-            throw new Error(payload.error ?? '删除失败')
-          }
 
           void fetchTokens()
-        }
-        catch (error) {
+        } catch (error) {
           msgApi.error((error as Error).message)
         }
       },
@@ -142,6 +155,9 @@ export function TokenPanel({ projectId }: { projectId?: string }) {
         <div className="mb-2 flex items-center gap-2">
           <LinkIcon size={14} />
           <Typography.Text strong>插件同步地址</Typography.Text>
+          {yapiPort > 0 && (
+            <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-green-500" title="服务器运行中" />
+          )}
         </div>
         <Typography.Text type="secondary" className="mb-3 block text-xs">
           在 EasyAPI 等插件中配置以下 Server URL 和 Token 即可导入接口。
@@ -157,12 +173,13 @@ export function TokenPanel({ projectId }: { projectId?: string }) {
             复制
           </Button>
           <Button
+            loading={restarting}
             type="text"
             size="small"
             icon={<PencilIcon size={14} />}
             onClick={() => {
-              setCustomPort(window.location.port || '')
-              setEditingPort(true)
+              setCustomPort(String(yapiPort || 14202))
+              setEditingPort(!editingPort)
             }}
           >
             修改端口
@@ -176,13 +193,16 @@ export function TokenPanel({ projectId }: { projectId?: string }) {
           <Input
             size="small"
             className="w-24"
-            placeholder={window.location.port || '49128'}
+            placeholder="14202"
             value={customPort}
             onChange={(e) => setCustomPort(e.target.value)}
-            onPressEnter={handleSavePort}
+            onPressEnter={() => void handleSavePort()}
           />
-          <Button size="small" type="primary" onClick={handleSavePort}>确定</Button>
+          <Button size="small" type="primary" loading={restarting} onClick={() => void handleSavePort()}>确定</Button>
           <Button size="small" onClick={() => setEditingPort(false)}>取消</Button>
+          <Typography.Text type="secondary" className="text-xs">
+            修改后插件同步地址将自动更新
+          </Typography.Text>
         </div>
       )}
 
@@ -225,7 +245,7 @@ export function TokenPanel({ projectId }: { projectId?: string }) {
           },
           {
             title: '创建时间',
-            dataIndex: 'created_at',
+            dataIndex: 'createdAt',
             width: 180,
             render: (text: string) => new Date(text).toLocaleString(),
           },

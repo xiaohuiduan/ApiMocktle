@@ -3,25 +3,28 @@
 import { useState } from 'react'
 
 import { Button, Card, Form, Input, Typography, message } from 'antd'
-import { Link, useLocation, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 
-import { resolveAuthRedirectTarget } from '@/router/auth-redirect'
+import { useAuth } from '@/contexts/auth'
+
+function resolveRedirectTarget(value: string | null | undefined) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) {
+    return '/projects'
+  }
+  return value
+}
 
 interface AuthFormProps {
   mode: 'login' | 'register'
-}
-
-interface AuthResponse {
-  ok: boolean
-  error: string | null
 }
 
 export function AuthForm(props: AuthFormProps) {
   const { mode } = props
   const [submitting, setSubmitting] = useState(false)
   const navigate = useNavigate()
-  const { search } = useLocation()
-  const redirectTo = resolveAuthRedirectTarget(new URLSearchParams(search).get('redirect'))
+  const [searchParams] = useSearchParams()
+  const { login, register } = useAuth()
+  const redirectTo = resolveRedirectTarget(searchParams.get('redirect'))
   const peerAuthPath = `${mode === 'login' ? '/register' : '/login'}?redirect=${encodeURIComponent(redirectTo)}`
 
   return (
@@ -37,17 +40,10 @@ export function AuthForm(props: AuthFormProps) {
             setSubmitting(true)
 
             try {
-              const response = await fetch(`/api/v1/auth/${mode}`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(values),
-              })
-
-              const payload = await response.json() as AuthResponse
-
-              if (!response.ok || !payload.ok) {
-                throw new Error(payload.error ?? `${mode} 失败`)
+              if (mode === 'login') {
+                await login(values.username, values.password)
+              } else {
+                await register(values.username, values.password)
               }
 
               message.success(mode === 'login' ? '登录成功' : '注册成功')

@@ -12,6 +12,8 @@ import type {
   RecycleData,
   RecycleDataItem,
 } from '@/types'
+import { api } from '@/api-client'
+import { useAuth } from '@/contexts/auth'
 
 interface MenuHelpers {
   addMenuItem: (menuData: ApiMenuData) => void
@@ -27,7 +29,6 @@ interface MenuHelpers {
     dropPosition: 0 | -1 | 1
   }) => void
   updateProjectEnvironmentConfig: (config: ProjectEnvironmentConfig) => Promise<void>
-  /** 将服务端返回的快照写入界面（如导入接口返回的 data），避免仅依赖二次 GET */
   applyServerState: (state: ProjectStateSnapshot) => void
   reloadState: () => Promise<void>
 }
@@ -55,12 +56,6 @@ export interface ProjectStateSnapshot {
 }
 
 type StatePayload = ProjectStateSnapshot
-
-interface ApiResult<T> {
-  ok: boolean
-  data: T
-  error: string | null
-}
 
 const MenuHelpersContext = createContext({} as MenuHelpersContextData)
 const getStateCacheKey = (projectId: string) => `project-state:${projectId}`
@@ -165,6 +160,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
   const { children } = props
 
   const projectId = useProjectId()
+  const { sessionId } = useAuth()
   const [menuRawList, setMenuRawList] = useState<ApiMenuData[]>()
   const [recyleRawData, setRecyleRawData] = useState<RecycleData>()
   const [projectEnvironments, setProjectEnvironments] = useState<ApiEnvironment[]>([])
@@ -188,29 +184,12 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
     }
   }, [projectId])
 
-  const requestState = useCallback(
-    async (input: RequestInfo, init?: RequestInit) => {
-      const response = await fetch(input, {
-        ...init,
-        credentials: 'include',
-      })
-      const payload = await response.json() as ApiResult<StatePayload>
-
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? '请求失败')
-      }
-
-      applyState(payload.data)
-    },
-    [applyState],
-  )
-
   const applyServerState = useCallback((state: ProjectStateSnapshot) => {
     applyState(state)
   }, [applyState])
 
   const reloadState = useCallback(async () => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       setMenuRawList(undefined)
       setRecyleRawData(undefined)
       setProjectEnvironments([])
@@ -220,12 +199,16 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
     }
 
     try {
-      await requestState(`/api/v1/projects/${projectId}/state`, { method: 'GET' })
+      const state = await api<StatePayload>('get_project_state', {
+        sessionId,
+        projectId,
+      })
+      applyState(state)
     }
     catch (error) {
       console.error(error)
     }
-  }, [projectId, requestState])
+  }, [projectId, sessionId, applyState])
 
   useEffect(() => {
     if (projectId) {
@@ -271,23 +254,46 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         return undefined
       }
 
+      if (!sessionId) {
+        return undefined
+      }
+
       return projectId
     }
 
     const mutateRecycleItems = (method: 'DELETE' | 'POST', recycleIds: string[]) => {
       const id = guardProject()
 
-      if (!id || recycleIds.length === 0) {
+      if (!id || recycleIds.length === 0 || !sessionId) {
         return
       }
 
-      void requestState(`/api/v1/projects/${id}/recycle`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recycleIds }),
-      }).catch((error: unknown) => {
-        console.error(error)
-      })
+      if (method === 'POST') {
+        // Restore each item
+        void Promise.all(
+          recycleIds.map((recycleId) =>
+            api<unknown>('restore_recycle_item', {
+              sessionId,
+              projectId: id,
+              recycleId,
+            }),
+          ),
+        )
+          .then(() => reloadState())
+          .catch((error: unknown) => {
+            console.error(error)
+          })
+      } else {
+        void api<unknown>('delete_recycle_items', {
+          sessionId,
+          projectId: id,
+          payload: { recycleIds },
+        })
+          .then(() => reloadState())
+          .catch((error: unknown) => {
+            console.error(error)
+          })
+      }
     }
 
     return {
@@ -296,58 +302,68 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
       addMenuItem: (menuData) => {
         const id = guardProject()
 
-        if (!id) {
+        if (!id || !sessionId) {
           return
         }
 
-        void requestState(`/api/v1/projects/${id}/menu-items`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(menuData),
-        }).catch((error: unknown) => {
-          console.error(error)
+        void api<unknown>('create_menu_item', {
+          sessionId,
+          projectId: id,
+          payload: menuData,
         })
+          .then(() => reloadState())
+          .catch((error: unknown) => {
+            console.error(error)
+          })
       },
       removeMenuItem: ({ id: menuId }) => {
         const id = guardProject()
 
-        if (!id) {
+        if (!id || !sessionId) {
           return
         }
 
-        void requestState(`/api/v1/projects/${id}/menu-items/${menuId}`, {
-          method: 'DELETE',
-        }).catch((error: unknown) => {
-          console.error(error)
+        void api<unknown>('delete_menu_item', {
+          sessionId,
+          projectId: id,
+          menuId,
         })
+          .then(() => reloadState())
+          .catch((error: unknown) => {
+            console.error(error)
+          })
       },
       removeMenuItems: async (menuIds) => {
         const id = guardProject()
 
-        if (!id || menuIds.length === 0) {
+        if (!id || menuIds.length === 0 || !sessionId) {
           return
         }
 
-        await requestState(`/api/v1/projects/${id}/menu-items/batch-delete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ menuIds }),
+        await api<unknown>('batch_delete_menu_items', {
+          sessionId,
+          projectId: id,
+          payload: { menuIds },
         })
+        await reloadState()
       },
       updateMenuItem: ({ id: menuId, ...rest }) => {
         const id = guardProject()
 
-        if (!id) {
+        if (!id || !sessionId) {
           return
         }
 
-        void requestState(`/api/v1/projects/${id}/menu-items/${menuId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(rest),
-        }).catch((error: unknown) => {
-          console.error(error)
+        void api<unknown>('update_menu_item', {
+          sessionId,
+          projectId: id,
+          menuId,
+          payload: rest,
         })
+          .then(() => reloadState())
+          .catch((error: unknown) => {
+            console.error(error)
+          })
       },
       restoreMenuItem: ({ restoreId }) => {
         mutateRecycleItems('POST', [restoreId])
@@ -361,33 +377,36 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
       moveMenuItem: ({ dragKey, dropKey, dropPosition }) => {
         const id = guardProject()
 
-        if (!id) {
+        if (!id || !sessionId) {
           return
         }
 
-        void requestState(`/api/v1/projects/${id}/menu-items/move`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dragKey, dropKey, dropPosition }),
-        }).catch((error: unknown) => {
-          console.error(error)
+        void api<unknown>('move_menu_items', {
+          sessionId,
+          projectId: id,
+          payload: { dragKey, dropKey, dropPosition },
         })
+          .then(() => reloadState())
+          .catch((error: unknown) => {
+            console.error(error)
+          })
       },
       updateProjectEnvironmentConfig: async (config) => {
         const id = guardProject()
 
-        if (!id) {
+        if (!id || !sessionId) {
           return
         }
 
-        await requestState(`/api/v1/projects/${id}/environments`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ config }),
+        const state = await api<StatePayload>('save_project_environments', {
+          sessionId,
+          projectId: id,
+          payload: { config },
         })
+        applyState(state)
       },
     }
-  }, [applyServerState, projectId, reloadState, requestState])
+  }, [applyServerState, projectId, sessionId, reloadState, applyState])
 
   return (
     <MenuHelpersContext.Provider

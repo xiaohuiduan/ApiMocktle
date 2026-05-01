@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Modal, Space, Spin, Typography, message, theme } from 'antd'
 import { useNavigate } from 'react-router'
 
+import { useAuth } from '@/contexts/auth'
 import { ICON_OPTIONS, ProjectIcon } from '@/components/ProjectIcon'
 import {
   ApiRequestError,
@@ -68,6 +69,7 @@ function getSubmitErrorTitle(dialog: ProjectDialogState) {
 export function ProjectsClient() {
   const { token } = theme.useToken()
   const navigate = useNavigate()
+  const { sessionId, logout } = useAuth()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [projects, setProjects] = useState<ProjectItem[]>([])
@@ -76,10 +78,11 @@ export function ProjectsClient() {
   const [messageApi, contextHolder] = message.useMessage()
 
   const fetchProjects = async () => {
+    if (!sessionId) return
     setLoading(true)
 
     try {
-      setProjects(await requestProjects())
+      setProjects(await requestProjects(sessionId))
     }
     catch (error) {
       if (isUnauthorized(error)) {
@@ -99,7 +102,7 @@ export function ProjectsClient() {
 
   useEffect(() => {
     void fetchProjects()
-  }, [])
+  }, [sessionId])
 
   const closeDialog = () => {
     setDialog(null)
@@ -117,18 +120,19 @@ export function ProjectsClient() {
   }
 
   const submitProject = async (values: ProjectFormValues) => {
+    if (!sessionId) return
     setSubmitting(true)
 
     try {
       if (dialog?.mode === 'edit') {
-        await requestUpdateProject(dialog.project.id, values)
+        await requestUpdateProject(sessionId, dialog.project.id, values)
         closeDialog()
         await fetchProjects()
         messageApi.success('项目已更新')
         return
       }
 
-      const project = await requestCreateProject(values)
+      const project = await requestCreateProject(sessionId, values)
 
       closeDialog()
       await fetchProjects()
@@ -152,15 +156,16 @@ export function ProjectsClient() {
 
   const confirmDeleteProject = (project: ProjectItem) => {
     Modal.confirm({
-      title: `删除项目“${project.name}”？`,
+      title: `删除项目"${project.name}"？`,
       content: '项目下的成员、接口、环境和回收站数据都会被彻底删除。',
       okText: '删除',
       okButtonProps: { danger: true },
       cancelText: '取消',
       maskClosable: true,
       onOk: async () => {
+        if (!sessionId) return
         try {
-          await requestDeleteProject(project.id)
+          await requestDeleteProject(sessionId, project.id)
           await fetchProjects()
           messageApi.success('项目已删除')
         }
@@ -192,10 +197,7 @@ export function ProjectsClient() {
         <Space className="ml-auto">
           <Button
             onClick={async () => {
-              await fetch('/api/v1/auth/logout', {
-                method: 'POST',
-                credentials: 'include',
-              })
+              await logout()
               navigate('/login', { replace: true })
             }}
           >

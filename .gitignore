@@ -15,6 +15,7 @@ next-env.d.ts
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
@@ -58,3 +59,4 @@ runtime/
 
 # Electron build output
 /release/
+src-tauri/target/**

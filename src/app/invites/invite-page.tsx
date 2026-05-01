@@ -6,23 +6,9 @@ import { Button, Card, Result, Space, Spin, Tag, Typography, message } from 'ant
 import dayjs from 'dayjs'
 import { Link, useNavigate, useParams } from 'react-router'
 
+import { api } from '@/api-client'
+import { useAuth } from '@/contexts/auth'
 import type { InvitationItem } from '@/components/project-settings/ProjectMembersSection'
-
-interface InvitationResponse {
-  ok: boolean
-  data?: {
-    invitation: InvitationItem
-    user: { id: string, username: string } | null
-    isCurrentUserMember: boolean
-  }
-  error: string | null
-}
-
-interface AcceptInvitationResponse {
-  ok: boolean
-  data?: { redirectTo: string }
-  error: string | null
-}
 
 function roleText(role: InvitationItem['role']) {
   return role === 'editor' ? '编辑者' : '查看者'
@@ -63,12 +49,12 @@ function statusColor(invitation: InvitationItem) {
 export default function ProjectInvitePage() {
   const navigate = useNavigate()
   const { inviteId } = useParams()
+  const { user, sessionId } = useAuth()
   const [messageApi, contextHolder] = message.useMessage()
   const [loading, setLoading] = useState(true)
   const [accepting, setAccepting] = useState(false)
   const [error, setError] = useState<string>()
   const [invitation, setInvitation] = useState<InvitationItem>()
-  const [user, setUser] = useState<{ id: string, username: string } | null>(null)
   const [isCurrentUserMember, setIsCurrentUserMember] = useState(false)
 
   const redirectTo = useMemo(() => {
@@ -76,7 +62,7 @@ export default function ProjectInvitePage() {
   }, [inviteId])
 
   useEffect(() => {
-    if (!inviteId) {
+    if (!inviteId || !sessionId) {
       setError('邀请不存在')
       setLoading(false)
       return
@@ -87,22 +73,19 @@ export default function ProjectInvitePage() {
     const fetchInvitation = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`/api/v1/project-invitations/${inviteId}`, {
-          credentials: 'include',
+        const payload = await api<{
+          invitation: InvitationItem
+          user: { id: string, username: string } | null
+          isCurrentUserMember: boolean
+        }>('get_project_invitation', {
+          sessionId,
+          inviteId,
         })
-        const payload = await response.json() as InvitationResponse
 
-        if (!response.ok || !payload.ok || !payload.data) {
-          throw new Error(payload.error ?? '加载邀请失败')
-        }
+        if (cancelled) return
 
-        if (cancelled) {
-          return
-        }
-
-        setInvitation(payload.data.invitation)
-        setUser(payload.data.user)
-        setIsCurrentUserMember(payload.data.isCurrentUserMember)
+        setInvitation(payload.invitation)
+        setIsCurrentUserMember(payload.isCurrentUserMember)
         setError(undefined)
       }
       catch (error) {
@@ -122,27 +105,20 @@ export default function ProjectInvitePage() {
     return () => {
       cancelled = true
     }
-  }, [inviteId])
+  }, [inviteId, sessionId])
 
   const handleAccept = async () => {
-    if (!inviteId) {
-      return
-    }
+    if (!inviteId || !sessionId) return
 
     try {
       setAccepting(true)
-      const response = await fetch(`/api/v1/project-invitations/${inviteId}/accept`, {
-        method: 'POST',
-        credentials: 'include',
+      const result = await api<{ projectId: string }>('accept_project_invitation', {
+        sessionId,
+        inviteId,
       })
-      const payload = await response.json() as AcceptInvitationResponse
-
-      if (!response.ok || !payload.ok || !payload.data) {
-        throw new Error(payload.error ?? '接受邀请失败')
-      }
 
       messageApi.success('已加入项目')
-      navigate(payload.data.redirectTo, { replace: true })
+      navigate(`/projects/${result.projectId}/home`, { replace: true })
     }
     catch (error) {
       messageApi.error((error as Error).message)

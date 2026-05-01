@@ -13,6 +13,9 @@ import {
   message,
 } from 'antd'
 
+import { api } from '@/api-client'
+import { useAuth } from '@/contexts/auth'
+
 export type Role = 'owner' | 'editor' | 'viewer'
 export type InviteRole = Exclude<Role, 'owner'>
 
@@ -111,15 +114,7 @@ function getInviteUrl(invitationId: string) {
     return `/invites/${invitationId}`
   }
 
-  return `${window.location.origin}/invites/${invitationId}`
-}
-
-async function readResult(response: Response, fallbackMessage: string) {
-  const payload = await response.json() as { ok: boolean, error: string | null }
-
-  if (!response.ok || !payload.ok) {
-    throw new Error(payload.error ?? fallbackMessage)
-  }
+  return `${window.location.origin}/#/invites/${invitationId}`
 }
 
 export function ProjectMembersSection(props: ProjectMembersSectionProps) {
@@ -132,25 +127,23 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
     loading,
     onRefresh,
   } = props
+  const { sessionId } = useAuth()
   const [msgApi, contextHolder] = message.useMessage()
   const [inviteForm] = Form.useForm<InviteFormValues>()
   const [submittingInvite, setSubmittingInvite] = useState(false)
 
   const handleInviteCreate = async (values: InviteFormValues) => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       return
     }
 
     try {
       setSubmittingInvite(true)
-      const response = await fetch(`/api/v1/projects/${projectId}/invitations`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
+      await api('create_project_invitation', {
+        sessionId,
+        projectId,
+        payload: { role: values.role, expiresInHours: values.expiresInHours },
       })
-
-      await readResult(response, '创建邀请失败')
       msgApi.success('邀请链接已创建')
       inviteForm.resetFields()
       inviteForm.setFieldsValue({ role: 'viewer', expiresInHours: DEFAULT_INVITE_TTL_HOURS })
@@ -165,19 +158,17 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
   }
 
   const handleMemberRoleChange = async (userId: string, nextRole: InviteRole) => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       return
     }
 
     try {
-      const response = await fetch(`/api/v1/projects/${projectId}/members/${userId}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: nextRole }),
+      await api('update_member_role', {
+        sessionId,
+        projectId,
+        userId,
+        payload: { role: nextRole },
       })
-
-      await readResult(response, '更新角色失败')
       msgApi.success('角色已更新')
       await onRefresh()
     }
@@ -187,17 +178,16 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
   }
 
   const handleMemberDelete = async (userId: string) => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       return
     }
 
     try {
-      const response = await fetch(`/api/v1/projects/${projectId}/members/${userId}`, {
-        method: 'DELETE',
-        credentials: 'include',
+      await api('remove_project_member', {
+        sessionId,
+        projectId,
+        userId,
       })
-
-      await readResult(response, '移除成员失败')
       msgApi.success('已移除成员')
       await onRefresh()
     }
@@ -207,17 +197,16 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
   }
 
   const handleInvitationRevoke = async (inviteId: string) => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       return
     }
 
     try {
-      const response = await fetch(`/api/v1/projects/${projectId}/invitations/${inviteId}`, {
-        method: 'DELETE',
-        credentials: 'include',
+      await api('revoke_project_invitation', {
+        sessionId,
+        projectId,
+        inviteId,
       })
-
-      await readResult(response, '撤销邀请失败')
       msgApi.success('邀请已撤销')
       await onRefresh()
     }

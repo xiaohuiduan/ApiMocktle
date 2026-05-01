@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
 import { useParams } from 'react-router'
 
+import { api } from '@/api-client'
+import { useAuth } from '@/contexts/auth'
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { SERVER_INHERIT } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
@@ -10,12 +12,6 @@ import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 import type { ApiDetails, ApiEnvironment, ApiFolder, ApiRunResult } from '@/types'
 
 const ABSOLUTE_URL_REGEX = /^https?:\/\//i
-
-interface ApiResponse<T> {
-  ok: boolean
-  data: T | null
-  error: string | null
-}
 
 function normalizeBaseUrl(value: string) {
   const normalized = value.trim()
@@ -63,6 +59,7 @@ export function useApiRequestRunner(apiId?: string) {
   const [error, setError] = useState<string>()
 
   const { projectId } = useParams()
+  const { sessionId } = useAuth()
   const { tabData } = useTabContentContext()
   const { messageApi } = useGlobalContext()
   const {
@@ -147,7 +144,7 @@ export function useApiRequestRunner(apiId?: string) {
   }, [projectEnvironments, resolveParentFolders])
 
   const run = useCallback(async (apiDetails: ApiDetails) => {
-    if (!projectId) {
+    if (!projectId || !sessionId) {
       const msg = '当前不在项目页面，无法运行请求'
       messageApi.error(msg)
       setError(msg)
@@ -162,19 +159,13 @@ export function useApiRequestRunner(apiId?: string) {
     try {
       const environmentId = resolveEnvironmentId(apiDetails)
       const baseUrlOverride = resolveBaseUrlOverride(apiDetails, environmentId)
-      const response = await fetch(`/api/v1/projects/${projectId}/requests/run`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiDetails, baseUrlOverride, environmentId }),
+      const payload = await api<ApiRunResult>('run_api_request', {
+        sessionId,
+        projectId,
+        payload: { apiDetails, environmentId },
       })
-      const payload = await response.json() as ApiResponse<ApiRunResult>
 
-      if (!response.ok || !payload.ok || !payload.data) {
-        throw new Error(payload.error ?? '运行失败')
-      }
-
-      setResult(payload.data)
+      setResult(payload)
     }
     catch (err) {
       const msg = err instanceof Error ? err.message : '运行失败'
@@ -184,7 +175,7 @@ export function useApiRequestRunner(apiId?: string) {
     finally {
       setRunning(false)
     }
-  }, [messageApi, projectId, resolveBaseUrlOverride, resolveEnvironmentId])
+  }, [messageApi, projectId, sessionId, resolveBaseUrlOverride, resolveEnvironmentId])
 
   const resetResult = useCallback(() => {
     setResult(undefined)
