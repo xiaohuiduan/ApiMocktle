@@ -346,6 +346,8 @@ pub struct RunRequestPayload {
     pub api_details: serde_json::Value,
     #[serde(rename = "environmentId")]
     pub environment_id: Option<String>,
+    #[serde(rename = "baseUrl")]
+    pub base_url: Option<String>,
 }
 
 // Collab

@@ -117,13 +117,13 @@ function sectionMeta(section: SettingsSectionKey) {
   if (section === SettingsSectionKey.ShareApi) {
     return {
       title: '接口分享',
-      description: '选择接口导出为 MHTML 文档，可离线查看完整的 API 接口文档。',
+      description: '选择接口导出为 MARKDOWN 文档，可离线查看完整的 API 接口文档。',
     }
   }
 
   return {
-    title: '导入接口',
-    description: '导入 OpenAPI 或 Postman 文档，并静默合并到当前项目资源。',
+    title: '导入导出接口',
+    description: '导入导出 OpenAPI 或 Postman 文档，并静默合并到当前项目资源。',
   }
 }
 

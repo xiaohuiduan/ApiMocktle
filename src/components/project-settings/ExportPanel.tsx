@@ -13,7 +13,7 @@ import { MenuItemType } from '@/enums'
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import type { ApiDetails } from '@/types'
-import { downloadMhtml } from '@/utils/api-doc-html'
+import { downloadMarkdown, type ExportTreeInput } from '@/utils/api-doc-markdown'
 
 interface ProjectInfo {
   id: string
@@ -91,23 +91,42 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
       const projectName = projectPayload.project?.name ?? 'API文档'
 
       // Collect selected API items with their full data (only ApiDetail type)
-      const selectedItems = menuRawList!
+      const apiItems = menuRawList!
         .filter((item) => checkedApiIds.has(item.id) && item.type === MenuItemType.ApiDetail && item.data)
         .map((item) => ({
           id: item.id,
           name: item.name,
-          data: item.data as import('@/types').ApiDetails,
+          parentId: item.parentId,
+          data: item.data as ApiDetails,
         }))
 
-      if (selectedItems.length === 0) {
+      if (apiItems.length === 0) {
         msgApi.error('所选接口暂无数据')
         return
       }
 
+      // Build folder tree from menuRawList
+      const folders = menuRawList!.filter((f) => f.type === MenuItemType.ApiDetailFolder)
+      const treeInput: ExportTreeInput = { folders: [], ungrouped: [], totalCount: apiItems.length }
+
+      for (const folder of folders) {
+        const children = apiItems.filter((api) => api.parentId === folder.id)
+        if (children.length > 0) {
+          treeInput.folders.push({
+            name: folder.name,
+            children: children.map(({ id, name, data }) => ({ id, name, data })),
+          })
+        }
+      }
+
+      treeInput.ungrouped = apiItems
+        .filter((api) => !api.parentId || !folders.some((f) => f.id === api.parentId))
+        .map(({ id, name, data }) => ({ id, name, data }))
+
       // Generate and show save dialog
-      const saved = await downloadMhtml(projectName, selectedItems)
+      const saved = await downloadMarkdown(projectName, treeInput)
       if (saved) {
-        msgApi.success(`已导出 ${selectedItems.length} 个接口`)
+        msgApi.success(`已导出 ${treeInput.totalCount} 个接口`)
         setExportModalOpen(false)
       }
     } catch (err) {
@@ -136,7 +155,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
       <Modal
         destroyOnClose
         open={exportModalOpen}
-        title="接口分享 — 导出 MHTML 文档"
+        title="接口分享 — 导出 Markdown 文档"
         width={640}
         onCancel={() => setExportModalOpen(false)}
         onOk={() => void handleExport()}

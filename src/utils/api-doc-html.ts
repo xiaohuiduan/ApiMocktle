@@ -16,16 +16,6 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function h(tag: string, attrs: Record<string, string>, body?: string): string {
-  const a = Object.entries(attrs)
-    .filter(([, v]) => v !== '')
-    .map(([k, v]) => ` ${k}="${esc(v)}"`)
-    .join('')
-  return body != null ? `<${tag}${a}>${body}</${tag}>` : `<${tag}${a} />`
-}
-
-// ── shared styles (inline) ──
-
 const CSS = `
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:14px;color:#333;background:#f5f5f5;line-height:1.6}
@@ -38,14 +28,23 @@ tr{border-bottom:1px solid #f0f0f0}
 .doc-header{background:#fff;border-bottom:1px solid #f0f0f0;padding:12px 24px;display:flex;align-items:center;gap:16px}
 .doc-header h1{font-size:18px;font-weight:600;margin:0}
 .doc-body{display:flex;min-height:calc(100vh - 53px)}
-.doc-sidebar{width:260px;flex-shrink:0;background:#fff;border-right:1px solid #f0f0f0;overflow-y:auto}
+.doc-sidebar{width:280px;flex-shrink:0;background:#fff;border-right:1px solid #f0f0f0;overflow-y:auto}
 .doc-sidebar-title{padding:8px 12px;font-size:12px;color:#999}
-.doc-sidebar-item{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #f5f5f5;font-size:13px;transition:background .15s}
+.folder-group{border-bottom:1px solid #f0f0f0}
+.folder-group summary{display:flex;align-items:center;gap:4px;padding:8px 12px;cursor:pointer;font-size:13px;font-weight:500;color:#555;list-style:none}
+.folder-group summary::-webkit-details-marker{display:none}
+.folder-group summary:hover{background:#f5f5f5}
+.folder-arrow{font-size:10px;width:14px;text-align:center;flex-shrink:0;display:inline-block;transition:transform .15s}
+details[open]>.folder-arrow{transform:rotate(90deg)}
+.folder-count{font-size:11px;color:#999;margin-left:auto}
+.doc-sidebar-item{display:flex;align-items:center;gap:6px;padding:6px 12px 6px 28px;border-bottom:1px solid #f9f9f9;font-size:12px;text-decoration:none;color:#333;transition:background .12s;cursor:pointer;user-select:none}
 .doc-sidebar-item:hover{background:#f0f7ff}
-.doc-sidebar-item.active{background:#e6f4ff}
-.doc-main{flex:1;overflow-y:auto;padding:24px}
+.doc-main{flex:1;overflow-y:auto;padding:24px;scroll-behavior:smooth}
+.placeholder{text-align:center;color:#999;padding:80px 0;font-size:14px}
 .method-tag{display:inline-block;padding:2px 6px;font-size:11px;font-weight:700;color:#fff;border-radius:3px;flex-shrink:0}
-.api-section{margin-bottom:24px;background:#fff;border:1px solid #f0f0f0;border-radius:6px;padding:24px}
+.api-radio{position:absolute;opacity:0;pointer-events:none}
+.api-section{background:#fff;border:1px solid #f0f0f0;border-radius:6px;padding:24px;margin-bottom:24px;display:none}
+.api-detail-active{display:block;border-color:#1677ff;box-shadow:0 0 0 2px rgba(22,119,255,.15)}
 .api-section h2{font-size:16px;margin-bottom:8px}
 .api-section h3{font-size:14px;margin:16px 0 8px}
 .schema-panel{border:1px solid #f0f0f0;border-radius:4px;overflow:hidden;display:grid;grid-template-columns:minmax(360px,1fr) minmax(240px,.9fr)}
@@ -54,17 +53,15 @@ tr{border-bottom:1px solid #f0f0f0}
 .schema-header{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#fafafa;border-bottom:1px solid #f0f0f0;font-size:12px}
 .schema-row{display:grid;grid-template-columns:2fr 1.2fr .8fr 2fr;gap:8px;padding:4px 12px;border-bottom:1px solid #f5f5f5;min-height:32px;align-items:center}
 .schema-field{padding:1px 6px;background:#e6f4ff;color:#1677ff;border-radius:4px;font-size:12px}
-.tabs{display:flex;border-bottom:1px solid #f0f0f0;margin-bottom:0}
-.tab{padding:6px 16px;font-size:13px;cursor:pointer;border:1px solid transparent;border-bottom:none;border-radius:4px 4px 0 0;margin-right:2px}
-.tab.active{background:#fff;border-color:#f0f0f0;font-weight:500}
 `
 
 // ── helpers ──
 
 function getTypeLabel(node: JsonSchema): string {
+  if (!node) return 'unknown'
   if (node.type === SchemaType.Array) return `array<${getTypeLabel(node.items)}>`
   if (node.type === SchemaType.Refer) return node.$ref
-  return node.type
+  return node.type ?? 'unknown'
 }
 
 interface SchemaFieldRow {
@@ -180,7 +177,7 @@ function renderSchemaPanel(schema?: JsonSchema): string {
   return `<span style="background:#f0f0f0;padding:2px 8px;border-radius:4px;font-size:12px">${esc(getTypeLabel(schema))}</span>`
 }
 
-function renderApiDetail(item: { name: string; data: ApiDetails }): string {
+function renderApiDetail(item: { id: string; name: string; data: ApiDetails }): string {
   const d = item.data
   const method = ((d as any).method ?? 'GET').toUpperCase()
   const path = (d as any).path ?? '/'
@@ -229,7 +226,7 @@ function renderApiDetail(item: { name: string; data: ApiDetails }): string {
     })
   }
 
-  return `<div class="api-section">
+  return `<div class="api-section api-detail-${esc(item.id)}" id="api-${esc(item.id)}">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
       ${renderMethodTag(method)}
       <strong style="font-size:18px">${esc(path)}</strong>
@@ -246,21 +243,86 @@ function renderApiDetail(item: { name: string; data: ApiDetails }): string {
   </div>`
 }
 
-function renderSidebar(items: { id: string; name: string; data: ApiDetails }[]): string {
-  return items.map(item => {
-    const method = ((item.data as any).method ?? 'GET').toUpperCase()
-    const path = (item.data as any).path ?? '/'
-    return `<div class="doc-sidebar-item">
-      ${renderMethodTag(method)}
-      <span style="font-size:12px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.name)}</span>
-      <span style="font-size:11px;color:#999;margin-left:auto">${esc(path)}</span>
-    </div>`
-  }).join('')
+// ── tree-structured data types & sidebar ──
+
+interface ExportApi {
+  id: string
+  name: string
+  data: ApiDetails
 }
 
-export function generateApiDocHtml(projectName: string, items: { id: string; name: string; data: ApiDetails }[]): string {
-  const sidebar = renderSidebar(items)
-  const main = items.map(item => renderApiDetail(item)).join('')
+interface ExportFolder {
+  name: string
+  children: ExportApi[]
+}
+
+function renderSidebarTree(folders: ExportFolder[], ungrouped: ExportApi[]): string {
+  let html = ''
+
+  for (const folder of folders) {
+    html += `<details class="folder-group" open>
+      <summary>
+        <span class="folder-arrow">&#9654;</span>
+        <span>${esc(folder.name)}</span>
+        <span class="folder-count">${folder.children.length}</span>
+      </summary>`
+    for (const api of folder.children) {
+      html += `<label class="doc-sidebar-item" for="r-${esc(api.id)}">
+        ${renderMethodTag((api.data as any).method ?? 'GET')}
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(api.name)}</span>
+      </label>`
+    }
+    html += '</details>'
+  }
+
+  // ungrouped (root-level) APIs
+  if (ungrouped.length > 0) {
+    html += `<div class="folder-group">
+      <div style="display:flex;align-items:center;gap:4px;padding:8px 12px;font-size:13px;font-weight:500;color:#555;background:#fafafa">
+        <span style="width:14px;flex-shrink:0"></span>
+        <span>未分组</span>
+        <span class="folder-count">${ungrouped.length}</span>
+      </div>`
+    for (const api of ungrouped) {
+      html += `<label class="doc-sidebar-item" for="r-${esc(api.id)}">
+        ${renderMethodTag((api.data as any).method ?? 'GET')}
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(api.name)}</span>
+      </label>`
+    }
+    html += '</div>'
+  }
+
+  return html
+}
+
+export function generateApiDocHtml(
+  projectName: string,
+  folders: ExportFolder[],
+  ungrouped: ExportApi[],
+  totalCount: number,
+): string {
+  const sidebar = renderSidebarTree(folders, ungrouped)
+
+  const allApis = [...ungrouped, ...folders.flatMap(f => f.children)]
+  const mainContent = allApis.length > 0
+    ? allApis.map(item => renderApiDetail(item)).join('')
+    : '<div class="placeholder">暂无接口数据</div>'
+
+  // Pure CSS radio-button navigation: each API has a hidden radio; sidebar
+  // labels toggle which API is visible via the sibling combinator.
+  const radioInputs = allApis.length > 0
+    ? allApis.map((api, i) =>
+        `<input type="radio" name="api-nav" id="r-${esc(api.id)}" class="api-radio"${i === 0 ? ' checked' : ''}>`,
+      ).join('')
+    : ''
+
+  // Per-API CSS: #r-{id}:checked ~ .doc-body .api-detail-{id} { display:block }
+  const dynamicCss = allApis.length > 0
+    ? allApis.map(api =>
+        `#r-${esc(api.id)}:checked~.doc-body .api-detail-${esc(api.id)}{display:block;border-color:#1677ff;box-shadow:0 0 0 2px rgba(22,119,255,.15)}` +
+        `body:has(#r-${esc(api.id)}:checked) .doc-sidebar label[for="r-${esc(api.id)}"]{background:#e6f4ff;color:#1677ff}`,
+      ).join('')
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -268,26 +330,33 @@ export function generateApiDocHtml(projectName: string, items: { id: string; nam
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(projectName)} - API 文档</title>
-<style>${CSS}</style>
+<style>${CSS}${dynamicCss}</style>
 </head>
 <body>
+${radioInputs}
 <div class="doc-header">
   <h1>${esc(projectName)} - API 文档</h1>
-  <span style="font-size:12px;color:#999">${items.length} 个接口</span>
+  <span style="font-size:12px;color:#999">${totalCount} 个接口</span>
 </div>
 <div class="doc-body">
   <div class="doc-sidebar">
-    <div class="doc-sidebar-title">接口列表 (${items.length})</div>
+    <div class="doc-sidebar-title">接口目录 (${totalCount})</div>
     ${sidebar}
   </div>
-  <div class="doc-main">${main}</div>
+  <div class="doc-main">${mainContent}</div>
 </div>
 </body>
 </html>`
 }
 
-export function generateMhtml(projectName: string, items: { id: string; name: string; data: ApiDetails }[]): string {
-  const html = generateApiDocHtml(projectName, items)
+export interface ExportTreeInput {
+  folders: ExportFolder[]
+  ungrouped: ExportApi[]
+  totalCount: number
+}
+
+export function generateMhtml(projectName: string, tree: ExportTreeInput): string {
+  const html = generateApiDocHtml(projectName, tree.folders, tree.ungrouped, tree.totalCount)
   const boundary = '----=_NextBoundary_001'
   return [
     'From: <api-doc-export@apimocktle.local>',
@@ -305,8 +374,8 @@ export function generateMhtml(projectName: string, items: { id: string; name: st
   ].join('\r\n')
 }
 
-export async function downloadMhtml(projectName: string, items: { id: string; name: string; data: ApiDetails }[]): Promise<boolean> {
-  const mhtml = generateMhtml(projectName, items)
+export async function downloadMhtml(projectName: string, tree: ExportTreeInput): Promise<boolean> {
+  const mhtml = generateMhtml(projectName, tree)
   const filename = `${projectName.replace(/[\\/:*?"<>|]/g, '_')}_API文档.mhtml`
 
   const filePath = await save({

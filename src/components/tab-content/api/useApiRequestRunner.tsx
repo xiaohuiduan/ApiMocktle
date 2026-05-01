@@ -158,11 +158,11 @@ export function useApiRequestRunner(apiId?: string) {
 
     try {
       const environmentId = resolveEnvironmentId(apiDetails)
-      const baseUrlOverride = resolveBaseUrlOverride(apiDetails, environmentId)
+      const baseUrl = resolveBaseUrlOverride(apiDetails, environmentId)
       const payload = await api<ApiRunResult>('run_api_request', {
         sessionId,
         projectId,
-        payload: { apiDetails, environmentId },
+        payload: { apiDetails, environmentId, baseUrl },
       })
 
       setResult(payload)
