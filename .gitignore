@@ -54,9 +54,6 @@ runtime/
 *.sqlite-shm
 *.sqlite-wal
 
-# Monaco Editor local copy (generated from node_modules)
-/public/monaco-editor/
-
 # Rust build output
 src-tauri/target/
 

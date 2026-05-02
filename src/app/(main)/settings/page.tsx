@@ -74,7 +74,7 @@ const items: MenuItem[] = [
       </div>
     ),
     type: 'group',
-    children: [{ key: SettingsSectionKey.ImportApi, label: '导入接口' }],
+    children: [{ key: SettingsSectionKey.ImportApi, label: '导入导出接口' }],
   },
   {
     key: 'g3',
