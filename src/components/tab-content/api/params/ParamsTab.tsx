@@ -6,10 +6,9 @@ import { ParamsEditableTable } from '../components/ParamsEditableTable'
 
 import { GlobalParametersNotice } from './GlobalParametersNotice'
 
-function BadgeLabel(props: React.PropsWithChildren<{ count?: number }>) {
+function TabLabel(props: React.PropsWithChildren<{ count?: number, hasContent?: boolean }>) {
   const { token } = theme.useToken()
-
-  const { children, count } = props
+  const { children, count, hasContent } = props
 
   return (
     <span>
@@ -24,7 +23,11 @@ function BadgeLabel(props: React.PropsWithChildren<{ count?: number }>) {
               {count}
             </span>
           )
-        : null}
+        : hasContent
+          ? (
+              <span className="ml-0.5 text-xs" style={{ color: token.colorSuccess }}>*</span>
+            )
+          : null}
     </span>
   )
 }
@@ -60,9 +63,9 @@ export function ParamsTab(props: ParamsTabProps) {
         {
           key: 'params',
           label: (
-            <BadgeLabel count={(parameters?.query?.length ?? 0) + (parameters?.path?.length ?? 0)}>
+            <TabLabel count={(parameters?.query?.length ?? 0) + (parameters?.path?.length ?? 0)}>
               Params
-            </BadgeLabel>
+            </TabLabel>
           ),
           children: (
             <div>
@@ -105,7 +108,11 @@ export function ParamsTab(props: ParamsTabProps) {
 
         {
           key: 'headers',
-          label: 'Headers',
+          label: (
+            <TabLabel hasContent={headerNames.size > 0}>
+              Headers
+            </TabLabel>
+          ),
           children: (
             <div className="pt-2">
               <GlobalParametersNotice
@@ -126,7 +133,11 @@ export function ParamsTab(props: ParamsTabProps) {
 
         {
           key: 'cookie',
-          label: 'Cookie',
+          label: (
+            <TabLabel hasContent={cookieNames.size > 0}>
+              Cookie
+            </TabLabel>
+          ),
           children: (
             <div className="pt-2">
               <GlobalParametersNotice

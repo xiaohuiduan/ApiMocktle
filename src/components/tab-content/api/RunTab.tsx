@@ -422,28 +422,41 @@ export function RunTab() {
             ? (
                 <div>
                   <div className="mb-2 flex flex-wrap items-center gap-1">
-                    {bodyTypeOptions.map(({ n, t }) => (
-                      <Tag.CheckableTag
-                        key={t}
-                        checked={workCopy.requestBody!.type === t}
-                        onChange={(checked) => {
-                          if (checked) {
-                            const next = {
-                              ...workCopy,
-                              requestBody: { ...workCopy.requestBody!, type: t },
+                    {bodyTypeOptions.map(({ n, t }) => {
+                      const b = workCopy.requestBody
+                      const hasContent = b
+                        ? t === BodyType.FormData || t === BodyType.UrlEncoded
+                          ? (b.parameters ?? []).some(p => p.name && p.enable !== false)
+                          : t === BodyType.Json || t === BodyType.Xml
+                            ? !!((b.jsonSchema as { properties?: unknown[] })?.properties?.length)
+                            : t === BodyType.Raw || t === BodyType.Binary
+                              ? !!(b.rawText?.trim())
+                              : false
+                        : false
+                      return (
+                        <Tag.CheckableTag
+                          key={t}
+                          checked={workCopy.requestBody!.type === t}
+                          onChange={(checked) => {
+                            if (checked) {
+                              const next = {
+                                ...workCopy,
+                                requestBody: { ...workCopy.requestBody!, type: t },
+                              }
+                              setWorkCopy(next)
+                              persist(next)
                             }
-                            setWorkCopy(next)
-                            persist(next)
-                          }
-                        }}
-                      >
-                        {n}
-                      </Tag.CheckableTag>
-                    ))}
+                          }}
+                        >
+                          {n}
+                          {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
+                        </Tag.CheckableTag>
+                      )
+                    })}
                   </div>
 
                   {showBodyEditor && (
-                    <div>
+                    <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: 'rgb(245, 245, 245)' }}>
                       <MonacoEditor
                         height="200px"
                         language={

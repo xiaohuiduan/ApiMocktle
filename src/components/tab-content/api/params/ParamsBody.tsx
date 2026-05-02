@@ -1,4 +1,4 @@
-import { Flex, Tag } from 'antd'
+import { Flex, Tag, theme } from 'antd'
 
 import { SchemaType } from '@/components/JsonSchema'
 import { JsonSchemaCard } from '@/components/JsonSchemaCard'
@@ -9,6 +9,25 @@ import type { ApiDetails, ApiEnvironmentValue } from '@/types'
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
 
 import { GlobalParametersNotice } from './GlobalParametersNotice'
+
+function hasBodyTypeContent(value: ApiDetails['requestBody'] | undefined, type: BodyType): boolean {
+  if (!value) return false
+  switch (type) {
+    case BodyType.FormData:
+    case BodyType.UrlEncoded:
+      return (value.parameters ?? []).some(p => p.name && p.enable !== false)
+    case BodyType.Json:
+    case BodyType.Xml:
+      return !!(value.jsonSchema && (
+        (value.jsonSchema as { properties?: unknown[] }).properties?.length
+      ))
+    case BodyType.Raw:
+    case BodyType.Binary:
+      return !!(value.rawText?.trim())
+    default:
+      return false
+  }
+}
 
 const types = [
   { name: 'none', type: BodyType.None },
@@ -83,6 +102,7 @@ interface ParamsBodyProps {
 
 export function ParamsBody(props: ParamsBodyProps) {
   const { globalRows, value, onChange } = props
+  const { token } = theme.useToken()
 
   const selectedType = value?.type ?? BodyType.None
   const bodyParamNames = new Set(
@@ -107,6 +127,9 @@ export function ParamsBody(props: ParamsBodyProps) {
               }}
             >
               {name}
+              {hasBodyTypeContent(value, type) && (
+                <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>
+              )}
             </Tag.CheckableTag>
           )
         })}
