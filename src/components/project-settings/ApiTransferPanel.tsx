@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router'
 
+import { invoke } from '@tauri-apps/api/core'
+import { save } from '@tauri-apps/plugin-dialog'
 import { Button, Checkbox, Input, message, Modal, Progress, Space, theme, Tree, Typography } from 'antd'
 import type { CheckboxChangeEvent } from 'antd/es/checkbox'
 import type { DataNode } from 'antd/es/tree'
@@ -17,13 +19,17 @@ function resolveProjectId(pathname: string) {
   return parts.at(0) === 'projects' ? parts.at(1) : undefined
 }
 
-function downloadFile(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  anchor.click()
-  URL.revokeObjectURL(url)
+async function saveExportFile(specName: string, format: string, content: string) {
+  const ext = format === 'yaml' ? 'yaml' : 'json'
+  const filePath = await save({
+    defaultPath: `${specName}.${ext}`,
+    filters: [{ name: format === 'yaml' ? 'YAML' : 'JSON', extensions: [ext] }],
+  })
+  if (filePath) {
+    await invoke('write_export_file', { path: filePath, content })
+    return true
+  }
+  return false
 }
 
 function pickImportFile(onSelect: (file: File) => void) {
@@ -134,10 +140,11 @@ export function ApiTransferPanel() {
         format: formatParam,
         menuIds,
       })
-      const blob = new Blob([payload.content], { type: 'application/json' })
       const specName = specFormat === 'swagger' ? 'swagger' : 'openapi'
-      downloadFile(blob, `${specName}.json`)
-      setSelectModalOpen(false)
+      const saved = await saveExportFile(specName, 'json', payload.content)
+      if (saved) {
+        setSelectModalOpen(false)
+      }
     } catch (err) {
       msgApi.error((err as Error).message)
     } finally {
@@ -157,9 +164,7 @@ export function ApiTransferPanel() {
         projectId,
         format,
       })
-      const mimeType = format === 'yaml' ? 'text/yaml' : 'application/json'
-      const blob = new Blob([payload.content], { type: mimeType })
-      downloadFile(blob, `openapi.${format}`)
+      await saveExportFile('openapi', format, payload.content)
     } catch (err) {
       msgApi.error((err as Error).message)
     }
