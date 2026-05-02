@@ -53,7 +53,7 @@ export function Schema() {
   useEffect(() => {
     if (fieldsValue) {
       setSchemaName(fieldsValue.name)
-      form.setFieldsValue(fieldsValue)
+      form.setFieldsValue(fieldsValue as any)
     }
   }, [form, fieldsValue])
 

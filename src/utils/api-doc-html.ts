@@ -2,7 +2,9 @@ import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 
 import type { ApiDetails, Parameter } from '@/types'
-import { SchemaType, type JsonSchema } from '@/components/JsonSchema'
+import type { JsonSchema } from '@/components/JsonSchema'
+import { SchemaType } from '@/components/JsonSchema'
+import { buildSchemaExample, buildSchemaRows, getTypeLabel } from '@/components/JsonSchema/schema-normalizer'
 
 const METHOD_COLORS: Record<string, string> = {
   GET: '#52c41a',
@@ -57,61 +59,6 @@ details[open]>.folder-arrow{transform:rotate(90deg)}
 
 // ── helpers ──
 
-function getTypeLabel(node: JsonSchema): string {
-  if (!node) return 'unknown'
-  if (node.type === SchemaType.Array) return `array<${getTypeLabel(node.items)}>`
-  if (node.type === SchemaType.Refer) return node.$ref
-  return node.type ?? 'unknown'
-}
-
-interface SchemaFieldRow {
-  name: string
-  typeLabel: string
-  description: string
-  depth: number
-}
-
-function buildSchemaRows(schema?: JsonSchema): SchemaFieldRow[] {
-  if (!schema || schema.type !== SchemaType.Object || !Array.isArray(schema.properties)) return []
-  const rows: SchemaFieldRow[] = []
-  const walk = (properties: JsonSchema[], depth: number) => {
-    properties.forEach((field: JsonSchema, i: number) => {
-      const name = field.name ?? `field_${i + 1}`
-      rows.push({ name, typeLabel: getTypeLabel(field), description: field.description ?? '-', depth })
-      if (field.type === SchemaType.Object && Array.isArray(field.properties)) walk(field.properties, depth + 1)
-      if (field.type === SchemaType.Array) {
-        const items = field.items
-        if (items?.type === SchemaType.Object && Array.isArray(items.properties)) walk(items.properties, depth + 1)
-      }
-    })
-  }
-  walk(schema.properties, 0)
-  return rows
-}
-
-function buildSchemaExample(schema?: JsonSchema): unknown {
-  if (!schema) return {}
-  switch (schema.type) {
-    case SchemaType.String: return 'string'
-    case SchemaType.Integer: return 0
-    case SchemaType.Number: return 0
-    case SchemaType.Boolean: return true
-    case SchemaType.Null: return null
-    case SchemaType.Refer: return {}
-    case SchemaType.Any: return {}
-    case SchemaType.Array: return [buildSchemaExample(schema.items)]
-    case SchemaType.Object: {
-      const out: Record<string, unknown> = {}
-      if (Array.isArray(schema.properties)) {
-        schema.properties.forEach((field, i) => {
-          out[field.name ?? `field_${i + 1}`] = buildSchemaExample(field)
-        })
-      }
-      return out
-    }
-    default: return {}
-  }
-}
 
 // ── HTML generators ──
 
@@ -143,8 +90,8 @@ function renderSchemaPanel(schema?: JsonSchema): string {
   if (!schema) return '<span style="color:#999">无</span>'
 
   if (schema.type === SchemaType.Object && Array.isArray(schema.properties) && schema.properties.length > 0) {
-    const rows = buildSchemaRows(schema)
-    const example = buildSchemaExample(schema)
+    const rows = buildSchemaRows(schema, undefined, { resolveRefs: false })
+    const example = buildSchemaExample(schema, undefined)
     const exampleJson = JSON.stringify(example, null, 2)
 
     const rowHtml = rows.map(r => `
@@ -152,7 +99,7 @@ function renderSchemaPanel(schema?: JsonSchema): string {
         <span style="padding-left:${r.depth * 16}px"><span class="schema-field">${esc(r.name)}</span></span>
         <span style="font-size:12px;opacity:.7;font-family:monospace">${esc(r.typeLabel)}</span>
         <span style="font-size:12px;opacity:.5">可选</span>
-        <span style="font-size:12px;opacity:.5">${esc(r.description)}</span>
+        <span style="font-size:12px;opacity:.5">${esc(r.description ?? '-')}</span>
       </div>`).join('')
 
     return `<div class="schema-panel">
@@ -174,7 +121,7 @@ function renderSchemaPanel(schema?: JsonSchema): string {
     return `<div><span style="background:#e6f4ff;color:#1677ff;padding:2px 8px;border-radius:4px;font-size:12px">array</span><div style="margin-top:8px">${renderSchemaPanel(schema.items)}</div></div>`
   }
 
-  return `<span style="background:#f0f0f0;padding:2px 8px;border-radius:4px;font-size:12px">${esc(getTypeLabel(schema))}</span>`
+  return `<span style="background:#f0f0f0;padding:2px 8px;border-radius:4px;font-size:12px">${schema ? esc(getTypeLabel(schema)) : 'unknown'}</span>`
 }
 
 function renderApiDetail(item: { id: string; name: string; data: ApiDetails }): string {
@@ -197,7 +144,7 @@ function renderApiDetail(item: { id: string; name: string; data: ApiDetails }): 
     if (reqBody.jsonSchema) {
       bodyHtml += renderSchemaPanel(reqBody.jsonSchema)
       bodyHtml += `<div style="margin-top:12px"><strong style="display:block;margin-bottom:8px;font-size:13px">请求示例</strong>
-        <pre style="margin:0;border:1px solid #f0f0f0;border-radius:4px;padding:12px;background:#fafafa;overflow:auto">${esc(JSON.stringify(buildSchemaExample(reqBody.jsonSchema), null, 2))}</pre></div>`
+        <pre style="margin:0;border:1px solid #f0f0f0;border-radius:4px;padding:12px;background:#fafafa;overflow:auto">${esc(JSON.stringify(buildSchemaExample(reqBody.jsonSchema, undefined), null, 2))}</pre></div>`
     }
   }
 
@@ -206,7 +153,7 @@ function renderApiDetail(item: { id: string; name: string; data: ApiDetails }): 
     responseHtml += '<h3>返回响应</h3>'
     responses.forEach(resp => {
       const resSchema = resp.jsonSchema
-      const resExample = JSON.stringify(buildSchemaExample(resSchema), null, 2)
+      const resExample = JSON.stringify(buildSchemaExample(resSchema, undefined), null, 2)
       const statusColor = String(resp.code).startsWith('2') ? '#52c41a' : String(resp.code).startsWith('4') ? '#fa8c16' : '#ff4d4f'
       responseHtml += `<div style="margin-bottom:16px;border:1px solid #f0f0f0;border-radius:4px">
         <div style="padding:8px 16px;background:#fafafa;border-bottom:1px solid #f0f0f0">

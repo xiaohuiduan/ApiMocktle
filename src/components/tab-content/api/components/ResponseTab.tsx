@@ -1,32 +1,42 @@
 import { useState } from 'react'
 
-import { Button, Form, Input, Popconfirm, Select, Tabs, theme, Tooltip } from 'antd'
-import { InfoIcon, PlusIcon, TrashIcon } from 'lucide-react'
+import { Button, Form, Popconfirm, Tabs, theme } from 'antd'
+import { PlusIcon, TrashIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import { IconText } from '@/components/IconText'
 import { JsonSchemaCard } from '@/components/JsonSchemaCard'
 import { JsonViewer } from '@/components/JsonViewer'
-import {
-  contentTypeOptions,
-  httpCodeOptions,
-  ModalNewResponse,
-} from '@/components/tab-content/api/ModalNewResponse'
-import type { ContentType } from '@/enums'
-import { getContentTypeString } from '@/helpers'
+import { ModalNewResponse } from '@/components/tab-content/api/ModalNewResponse'
 import { useStyles } from '@/hooks/useStyle'
 import type { ApiDetails } from '@/types'
 
 import { css } from '@emotion/css'
 
+function ResponseSchemaEditor({ idx }: { idx: number }) {
+  return (
+    <Form.Item noStyle shouldUpdate>
+      {(form) => {
+        const jsonSchema = form.getFieldValue(['responses', idx, 'jsonSchema'])
+        return (
+          <JsonSchemaCard
+            editorProps={{ defaultExpandAll: true }}
+            value={jsonSchema}
+            onChange={(val) => form.setFieldValue(['responses', idx, 'jsonSchema'], val)}
+          />
+        )
+      }}
+    </Form.Item>
+  )
+}
+
 interface ResponseTabProps {
   value?: ApiDetails['responses']
   onChange?: (value: ResponseTabProps['value']) => void
-  defaultActiveResTabKey?: string
 }
 
 export function ResponseTab(props: ResponseTabProps) {
-  const { value, onChange, defaultActiveResTabKey } = props
+  const { value, onChange } = props
 
   const { token } = theme.useToken()
 
@@ -44,7 +54,8 @@ export function ResponseTab(props: ResponseTabProps) {
   })
 
   const [modalOpen, setModalOpen] = useState(false)
-  const [activeResTabKey, setActiveResTabKey] = useState(defaultActiveResTabKey)
+  // 仅用于新增/删除后跳转，不用于初始选中（由 antd 默认行为处理）
+  const [activeResTabKey, setActiveResTabKey] = useState<string>()
 
   return (
     <>
@@ -60,98 +71,34 @@ export function ResponseTab(props: ResponseTabProps) {
             label: `${resp.name}(${resp.code})`,
             children: (
               <div className="p-tabContent">
-                <div className="mb-tabContent flex gap-6">
-                  <div className="flex flex-wrap items-center gap-6">
-                    <Form.Item
-                      label="HTTP 状态码"
-                      name={['responses', idx, 'code']}
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Select
-                        optionRender={({ label, data }) => (
-                          <span className="group flex items-center">
-                            {label}
-                            <span className="ml-3 font-normal opacity-65">
-                              {data.text as string}
-                            </span>
-                            <Tooltip title={`${data.desc as string}。`}>
-                              <InfoIcon
-                                className="ml-auto mr-1 opacity-0 transition-opacity group-hover:opacity-100"
-                                size={14}
-                              />
-                            </Tooltip>
-                          </span>
-                        )}
-                        options={httpCodeOptions}
-                        popupClassName="min-w-[350px]"
-                      />
-                    </Form.Item>
-                    <Form.Item
-                      label="名称"
-                      name={['responses', idx, 'name']}
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Input style={{ width: '88px' }} />
-                    </Form.Item>
-                    <Form.Item
-                      label="内容格式"
-                      name={['responses', idx, 'contentType']}
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Select options={contentTypeOptions} style={{ width: '130px' }} />
-                    </Form.Item>
-                    <Form.Item
-                      dependencies={['responses', idx, 'contentType']}
-                      label="Content-Type"
-                      style={{ marginBottom: 0 }}
-                    >
-                      {({ getFieldValue: getFieldValue1 }) => {
-                        const contentType: ContentType = getFieldValue1([
-                          'responses',
-                          idx,
-                          'contentType',
-                        ])
-
-                        return <span>{getContentTypeString(contentType)}</span>
+                {!onlyOneRes && (
+                  <div className="mb-tabContent flex justify-end">
+                    <Popconfirm
+                      title={(
+                        <span>
+                          确定删除？确定后点击右上角
+                          <strong>保存</strong>
+                          按钮生效
+                        </span>
+                      )}
+                      onConfirm={() => {
+                        const newResponses = value.filter((_, i) => i !== idx)
+                        onChange?.(newResponses)
+                        setActiveResTabKey(newResponses.at(0)?.id)
                       }}
-                    </Form.Item>
-                  </div>
-
-                  {!onlyOneRes && (
-                    <div className="ml-auto pt-1">
-                      <Popconfirm
-                        title={(
-                          <span>
-                            确定删除？确定后点击右上角
-                            <strong>保存</strong>
-                            按钮生效
-                          </span>
-                        )}
-                        onConfirm={() => {
-                          const newResponses = value.filter((_, i) => i !== idx)
-
-                          onChange?.(newResponses)
-
-                          setActiveResTabKey(newResponses.at(0)?.id)
-                        }}
+                    >
+                      <Button
+                        size="small"
+                        style={{ color: token.colorTextSecondary }}
+                        type="text"
                       >
-                        <Button
-                          size="small"
-                          style={{
-                            color: token.colorTextSecondary,
-                          }}
-                          type="text"
-                        >
-                          <IconText icon={<TrashIcon size={14} />} />
-                        </Button>
-                      </Popconfirm>
-                    </div>
-                  )}
-                </div>
+                        <IconText icon={<TrashIcon size={14} />} />
+                      </Button>
+                    </Popconfirm>
+                  </div>
+                )}
 
-                <Form.Item noStyle name={['responses', idx, 'jsonSchema']}>
-                  <JsonSchemaCard editorProps={{ defaultExpandAll: true }} />
-                </Form.Item>
+                <ResponseSchemaEditor idx={idx} />
 
                 <Form.Item noStyle dependencies={['responseExamples']}>
                   {({ getFieldValue: getFieldValue2 }) => {

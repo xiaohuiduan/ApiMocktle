@@ -204,6 +204,18 @@ fn build_openapi_responses(operation: &Value) -> Value {
                 .get(&content_type)
                 .and_then(|c| c.get("schema"))
                 .cloned();
+        } else if let Some(schema) = response.get("schema") {
+            // Swagger 2.0: response["schema"] 直接包含 schema
+            content_type = "application/json".to_string();
+            json_schema = Some(schema.clone());
+        } else if let Some(examples) = response.get("examples") {
+            // 从 examples 推断 content type
+            content_type = examples
+                .as_object()
+                .and_then(|o| o.keys().next())
+                .cloned()
+                .unwrap_or_else(|| "application/json".to_string());
+            json_schema = None;
         } else {
             content_type = "application/json".to_string();
             json_schema = None;
@@ -212,7 +224,7 @@ fn build_openapi_responses(operation: &Value) -> Value {
         result.push(serde_json::json!({
             "id": Uuid::new_v4().to_string(),
             "code": code,
-            "name": format!("{} {}", name, description),
+            "name": format!("{} {}", name, description).trim().to_string(),
             "contentType": content_type,
             "jsonSchema": json_schema,
         }));
@@ -594,4 +606,117 @@ pub fn import_api_document(
 ) -> Result<ProjectStateSnapshot, AppError> {
     let doc = parse_content(content, format)?;
     detect_and_import(db, project_id, &doc)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_swagger2_response_schema_extraction() {
+        let operation = json!({
+            "responses": {
+                "200": {
+                    "description": "成功",
+                    "schema": {
+                        "$ref": "#/definitions/UserResponse",
+                        "description": "用户信息"
+                    }
+                },
+                "400": {
+                    "description": "参数错误",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "code": { "type": "integer" },
+                            "message": { "type": "string" }
+                        }
+                    }
+                }
+            }
+        });
+
+        let result = build_openapi_responses(&operation);
+        let arr = result.as_array().unwrap();
+        assert_eq!(arr.len(), 2, "应该有 2 个 response");
+
+        let resp200 = &arr[0];
+        assert_eq!(resp200["code"], 200);
+        assert!(resp200["jsonSchema"].is_object(), "Swagger 2.0 response schema 不能为 null");
+        assert_eq!(resp200["jsonSchema"]["$ref"], "#/definitions/UserResponse");
+
+        let resp400 = &arr[1];
+        assert_eq!(resp400["code"], 400);
+        assert!(resp400["jsonSchema"].is_object());
+        assert_eq!(resp400["jsonSchema"]["type"], "object");
+        assert_eq!(resp400["jsonSchema"]["properties"]["code"]["type"], "integer");
+    }
+
+    #[test]
+    fn test_openapi3_response_schema_extraction() {
+        let operation = json!({
+            "responses": {
+                "200": {
+                    "description": "成功",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pet"
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        let result = build_openapi_responses(&operation);
+        let arr = result.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        let resp = &arr[0];
+        assert_eq!(resp["code"], 200);
+        assert_eq!(resp["contentType"], "application/json");
+        assert!(resp["jsonSchema"].is_object(), "OpenAPI 3.x response schema 不能为 null");
+        assert_eq!(resp["jsonSchema"]["$ref"], "#/components/schemas/Pet");
+    }
+
+    #[test]
+    fn test_response_without_schema_returns_null() {
+        let operation = json!({
+            "responses": {
+                "204": {
+                    "description": "No Content"
+                }
+            }
+        });
+
+        let result = build_openapi_responses(&operation);
+        let arr = result.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert!(arr[0]["jsonSchema"].is_null(), "无 schema 时应为 null");
+    }
+
+    #[test]
+    fn test_swagger2_response_with_examples() {
+        let operation = json!({
+            "responses": {
+                "200": {
+                    "description": "成功",
+                    "examples": {
+                        "application/json": {
+                            "code": 0,
+                            "data": { "name": "test" }
+                        }
+                    }
+                }
+            }
+        });
+
+        let result = build_openapi_responses(&operation);
+        let arr = result.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["contentType"], "application/json");
+        // examples 中只有示例数据，没有 schema
+        assert!(arr[0]["jsonSchema"].is_null());
+    }
 }

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useLocation } from 'react-router'
 
 import type { ApiMenuData } from '@/components/ApiMenu'
+import { normalizeMenuRawList } from '@/components/JsonSchema/schema-normalizer'
 import {
   createGlobalParameters,
   EMPTY_PROJECT_ENVIRONMENT_CONFIG,
@@ -173,6 +174,9 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
 
   const applyState = useCallback((state: StatePayload) => {
     const normalizedState = normalizeStatePayload(state)
+
+    // 统一归一化所有 JSON Schema（外部格式 → 内部格式），后续所有组件直接使用
+    normalizedState.menuRawList = normalizeMenuRawList(normalizedState.menuRawList) as ApiMenuData[]
 
     setMenuRawList(normalizedState.menuRawList)
     setRecyleRawData(normalizedState.recyleRawData)

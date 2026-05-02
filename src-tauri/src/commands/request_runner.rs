@@ -21,59 +21,8 @@ pub async fn run_api_request(
         return Ok(crate::errors::AppError::Forbidden("无权限".into()).into());
     }
 
-    let details = &payload.api_details;
-    let method = details
-        .get("method")
-        .and_then(|v| v.as_str())
-        .unwrap_or("GET")
-        .to_uppercase();
-    let path = details
-        .get("path")
-        .and_then(|v| v.as_str())
-        .unwrap_or("/");
-
-    // Resolve base URL
-    let base_url = payload
-        .base_url
-        .as_deref()
-        .unwrap_or("")
-        .trim_end_matches('/');
-
-    // Build full URL
-    let is_absolute = path.starts_with("http://") || path.starts_with("https://");
-    let full_url = if is_absolute {
-        path.to_string()
-    } else if base_url.is_empty() {
-        path.to_string()
-    } else {
-        format!("{}{}", base_url, path)
-    };
-
-    // Build query parameters
-    let query_params = extract_params(details, "query");
-    let query_string = build_query_string(&query_params);
-    let url_with_query = if query_string.is_empty() {
-        full_url
-    } else {
-        let sep = if full_url.contains('?') { '&' } else { '?' };
-        format!("{}{}{}", full_url, sep, query_string)
-    };
-
-    // Build headers
-    let header_params = extract_params(details, "header");
-    let request_headers: Vec<(String, String)> = header_params
-        .iter()
-        .map(|h| (h.name.clone(), h.value.clone()))
-        .collect();
-
-    // Build body
-    let body_type = details
-        .get("requestBody")
-        .and_then(|b| b.get("type"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("none");
-    let (body_text, content_type_header, body_params) =
-        build_body(details, body_type);
+    let method = payload.method.to_uppercase();
+    let url = &payload.url;
 
     let start = Instant::now();
     let client = reqwest::Client::builder()
@@ -82,28 +31,30 @@ pub async fn run_api_request(
         .unwrap_or_default();
 
     let mut req = match method.as_str() {
-        "POST" => client.post(&url_with_query),
-        "PUT" => client.put(&url_with_query),
-        "PATCH" => client.patch(&url_with_query),
-        "DELETE" => client.delete(&url_with_query),
-        _ => client.get(&url_with_query),
+        "POST" => client.post(url),
+        "PUT" => client.put(url),
+        "PATCH" => client.patch(url),
+        "DELETE" => client.delete(url),
+        _ => client.get(url),
     };
 
-    // Set headers
-    for (key, value) in &request_headers {
-        if !key.is_empty() {
-            req = req.header(key.as_str(), value.as_str());
+    // Set headers from payload
+    for h in &payload.headers {
+        if !h.name.is_empty() {
+            req = req.header(&h.name, &h.value);
         }
     }
-    if let Some(ct) = &content_type_header {
-        if !request_headers.iter().any(|(k, _)| k.to_lowercase() == "content-type") {
+
+    // Content-Type
+    if let Some(ct) = &payload.content_type {
+        if !payload.headers.iter().any(|h| h.name.to_lowercase() == "content-type") {
             req = req.header("Content-Type", ct.as_str());
         }
     }
 
     // Set body
-    if !body_text.is_empty() && method != "GET" {
-        req = req.body(body_text.clone());
+    if !payload.body.is_empty() && method != "GET" {
+        req = req.body(payload.body.clone());
     }
 
     match req.send().await {
@@ -129,31 +80,21 @@ pub async fn run_api_request(
             let body = resp.text().await.unwrap_or_default();
             let duration_ms = start.elapsed().as_millis() as u64;
 
-            let req_headers_json: Vec<serde_json::Value> = request_headers
-                .iter()
-                .map(|(k, v)| {
-                    serde_json::json!({ "name": k, "value": v })
-                })
-                .collect();
-
-            let req_query_json: Vec<serde_json::Value> = query_params
-                .iter()
-                .map(|p| {
-                    serde_json::json!({ "name": p.name, "value": p.value })
-                })
+            let req_headers_json: Vec<serde_json::Value> = payload.headers.iter()
+                .map(|h| serde_json::json!({ "name": h.name, "value": h.value }))
                 .collect();
 
             Ok(ApiResult::success(serde_json::json!({
-                "url": url_with_query,
+                "url": url,
                 "method": method,
                 "status": status,
                 "statusText": status_text,
                 "durationMs": duration_ms,
                 "requestHeaders": req_headers_json,
-                "requestQuery": req_query_json,
+                "requestQuery": [],
                 "requestCookie": [],
-                "requestBodyParameters": body_params,
-                "requestBodyText": body_text,
+                "requestBodyParameters": [],
+                "requestBodyText": payload.body,
                 "headers": resp_headers,
                 "contentType": resp_content_type,
                 "body": body,
@@ -162,7 +103,7 @@ pub async fn run_api_request(
         Err(e) => {
             let duration_ms = start.elapsed().as_millis() as u64;
             Ok(ApiResult::success(serde_json::json!({
-                "url": url_with_query,
+                "url": url,
                 "method": method,
                 "status": 0,
                 "statusText": e.to_string(),
@@ -335,5 +276,153 @@ fn build_schema_example(schema: &serde_json::Value) -> serde_json::Value {
         "boolean" => serde_json::json!(true),
         "null" => serde_json::Value::Null,
         _ => serde_json::json!("string"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_build_body_json_with_raw_text() {
+        let details = json!({
+            "requestBody": {
+                "type": "application/json",
+                "rawText": "{\"d\": \"123\"}",
+                "jsonSchema": {
+                    "type": "object",
+                    "properties": [{ "name": "d", "type": "string" }]
+                }
+            }
+        });
+        let (body_text, content_type, _) = build_body(&details, "json");
+        assert_eq!(body_text, "{\"d\": \"123\"}");
+        assert_eq!(content_type, Some("application/json".into()));
+    }
+
+    #[test]
+    fn test_build_body_json_falls_back_to_schema() {
+        let details = json!({
+            "requestBody": {
+                "type": "application/json",
+                "jsonSchema": {
+                    "type": "object",
+                    "properties": [
+                        { "name": "name", "type": "string" },
+                        { "name": "age", "type": "integer" }
+                    ]
+                }
+            }
+        });
+        let (body_text, _, _) = build_body(&details, "json");
+        assert!(!body_text.is_empty());
+        let parsed: serde_json::Value = serde_json::from_str(&body_text).unwrap();
+        assert_eq!(parsed["name"], "string");
+        assert_eq!(parsed["age"], 0);
+    }
+
+    #[test]
+    fn test_build_body_json_empty_raw_falls_back() {
+        let details = json!({
+            "requestBody": {
+                "type": "application/json",
+                "rawText": "",
+                "jsonSchema": {
+                    "type": "object",
+                    "properties": [{ "name": "x", "type": "string" }]
+                }
+            }
+        });
+        let (body_text, _, _) = build_body(&details, "json");
+        assert!(!body_text.is_empty());
+    }
+
+    #[test]
+    fn test_build_body_json_with_parameters_and_raw_text() {
+        let details = json!({
+            "requestBody": {
+                "type": "application/json",
+                "rawText": "{\"d\": \"123\", \"dd\": \"12312\"}",
+                "jsonSchema": {
+                    "type": "object",
+                    "properties": [
+                        { "name": "d", "type": "string" },
+                        { "name": "dd", "type": "string" }
+                    ]
+                },
+                "parameters": [
+                    { "name": "dform", "type": "string", "example": "1231" }
+                ]
+            }
+        });
+
+        let (body_text, content_type, _) = build_body(&details, "json");
+        assert_eq!(body_text, "{\"d\": \"123\", \"dd\": \"12312\"}",
+            "JSON 类型 body 必须优先使用 rawText，忽略 parameters");
+        assert_eq!(content_type, Some("application/json".into()));
+    }
+
+    #[test]
+    fn test_build_body_form_data() {
+        let details = json!({
+            "requestBody": {
+                "type": "multipart/form-data",
+                "parameters": [
+                    { "name": "field1", "type": "string", "example": "value1", "enable": true },
+                    { "name": "field2", "type": "string", "example": "", "enable": true },
+                    { "name": "disabled", "type": "string", "example": "x", "enable": false }
+                ]
+            }
+        });
+
+        let (body_text, content_type, _) = build_body(&details, "form-data");
+        assert!(body_text.contains("field1=value1"));
+        assert!(body_text.contains("field2="));
+        assert!(!body_text.contains("disabled"));
+        assert_eq!(content_type, Some("multipart/form-data".into()));
+    }
+
+    #[test]
+    fn test_build_body_url_encoded() {
+        let details = json!({
+            "requestBody": {
+                "type": "application/x-www-form-urlencoded",
+                "parameters": [
+                    { "name": "key", "type": "string", "example": "val", "enable": true }
+                ]
+            }
+        });
+
+        let (body_text, content_type, _) = build_body(&details, "url-encoded");
+        assert_eq!(body_text, "key=val");
+        assert_eq!(content_type, Some("application/x-www-form-urlencoded".into()));
+    }
+
+    #[test]
+    fn test_build_body_raw() {
+        let details = json!({
+            "requestBody": {
+                "type": "text/plain",
+                "rawText": "raw content here"
+            }
+        });
+
+        let (body_text, content_type, _) = build_body(&details, "raw");
+        assert_eq!(body_text, "raw content here");
+        assert_eq!(content_type, None);
+    }
+
+    #[test]
+    fn test_build_body_none_returns_empty() {
+        let details = json!({
+            "requestBody": {
+                "type": "none"
+            }
+        });
+
+        let (body_text, content_type, _) = build_body(&details, "none");
+        assert!(body_text.is_empty());
+        assert_eq!(content_type, None);
     }
 }

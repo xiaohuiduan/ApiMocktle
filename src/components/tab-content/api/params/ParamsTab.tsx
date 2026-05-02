@@ -1,12 +1,10 @@
-import { Form, Tabs, theme, Typography } from 'antd'
+import { Tabs, theme, Typography } from 'antd'
 
 import type { ApiDetails, ProjectEnvironmentConfig } from '@/types'
 
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
 
 import { GlobalParametersNotice } from './GlobalParametersNotice'
-import { ParamsAuth } from './ParamsAuth'
-import { ParamsBody } from './ParamsBody'
 
 function BadgeLabel(props: React.PropsWithChildren<{ count?: number }>) {
   const { token } = theme.useToken()
@@ -33,8 +31,8 @@ function BadgeLabel(props: React.PropsWithChildren<{ count?: number }>) {
 
 interface ParamsTabProps {
   value?: ApiDetails['parameters']
-  globalParameters?: ProjectEnvironmentConfig['globalParameters']
   onChange?: (value: ParamsTabProps['value']) => void
+  globalParameters?: ProjectEnvironmentConfig['globalParameters']
 }
 
 function getParamNameSet(params?: Array<{ name?: string, enable?: boolean }>) {
@@ -46,13 +44,14 @@ function getParamNameSet(params?: Array<{ name?: string, enable?: boolean }>) {
 }
 
 /**
- * 请求参数页签。
+ * 请求参数及 Headers/Cookie 页签。
+ * Body 和 Auth 在 ApiDocEditing / RunTab 中独立渲染。
  */
 export function ParamsTab(props: ParamsTabProps) {
-  const { value, globalParameters, onChange } = props
-  const queryNames = getParamNameSet(value?.query)
-  const headerNames = new Set(Array.from(getParamNameSet(value?.header)).map(name => name.toLowerCase()))
-  const cookieNames = getParamNameSet(value?.cookie)
+  const { value: parameters, onChange, globalParameters } = props
+  const queryNames = getParamNameSet(parameters?.query)
+  const headerNames = new Set(Array.from(getParamNameSet(parameters?.header)).map(name => name.toLowerCase()))
+  const cookieNames = getParamNameSet(parameters?.cookie)
 
   return (
     <Tabs
@@ -61,7 +60,7 @@ export function ParamsTab(props: ParamsTabProps) {
         {
           key: 'params',
           label: (
-            <BadgeLabel count={(value?.query?.length ?? 0) + (value?.path?.length ?? 0)}>
+            <BadgeLabel count={(parameters?.query?.length ?? 0) + (parameters?.path?.length ?? 0)}>
               Params
             </BadgeLabel>
           ),
@@ -76,13 +75,13 @@ export function ParamsTab(props: ParamsTabProps) {
                 <Typography.Text type="secondary">Query 参数</Typography.Text>
               </div>
               <ParamsEditableTable
-                value={value?.query}
+                value={parameters?.query}
                 onChange={(query) => {
-                  onChange?.({ ...value, query })
+                  onChange?.({ ...parameters, query })
                 }}
               />
 
-              {value?.path && value.path.length > 0
+              {parameters?.path && parameters.path.length > 0
                 ? (
                     <>
                       <div className="py-2">
@@ -92,25 +91,15 @@ export function ParamsTab(props: ParamsTabProps) {
                         isPathParamsTable
                         autoNewRow={false}
                         removable={false}
-                        value={value.path}
+                        value={parameters.path}
                         onChange={(path) => {
-                          onChange?.({ ...value, path })
+                          onChange?.({ ...parameters, path })
                         }}
                       />
                     </>
                   )
                 : null}
             </div>
-          ),
-        },
-
-        {
-          key: 'body',
-          label: 'Body',
-          children: (
-            <Form.Item noStyle name="requestBody">
-              <ParamsBody globalRows={globalParameters?.body} />
-            </Form.Item>
           ),
         },
 
@@ -126,9 +115,9 @@ export function ParamsTab(props: ParamsTabProps) {
                 title="当前全局 Header 参数"
               />
               <ParamsEditableTable
-                value={value?.header}
+                value={parameters?.header}
                 onChange={(header) => {
-                  onChange?.({ ...value, header })
+                  onChange?.({ ...parameters, header })
                 }}
               />
             </div>
@@ -146,22 +135,12 @@ export function ParamsTab(props: ParamsTabProps) {
                 title="当前全局 Cookie 参数"
               />
               <ParamsEditableTable
-                value={value?.cookie}
+                value={parameters?.cookie}
                 onChange={(cookie) => {
-                  onChange?.({ ...value, cookie })
+                  onChange?.({ ...parameters, cookie })
                 }}
               />
             </div>
-          ),
-        },
-
-        {
-          key: 'auth',
-          label: 'Auth',
-          children: (
-            <Form.Item noStyle name="auth">
-              <ParamsAuth />
-            </Form.Item>
           ),
         },
       ]}

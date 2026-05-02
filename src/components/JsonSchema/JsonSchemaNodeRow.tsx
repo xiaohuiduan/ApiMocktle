@@ -253,7 +253,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
     return null
   }
 
-  const { type, name, displayName, description } = value
+  const { type, name, displayName, description, example } = value
 
   const { indentWidth } = getNodeLevelInfo(fieldPath)
 
@@ -386,6 +386,17 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
           value={description}
           onChange={(ev) => {
             triggerChange?.({ ...value, description: ev.target.value })
+          }}
+        />
+      </div>
+
+      <div className={`${styles.row.col} ${styles.row.title} ${styles.row.colHover}`}>
+        <Input
+          disabled={disabled}
+          placeholder="示例值"
+          value={typeof example === 'string' ? example : (example != null ? JSON.stringify(example) : '')}
+          onChange={(ev) => {
+            triggerChange?.({ ...value, example: ev.target.value })
           }}
         />
       </div>

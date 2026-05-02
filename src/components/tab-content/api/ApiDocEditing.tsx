@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { Button, Form, type FormProps, Select, type SelectProps, Space } from 'antd'
+import { Button, Form, type FormProps, Select, type SelectProps, Space, Typography } from 'antd'
 import { nanoid } from 'nanoid'
 
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
@@ -8,6 +8,8 @@ import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { InputUnderline } from '@/components/InputUnderline'
 import { ApiRemoveButton } from '@/components/tab-content/api/ApiRemoveButton'
 import { ResponseTab } from '@/components/tab-content/api/components/ResponseTab'
+import { ParamsAuth } from './params/ParamsAuth'
+import { ParamsBody } from './params/ParamsBody'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
@@ -57,7 +59,7 @@ export function ApiDocEditing() {
 
   useEffect(() => {
     if (isCreating) {
-      form.setFieldsValue(initialCreateApiDetailsData)
+      form.setFieldsValue(initialCreateApiDetailsData as any)
     }
     else {
       if (menuRawList) {
@@ -73,7 +75,7 @@ export function ApiDocEditing() {
           const apiDetails = menuData.data
 
           if (apiDetails) {
-            form.setFieldsValue(apiDetails)
+            form.setFieldsValue(apiDetails as any)
           }
         }
       }
@@ -259,6 +261,20 @@ export function ApiDocEditing() {
         <Form.Item noStyle name="parameters">
           <ParamsTab globalParameters={projectEnvironmentConfig.globalParameters} />
         </Form.Item>
+
+        <div className="mt-4">
+          <Typography.Text strong className="mb-2 block text-sm">Body</Typography.Text>
+          <Form.Item noStyle name="requestBody">
+            <ParamsBody globalRows={projectEnvironmentConfig.globalParameters?.body} />
+          </Form.Item>
+        </div>
+
+        <div className="mt-4">
+          <Typography.Text strong className="mb-2 block text-sm">Auth</Typography.Text>
+          <Form.Item noStyle name="auth">
+            <ParamsAuth />
+          </Form.Item>
+        </div>
 
         <GroupTitle className="mb-3 mt-8">返回响应</GroupTitle>
         <Form.Item noStyle name="responses">

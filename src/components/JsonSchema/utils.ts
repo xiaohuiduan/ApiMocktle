@@ -5,6 +5,50 @@ import { INDENT, KEY_ITEMS, KEY_PROPERTIES, SchemaType, SEPARATOR } from './cons
 import type { FieldPath, JsonSchema } from './JsonSchema.type'
 
 /**
+ * 标准化 JSON Schema：将标准 JSON Schema 格式（$ref-only、properties 为对象 map）转换为内部格式。
+ * 递归处理所有嵌套节点。
+ */
+export function normalizeJsonSchema(schema: unknown): unknown {
+  if (!schema || typeof schema !== 'object') return schema
+
+  const s = schema as Record<string, unknown>
+
+  // 标准化 $ref-only schema：{ "$ref": "..." } → { type: "ref", "$ref": "..." }
+  if (typeof s.$ref === 'string' && !s.type) {
+    return normalizeJsonSchema({ ...s, type: SchemaType.Refer })
+  }
+
+  // 标准化 properties：Object map → Array
+  if (s.type === 'object' && s.properties && typeof s.properties === 'object' && !Array.isArray(s.properties)) {
+    const propsObj = s.properties as Record<string, unknown>
+    const propsArray = Object.entries(propsObj).map(([name, def]) => ({
+      name,
+      ...(normalizeJsonSchema(def) as Record<string, unknown>),
+    }))
+    return { ...s, properties: propsArray }
+  }
+
+  // 递归处理嵌套
+  if (s.type === 'object' && Array.isArray(s.properties)) {
+    return {
+      ...s,
+      properties: (s.properties as unknown[]).map((prop) => normalizeJsonSchema(prop)),
+    }
+  }
+
+  if (s.type === 'array' && s.items) {
+    return { ...s, items: normalizeJsonSchema(s.items) }
+  }
+
+  // 路径引用（标准 JSON Schema $ref）
+  if (typeof s.$ref === 'string') {
+    return { ...s, type: SchemaType.Refer }
+  }
+
+  return schema
+}
+
+/**
  * 递归解析 JsonSchema，将所有可展开的节点的字段路径作为 key，最后合并到一个数组中并返回。
  *
  * @example
@@ -23,15 +67,22 @@ export function getAllExpandedKeys(
       keys.push('') // <-- 根节点
     }
 
-    jsonSchema.properties?.forEach((js, i) => {
-      const newPath = [...path, KEY_PROPERTIES, `${i}`]
-      keys.push(newPath.join(SEPARATOR))
-      getAllExpandedKeys(js, newPath, keys)
-    })
+    if (Array.isArray(jsonSchema.properties)) {
+      jsonSchema.properties.forEach((js, i) => {
+        const newPath = [...path, KEY_PROPERTIES, `${i}`]
+        keys.push(newPath.join(SEPARATOR))
+        getAllExpandedKeys(js, newPath, keys)
+      })
+    }
   } else if (jsonSchema.type === SchemaType.Array) {
     const newPath = [...path, KEY_ITEMS]
     keys.push(newPath.join(SEPARATOR))
     getAllExpandedKeys(jsonSchema.items, newPath, keys)
+  } else if (jsonSchema.type === SchemaType.Refer) {
+    // $ref 引用节点也需要默认展开
+    if (keys.length === 0) {
+      keys.push('')
+    }
   }
 
   return keys
@@ -50,12 +101,19 @@ export function getNodeLevelInfo(fieldPath: FieldPath[]): { level: number; inden
   return { level, indentWidth }
 }
 
+function extractRefName(ref: string): string {
+  const parts = ref.split('/')
+  return parts[parts.length - 1] || ref
+}
+
 export function getRefJsonSchema(
   menuRawList: ApiMenuData[],
   refName: string
 ): JsonSchema | undefined {
+  const name = extractRefName(refName)
+
   const menuData = menuRawList.find(
-    (item) => item.name === refName && item.type === MenuItemType.ApiSchema
+    (item) => item.name === name && item.type === MenuItemType.ApiSchema
   )
 
   const jsonSchema =
@@ -68,13 +126,18 @@ export function getRefJsonSchema(
  * 递归解析 JsonSchema 中的 `$ref` 引用，将 RefSchema 替换为实际引用的模型定义。
  * 使用 visited Set 检测循环引用。
  */
+function isRefSchema(schema: JsonSchema | Record<string, unknown>): boolean {
+  return (schema as JsonSchema).type === SchemaType.Refer
+    || (typeof (schema as Record<string, unknown>).$ref === 'string' && (schema as JsonSchema).type === undefined)
+}
+
 export function resolveRefSchema(
   jsonSchema: JsonSchema,
   menuRawList: ApiMenuData[],
   visited: Set<string> = new Set(),
 ): JsonSchema {
-  if (jsonSchema.type === SchemaType.Refer) {
-    const refName = jsonSchema.$ref
+  if (isRefSchema(jsonSchema)) {
+    const refName = (jsonSchema as unknown as Record<string, unknown>).$ref as string
 
     if (visited.has(refName)) {
       return jsonSchema
@@ -98,7 +161,7 @@ export function resolveRefSchema(
     }
   }
 
-  if (jsonSchema.type === SchemaType.Object && jsonSchema.properties) {
+  if (jsonSchema.type === SchemaType.Object && Array.isArray(jsonSchema.properties)) {
     return {
       ...jsonSchema,
       properties: jsonSchema.properties.map((prop) =>

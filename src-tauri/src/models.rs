@@ -333,12 +333,20 @@ pub struct ImportPayload {
 // Request Runner
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RunRequestPayload {
-    #[serde(rename = "apiDetails")]
-    pub api_details: serde_json::Value,
-    #[serde(rename = "environmentId")]
-    pub environment_id: Option<String>,
-    #[serde(rename = "baseUrl")]
-    pub base_url: Option<String>,
+    pub url: String,
+    pub method: String,
+    #[serde(default)]
+    pub headers: Vec<RunRequestHeader>,
+    #[serde(default)]
+    pub body: String,
+    #[serde(rename = "contentType", default)]
+    pub content_type: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RunRequestHeader {
+    pub name: String,
+    pub value: String,
 }
 
 // Collab

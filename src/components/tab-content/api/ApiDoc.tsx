@@ -12,9 +12,8 @@ import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { creator } from '@/data/remote'
 import { useStyles } from '@/hooks/useStyle'
 import { BodyType } from '@/enums'
-import { SchemaType, type JsonSchema } from '@/components/JsonSchema'
-import type { ApiMenuData } from '@/components/ApiMenu'
-import { resolveRefSchema } from '@/components/JsonSchema/utils'
+import type { JsonSchema } from '@/components/JsonSchema'
+import { buildSchemaExample, buildSchemaRows, denormalizeJsonSchema, type SchemaFieldRow } from '@/components/JsonSchema/schema-normalizer'
 import type { ApiDetails, Parameter } from '@/types'
 
 import { css } from '@emotion/css'
@@ -127,172 +126,6 @@ function ApiParameter({ param }: { param: Parameter }) {
       </div>
     </div>
   )
-}
-
-function normalizeSchemaForDisplay(input: unknown): unknown {
-  if (Array.isArray(input)) {
-    return input.map(normalizeSchemaForDisplay)
-  }
-
-  if (!input || typeof input !== 'object') {
-    return input
-  }
-
-  const schema = input as Record<string, unknown>
-  const normalized: Record<string, unknown> = {}
-
-  Object.entries(schema).forEach(([key, value]) => {
-    if (key === 'properties' && Array.isArray(value)) {
-      const propertyObject: Record<string, unknown> = {}
-
-      value.forEach((item) => {
-        if (!item || typeof item !== 'object') {
-          return
-        }
-
-        const prop = item as Record<string, unknown>
-        const propName = typeof prop.name === 'string' ? prop.name : undefined
-
-        if (!propName) {
-          return
-        }
-
-        const rest = { ...prop }
-        delete rest.name
-        propertyObject[propName] = normalizeSchemaForDisplay(rest)
-      })
-
-      normalized[key] = propertyObject
-      return
-    }
-
-    normalized[key] = normalizeSchemaForDisplay(value)
-  })
-
-  return normalized
-}
-
-interface SchemaFieldRow {
-  key: string
-  name: string
-  typeLabel: string
-  description?: string
-  depth: number
-}
-
-function getTypeLabel(node: JsonSchema): string {
-  if (node.type === SchemaType.Array) {
-    const itemType = getTypeLabel(node.items)
-    return `array<${itemType}>`
-  }
-
-  if (node.type === SchemaType.Refer) {
-    return node.$ref
-  }
-
-  return node.type
-}
-
-function buildSchemaRows(schema?: JsonSchema, menuRawList?: ApiMenuData[]): SchemaFieldRow[] {
-  if (!schema) {
-    return []
-  }
-
-  if (schema.type === SchemaType.Refer && menuRawList) {
-    const resolved = resolveRefSchema(schema, menuRawList)
-    if (resolved.type !== SchemaType.Refer) {
-      return buildSchemaRows(resolved, menuRawList)
-    }
-    return []
-  }
-
-  if (schema.type !== SchemaType.Object || !Array.isArray(schema.properties)) {
-    return []
-  }
-
-  const rows: SchemaFieldRow[] = []
-
-  const walk = (properties: JsonSchema[], depth: number) => {
-    properties.forEach((field, index) => {
-      const name = field.name ?? `field_${index + 1}`
-      const key = `${depth}-${name}-${index}`
-
-      rows.push({
-        key,
-        name,
-        typeLabel: getTypeLabel(field),
-        description: field.description,
-        depth,
-      })
-
-      if (field.type === SchemaType.Object && Array.isArray(field.properties)) {
-        walk(field.properties, depth + 1)
-      }
-
-      if (field.type === SchemaType.Array) {
-        const items = field.items
-        if (items.type === SchemaType.Object && Array.isArray(items.properties)) {
-          walk(items.properties, depth + 1)
-        }
-      }
-
-      if (field.type === SchemaType.Refer && menuRawList) {
-        const resolved = resolveRefSchema(field, menuRawList)
-        if (resolved.type === SchemaType.Object && Array.isArray(resolved.properties)) {
-          walk(resolved.properties, depth + 1)
-        } else if (resolved.type === SchemaType.Array) {
-          const items = resolved.items
-          if (items.type === SchemaType.Object && Array.isArray(items.properties)) {
-            walk(items.properties, depth + 1)
-          }
-        }
-      }
-    })
-  }
-
-  walk(schema.properties, 0)
-  return rows
-}
-
-function buildSchemaExample(schema?: JsonSchema, menuRawList?: ApiMenuData[]): unknown {
-  if (!schema) {
-    return {}
-  }
-
-  if (schema.type === SchemaType.Refer && menuRawList) {
-    const resolved = resolveRefSchema(schema, menuRawList)
-    if (resolved.type !== SchemaType.Refer) {
-      return buildSchemaExample(resolved, menuRawList)
-    }
-    return { $ref: schema.$ref }
-  }
-
-  switch (schema.type) {
-    case SchemaType.String:
-      return 'string'
-    case SchemaType.Integer:
-      return 0
-    case SchemaType.Number:
-      return 0
-    case SchemaType.Boolean:
-      return true
-    case SchemaType.Null:
-      return null
-    case SchemaType.Array:
-      return [buildSchemaExample(schema.items, menuRawList)]
-    case SchemaType.Object: {
-      const output: Record<string, unknown> = {}
-
-      schema.properties?.forEach((field, index) => {
-        const fieldName = field.name ?? `field_${index + 1}`
-        output[fieldName] = buildSchemaExample(field, menuRawList)
-      })
-
-      return output
-    }
-    default:
-      return {}
-  }
 }
 
 function stringifyParameterExample(example: Parameter['example']): string {
@@ -513,11 +346,12 @@ export function ApiDoc() {
   const headerParams = docValue.parameters?.header
   const cookieParams = docValue.parameters?.cookie
   const queryStringForCopy = buildQueryStringForCopy(queryParams)
-  const normalizedRequestSchema = docValue.requestBody?.jsonSchema
-    ? normalizeSchemaForDisplay(docValue.requestBody.jsonSchema)
+  const requestBodyJsonSchema = docValue.requestBody?.jsonSchema
+  const displayRequestSchema = requestBodyJsonSchema
+    ? denormalizeJsonSchema(requestBodyJsonSchema)
     : undefined
-  const requestSchemaRows = buildSchemaRows(docValue.requestBody?.jsonSchema, menuRawList)
-  const requestSchemaExample = buildSchemaExample(docValue.requestBody?.jsonSchema, menuRawList)
+  const requestSchemaRows = buildSchemaRows(requestBodyJsonSchema, menuRawList)
+  const requestSchemaExample = buildSchemaExample(requestBodyJsonSchema, menuRawList)
 
   return (
     <div className="h-full overflow-auto p-tabContent">
@@ -694,7 +528,7 @@ export function ApiDoc() {
                   </div>
                 )}
 
-                {normalizedRequestSchema !== undefined && normalizedRequestSchema !== null && (
+                {displayRequestSchema !== undefined && displayRequestSchema !== null && (
                   <div className={styles.requestBodySchema}>
                     <div className="schema-header">
                       <span>application/json</span>
@@ -720,7 +554,7 @@ export function ApiDoc() {
                                     <span className="schema-field-name">{row.name}</span>
                                   </span>
                                   <span className="schema-type-text">{row.typeLabel}</span>
-                                  <span className="schema-required">可选</span>
+                                  <span className={`schema-required${row.required ? ' is-required' : ''}`}>{row.required ? '必填' : '可选'}</span>
                                   <span className="schema-desc">{row.description ?? '-'}</span>
                                 </div>
                               ))
@@ -738,7 +572,7 @@ export function ApiDoc() {
                               type="link"
                               onClick={() => {
                                 const bodyExample = JSON.stringify(
-                                  requestSchemaExample ?? normalizedRequestSchema,
+                                  requestSchemaExample ?? displayRequestSchema,
                                   null,
                                   2,
                                 )
@@ -752,7 +586,7 @@ export function ApiDoc() {
                           </Space>
                         </div>
                         <pre className="schema-code">
-                          {JSON.stringify(requestSchemaExample ?? normalizedRequestSchema, null, 2)}
+                          {JSON.stringify(requestSchemaExample ?? displayRequestSchema, null, 2)}
                         </pre>
                       </div>
                     </div>
@@ -768,8 +602,8 @@ export function ApiDoc() {
           <Tabs
             className={styles.tabWithBorder}
             items={docValue.responses.map((res) => {
-              const normalizedResSchema = res.jsonSchema
-                ? normalizeSchemaForDisplay(res.jsonSchema)
+              const displayResSchema = res.jsonSchema
+                ? denormalizeJsonSchema(res.jsonSchema)
                 : undefined
               const resSchemaRows = buildSchemaRows(res.jsonSchema, menuRawList)
               const resSchemaExample = buildSchemaExample(res.jsonSchema, menuRawList)
@@ -791,7 +625,7 @@ export function ApiDoc() {
                       </span>
                     </div>
 
-                    {normalizedResSchema !== undefined && normalizedResSchema !== null && (
+                    {displayResSchema !== undefined && displayResSchema !== null && (
                       <div className={styles.requestBodySchema}>
                         <div className="schema-header">
                           <span>{res.contentType}</span>
@@ -817,7 +651,7 @@ export function ApiDoc() {
                                         <span className="schema-field-name">{row.name}</span>
                                       </span>
                                       <span className="schema-type-text">{row.typeLabel}</span>
-                                      <span className="schema-required">可选</span>
+                                      <span className={`schema-required${row.required ? ' is-required' : ''}`}>{row.required ? '必填' : '可选'}</span>
                                       <span className="schema-desc">{row.description ?? '-'}</span>
                                     </div>
                                   ))
@@ -835,7 +669,7 @@ export function ApiDoc() {
                                   type="link"
                                   onClick={() => {
                                     const bodyExample = JSON.stringify(
-                                      resSchemaExample ?? normalizedResSchema,
+                                      resSchemaExample ?? displayResSchema,
                                       null,
                                       2,
                                     )
@@ -849,7 +683,7 @@ export function ApiDoc() {
                               </Space>
                             </div>
                             <pre className="schema-code">
-                              {JSON.stringify(resSchemaExample ?? normalizedResSchema, null, 2)}
+                              {JSON.stringify(resSchemaExample ?? displayResSchema, null, 2)}
                             </pre>
                           </div>
                         </div>

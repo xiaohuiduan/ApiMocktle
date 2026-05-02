@@ -5,7 +5,7 @@ import { useStyles } from '@/hooks/useStyle'
 
 import { columnHeight, INDENT, KEY_ITEMS, KEY_PROPERTIES, SchemaType, SEPARATOR } from './constants'
 import { useJsonSchemaContext } from './JsonSchema.context'
-import type { ArraySchema } from './JsonSchema.type'
+import type { ArraySchema, ObjectSchema } from './JsonSchema.type'
 import { JsonSchemaNodeRow, type JsonSchemaNodeRowProps } from './JsonSchemaNodeRow'
 import { JsonSchemaNodeWrapper } from './JsonSchemaNodeWrapper'
 import { getNodeLevelInfo, getRefJsonSchema } from './utils'
@@ -95,14 +95,15 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
       const shouldExpand = !!expandedKeys?.includes(fieldPathKey)
 
       if (value.type === SchemaType.Object) {
+        const objectValue = value as ObjectSchema
         return (
           <>
             {!restProps.fromRef && <JsonSchemaNodeRow {...rowProps} />}
 
-            {Array.isArray(value.properties) && value.properties.length > 0
+            {Array.isArray(objectValue.properties) && objectValue.properties.length > 0
               ? (
                   <JsonSchemaNodeWrapper shouldExpand={!!restProps.fromRef || shouldExpand}>
-                    {value.properties.map((propSchema, i) => {
+                    {objectValue.properties.map((propSchema, i) => {
                       const key = `${propSchema.type}_${i}_${fieldPathKey}`
 
                       return (
@@ -112,7 +113,7 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
                           fieldPath={[...fieldPath, KEY_PROPERTIES, `${i}`]}
                           value={propSchema}
                           onChange={(changValue) => {
-                            const newProperties = value.properties!.map((prop, idx) => {
+                            const newProperties = objectValue.properties!.map((prop, idx) => {
                               if (idx === i && changValue) {
                                 return changValue
                               }
@@ -120,7 +121,7 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
                               return prop
                             })
 
-                            onChange?.({ ...value, properties: newProperties })
+                            onChange?.({ ...objectValue, properties: newProperties })
                           }}
                         />
                       )
@@ -157,6 +158,7 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
       }
 
       if (value.type === SchemaType.Array) {
+        const arrayValue = value as ArraySchema
         return (
           <>
             <JsonSchemaNodeRow {...rowProps} />
@@ -165,11 +167,11 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
               <JsonSchemaNode
                 {...renderProps}
                 fieldPath={[...fieldPath, KEY_ITEMS]}
-                value={value.items}
+                value={arrayValue.items}
                 onChange={(changValue) => {
                   if (changValue) {
                     onChange?.({
-                      ...value,
+                      ...arrayValue,
                       items: changValue as ArraySchema['items'],
                     })
                   }
@@ -183,44 +185,52 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (value.type === SchemaType.Refer) {
         const { $ref, ...restValue } = value
+        const refJsonSchema = menuRawList ? getRefJsonSchema(menuRawList, $ref) : undefined
 
-        if (menuRawList) {
-          const refJsonSchema = getRefJsonSchema(menuRawList, $ref)
+        // 为了避免循环引用，需要判断一下，如果是同一个引用，就不再往下展示了。
+        return (
+          <>
+            <JsonSchemaNodeRow {...rowProps} />
 
-          // 为了避免循环引用，需要判断一下，如果是同一个引用，就不再往下展示了。
-          return (
-            <>
-              <JsonSchemaNodeRow {...rowProps} />
+            {$ref !== restProps.fromRef && (
+              <JsonSchemaNodeWrapper className={styles.node} shouldExpand={shouldExpand}>
+                <div className={styles.ref}>
+                  {refJsonSchema
+                    ? (
+                        <div
+                          className={styles.unbind}
+                          onClick={() => {
+                            if (refJsonSchema) {
+                              onChange?.({
+                                ...restValue,
+                                ...refJsonSchema,
+                              })
+                            }
+                          }}
+                        >
+                          解除关联
+                        </div>
+                      )
+                    : (
+                        <div
+                          className={styles.unbind}
+                          style={{ backgroundColor: token.colorWarningBg, color: token.colorWarningText }}
+                        >
+                          模型未找到: {$ref}
+                        </div>
+                      )}
 
-              {$ref !== restProps.fromRef && (
-                <JsonSchemaNodeWrapper className={styles.node} shouldExpand={shouldExpand}>
-                  <div className={styles.ref}>
-                    <div
-                      className={styles.unbind}
-                      onClick={() => {
-                        if (refJsonSchema) {
-                          onChange?.({
-                            ...restValue,
-                            ...refJsonSchema,
-                          })
-                        }
-                      }}
-                    >
-                      解除关联
-                    </div>
-
-                    <JsonSchemaNode
-                      disabled
-                      fieldPath={[$ref, ...fieldPath]}
-                      fromRef={$ref}
-                      value={refJsonSchema}
-                    />
-                  </div>
-                </JsonSchemaNodeWrapper>
-              )}
-            </>
-          )
-        }
+                  <JsonSchemaNode
+                    disabled
+                    fieldPath={[$ref, ...fieldPath]}
+                    fromRef={$ref}
+                    value={refJsonSchema}
+                  />
+                </div>
+              </JsonSchemaNodeWrapper>
+            )}
+          </>
+        )
       }
 
       return null

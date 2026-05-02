@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   Button,
-  Form,
-  type FormProps,
   Input,
   Modal,
   Select,
@@ -14,9 +12,10 @@ import {
   Typography,
   theme,
 } from 'antd'
-import { PlayIcon, RotateCcwIcon, SaveIcon, TerminalIcon } from 'lucide-react'
+import { PlayIcon, RotateCcwIcon, TerminalIcon } from 'lucide-react'
 
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
+import { buildSchemaExample } from '@/components/JsonSchema/schema-normalizer'
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
@@ -25,6 +24,7 @@ import { BodyType } from '@/enums'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 import type { ApiDetails, ApiRunResult } from '@/types'
 
+import { ParamsEditableTable } from './components/ParamsEditableTable'
 import { ParamsTab } from './params/ParamsTab'
 import { useApiRequestRunner } from './useApiRequestRunner'
 
@@ -66,7 +66,7 @@ function generateCurl(apiDetails: ApiDetails, fullUrl: string): { windows: strin
       bodyContent = apiDetails.requestBody.rawText?.trim()
         ? ` -d '${apiDetails.requestBody.rawText.replace(/'/g, "'\\''")}'`
         : apiDetails.requestBody.jsonSchema
-          ? ` -d '${JSON.stringify(buildSchemaExampleForCurl(apiDetails.requestBody.jsonSchema))}'`
+          ? ` -d '${JSON.stringify(buildSchemaExample(apiDetails.requestBody.jsonSchema as never))}'`
           : ''
     } else if (apiDetails.requestBody.rawText?.trim()) {
       bodyContent = ` -d '${apiDetails.requestBody.rawText.replace(/'/g, "'\\''")}'`
@@ -79,31 +79,26 @@ function generateCurl(apiDetails: ApiDetails, fullUrl: string): { windows: strin
   return { linux: cmdLinux, windows: cmdWindows }
 }
 
-function buildSchemaExampleForCurl(schema: unknown): unknown {
-  if (!schema || typeof schema !== 'object') return {}
-  const s = schema as Record<string, unknown>
-  if (s.type === 'object' && Array.isArray(s.properties)) {
-    const out: Record<string, unknown> = {}
-    ;(s.properties as Array<Record<string, unknown>>).forEach((p, i) => {
-      const name = (p.name ?? `field_${i + 1}`) as string
-      out[name] = buildSchemaExampleForCurl(p)
-    })
-    return out
+function buildBodyExample(apiDetails: ApiDetails, menuRawList?: unknown): string {
+  const body = apiDetails.requestBody
+  if (!body || body.type === BodyType.None) return ''
+  if (body.jsonSchema) {
+    const example = buildSchemaExample(body.jsonSchema as never, menuRawList as never)
+    return JSON.stringify(example, null, 2)
   }
-  if (s.type === 'array' && s.items) return [buildSchemaExampleForCurl(s.items)]
-  if (s.type === 'string') return 'string'
-  if (s.type === 'integer' || s.type === 'number') return 0
-  if (s.type === 'boolean') return true
+  if (body.rawText?.trim()) return body.rawText
   return ''
 }
 
-function buildBodyExample(apiDetails: ApiDetails): string {
+function buildBodyFillText(apiDetails: ApiDetails, menuRawList?: unknown): string {
   const body = apiDetails.requestBody
   if (!body || body.type === BodyType.None) return ''
-  // Prefer generating example from schema (avoids showing raw schema definition as body)
-  if (body.jsonSchema) return JSON.stringify(buildSchemaExampleForCurl(body.jsonSchema), null, 2)
+  if (body.jsonSchema) {
+    const example = buildSchemaExample(body.jsonSchema as never, menuRawList as never)
+    return JSON.stringify(example, null, 2)
+  }
   if (body.rawText?.trim()) return body.rawText
-  return ''
+  return JSON.stringify({}, null, 2)
 }
 
 function getStatusColor(code: number) {
@@ -136,6 +131,16 @@ const headerTableColumns = [
   { title: 'Value', dataIndex: 'value', key: 'value' },
 ]
 
+const bodyTypeOptions = [
+  { n: 'none', t: BodyType.None },
+  { n: 'form-data', t: BodyType.FormData },
+  { n: 'url-encoded', t: BodyType.UrlEncoded },
+  { n: 'json', t: BodyType.Json },
+  { n: 'xml', t: BodyType.Xml },
+  { n: 'raw', t: BodyType.Raw },
+  { n: 'binary', t: BodyType.Binary },
+]
+
 export function RunTab() {
   const { token } = theme.useToken()
   const { tabData } = useTabContentContext()
@@ -144,18 +149,17 @@ export function RunTab() {
     menuRawList,
     projectEnvironments,
     currentProjectEnvironmentId,
-    updateMenuItem,
   } = useMenuHelpersContext()
 
-  const docValue = useMemo(() => {
-    return menuRawList?.find(({ id }) => id === tabData.key)?.data as ApiDetails | undefined
+  const { menuApiItem, docValue } = useMemo(() => {
+    const item = menuRawList?.find(({ id }) => id === tabData.key)
+    return { menuApiItem: item, docValue: item?.data as ApiDetails | undefined }
   }, [menuRawList, tabData.key])
 
   const storageKey = docValue ? `${STORAGE_PREFIX}${docValue.id}` : ''
 
-  const { run, running, result, error, resetResult } = useApiRequestRunner(docValue?.id)
+  const { run, running, result, error, resetResult } = useApiRequestRunner()
 
-  // 初始化工作副本：localStorage > 文档定义
   const [workCopy, setWorkCopy] = useState<ApiDetails | undefined>(() => {
     if (!docValue) return undefined
     try {
@@ -166,39 +170,42 @@ export function RunTab() {
   })
 
   const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
-  const [bodyError, setBodyError] = useState<string>()
 
-  // docValue 变化时重新初始化
+  // 用数据库表列的 updatedAt 追踪文档版本（data_json 内部 updatedAt 不会随保存变化）
+  const docVersionRef = useRef((menuApiItem as { updatedAt?: string } | undefined)?.updatedAt)
+
   useEffect(() => {
     if (!docValue) return
-    try {
-      const saved = localStorage.getItem(`${STORAGE_PREFIX}${docValue.id}`)
-      if (saved) {
-        setWorkCopy(JSON.parse(saved) as ApiDetails)
-      } else {
-        setWorkCopy(cloneApiDetails(docValue))
-      }
-    } catch {
+    const menuUpdatedAt = (menuApiItem as { updatedAt?: string } | undefined)?.updatedAt
+    // 文档有更新时，重新从文档初始化 workCopy
+    if (menuUpdatedAt && menuUpdatedAt !== docVersionRef.current) {
+      docVersionRef.current = menuUpdatedAt
       setWorkCopy(cloneApiDetails(docValue))
+      setBodyRawText(undefined)
+      resetResult()
+      return
     }
-    resetResult()
-  }, [docValue?.id])
+    // 首次加载：有本地副本则恢复，否则从文档初始化
+    if (docVersionRef.current === undefined) {
+      docVersionRef.current = menuUpdatedAt
+      try {
+        const saved = localStorage.getItem(`${STORAGE_PREFIX}${docValue.id}`)
+        if (saved) {
+          setWorkCopy(JSON.parse(saved) as ApiDetails)
+          return
+        }
+      } catch { /* ignore */ }
+      setWorkCopy(cloneApiDetails(docValue))
+      resetResult()
+    }
+  }, [(menuApiItem as { updatedAt?: string } | undefined)?.updatedAt])
 
-  // 持久化到 localStorage
   const persist = useCallback((copy: ApiDetails) => {
     if (!copy?.id) return
-    try {
-      localStorage.setItem(`${STORAGE_PREFIX}${copy.id}`, JSON.stringify(copy))
-    } catch { /* ignore */ }
+    try { localStorage.setItem(`${STORAGE_PREFIX}${copy.id}`, JSON.stringify(copy)) } catch { /* ignore */ }
   }, [])
 
-  const handleValuesChange: FormProps['onValuesChange'] = (_changed, all) => {
-    const next = { ...workCopy, ...all } as ApiDetails
-    setWorkCopy(next)
-    persist(next)
-  }
-
-  // 当前环境信息
+  // 当前环境
   const currentEnv = useMemo(() => {
     const envId = workCopy?.serverId || currentProjectEnvironmentId
     return projectEnvironments?.find((e) => e.id === envId)
@@ -219,27 +226,9 @@ export function RunTab() {
         const fresh = cloneApiDetails(docValue)
         setWorkCopy(fresh)
         setBodyRawText(undefined)
-        setBodyError(undefined)
         resetResult()
         try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
         messageApi.success('已复原')
-      },
-    })
-  }
-
-  // 覆盖到文档
-  const handleOverwrite = () => {
-    Modal.confirm({
-      title: '覆盖到文档',
-      content: '确定要用当前运行 Tab 中的参数覆盖文档定义吗？此操作不可撤销。',
-      onOk: () => {
-        if (!workCopy) return
-        updateMenuItem({
-          id: tabData.key,
-          name: workCopy.name,
-          data: workCopy,
-        })
-        messageApi.success('已覆盖到文档')
       },
     })
   }
@@ -248,33 +237,59 @@ export function RunTab() {
   const handleRun = async () => {
     if (!workCopy) return
 
-    // 如果是 JSON/XML body，同步编辑器内容到 requestBody
+    // 构建完整 URL（含 query 参数）
+    const base = envBaseUrl ? envBaseUrl.replace(/\/$/, '') : ''
+    const path = workCopy.path ?? '/'
+    const fullPath = path.startsWith('http://') || path.startsWith('https://')
+      ? path
+      : base ? `${base}${path}` : path
+
+    const queryParams = (workCopy.parameters?.query ?? [])
+      .filter(p => p.name && p.enable !== false)
+      .map(p => `${encodeURIComponent(p.name!)}=${encodeURIComponent(String(p.example ?? ''))}`)
+      .join('&')
+    const url = queryParams ? `${fullPath}${fullPath.includes('?') ? '&' : '?'}${queryParams}` : fullPath
+
+    // 构建 Header
+    const headers = (workCopy.parameters?.header ?? [])
+      .filter(h => h.name && h.enable !== false)
+      .map(h => ({ name: h.name!, value: String(h.example ?? '') }))
+
+    // 构建 Body
     const body = workCopy.requestBody
-    const currentBodyText = bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy)
-    if (body && (body.type === BodyType.Json || body.type === BodyType.Xml)) {
-      if (currentBodyText.trim()) {
-        try {
-          JSON.parse(currentBodyText)
-          setBodyError(undefined)
-        } catch {
-          setBodyError('JSON 格式错误')
-          return
-        }
+    let bodyText = ''
+    let contentType: string | undefined
+    if (body && body.type !== BodyType.None) {
+      if (body.type === BodyType.Json || body.type === BodyType.Xml || body.type === BodyType.Raw) {
+        bodyText = bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)
+        contentType = body.type === BodyType.Xml ? 'application/xml'
+          : body.type === BodyType.Raw ? 'text/plain'
+          : 'application/json'
+      } else if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
+        const params = (body.parameters ?? [])
+          .filter(p => p.name && p.enable !== false)
+        bodyText = params.map(p =>
+          `${encodeURIComponent(p.name!)}=${encodeURIComponent(String(p.example ?? ''))}`
+        ).join('&')
+        contentType = body.type === BodyType.FormData ? 'multipart/form-data' : 'application/x-www-form-urlencoded'
       }
-      workCopy.requestBody = { ...body, rawText: currentBodyText }
     }
 
-    await run(workCopy)
+    await run(url, workCopy.method ?? 'GET', headers, bodyText, contentType)
   }
 
+  // 一键填充 Body
   const handleFillBody = () => {
     if (!workCopy) return
-    const example = buildBodyExample(workCopy)
-    if (example) {
-      setBodyRawText(example)
-      setBodyError(undefined)
-    }
+    const text = buildBodyFillText(workCopy, menuRawList)
+    setBodyRawText(text)
   }
+
+  // 判断是否显示 JSON 输入框
+  const showBodyEditor = workCopy?.requestBody
+    && (workCopy.requestBody.type === BodyType.Json
+      || workCopy.requestBody.type === BodyType.Xml
+      || workCopy.requestBody.type === BodyType.Raw)
 
   // cURL
   const curlCommands = useMemo(() => {
@@ -292,11 +307,6 @@ export function RunTab() {
     })), [])
 
   if (!docValue || !workCopy) return null
-
-  const showBodyTextarea = workCopy.requestBody
-    && (workCopy.requestBody.type === BodyType.Json
-      || workCopy.requestBody.type === BodyType.Xml
-      || workCopy.requestBody.type === BodyType.Raw)
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -325,9 +335,10 @@ export function RunTab() {
       </div>
 
       {/* URL 行 */}
-      <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+      <div className="flex items-center gap-2 px-3 py-2 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
         <Select
-          className="min-w-[100px]"
+          className="shrink-0"
+          style={{ minWidth: 90 }}
           options={methodOptions}
           popupMatchSelectWidth={false}
           value={workCopy.method ?? 'GET'}
@@ -339,7 +350,7 @@ export function RunTab() {
         />
 
         <div
-          className="flex items-center rounded border px-2"
+          className="flex items-center rounded border px-2 min-w-0"
           style={{
             backgroundColor: token.colorFillQuaternary,
             borderColor: token.colorBorderSecondary,
@@ -358,7 +369,7 @@ export function RunTab() {
             : null}
           <Input
             bordered={false}
-            className="flex-1"
+            className="flex-1 min-w-0"
             style={{ paddingLeft: envBaseUrl ? 0 : 8 }}
             value={workCopy.path ?? ''}
             onChange={(e) => {
@@ -369,7 +380,7 @@ export function RunTab() {
           />
         </div>
 
-        <Space.Compact>
+        <Space.Compact className="shrink-0">
           <Button
             loading={running}
             type="primary"
@@ -377,13 +388,6 @@ export function RunTab() {
             onClick={() => void handleRun()}
           >
             运行
-          </Button>
-          <Button
-            icon={<SaveIcon size={14} />}
-            onClick={handleOverwrite}
-            title="覆盖到文档"
-          >
-            覆盖
           </Button>
           <Button
             icon={<RotateCcwIcon size={14} />}
@@ -406,22 +410,14 @@ export function RunTab() {
           />
         </div>
 
-        {/* Body 区域 */}
+        {/* Body 编辑区 */}
         <div className="px-3 pb-3">
           <Typography.Text strong className="mb-2 block text-sm">Body</Typography.Text>
           {workCopy.requestBody
             ? (
                 <div>
                   <div className="mb-2 flex flex-wrap items-center gap-1">
-                    {[
-                      { n: 'none', t: BodyType.None },
-                      { n: 'form-data', t: BodyType.FormData },
-                      { n: 'url-encoded', t: BodyType.UrlEncoded },
-                      { n: 'json', t: BodyType.Json },
-                      { n: 'xml', t: BodyType.Xml },
-                      { n: 'raw', t: BodyType.Raw },
-                      { n: 'binary', t: BodyType.Binary },
-                    ].map(({ n, t }) => (
+                    {bodyTypeOptions.map(({ n, t }) => (
                       <Tag.CheckableTag
                         key={t}
                         checked={workCopy.requestBody!.type === t}
@@ -441,19 +437,22 @@ export function RunTab() {
                     ))}
                   </div>
 
-                  {showBodyTextarea && (
+                  {showBodyEditor && (
                     <div>
                       <MonacoEditor
                         height="200px"
-                        language="json"
-                        value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy)}
+                        language={
+                          workCopy.requestBody!.type === BodyType.Xml ? 'xml'
+                            : workCopy.requestBody!.type === BodyType.Raw ? 'plaintext'
+                            : 'json'
+                        }
+                        value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
                         onChange={(val) => {
                           const text = typeof val === 'string' ? val : (val != null ? JSON.stringify(val, null, 2) : '')
                           setBodyRawText(text)
-                          setBodyError(undefined)
                         }}
+                        options={{ readOnly: false }}
                         onMount={(editor, monaco) => {
-                          // Disable JS/TS diagnostics to prevent spurious errors on JSON content
                           monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
                           monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
                           setTimeout(() => {
@@ -461,9 +460,6 @@ export function RunTab() {
                           }, 100)
                         }}
                       />
-                      {bodyError && (
-                        <Typography.Text className="mt-1 text-xs" type="danger">{bodyError}</Typography.Text>
-                      )}
                       <div className="mt-1 flex gap-2">
                         <Button size="small" onClick={handleFillBody}>一键填充</Button>
                       </div>
@@ -472,9 +468,22 @@ export function RunTab() {
 
                   {(workCopy.requestBody.type === BodyType.FormData
                     || workCopy.requestBody.type === BodyType.UrlEncoded) && (
-                    <Typography.Text type="secondary" className="text-xs">
-                      参数在 Body tab 中编辑
-                    </Typography.Text>
+                    <div>
+                      <Typography.Text type="secondary" className="mb-2 block text-xs">
+                        {workCopy.requestBody.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
+                      </Typography.Text>
+                      <ParamsEditableTable
+                        value={workCopy.requestBody.parameters}
+                        onChange={(parameters) => {
+                          const next = {
+                            ...workCopy,
+                            requestBody: { ...workCopy.requestBody!, parameters },
+                          }
+                          setWorkCopy(next)
+                          persist(next)
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
               )

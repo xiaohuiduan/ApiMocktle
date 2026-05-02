@@ -398,6 +398,96 @@ pub fn revoke_project_invitation(
     Ok(())
 }
 
+/// 递归归一化 JSON Schema：properties object map → array、$ref 补 type: "ref"
+fn normalize_json_schema(schema: &mut serde_json::Value) {
+    if let Some(obj) = schema.as_object_mut() {
+        // $ref-only → 补 type: "ref"
+        if obj.contains_key("$ref") && !obj.contains_key("type") {
+            obj.insert("type".to_string(), serde_json::Value::String("ref".to_string()));
+        }
+        // properties 为 object map → 转数组 [{name, ...}]
+        if obj.get("type") == Some(&serde_json::Value::String("object".to_string())) {
+            if let Some(props_val) = obj.remove("properties") {
+                if let serde_json::Value::Object(props_map) = props_val {
+                    let mut arr: Vec<serde_json::Value> = Vec::new();
+                    for (name, mut def) in props_map {
+                        normalize_json_schema(&mut def);
+                        if let Some(def_obj) = def.as_object_mut() {
+                            def_obj.insert("name".to_string(), serde_json::Value::String(name));
+                        }
+                        arr.push(def);
+                    }
+                    obj.insert("properties".to_string(), serde_json::Value::Array(arr));
+                } else {
+                    // 数组或其它类型 → 递归处理每个元素后放回
+                    let mut props_val = props_val;
+                    if let serde_json::Value::Array(ref mut props_arr) = props_val {
+                        for prop in props_arr.iter_mut() {
+                            normalize_json_schema(prop);
+                        }
+                    }
+                    obj.insert("properties".to_string(), props_val);
+                }
+            }
+            // 从 required[] 提取到各字段
+            if let Some(serde_json::Value::Array(_)) = obj.get("required") {
+                obj.remove("required");
+            }
+        }
+        // 递归处理 array items
+        if obj.get("type") == Some(&serde_json::Value::String("array".to_string())) {
+            if let Some(items) = obj.get_mut("items") {
+                normalize_json_schema(items);
+            }
+        }
+        // 递归处理已为数组的 properties
+        if obj.get("type") == Some(&serde_json::Value::String("object".to_string())) {
+            if let Some(serde_json::Value::Array(props)) = obj.get_mut("properties") {
+                for prop in props.iter_mut() {
+                    normalize_json_schema(prop);
+                }
+            }
+        }
+    }
+}
+
+/// 归一化菜单项中的 JSON Schema（data_json 字段）
+fn normalize_menu_item_schema(menu_item: &mut ApiMenuData) {
+    if let Some(ref mut data) = menu_item.data_json {
+        let data_obj = match data.as_object_mut() {
+            Some(o) => o,
+            None => return,
+        };
+
+        // requestBody.jsonSchema
+        if let Some(req_body) = data_obj.get_mut("requestBody") {
+            if let Some(req_obj) = req_body.as_object_mut() {
+                if let Some(json_schema) = req_obj.get_mut("jsonSchema") {
+                    normalize_json_schema(json_schema);
+                }
+            }
+        }
+
+        // responses[].jsonSchema
+        if let Some(responses) = data_obj.get_mut("responses") {
+            if let Some(resp_arr) = responses.as_array_mut() {
+                for resp in resp_arr.iter_mut() {
+                    if let Some(resp_obj) = resp.as_object_mut() {
+                        if let Some(json_schema) = resp_obj.get_mut("jsonSchema") {
+                            normalize_json_schema(json_schema);
+                        }
+                    }
+                }
+            }
+        }
+
+        // apiSchema: data.jsonSchema
+        if let Some(json_schema) = data_obj.get_mut("jsonSchema") {
+            normalize_json_schema(json_schema);
+        }
+    }
+}
+
 // Project State
 pub fn get_project_state(
     db: &Db,
@@ -409,7 +499,7 @@ pub fn get_project_state(
         "SELECT id, parent_id, name, type, data_json, sort_order, created_at, updated_at
          FROM menu_items WHERE project_id = ?1 ORDER BY sort_order",
     )?;
-    let menu_raw_list: Vec<ApiMenuData> = stmt
+    let mut menu_raw_list: Vec<ApiMenuData> = stmt
         .query_map(params![project_id], |row| {
             Ok(ApiMenuData {
                 id: row.get(0)?,
@@ -424,6 +514,11 @@ pub fn get_project_state(
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
+
+    // 统一归一化所有 JSON Schema
+    for item in menu_raw_list.iter_mut() {
+        normalize_menu_item_schema(item);
+    }
 
     let mut stmt2 = conn.prepare(
         "SELECT id, catalog_type, deleted_item_json, creator_json, expires_at, created_at

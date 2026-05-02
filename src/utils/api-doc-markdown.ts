@@ -2,7 +2,9 @@ import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 
 import type { ApiDetails, Parameter } from '@/types'
-import { SchemaType, type JsonSchema } from '@/components/JsonSchema'
+import type { JsonSchema } from '@/components/JsonSchema'
+import { SchemaType } from '@/components/JsonSchema'
+import { buildSchemaExample, buildSchemaRows, getTypeLabel } from '@/components/JsonSchema/schema-normalizer'
 
 // ── types ──
 
@@ -29,55 +31,6 @@ function esc(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\|/g, '\\|')
 }
 
-function getTypeLabel(node: JsonSchema): string {
-  if (!node) return 'unknown'
-  if (node.type === SchemaType.Array) return `array<${getTypeLabel(node.items)}>`
-  if (node.type === SchemaType.Refer) return node.$ref
-  return node.type ?? 'unknown'
-}
-
-function buildSchemaExample(schema?: JsonSchema): unknown {
-  if (!schema) return {}
-  switch (schema.type) {
-    case SchemaType.String: return 'string'
-    case SchemaType.Integer: return 0
-    case SchemaType.Number: return 0
-    case SchemaType.Boolean: return true
-    case SchemaType.Null: return null
-    case SchemaType.Refer: return {}
-    case SchemaType.Any: return {}
-    case SchemaType.Array: return [buildSchemaExample(schema.items)]
-    case SchemaType.Object: {
-      const out: Record<string, unknown> = {}
-      if (Array.isArray(schema.properties)) {
-        schema.properties.forEach((field, i) => {
-          out[field.name ?? `field_${i + 1}`] = buildSchemaExample(field)
-        })
-      }
-      return out
-    }
-    default: return {}
-  }
-}
-
-function buildSchemaRows(schema?: JsonSchema): { name: string; typeLabel: string; description: string; depth: number }[] {
-  if (!schema || schema.type !== SchemaType.Object || !Array.isArray(schema.properties)) return []
-  const rows: { name: string; typeLabel: string; description: string; depth: number }[] = []
-  const walk = (properties: JsonSchema[], depth: number) => {
-    properties.forEach((field: JsonSchema, i: number) => {
-      const name = field.name ?? `field_${i + 1}`
-      rows.push({ name, typeLabel: getTypeLabel(field), description: field.description ?? '-', depth })
-      if (field.type === SchemaType.Object && Array.isArray(field.properties)) walk(field.properties, depth + 1)
-      if (field.type === SchemaType.Array) {
-        const items = field.items
-        if (items?.type === SchemaType.Object && Array.isArray(items.properties)) walk(items.properties, depth + 1)
-      }
-    })
-  }
-  walk(schema.properties, 0)
-  return rows
-}
-
 // ── Markdown generators ──
 
 function renderParamsTable(params: Parameter[] | undefined, title: string): string {
@@ -91,17 +44,17 @@ function renderParamsTable(params: Parameter[] | undefined, title: string): stri
 function renderSchemaMd(schema?: JsonSchema, indent = ''): string {
   if (!schema) return ''
   if (schema.type === SchemaType.Object && Array.isArray(schema.properties) && schema.properties.length > 0) {
-    const rows = buildSchemaRows(schema)
+    const rows = buildSchemaRows(schema, undefined, { resolveRefs: false })
     const rowMd = rows.map(r =>
-      `${indent}| ${'  '.repeat(r.depth)}${esc(r.name)} | ${esc(r.typeLabel)} | 可选 | ${esc(r.description)} |`,
+      `${indent}| ${'  '.repeat(r.depth)}${esc(r.name)} | ${esc(r.typeLabel)} | ${r.required ? '必填' : '可选'} | ${esc(r.description ?? '-')} |`,
     ).join('\n')
-    const example = JSON.stringify(buildSchemaExample(schema), null, 2)
+    const example = JSON.stringify(buildSchemaExample(schema, undefined), null, 2)
     return `${indent}| 字段名 | 类型 | 必填 | 说明 |\n${indent}|--------|------|------|------|\n${rowMd}\n\n**示例:**\n\n\`\`\`json\n${example}\n\`\`\`\n`
   }
   if (schema.type === SchemaType.Array) {
     return `${indent}array\n\n${renderSchemaMd(schema.items, indent)}`
   }
-  return `${indent}\`${esc(getTypeLabel(schema))}\`\n`
+  return `${indent}\`${schema ? esc(getTypeLabel(schema)) : 'unknown'}\`\n`
 }
 
 function renderApiMd(item: ExportApi): string {
@@ -146,7 +99,7 @@ function renderApiMd(item: ExportApi): string {
       if (resSchema) {
         md += renderSchemaMd(resSchema)
       } else {
-        md += `**返回示例:**\n\n\`\`\`json\n${JSON.stringify(buildSchemaExample(resSchema), null, 2)}\n\`\`\`\n\n`
+        md += `**返回示例:**\n\n\`\`\`json\n${JSON.stringify(buildSchemaExample(resSchema, undefined), null, 2)}\n\`\`\`\n\n`
       }
     })
   }

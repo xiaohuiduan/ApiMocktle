@@ -219,7 +219,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
       },
     },
     {
-      title: '示例值',
+      title: '请求值',
       dataIndex: 'example',
       width: '25%',
       render: (exampleVal, record, ridx) => {

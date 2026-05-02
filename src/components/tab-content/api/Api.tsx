@@ -80,7 +80,7 @@ export function Api() {
                 <Tabs
                   animated={false}
                   className="api-details-tabs flex-1"
-                  defaultActiveKey="docEdit"
+                  defaultActiveKey="doc"
                   items={apiTabItems}
                   tabBarExtraContent={(
                     <>
