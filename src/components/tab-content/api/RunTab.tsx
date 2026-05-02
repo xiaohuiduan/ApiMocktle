@@ -412,7 +412,12 @@ export function RunTab() {
 
         {/* Body 编辑区 */}
         <div className="px-3 pb-3">
-          <Typography.Text strong className="mb-2 block text-sm">Body</Typography.Text>
+          <div className="mb-2 flex items-center justify-between">
+            <Typography.Text strong className="text-sm">Body</Typography.Text>
+            {showBodyEditor && (
+              <Button size="small" onClick={handleFillBody}>一键填充</Button>
+            )}
+          </div>
           {workCopy.requestBody
             ? (
                 <div>
@@ -460,9 +465,6 @@ export function RunTab() {
                           }, 100)
                         }}
                       />
-                      <div className="mt-1 flex gap-2">
-                        <Button size="small" onClick={handleFillBody}>一键填充</Button>
-                      </div>
                     </div>
                   )}
 
