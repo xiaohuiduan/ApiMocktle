@@ -141,7 +141,7 @@ pub fn move_menu_items(
     project_id: &str,
     drag_key: &str,
     drop_key: &str,
-    drop_position: i32,
+    _drop_position: i32,
 ) -> Result<(), crate::errors::AppError> {
     let conn = db.0.lock().unwrap();
     let now = chrono::Utc::now().to_rfc3339();

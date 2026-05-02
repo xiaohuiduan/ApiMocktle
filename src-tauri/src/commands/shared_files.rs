@@ -31,11 +31,11 @@ pub fn list_shared_files(db: State<Arc<Db>>, session_id: String, project_id: Str
 #[tauri::command]
 pub fn upload_shared_file(
     db: State<Arc<Db>>,
-    app_handle: tauri::AppHandle,
+    _app_handle: tauri::AppHandle,
     session_id: String,
     project_id: String,
 ) -> ApiResult<serde_json::Value> {
-    let user = match check_member(&db, &session_id, &project_id) {
+    let _user = match check_member(&db, &session_id, &project_id) {
         Ok(u) => u,
         Err(e) => return e.into(),
     };

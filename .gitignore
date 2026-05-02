@@ -57,6 +57,8 @@ runtime/
 # Monaco Editor local copy (generated from node_modules)
 /public/monaco-editor/
 
-# Electron build output
+# Rust build output
+src-tauri/target/
+
+# Electron/Tauri release output
 /release/
-src-tauri/target/**

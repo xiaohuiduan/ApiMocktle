@@ -597,7 +597,7 @@ pub async fn start_yapi_server(
     let router = build_router(db);
     log::info!("YApi HTTP server started on 127.0.0.1:{}", actual_port);
 
-    axum::serve(listener, router)
+    let _ = axum::serve(listener, router)
         .with_graceful_shutdown(async { rx.await.ok(); })
         .await;
 
