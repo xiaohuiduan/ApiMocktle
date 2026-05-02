@@ -275,37 +275,6 @@ pub struct SharedFileItem {
     pub created_at: String,
 }
 
-// Share Links
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ShareLinkItem {
-    pub id: String,
-    #[serde(rename = "projectId")]
-    pub project_id: String,
-    #[serde(rename = "creatorUserId")]
-    pub creator_user_id: String,
-    #[serde(rename = "apiMenuIds")]
-    pub api_menu_ids: String,
-    #[serde(rename = "passwordHash")]
-    pub password_hash: Option<String>,
-    #[serde(rename = "accessKey")]
-    pub access_key: Option<String>,
-    pub title: String,
-    #[serde(rename = "expiresAt")]
-    pub expires_at: Option<String>,
-    #[serde(rename = "createdAt")]
-    pub created_at: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateShareLinkPayload {
-    #[serde(rename = "apiMenuIds")]
-    pub api_menu_ids: Vec<String>,
-    pub password: Option<String>,
-    pub title: Option<String>,
-    #[serde(rename = "expiresAt")]
-    pub expires_at: Option<String>,
-}
-
 // Tokens
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectToken {
@@ -390,33 +359,3 @@ impl<T: Serialize> From<crate::errors::AppError> for ApiResult<T> {
     }
 }
 
-// Access check result
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProjectAccessResult {
-    pub role: String,
-    pub project_name: String,
-}
-
-// Public share
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PublicShareData {
-    pub id: String,
-    pub title: String,
-    #[serde(rename = "apiMenuIds")]
-    pub api_menu_ids: Vec<String>,
-    #[serde(rename = "hasPassword")]
-    pub has_password: bool,
-    #[serde(rename = "accessKey")]
-    pub access_key: Option<String>,
-    #[serde(rename = "expiresAt")]
-    pub expires_at: Option<String>,
-    #[serde(rename = "menuItems")]
-    pub menu_items: Vec<ApiMenuData>,
-    #[serde(rename = "projectName")]
-    pub project_name: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AccessSharePayload {
-    pub password: Option<String>,
-}

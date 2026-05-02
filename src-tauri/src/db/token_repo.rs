@@ -1,4 +1,4 @@
-use rand::Rng;
+
 use rusqlite::params;
 use uuid::Uuid;
 

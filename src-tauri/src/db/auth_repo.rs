@@ -81,13 +81,6 @@ pub fn delete_session(db: &Db, session_id: &str) {
         .ok();
 }
 
-pub fn clear_expired_sessions(db: &Db) {
-    let conn = db.0.lock().unwrap();
-    let now = chrono::Utc::now().timestamp_millis();
-    conn.execute("DELETE FROM sessions WHERE expires_at <= ?1", params![now])
-        .ok();
-}
-
 pub fn get_session(db: &Db, session_id: &str) -> Option<SessionRow> {
     let conn = db.0.lock().unwrap();
     clear_expired_sessions_inner(&conn);

@@ -2,7 +2,7 @@ use rusqlite::params;
 use uuid::Uuid;
 
 use crate::db::client::Db;
-use crate::models::{SharedDocItem, SharedFileItem, ApiResult};
+use crate::models::{SharedDocItem, SharedFileItem};
 
 pub fn list_shared_docs(
     db: &Db,
@@ -172,37 +172,6 @@ pub fn list_shared_files(
     })?;
 
     rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.into())
-}
-
-pub fn create_shared_file(
-    db: &Db,
-    project_id: &str,
-    uploader_user_id: &str,
-    name: &str,
-    size: i64,
-    mime_type: &str,
-    storage_path: &str,
-) -> Result<SharedFileItem, crate::errors::AppError> {
-    let conn = db.0.lock().unwrap();
-    let id = Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
-
-    conn.execute(
-        "INSERT INTO shared_files (id, project_id, uploader_user_id, name, size, mime_type, storage_path, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        params![id, project_id, uploader_user_id, name, size, mime_type, storage_path, now],
-    )?;
-
-    Ok(SharedFileItem {
-        id,
-        project_id: project_id.to_string(),
-        uploader_user_id: uploader_user_id.to_string(),
-        linked_doc_id: None,
-        name: name.to_string(),
-        size,
-        mime_type: mime_type.to_string(),
-        created_at: now,
-    })
 }
 
 pub fn get_shared_file(

@@ -322,13 +322,3 @@ pub fn list_menu_items(
     rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.into())
 }
 
-pub fn delete_menu_items(
-    db: &Db,
-    project_id: &str,
-    ids: &[String],
-) -> Result<(), crate::errors::AppError> {
-    for id in ids {
-        delete_menu_item(db, project_id, id)?;
-    }
-    Ok(())
-}

@@ -1,6 +1,5 @@
 use rand::RngCore;
 use scrypt::{scrypt, Params};
-use sha2::{Sha256, Digest};
 
 pub fn hash_password(password: &str) -> Result<String, String> {
     let mut salt = [0u8; 16];
@@ -55,8 +54,3 @@ pub fn verify_password(password: &str, stored_hash: &str) -> bool {
     diff == 0
 }
 
-pub fn sha256_hash(input: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(input.as_bytes());
-    hex::encode(hasher.finalize())
-}

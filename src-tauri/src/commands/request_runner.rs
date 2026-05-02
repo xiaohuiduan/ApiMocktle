@@ -120,11 +120,13 @@ pub async fn run_api_request(
     }
 }
 
+#[allow(dead_code)]
 struct ParamEntry {
     name: String,
     value: String,
 }
 
+#[allow(dead_code)]
 fn extract_params(details: &serde_json::Value, section: &str) -> Vec<ParamEntry> {
     details
         .get("parameters")
@@ -148,6 +150,7 @@ fn extract_params(details: &serde_json::Value, section: &str) -> Vec<ParamEntry>
         .unwrap_or_default()
 }
 
+#[allow(dead_code)]
 fn build_query_string(params: &[ParamEntry]) -> String {
     if params.is_empty() {
         return String::new();
@@ -165,6 +168,7 @@ fn build_query_string(params: &[ParamEntry]) -> String {
         .join("&")
 }
 
+#[allow(dead_code)]
 fn build_body(
     details: &serde_json::Value,
     body_type: &str,
@@ -240,6 +244,7 @@ fn build_body(
     }
 }
 
+#[allow(dead_code)]
 fn build_schema_example(schema: &serde_json::Value) -> serde_json::Value {
     let stype = schema
         .get("type")

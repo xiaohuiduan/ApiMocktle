@@ -145,16 +145,6 @@ pub fn get_project_member_role(
     .ok()
 }
 
-pub fn get_project_owner_id(db: &Db, project_id: &str) -> Option<String> {
-    let conn = db.0.lock().unwrap();
-    conn.query_row(
-        "SELECT owner_id FROM projects WHERE id = ?1",
-        params![project_id],
-        |row| row.get(0),
-    )
-    .ok()
-}
-
 pub fn list_project_members(
     db: &Db,
     project_id: &str,
