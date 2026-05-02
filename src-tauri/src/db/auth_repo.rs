@@ -3,14 +3,16 @@ use uuid::Uuid;
 
 use crate::db::client::Db;
 
+#[allow(dead_code)]
 pub struct UserRow {
-    pub _id: String,
+    pub id: String,
     pub username: String,
     pub password_hash: String,
 }
 
+#[allow(dead_code)]
 pub struct SessionRow {
-    pub _id: String,
+    pub id: String,
     pub user_id: String,
     pub expires_at: i64,
 }
@@ -43,7 +45,7 @@ pub fn get_user_by_username(db: &Db, username: &str) -> Option<UserRow> {
         params![username],
         |row| {
             Ok(UserRow {
-                _id: row.get(0)?,
+                id: row.get(0)?,
                 username: row.get(1)?,
                 password_hash: row.get(2)?,
             })
@@ -90,7 +92,7 @@ pub fn get_session(db: &Db, session_id: &str) -> Option<SessionRow> {
         params![session_id],
         |row| {
             Ok(SessionRow {
-                _id: row.get(0)?,
+                id: row.get(0)?,
                 user_id: row.get(1)?,
                 expires_at: row.get(2)?,
             })

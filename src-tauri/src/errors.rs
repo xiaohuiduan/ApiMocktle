@@ -17,6 +17,7 @@ pub enum AppError {
 }
 
 #[derive(Serialize)]
+#[allow(dead_code)]
 pub struct ApiError {
     pub ok: bool,
     pub data: Option<()>,
