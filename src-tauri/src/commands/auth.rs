@@ -1,7 +1,7 @@
 use tauri::State;
 use crate::db::client::Db;
 use std::sync::Arc;
-use crate::db::auth_repo;
+use crate::db::{auth_repo, personal_token_repo};
 use crate::models::{LoginPayload, RegisterPayload, AuthResult, SessionUser, ApiResult, ChangePasswordPayload};
 use crate::services::auth_service;
 
@@ -62,6 +62,47 @@ pub fn list_all_users(db: State<Arc<Db>>, session_id: String) -> ApiResult<Vec<s
             }).collect();
             ApiResult::success(result)
         }
+        Err(e) => e.into(),
+    }
+}
+
+#[tauri::command]
+pub fn list_personal_tokens(db: State<Arc<Db>>, session_id: String) -> ApiResult<Vec<serde_json::Value>> {
+    let user = match auth_repo::get_valid_session_user(&db, &session_id) {
+        Some(u) => u,
+        None => return crate::errors::AppError::Unauthorized("未登录".into()).into(),
+    };
+    match personal_token_repo::list_personal_tokens(&db, &user.id) {
+        Ok(tokens) => {
+            let result: Vec<serde_json::Value> = tokens.into_iter().map(|t| {
+                serde_json::json!({ "id": t.id, "token": t.token, "name": t.name, "createdAt": t.created_at })
+            }).collect();
+            ApiResult::success(result)
+        }
+        Err(e) => e.into(),
+    }
+}
+
+#[tauri::command]
+pub fn create_personal_token(db: State<Arc<Db>>, session_id: String, name: String) -> ApiResult<serde_json::Value> {
+    let user = match auth_repo::get_valid_session_user(&db, &session_id) {
+        Some(u) => u,
+        None => return crate::errors::AppError::Unauthorized("未登录".into()).into(),
+    };
+    match personal_token_repo::create_personal_token(&db, &user.id, &name) {
+        Ok(t) => ApiResult::success(serde_json::json!({ "id": t.id, "token": t.token, "name": t.name, "createdAt": t.created_at })),
+        Err(e) => e.into(),
+    }
+}
+
+#[tauri::command]
+pub fn delete_personal_token(db: State<Arc<Db>>, session_id: String, token_id: String) -> ApiResult<()> {
+    let user = match auth_repo::get_valid_session_user(&db, &session_id) {
+        Some(u) => u,
+        None => return crate::errors::AppError::Unauthorized("未登录".into()).into(),
+    };
+    match personal_token_repo::delete_personal_token(&db, &user.id, &token_id) {
+        Ok(()) => ApiResult::success(()),
         Err(e) => e.into(),
     }
 }

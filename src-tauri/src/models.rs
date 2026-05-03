@@ -195,23 +195,6 @@ pub struct UpdateMemberRolePayload {
 }
 
 
-// Tokens
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProjectToken {
-    pub id: String,
-    #[serde(rename = "projectId")]
-    pub project_id: String,
-    pub token: String,
-    pub name: String,
-    #[serde(rename = "createdAt")]
-    pub created_at: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateTokenPayload {
-    pub name: Option<String>,
-}
-
 // Import
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ImportPayload {
@@ -236,6 +219,18 @@ pub struct RunRequestPayload {
 pub struct RunRequestHeader {
     pub name: String,
     pub value: String,
+}
+
+// Personal Tokens
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PersonalToken {
+    pub id: String,
+    #[serde(rename = "userId")]
+    pub user_id: String,
+    pub token: String,
+    pub name: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
 }
 
 // Response wrappers

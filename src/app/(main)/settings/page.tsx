@@ -20,7 +20,6 @@ import { useAuth } from '@/contexts/auth'
 import { ProjectEnvironmentsPanel } from '@/components/project-settings/ProjectEnvironmentsPanel'
 import { ApiTransferPanel } from '@/components/project-settings/ApiTransferPanel'
 import { ExportPanel } from '@/components/project-settings/ExportPanel'
-import { TokenPanel } from '@/components/project-settings/TokenPanel'
 import {
   ProjectMembersSection,
   type MemberItem,
@@ -36,7 +35,6 @@ const enum SettingsSectionKey {
   Environments = 'environments',
   ImportApi = 'import-api',
   ShareApi = 'share-api',
-  TokenConfig = 'token-config',
 }
 
 interface ProjectInfo {
@@ -59,7 +57,6 @@ const items: MenuItem[] = [
     children: [
       { key: SettingsSectionKey.Members, label: '成员管理' },
       { key: SettingsSectionKey.Environments, label: '环境管理' },
-      { key: SettingsSectionKey.TokenConfig, label: '同步配置' },
     ],
   },
   {
@@ -116,13 +113,6 @@ function sectionMeta(section: SettingsSectionKey) {
   }
 }
 
-function tokenSectionMeta() {
-  return {
-    title: '同步配置',
-    description: '管理项目 API Token，用于 EasyAPI 等第三方插件的接口导入。',
-  }
-}
-
 function roleText(role: Role) {
   if (role === 'owner') {
     return '拥有者'
@@ -157,10 +147,6 @@ export default function SettingsPage() {
       return SettingsSectionKey.ShareApi
     }
 
-    if (section === SettingsSectionKey.TokenConfig) {
-      return SettingsSectionKey.TokenConfig
-    }
-
     return SettingsSectionKey.Members
   })
   const [members, setMembers] = useState<MemberItem[]>([])
@@ -177,9 +163,7 @@ export default function SettingsPage() {
   const canManageEnvironments = projectRole === 'owner' || projectRole === 'editor'
   const isMembersSection = selectedSection === SettingsSectionKey.Members
   const isEnvironmentsSection = selectedSection === SettingsSectionKey.Environments
-  const currentSectionMeta = selectedSection === SettingsSectionKey.TokenConfig
-    ? tokenSectionMeta()
-    : sectionMeta(selectedSection)
+  const currentSectionMeta = sectionMeta(selectedSection)
 
   const fetchData = useCallback(async () => {
     if (!projectId || !sessionId) {
@@ -233,11 +217,6 @@ export default function SettingsPage() {
 
     if (section === SettingsSectionKey.ShareApi) {
       setSelectedSection(SettingsSectionKey.ShareApi)
-      return
-    }
-
-    if (section === SettingsSectionKey.TokenConfig) {
-      setSelectedSection(SettingsSectionKey.TokenConfig)
       return
     }
 
@@ -313,11 +292,7 @@ export default function SettingsPage() {
                   ? (
                       <ExportPanel projectId={projectId} />
                     )
-                  : selectedSection === SettingsSectionKey.TokenConfig
-                    ? (
-                        <TokenPanel projectId={projectId} />
-                      )
-                    : null}
+                  : null}
         </div>
       )}
     />

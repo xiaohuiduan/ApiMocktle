@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Modal, Space, Spin, Typography, message, theme } from 'antd'
 import { useNavigate } from 'react-router'
 
+import { UserMenu } from '@/components/UserMenu'
+
 import { useAuth } from '@/contexts/auth'
 import { ICON_OPTIONS, ProjectIcon } from '@/components/ProjectIcon'
 import {
@@ -69,7 +71,7 @@ function getSubmitErrorTitle(dialog: ProjectDialogState) {
 export function ProjectsClient() {
   const { token } = theme.useToken()
   const navigate = useNavigate()
-  const { sessionId, logout } = useAuth()
+  const { sessionId } = useAuth()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [projects, setProjects] = useState<ProjectItem[]>([])
@@ -195,14 +197,7 @@ export function ProjectsClient() {
         </Typography.Title>
 
         <Space className="ml-auto">
-          <Button
-            onClick={async () => {
-              await logout()
-              navigate('/login', { replace: true })
-            }}
-          >
-            退出登录
-          </Button>
+          <UserMenu />
           <Button type="primary" onClick={openCreateDialog}>
             新建项目
           </Button>

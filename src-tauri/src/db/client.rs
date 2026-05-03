@@ -96,13 +96,13 @@ fn create_tables(conn: &Connection) {
             FOREIGN KEY (creator_user_id) REFERENCES users(id) ON DELETE CASCADE
         );
 
-        CREATE TABLE IF NOT EXISTS project_tokens (
+        CREATE TABLE IF NOT EXISTS personal_tokens (
             id TEXT PRIMARY KEY,
-            project_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
             token TEXT NOT NULL UNIQUE,
             name TEXT NOT NULL DEFAULT 'default',
             created_at TEXT NOT NULL,
-            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
 
         CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
@@ -113,7 +113,6 @@ fn create_tables(conn: &Connection) {
         CREATE INDEX IF NOT EXISTS idx_recycle_items_project ON recycle_items(project_id);
         CREATE INDEX IF NOT EXISTS idx_recycle_items_expires_at ON recycle_items(expires_at);
         CREATE INDEX IF NOT EXISTS idx_share_links_project_id ON share_links(project_id);
-        CREATE INDEX IF NOT EXISTS idx_project_tokens_token ON project_tokens(token);
         ",
     )
     .expect("Failed to create database tables");

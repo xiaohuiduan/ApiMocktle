@@ -41,6 +41,9 @@ pub fn run() {
             commands::auth::get_current_user,
             commands::auth::change_password,
             commands::auth::list_all_users,
+            commands::auth::list_personal_tokens,
+            commands::auth::create_personal_token,
+            commands::auth::delete_personal_token,
             // Projects
             commands::projects::list_projects,
             commands::projects::create_project,
@@ -73,11 +76,6 @@ pub fn run() {
             // Request runner
             commands::request_runner::run_api_request,
             // Tokens
-            commands::tokens::list_project_tokens,
-            commands::tokens::create_project_token,
-            commands::tokens::delete_project_token,
-            commands::tokens::get_yapi_server_info,
-            commands::tokens::restart_yapi_server,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
