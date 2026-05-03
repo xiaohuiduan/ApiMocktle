@@ -1,63 +1,81 @@
-> [!CAUTION]
-> 该项目仍处于开发阶段。
->
-> - 功能仍在持续补齐，数据结构和交互细节可能继续调整。
-> - 本地数据默认写入 `runtime/apimocktle.sqlite`，调试前请注意备份。
-> - 导入接口文档会静默合并到当前项目资源，不会清空已有内容。
-
 # ApiMocktle
 
-**Mock**（模拟，鹦鹉学舌）+ **Turtle**（龟）→ **Mocktle**。突出 API 模拟能力，壳（shell）象征数据结构稳定。
+**Mock**（模拟，类似鹦鹉学舌，突出 API 模拟能力）+ **Turtle**（龟，象征数据结构稳定）→ **Mocktle**。一个基于 **Tauri v2 + React + Rust + SQLite** 的本地优先 API 管理桌面应用。
 
-一个基于 React Router + Vite + TypeScript + Ant Design + SQLite 的本地优先 API 管理项目。它提供注册登录、项目协作、接口目录、文档与模型编辑、环境管理、请求调试、接口导入导出等能力，目标是把常用的接口管理工作流放到一个可审计、可运行、可自行改造的项目里。
+当然上面的名字是先射箭画靶，AI给我取得，真实原因是因为我养了鹦鹉🦜和乌龟🐢，然后Deepseek给我取了这两个名字
 
-![项目界面展示](https://i.imgur.com/8UmNM9c.png)
+它把注册登录、项目管理、接口目录、文档与数据模型编辑、环境变量、请求调试、Swagger/OpenAPI 导入导出等能力整合到一个可离线运行的桌面应用里，数据完全掌握在用户本地。
 
 ## 为什么做这个项目
 
-这个项目的直接起点，是对 Apifox 投毒漏洞问题的关注。相比依赖不可控的客户端环境，我更希望把常用的接口管理能力放到一个可以自行审查、运行和改造的代码库里，在保留熟悉工作流的同时，把数据和运行环境的主动权拿回到自己手上。
+相比依赖外部服务的 API 管理工具（如 Apifox、Postman），更希望把常用的接口管理能力放到一个可以自行审计、运行和改造的代码库里。结合 Tauri 桌面框架，做到真正的本地优先、离线可用、无数据外泄风险。（例如著名的API工具投毒事件）
 
-## 当前能力
+## 核心能力
 
-- 用户注册、登录、退出登录，基于 Cookie Session 持久化登录状态。
-- 项目列表页支持创建、重命名、删除项目。
-- 项目成员支持 `owner`、`editor`、`viewer` 三种角色。
-- 支持邀请链接、邀请接受与角色控制。
-- 接口管理页支持树形目录、拖拽排序、重命名、复制、移动、删除与回收站恢复。
-- 资源类型覆盖接口、Markdown 文档、数据模型、快捷请求。
-- 接口编辑支持路径、参数、请求体、认证方式、响应定义、示例数据等。
-- 环境管理支持前置 URL、全局变量、全局 Header / Query / Cookie / Body 参数。
-- 支持在项目内直接运行接口请求并查看返回结果。
-- 支持导入 OpenAPI 3.x、Postman Collection v2/v2.1。
-- 支持导出 OpenAPI JSON / YAML。
-- 接口目录支持从 cURL 导入单条请求。
-- 新增项目级共享文件区：成员可上传、下载、删除共享文件。
-- 新增项目级在线文档：支持新建、编辑、保存、导出 Markdown。
-- 在线文档支持基于 CRDT 的协同同步（Yjs 状态合并，轮询拉取最新状态）。
-- 内置主题编辑器，可调整界面主题配置。
+### 项目管理
+- 用户注册、登录、记住密码 + 记住登录状态（可选 1/3/7/30 天/永久）
+- 创建、重命名、删除项目，支持项目图标
+- 成员管理：搜索用户直接加入项目，支持 owner/editor/viewer 三种角色
+- 修改密码
+
+### 接口管理
+- 树形目录，支持拖拽排序、重命名、复制、移动、删除、回收站恢复
+- 资源类型：API 接口 / Markdown 文档 / 数据模型 / 快捷请求
+- 接口编辑：路径、Query/Path/Header/Cookie 参数、Body（JSON/XML/form-data/url-encoded/raw/binary）
+- Body JSON 支持树形 Schema 编辑器（字段名、类型、示例值、说明）
+- 返回响应支持多个 HTTP 状态码，每个响应独立定义 JSON Schema
+- 数据模型支持 `$ref` 引用，跨接口复用 Schema 定义
+
+### 环境管理
+- 前置 URL、环境变量（支持 `{{varName}}` 模板语法，运行时自动替换）
+- 全局 Header / Query / Cookie / Body 参数
+- 个人本地值与团队值的优先级覆盖
+
+### 请求调试
+- Run Tab 独立运行接口，查看响应内容/响应头/cURL 命令
+- 支持 Query 参数 + Body JSON 同时发送
+- 环境变量 `{{x}}` 在运行时自动解析
+- 一键填充：从 Schema 示例或 default 值自动生成 Body JSON
+
+### 导入导出
+- 导入：OpenAPI 3.x / Swagger 2.0 JSON/YAML，静默合并到当前项目
+- 导出：完整 OpenAPI 3.0 / Swagger 2.0 规范文档（含 paths + definitions/schemas）
+- cURL 导入单条请求
+- 接口分享：导出 Markdown 文档
+
+### 个人 Token（YAPI 兼容）
+- 用户创建个人 Token，用于[Java插件](https://github.com/xiaohuiduan/ApiMocktle-java-plugin)同步
+- `/api/project/list` 返回用户有权限的项目列表
+- 插件可选择目标项目进行同步
 
 ## 技术栈
 
-- 前端与路由：React 18、React Router v7、Vite
-- UI：Ant Design、TailwindCSS、Lucide React、Emotion
-- 编辑能力：Monaco Editor、ByteMD
-- 服务端能力：React Router Route Handlers
-- 数据存储：Node 内置 `node:sqlite`
-- 语言与工具：TypeScript、ESLint、Stylelint
+| 层 | 技术 |
+|---|---|
+| 桌面框架 | Tauri v2 |
+| 前端 | React 18 + React Router v7 + Vite |
+| UI | Ant Design v5 + TailwindCSS + Lucide React |
+| 编辑器 | Monaco Editor（JSON 输入）+ ByteMD（Markdown） |
+| 后端 | Rust + Axum（YAPI HTTP 服务） |
+| 数据库 | SQLite（rusqlite） |
+| 实时协作 | Yjs CRDT（在线文档） |
 
 ## 项目结构
 
 ```text
-src/
-  app/            页面路由与 API 路由
-  components/     界面组件、编辑器、设置面板
-  server/         业务逻辑、导入导出、请求执行、SQLite 仓储
-  contexts/       全局状态与编辑辅助上下文
-  data/           初始展示数据与默认内容
-  content/        项目介绍等共享文案
-  styles/         全局样式
-runtime/
-  apimocktle.sqlite   启动后自动生成的本地数据库
+src/                   前端源码
+  app/                 页面路由
+  components/          UI 组件（ApiTab、JsonSchema、项目面板等）
+  contexts/            React Context（auth、menu-helpers、global）
+  utils/               工具函数（Markdown/HTML 导出）
+
+src-tauri/             Rust 后端
+  src/
+    commands/          Tauri 命令（auth、projects、menu_items、environments、imports、exports、request_runner）
+    db/                SQLite 仓储（auth_repo、project_repo、menu_repo、personal_token_repo 等）
+    services/          业务逻辑（导入解析、密码加密、YApi 转换）
+    http/              YAPI 兼容 HTTP 服务
+  Cargo.toml
 ```
 
 ## 快速开始
@@ -66,6 +84,7 @@ runtime/
 
 - Node.js `>= 20`
 - pnpm `>= 9`
+- Rust (stable toolchain)
 
 ### 安装依赖
 
@@ -76,54 +95,31 @@ pnpm install
 ### 启动开发环境
 
 ```sh
-pnpm dev
+pnpm tauri:dev
 ```
 
-首次使用建议按这个顺序体验：
-
-1. 打开注册页创建账号。
-2. 登录后进入项目列表，新建一个项目。
-3. 在项目设置中配置环境或导入 OpenAPI / Postman 文档。
-4. 回到接口管理页编辑接口、文档和模型，并直接运行请求。
-
-### 构建与启动
+### 构建
 
 ```sh
-pnpm build
-pnpm start
+pnpm tauri:build
 ```
 
-### 代码检查
+## 数据库
 
-```sh
-pnpm lint
-```
-
-## 数据与运行方式
-
-- 数据库文件默认位于 `runtime/apimocktle.sqlite`。
-- 项目启动时会自动创建 `runtime/` 目录和所需表结构。
-- 当前数据表覆盖用户、会话、项目、项目成员、邀请、菜单项、回收站和项目级元数据。
-- 这是一个本地即可跑起来的完整应用，不是纯前端 mock 页面。
+- 默认位置：`%APPDATA%/com.apimocktle.app/runtime/apimocktle.sqlite`（Windows）
+- 启动时自动创建所需表结构
+- 表包括：users、sessions、projects、project_members、menu_items、recycle_items、meta、share_links、personal_tokens
 
 ## 导入导出说明
 
-- 导入接口文档时，当前项目下的接口、模型、请求目录会静默合并到现有资源，不会清空已有菜单或回收站。
-- 导入仅支持 `.json`、`.yaml`、`.yml`。
-- OpenAPI 仅支持 `3.x`。
-- Postman 仅支持 Collection `v2` / `v2.1`。
-- Swagger `2.0` 当前不支持直接导入。
-- OpenAPI 导出需要项目具备 `editor` 或以上权限。
-
-## 当前限制
-
-- Binary Body 已建模，但请求运行暂不支持直接执行。
-- 文档导入当前为静默合并策略，不提供显式冲突预览。
-- 权限与协作能力已具备基础闭环，但仍有继续细化的空间。
-- 共享文件未设置业务大小上限，但仍受机器磁盘容量与文件系统限制。
-- 在线文档协同当前为增量推送 + 定时拉取模型，不是 WebSocket 持久连接。
-- 当前 README 只描述仓库内已实现能力，不承诺未落地功能。
+- 导入支持 `.json`、`.yaml`、`.yml`
+- OpenAPI 3.x 和 Swagger 2.0 均可导入
+- 导出生成完整的 OpenAPI 3.0 / Swagger 2.0 规范文档
+- 导入采用静默合并策略，不会清空已有资源
 
 ## 致谢
 
-本项目的界面与交互参考了 [Codennnn / Apifox-UI](https://github.com/Codennnn/Apifox-UI)。感谢原作者提供高质量的 UI 设计还原与开源分享，这个项目在此基础上继续做了适配、重构和演进。
+1. 本项目的界面与交互参考了 [Codennnn / Apifox-UI](https://github.com/Codennnn/Apifox-UI)。感谢原作者提供高质量的 UI 设计还原与开源分享，这个项目在此基础上继续做了适配、重构和演进。
+2. 感觉[qq201128 / Apifox-Local](https://github.com/qq201128/Apifox-Local)在Apifox-UI的基础上增加了很多功能，能够让我在其上面的基础上添加更多的功能。
+3. 感谢mimo 100T计划，给我提供的免费2亿credits套餐（虽然我一天就蹬完了🤣）。
+4. 感谢伟大的DeepSeek V4 pro，在五一期间降价，让我疯狂蹬，花费却不到100，完成了项目所有内容。
