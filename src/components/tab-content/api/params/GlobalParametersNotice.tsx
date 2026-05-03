@@ -3,14 +3,9 @@ import { Tag, Typography, theme } from 'antd'
 import type { ApiEnvironmentValue } from '@/types'
 
 function getEntryValue(entry: ApiEnvironmentValue) {
-  if (entry.localValue) {
-    return { label: '本地值', value: entry.localValue }
+  if (entry.value) {
+    return { label: '已配置', value: entry.value }
   }
-
-  if (entry.remoteValue) {
-    return { label: '远程值', value: entry.remoteValue }
-  }
-
   return { label: '未配置', value: '-' }
 }
 

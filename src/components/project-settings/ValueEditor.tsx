@@ -50,19 +50,10 @@ function ValueRowsTable(props: {
       <Input
         variant="borderless"
         disabled={!editable}
-        placeholder="远程值"
-        value={row.remoteValue}
+        placeholder="值"
+        value={row.value}
         onChange={(event) => {
-          onChange(updateValueRow(rows, row.id, 'remoteValue', event.target.value))
-        }}
-      />
-      <Input
-        variant="borderless"
-        disabled={!editable}
-        placeholder="本地值"
-        value={row.localValue}
-        onChange={(event) => {
-          onChange(updateValueRow(rows, row.id, 'localValue', event.target.value))
+          onChange(updateValueRow(rows, row.id, 'value', event.target.value))
         }}
       />
       <div className="flex items-center justify-center">
@@ -92,7 +83,7 @@ function ValueTable(props: {
   return (
     <div style={{ border: `1px solid ${token.colorBorderSecondary}`, borderRadius: token.borderRadiusLG }}>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
-        {['变量名', '远程值', '本地值', ''].map((header) => (
+        {['变量名', '值', ''].map((header) => (
           <div
             key={header}
             className="px-3 py-2 text-sm"

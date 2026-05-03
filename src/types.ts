@@ -107,8 +107,7 @@ export interface ApiRunHeader {
 export interface ApiEnvironmentValue {
   id: string
   name: string
-  remoteValue?: string
-  localValue?: string
+  value?: string
 }
 
 export const GLOBAL_PARAMETER_SECTIONS = ['header', 'cookie', 'query', 'body'] as const

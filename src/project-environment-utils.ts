@@ -31,8 +31,7 @@ export function createEnvironmentValue(): ApiEnvironmentValue {
   return {
     id: nanoid(6),
     name: '',
-    remoteValue: '',
-    localValue: '',
+    value: '',
   }
 }
 

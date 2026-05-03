@@ -149,6 +149,7 @@ export function RunTab() {
     menuRawList,
     projectEnvironments,
     currentProjectEnvironmentId,
+    projectEnvironmentConfig,
   } = useMenuHelpersContext()
 
   const { menuApiItem, docValue } = useMemo(() => {
@@ -237,23 +238,36 @@ export function RunTab() {
   const handleRun = async () => {
     if (!workCopy) return
 
+    // 收集环境变量用于 {{var}} 替换
+    const varMap = new Map<string, string>()
+    const envVars = [
+      ...(projectEnvironmentConfig?.globalVariables ?? []),
+      ...(projectEnvironmentConfig?.vaultSecrets ?? []),
+      ...(currentEnv?.variables ?? []),
+    ]
+    for (const v of envVars) {
+      if (v.name && v.value != null) varMap.set(v.name, v.value)
+    }
+
+    const resolveVars = (s: string) => s.replace(/\{\{(\w+)\}\}/g, (_, name) => varMap.get(name) ?? `{{${name}}}`)
+
     // 构建完整 URL（含 query 参数）
     const base = envBaseUrl ? envBaseUrl.replace(/\/$/, '') : ''
-    const path = workCopy.path ?? '/'
+    const path = resolveVars(workCopy.path ?? '/')
     const fullPath = path.startsWith('http://') || path.startsWith('https://')
       ? path
       : base ? `${base}${path}` : path
 
     const queryParams = (workCopy.parameters?.query ?? [])
       .filter(p => p.name && p.enable !== false)
-      .map(p => `${encodeURIComponent(p.name!)}=${encodeURIComponent(String(p.example ?? ''))}`)
+      .map(p => `${encodeURIComponent(p.name!)}=${encodeURIComponent(resolveVars(String(p.example ?? '')))}`)
       .join('&')
     const url = queryParams ? `${fullPath}${fullPath.includes('?') ? '&' : '?'}${queryParams}` : fullPath
 
     // 构建 Header
     const headers = (workCopy.parameters?.header ?? [])
       .filter(h => h.name && h.enable !== false)
-      .map(h => ({ name: h.name!, value: String(h.example ?? '') }))
+      .map(h => ({ name: h.name!, value: resolveVars(String(h.example ?? '')) }))
 
     // 构建 Body
     const body = workCopy.requestBody
@@ -261,7 +275,8 @@ export function RunTab() {
     let contentType: string | undefined
     if (body && body.type !== BodyType.None) {
       if (body.type === BodyType.Json || body.type === BodyType.Xml || body.type === BodyType.Raw) {
-        bodyText = bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)
+        const raw = bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)
+        bodyText = resolveVars(raw)
         contentType = body.type === BodyType.Xml ? 'application/xml'
           : body.type === BodyType.Raw ? 'text/plain'
           : 'application/json'
@@ -269,7 +284,7 @@ export function RunTab() {
         const params = (body.parameters ?? [])
           .filter(p => p.name && p.enable !== false)
         bodyText = params.map(p =>
-          `${encodeURIComponent(p.name!)}=${encodeURIComponent(String(p.example ?? ''))}`
+          `${encodeURIComponent(p.name!)}=${encodeURIComponent(resolveVars(String(p.example ?? '')))}`
         ).join('&')
         contentType = body.type === BodyType.FormData ? 'multipart/form-data' : 'application/x-www-form-urlencoded'
       }

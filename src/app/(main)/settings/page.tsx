@@ -62,7 +62,7 @@ const items: MenuItem[] = [
     children: [
       { key: SettingsSectionKey.Members, label: '成员管理' },
       { key: SettingsSectionKey.Environments, label: '环境管理' },
-      { key: SettingsSectionKey.TokenConfig, label: 'Token 配置' },
+      { key: SettingsSectionKey.TokenConfig, label: '同步配置' },
     ],
   },
   {
@@ -129,7 +129,7 @@ function sectionMeta(section: SettingsSectionKey) {
 
 function tokenSectionMeta() {
   return {
-    title: 'Token 配置',
+    title: '同步配置',
     description: '管理项目 API Token，用于 EasyAPI 等第三方插件的接口导入。',
   }
 }
