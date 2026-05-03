@@ -83,6 +83,7 @@ function BodyComp(props: BodyCompProps) {
     return (
       <JsonSchemaCard
         defaultValue={{ type: SchemaType.Object, properties: [] }}
+        editorProps={{ defaultExpandAll: true }}
         value={value.jsonSchema}
         onChange={(values) => {
           onChange?.({ ...value, jsonSchema: values })
