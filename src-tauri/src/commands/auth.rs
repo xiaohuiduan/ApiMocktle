@@ -106,3 +106,14 @@ pub fn delete_personal_token(db: State<Arc<Db>>, session_id: String, token_id: S
         Err(e) => e.into(),
     }
 }
+
+#[tauri::command]
+pub fn get_yapi_port(handle: tauri::State<'_, Arc<crate::http::yapi_server::YApiServerHandle>>) -> u16 {
+    // 等待服务启动（最多 3 秒）
+    for _ in 0..30 {
+        let p = *handle.port.lock().unwrap();
+        if p > 0 { return p; }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    *handle.port.lock().unwrap()
+}

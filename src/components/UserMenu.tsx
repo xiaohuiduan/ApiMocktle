@@ -4,6 +4,7 @@ import { Button, Dropdown, Form, Input, List, Modal, Popconfirm, Space, Typograp
 import { CopyIcon, KeyIcon, KeyRoundIcon, LogOutIcon, TrashIcon, UserCircle2Icon } from 'lucide-react'
 import { useNavigate } from 'react-router'
 
+import { invoke } from '@tauri-apps/api/core'
 import { api } from '@/api-client'
 import { useAuth } from '@/contexts/auth'
 
@@ -25,6 +26,7 @@ export function UserMenu() {
   const [tokenOpen, setTokenOpen] = useState(false)
   const [tokens, setTokens] = useState<PersonalToken[]>([])
   const [loadingTokens, setLoadingTokens] = useState(false)
+  const [yapiPort, setYapiPort] = useState<number>(0)
 
   const loadTokens = useCallback(async () => {
     if (!sessionId) return
@@ -33,7 +35,9 @@ export function UserMenu() {
     finally { setLoadingTokens(false) }
   }, [sessionId])
 
-  useEffect(() => { if (tokenOpen) loadTokens() }, [tokenOpen, loadTokens])
+  useEffect(() => {
+    if (tokenOpen) { loadTokens(); invoke<number>('get_yapi_port').then(setYapiPort).catch(() => {}) }
+  }, [tokenOpen, loadTokens])
 
   const handleCreateToken = async (values: { name: string }) => {
     if (!sessionId) return
@@ -43,7 +47,7 @@ export function UserMenu() {
 
   const handleDeleteToken = async (tokenId: string) => {
     if (!sessionId) return
-    try { await api('delete_personal_token', { sessionId, token_id: tokenId }); message.success('已删除'); await loadTokens() }
+    try { await api('delete_personal_token', { sessionId, tokenId }); message.success('已删除'); await loadTokens() }
     catch (err) { message.error((err as Error).message) }
   }
 
@@ -97,6 +101,11 @@ export function UserMenu() {
       </Modal>
 
       <Modal title="管理个人 Token" open={tokenOpen} onCancel={() => setTokenOpen(false)} footer={null} destroyOnClose>
+        {yapiPort > 0 && (
+          <Typography.Paragraph type="secondary" className="mb-3" copyable>
+            服务地址：http://127.0.0.1:{yapiPort}
+          </Typography.Paragraph>
+        )}
         <Form layout="inline" className="mb-4" onFinish={(v) => void handleCreateToken(v)}>
           <Form.Item name="name" rules={[{ required: true, message: '请输入名称' }]}>
             <Input placeholder="Token 名称" style={{ width: 200 }} />

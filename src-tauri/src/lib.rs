@@ -44,6 +44,7 @@ pub fn run() {
             commands::auth::list_personal_tokens,
             commands::auth::create_personal_token,
             commands::auth::delete_personal_token,
+            commands::auth::get_yapi_port,
             // Projects
             commands::projects::list_projects,
             commands::projects::create_project,
