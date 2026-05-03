@@ -19,12 +19,10 @@ import { api } from '@/api-client'
 import { useAuth } from '@/contexts/auth'
 import { ProjectEnvironmentsPanel } from '@/components/project-settings/ProjectEnvironmentsPanel'
 import { ApiTransferPanel } from '@/components/project-settings/ApiTransferPanel'
-import { SharedWorkspacePanel } from '@/components/project-settings/SharedWorkspacePanel'
 import { ExportPanel } from '@/components/project-settings/ExportPanel'
 import { TokenPanel } from '@/components/project-settings/TokenPanel'
 import {
   ProjectMembersSection,
-  type InvitationItem,
   type MemberItem,
   type Role,
 } from '@/components/project-settings/ProjectMembersSection'
@@ -37,7 +35,6 @@ const enum SettingsSectionKey {
   Members = 'members',
   Environments = 'environments',
   ImportApi = 'import-api',
-  SharedWorkspace = 'shared-workspace',
   ShareApi = 'share-api',
   TokenConfig = 'token-config',
 }
@@ -86,7 +83,6 @@ const items: MenuItem[] = [
     ),
     type: 'group',
     children: [
-      { key: SettingsSectionKey.SharedWorkspace, label: '共享文件与在线文档' },
       { key: SettingsSectionKey.ShareApi, label: '接口分享' },
     ],
   },
@@ -96,7 +92,7 @@ function sectionMeta(section: SettingsSectionKey) {
   if (section === SettingsSectionKey.Members) {
     return {
       title: '成员管理',
-      description: '管理项目成员、角色以及邀请链接。',
+      description: '管理项目成员及角色权限。',
     }
   }
 
@@ -104,13 +100,6 @@ function sectionMeta(section: SettingsSectionKey) {
     return {
       title: '环境管理',
       description: '统一维护项目环境、前置 URL、全局变量与密钥。',
-    }
-  }
-
-  if (section === SettingsSectionKey.SharedWorkspace) {
-    return {
-      title: '共享文件与在线文档',
-      description: '项目成员可上传下载共享文件，并在同一空间协作在线文档。',
     }
   }
 
@@ -164,10 +153,6 @@ export default function SettingsPage() {
       return SettingsSectionKey.ImportApi
     }
 
-    if (section === SettingsSectionKey.SharedWorkspace) {
-      return SettingsSectionKey.SharedWorkspace
-    }
-
     if (section === SettingsSectionKey.ShareApi) {
       return SettingsSectionKey.ShareApi
     }
@@ -179,7 +164,6 @@ export default function SettingsPage() {
     return SettingsSectionKey.Members
   })
   const [members, setMembers] = useState<MemberItem[]>([])
-  const [invitations, setInvitations] = useState<InvitationItem[]>([])
   const [project, setProject] = useState<ProjectInfo>()
   const [projectRole, setProjectRole] = useState<Role>()
   const [currentUserId, setCurrentUserId] = useState<string>()
@@ -191,7 +175,6 @@ export default function SettingsPage() {
 
   const canManageMembers = Boolean(currentUserId && project?.ownerId === currentUserId)
   const canManageEnvironments = projectRole === 'owner' || projectRole === 'editor'
-  const canEditSharedWorkspace = projectRole === 'owner' || projectRole === 'editor'
   const isMembersSection = selectedSection === SettingsSectionKey.Members
   const isEnvironmentsSection = selectedSection === SettingsSectionKey.Environments
   const currentSectionMeta = selectedSection === SettingsSectionKey.TokenConfig
@@ -221,17 +204,6 @@ export default function SettingsPage() {
       setCurrentUserId(payload.currentUserId)
       setMembers(payload.members ?? [])
 
-      if (payload.project.ownerId !== payload.currentUserId) {
-        setInvitations([])
-        return
-      }
-
-      const invitationPayload = await api<{ invitations?: InvitationItem[] }>(
-        'list_project_invitations',
-        { sessionId, projectId },
-      )
-
-      setInvitations(invitationPayload.invitations ?? [])
     }
     catch (error) {
       msgApi.error((error as Error).message)
@@ -256,11 +228,6 @@ export default function SettingsPage() {
 
     if (section === SettingsSectionKey.ImportApi) {
       setSelectedSection(SettingsSectionKey.ImportApi)
-      return
-    }
-
-    if (section === SettingsSectionKey.SharedWorkspace) {
-      setSelectedSection(SettingsSectionKey.SharedWorkspace)
       return
     }
 
@@ -327,7 +294,6 @@ export default function SettingsPage() {
             ? (
                 <ProjectMembersSection
                   canManageMembers={canManageMembers}
-                  invitations={invitations}
                   loading={loading}
                   members={members}
                   projectId={projectId}
@@ -351,9 +317,7 @@ export default function SettingsPage() {
                     ? (
                         <TokenPanel projectId={projectId} />
                       )
-                    : (
-                      <SharedWorkspacePanel editable={canEditSharedWorkspace} projectId={projectId} />
-                    )}
+                    : null}
         </div>
       )}
     />

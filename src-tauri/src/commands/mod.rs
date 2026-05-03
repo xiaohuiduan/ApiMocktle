@@ -6,7 +6,4 @@ pub mod environments;
 pub mod imports;
 pub mod exports;
 pub mod request_runner;
-pub mod shared_docs;
-pub mod shared_files;
-pub mod collab;
 pub mod tokens;

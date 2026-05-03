@@ -82,7 +82,7 @@ export function ApiDocEditing() {
     }
   }, [form, menuRawList, isCreating, tabData.key])
 
-  const handleFinish: FormProps<ApiDetails>['onFinish'] = (values) => {
+  const handleFinish: FormProps<ApiDetails>['onFinish'] = async (values) => {
     const menuName = values.name ?? DEFAULT_NAME
     const createType = tabData.contentType === MenuItemType.HttpRequest
       ? MenuItemType.HttpRequest
@@ -108,13 +108,16 @@ export function ApiDocEditing() {
       )
     }
     else {
-      updateMenuItem({
-        id: tabData.key,
-        name: menuName,
-        data: { ...values, name: menuName },
-      })
-
-      messageApi.success('保存成功')
+      try {
+        await updateMenuItem({
+          id: tabData.key,
+          name: menuName,
+          data: { ...values, name: menuName },
+        })
+        messageApi.success('保存成功')
+      } catch (err) {
+        messageApi.error((err as Error).message || '保存失败，请检查权限')
+      }
     }
   }
 

@@ -61,7 +61,7 @@ export function Schema() {
     <div className="p-tabContent">
       <Form
         form={form}
-        onFinish={(values) => {
+        onFinish={async (values) => {
           const menuName = values.name ?? '未命名数据模型'
 
           if (isCreating) {
@@ -84,13 +84,16 @@ export function Schema() {
             )
           }
           else {
-            updateMenuItem({
-              id: tabData.key,
-              name: menuName,
-              data: values,
-            })
-
-            messageApi.success('保存成功')
+            try {
+              await updateMenuItem({
+                id: tabData.key,
+                name: menuName,
+                data: values,
+              })
+              messageApi.success('保存成功')
+            } catch (err) {
+              messageApi.error((err as Error).message || '保存失败，请检查权限')
+            }
           }
         }}
         onValuesChange={(changedValues: ApiSchemaForm) => {

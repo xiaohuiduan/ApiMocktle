@@ -4,7 +4,7 @@ mod errors;
 mod http;
 mod models;
 mod services;
-mod ws;
+
 
 use std::sync::Arc;
 
@@ -23,19 +23,6 @@ pub fn run() {
             let db_http = db.clone();
             app.manage(db);
 
-            // Start WebSocket server
-            let ws_port = 19876u16;
-            tauri::async_runtime::spawn(async move {
-                match ws::collab_server::start(ws_port).await {
-                    Ok(server) => {
-                        log::info!("Collab WebSocket server started on port {}", server.port);
-                    }
-                    Err(e) => {
-                        log::error!("Failed to start WebSocket server: {}", e);
-                    }
-                }
-            });
-
             // Start YApi HTTP server for EasyAPI plugin
             let yapi_handle = Arc::new(http::yapi_server::YApiServerHandle::new());
             let yapi_handle_clone = yapi_handle.clone();
@@ -53,6 +40,7 @@ pub fn run() {
             commands::auth::logout,
             commands::auth::get_current_user,
             commands::auth::change_password,
+            commands::auth::list_all_users,
             // Projects
             commands::projects::list_projects,
             commands::projects::create_project,
@@ -64,11 +52,6 @@ pub fn run() {
             commands::projects::add_project_member,
             commands::projects::update_member_role,
             commands::projects::remove_project_member,
-            commands::projects::list_project_invitations,
-            commands::projects::create_project_invitation,
-            commands::projects::revoke_project_invitation,
-            commands::projects::get_project_invitation,
-            commands::projects::accept_project_invitation,
             // Menu items
             commands::menu_items::list_menu_items,
             commands::menu_items::create_menu_item,
@@ -89,23 +72,6 @@ pub fn run() {
             commands::exports::write_export_file,
             // Request runner
             commands::request_runner::run_api_request,
-            // Shared docs
-            commands::shared_docs::list_shared_docs,
-            commands::shared_docs::create_shared_doc,
-            commands::shared_docs::get_shared_doc,
-            commands::shared_docs::save_shared_doc,
-            commands::shared_docs::delete_shared_doc,
-            commands::shared_docs::export_shared_doc,
-            // Shared files
-            commands::shared_files::list_shared_files,
-            commands::shared_files::upload_shared_file,
-            commands::shared_files::delete_shared_file,
-            commands::shared_files::download_shared_file,
-            // Collab
-            commands::collab::get_collab_state,
-            commands::collab::apply_collab_update,
-            commands::collab::update_presence,
-            commands::collab::get_doc_presence,
             // Tokens
             commands::tokens::list_project_tokens,
             commands::tokens::create_project_token,

@@ -9,8 +9,6 @@ import MainLayout from '@/app/(main)/layout'
 import HomePage from '@/app/(main)/home/page'
 import SettingsPage from '@/app/(main)/settings/page'
 import TestPage from '@/app/test/page'
-import ProjectInvitePage from '@/app/invites/invite-page'
-
 import Root from './root'
 
 export const appRoutes = (
@@ -18,7 +16,6 @@ export const appRoutes = (
     <Route index element={<RootPage />} />
     <Route path="login" element={<LoginPage />} />
     <Route path="register" element={<RegisterPage />} />
-    <Route path="invites/:inviteId" element={<ProjectInvitePage />} />
     <Route path="projects" element={<ProjectsPage />} />
     <Route path="projects/:projectId" element={<ProjectLayout />}>
       <Route element={<MainLayout />}>

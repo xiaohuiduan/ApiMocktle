@@ -175,6 +175,7 @@ pub struct ProjectStateSnapshot {
 // Project Members
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectMember {
+    #[serde(rename = "userId")]
     pub id: String,
     pub username: String,
     pub role: String,
@@ -193,95 +194,6 @@ pub struct UpdateMemberRolePayload {
     pub role: String,
 }
 
-// Invitations
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProjectInvitation {
-    pub id: String,
-    #[serde(rename = "projectId")]
-    pub project_id: String,
-    #[serde(rename = "projectName")]
-    pub project_name: Option<String>,
-    #[serde(rename = "inviterUserId")]
-    pub inviter_user_id: String,
-    #[serde(rename = "inviterUsername")]
-    pub inviter_username: Option<String>,
-    #[serde(rename = "acceptedByUserId")]
-    pub accepted_by_user_id: Option<String>,
-    pub role: String,
-    pub status: String,
-    #[serde(rename = "expiresAt")]
-    pub expires_at: i64,
-    #[serde(rename = "acceptedAt")]
-    pub accepted_at: Option<String>,
-    #[serde(rename = "createdAt")]
-    pub created_at: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateInvitationPayload {
-    pub role: String,
-    #[serde(rename = "expiresInHours", default = "default_expires_in_hours")]
-    pub expires_in_hours: i32,
-}
-
-fn default_expires_in_hours() -> i32 {
-    24
-}
-
-// Shared Docs
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SharedDocItem {
-    pub id: String,
-    #[serde(rename = "projectId")]
-    pub project_id: String,
-    #[serde(rename = "creatorUserId")]
-    pub creator_user_id: String,
-    #[serde(rename = "docType")]
-    pub doc_type: String,
-    pub title: String,
-    pub content: String,
-    #[serde(rename = "yStateBase64")]
-    pub y_state_base64: String,
-    pub version: i32,
-    #[serde(rename = "createdAt")]
-    pub created_at: String,
-    #[serde(rename = "updatedAt")]
-    pub updated_at: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateDocPayload {
-    #[serde(rename = "docType")]
-    pub doc_type: Option<String>,
-    pub title: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SaveDocPayload {
-    pub content: Option<String>,
-    #[serde(rename = "yStateBase64")]
-    pub y_state_base64: Option<String>,
-    pub title: Option<String>,
-    pub version: Option<i32>,
-}
-
-// Shared Files
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SharedFileItem {
-    pub id: String,
-    #[serde(rename = "projectId")]
-    pub project_id: String,
-    #[serde(rename = "uploaderUserId")]
-    pub uploader_user_id: String,
-    #[serde(rename = "linkedDocId")]
-    pub linked_doc_id: Option<String>,
-    pub name: String,
-    pub size: i64,
-    #[serde(rename = "mimeType")]
-    pub mime_type: String,
-    #[serde(rename = "createdAt")]
-    pub created_at: String,
-}
 
 // Tokens
 #[derive(Debug, Serialize, Deserialize)]
@@ -324,19 +236,6 @@ pub struct RunRequestPayload {
 pub struct RunRequestHeader {
     pub name: String,
     pub value: String,
-}
-
-// Collab
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CollabUpdatePayload {
-    #[serde(rename = "updateBase64")]
-    pub update_base64: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PresencePayload {
-    #[serde(rename = "isTyping")]
-    pub is_typing: bool,
 }
 
 // Response wrappers

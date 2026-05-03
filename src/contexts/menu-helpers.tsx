@@ -20,7 +20,7 @@ interface MenuHelpers {
   addMenuItem: (menuData: ApiMenuData) => void
   removeMenuItem: (menuData: Pick<ApiMenuData, 'id'>) => void
   removeMenuItems: (menuIds: ApiMenuData['id'][]) => Promise<void>
-  updateMenuItem: (menuData: Partial<ApiMenuData> & Pick<ApiMenuData, 'id'>) => void
+  updateMenuItem: (menuData: Partial<ApiMenuData> & Pick<ApiMenuData, 'id'>) => Promise<void>
   restoreMenuItem: (menuData: { restoreId: RecycleDataItem['id'] }) => void
   restoreMenuItems: (recycleIds: RecycleDataItem['id'][]) => void
   deleteRecycleItems: (recycleIds: RecycleDataItem['id'][]) => void
@@ -351,23 +351,20 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         })
         await reloadState()
       },
-      updateMenuItem: ({ id: menuId, ...rest }) => {
+      updateMenuItem: async ({ id: menuId, ...rest }) => {
         const id = guardProject()
 
         if (!id || !sessionId) {
           return
         }
 
-        void api<unknown>('update_menu_item', {
+        await api<unknown>('update_menu_item', {
           sessionId,
           projectId: id,
           menuId,
           payload: rest,
         })
-          .then(() => reloadState())
-          .catch((error: unknown) => {
-            console.error(error)
-          })
+        await reloadState()
       },
       restoreMenuItem: ({ restoreId }) => {
         mutateRecycleItems('POST', [restoreId])

@@ -1,6 +1,7 @@
 use tauri::State;
 use crate::db::client::Db;
 use std::sync::Arc;
+use crate::db::auth_repo;
 use crate::models::{LoginPayload, RegisterPayload, AuthResult, SessionUser, ApiResult, ChangePasswordPayload};
 use crate::services::auth_service;
 
@@ -44,6 +45,23 @@ pub fn change_password(
 ) -> ApiResult<()> {
     match auth_service::change_password(&db, &session_id, &payload) {
         Ok(()) => ApiResult::success(()),
+        Err(e) => e.into(),
+    }
+}
+
+#[tauri::command]
+pub fn list_all_users(db: State<Arc<Db>>, session_id: String) -> ApiResult<Vec<serde_json::Value>> {
+    let _user = match auth_repo::get_valid_session_user(&db, &session_id) {
+        Some(u) => u,
+        None => return crate::errors::AppError::Unauthorized("未登录".into()).into(),
+    };
+    match auth_repo::list_all_users(&db) {
+        Ok(users) => {
+            let result: Vec<serde_json::Value> = users.into_iter().map(|(id, username)| {
+                serde_json::json!({ "id": id, "username": username })
+            }).collect();
+            ApiResult::success(result)
+        }
         Err(e) => e.into(),
     }
 }

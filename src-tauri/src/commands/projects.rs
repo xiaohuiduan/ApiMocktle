@@ -138,7 +138,8 @@ pub fn add_project_member(db: State<Arc<Db>>, session_id: String, project_id: St
 }
 
 #[tauri::command]
-pub fn update_member_role(db: State<Arc<Db>>, session_id: String, project_id: String, user_id: String, payload: UpdateMemberRolePayload) -> ApiResult<serde_json::Value> {
+#[allow(non_snake_case)]
+pub fn update_member_role(db: State<Arc<Db>>, session_id: String, project_id: String, userId: String, payload: UpdateMemberRolePayload) -> ApiResult<serde_json::Value> {
     let actor = match check_session(&db, &session_id) {
         Ok(u) => u,
         Err(e) => return e.into(),
@@ -149,7 +150,7 @@ pub fn update_member_role(db: State<Arc<Db>>, session_id: String, project_id: St
         return crate::errors::AppError::Forbidden("仅项目所有者可修改角色".into()).into();
     }
 
-    match project_repo::update_member_role(&db, &project_id, &user_id, &payload.role) {
+    match project_repo::update_member_role(&db, &project_id, &userId, &payload.role) {
         Ok(()) => ApiResult::success(serde_json::json!({})),
         Err(e) => e.into(),
     }
@@ -173,87 +174,6 @@ pub fn remove_project_member(db: State<Arc<Db>>, session_id: String, project_id:
     }
 }
 
-#[tauri::command]
-pub fn list_project_invitations(db: State<Arc<Db>>, session_id: String, project_id: String) -> ApiResult<serde_json::Value> {
-    let user = match check_session(&db, &session_id) {
-        Ok(u) => u,
-        Err(e) => return e.into(),
-    };
-
-    if project_repo::get_project_member_role(&db, &project_id, &user.id).is_none() {
-        return crate::errors::AppError::Forbidden("无权限".into()).into();
-    }
-
-    match project_repo::list_project_invitations(&db, &project_id) {
-        Ok(invitations) => ApiResult::success(serde_json::json!({ "invitations": invitations })),
-        Err(e) => e.into(),
-    }
-}
-
-#[tauri::command]
-pub fn create_project_invitation(db: State<Arc<Db>>, session_id: String, project_id: String, payload: CreateInvitationPayload) -> ApiResult<serde_json::Value> {
-    let user = match check_session(&db, &session_id) {
-        Ok(u) => u,
-        Err(e) => return e.into(),
-    };
-
-    let role = project_repo::get_project_member_role(&db, &project_id, &user.id);
-    if role.as_deref() != Some("owner") {
-        return crate::errors::AppError::Forbidden("仅项目所有者可创建邀请".into()).into();
-    }
-
-    match project_repo::create_project_invitation(&db, &project_id, &user.id, &payload.role, payload.expires_in_hours) {
-        Ok(invitation) => ApiResult::success(serde_json::json!({ "invitation": invitation })),
-        Err(e) => e.into(),
-    }
-}
-
-#[tauri::command]
-pub fn revoke_project_invitation(db: State<Arc<Db>>, session_id: String, project_id: String, invite_id: String) -> ApiResult<serde_json::Value> {
-    let user = match check_session(&db, &session_id) {
-        Ok(u) => u,
-        Err(e) => return e.into(),
-    };
-
-    let role = project_repo::get_project_member_role(&db, &project_id, &user.id);
-    if role.as_deref() != Some("owner") {
-        return crate::errors::AppError::Forbidden("仅项目所有者可撤销邀请".into()).into();
-    }
-
-    match project_repo::revoke_project_invitation(&db, &project_id, &invite_id) {
-        Ok(()) => ApiResult::success(serde_json::json!({})),
-        Err(e) => e.into(),
-    }
-}
-
-#[tauri::command]
-pub fn get_project_invitation(db: State<Arc<Db>>, session_id: String, invite_id: String) -> ApiResult<serde_json::Value> {
-    let _user = match check_session(&db, &session_id) {
-        Ok(u) => u,
-        Err(e) => return e.into(),
-    };
-
-    match project_repo::get_project_invitation(&db, &invite_id) {
-        Some(invitation) => ApiResult::success(serde_json::json!({ "invitation": invitation })),
-        None => crate::errors::AppError::NotFound("邀请不存在".into()).into(),
-    }
-}
-
-#[tauri::command]
-pub fn accept_project_invitation(db: State<Arc<Db>>, session_id: String, invite_id: String) -> ApiResult<serde_json::Value> {
-    let user = match check_session(&db, &session_id) {
-        Ok(u) => u,
-        Err(e) => return e.into(),
-    };
-
-    match project_repo::accept_project_invitation(&db, &invite_id, &user.id) {
-        Ok(result) => ApiResult::success(serde_json::json!({
-            "projectId": result.project_id,
-            "projectName": result.project_name,
-        })),
-        Err(e) => e.into(),
-    }
-}
 
 #[tauri::command]
 pub fn get_project_state(db: State<Arc<Db>>, session_id: String, project_id: String) -> ApiResult<ProjectStateSnapshot> {

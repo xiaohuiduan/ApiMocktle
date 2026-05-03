@@ -133,3 +133,10 @@ pub fn update_password(db: &Db, user_id: &str, password_hash: &str) -> Result<()
     )?;
     Ok(())
 }
+
+pub fn list_all_users(db: &Db) -> Result<Vec<(String, String)>, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    let mut stmt = conn.prepare("SELECT id, username FROM users ORDER BY username")?;
+    let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.into())
+}
