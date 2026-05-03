@@ -1,7 +1,7 @@
 use tauri::State;
 use crate::db::client::Db;
 use std::sync::Arc;
-use crate::models::{LoginPayload, RegisterPayload, AuthResult, SessionUser, ApiResult};
+use crate::models::{LoginPayload, RegisterPayload, AuthResult, SessionUser, ApiResult, ChangePasswordPayload};
 use crate::services::auth_service;
 
 #[tauri::command]
@@ -34,4 +34,16 @@ pub fn logout(db: State<Arc<Db>>, session_id: String) -> ApiResult<()> {
 pub fn get_current_user(db: State<Arc<Db>>, session_id: String) -> ApiResult<Option<SessionUser>> {
     let user = auth_service::get_current_user(&db, &session_id);
     ApiResult::success(user)
+}
+
+#[tauri::command]
+pub fn change_password(
+    db: State<Arc<Db>>,
+    session_id: String,
+    payload: ChangePasswordPayload,
+) -> ApiResult<()> {
+    match auth_service::change_password(&db, &session_id, &payload) {
+        Ok(()) => ApiResult::success(()),
+        Err(e) => e.into(),
+    }
 }

@@ -52,6 +52,7 @@ pub fn run() {
             commands::auth::register,
             commands::auth::logout,
             commands::auth::get_current_user,
+            commands::auth::change_password,
             // Projects
             commands::projects::list_projects,
             commands::projects::create_project,

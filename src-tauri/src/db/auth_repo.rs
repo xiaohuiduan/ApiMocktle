@@ -124,3 +124,12 @@ pub fn get_valid_session_user(
         username: user.1,
     })
 }
+
+pub fn update_password(db: &Db, user_id: &str, password_hash: &str) -> Result<(), crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    conn.execute(
+        "UPDATE users SET password_hash = ?1 WHERE id = ?2",
+        params![password_hash, user_id],
+    )?;
+    Ok(())
+}

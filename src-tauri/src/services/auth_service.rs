@@ -1,6 +1,6 @@
 use crate::db::auth_repo;
 use crate::db::client::Db;
-use crate::models::{AuthResult, LoginPayload, RegisterPayload, SessionUser};
+use crate::models::{AuthResult, LoginPayload, RegisterPayload, SessionUser, ChangePasswordPayload};
 use crate::services::crypto;
 
 pub fn register(
@@ -59,4 +59,26 @@ pub fn logout(db: &Db, session_id: &str) {
 
 pub fn get_current_user(db: &Db, session_id: &str) -> Option<SessionUser> {
     auth_repo::get_valid_session_user(db, session_id)
+}
+
+pub fn change_password(
+    db: &Db,
+    session_id: &str,
+    payload: &ChangePasswordPayload,
+) -> Result<(), crate::errors::AppError> {
+    let session_user = auth_repo::get_valid_session_user(db, session_id)
+        .ok_or_else(|| crate::errors::AppError::Unauthorized("未登录".into()))?;
+
+    let user = auth_repo::get_user_by_username(db, &session_user.username)
+        .ok_or_else(|| crate::errors::AppError::NotFound("用户不存在".into()))?;
+
+    if !crypto::verify_password(&payload.old_password, &user.password_hash) {
+        return Err(crate::errors::AppError::Unauthorized("旧密码错误".into()));
+    }
+
+    let new_hash = crypto::hash_password(&payload.new_password)
+        .map_err(|e| crate::errors::AppError::Internal(e))?;
+
+    auth_repo::update_password(db, &session_user.id, &new_hash)?;
+    Ok(())
 }

@@ -20,6 +20,14 @@ pub struct RegisterPayload {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ChangePasswordPayload {
+    #[serde(rename = "oldPassword")]
+    pub old_password: String,
+    #[serde(rename = "newPassword")]
+    pub new_password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AuthResult {
     pub user: SessionUser,
     pub session_id: String,

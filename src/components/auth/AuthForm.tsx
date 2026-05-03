@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import { Button, Card, Form, Input, Typography, message } from 'antd'
+import { Button, Card, Checkbox, Form, Input, Select, Typography, message } from 'antd'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 
-import { useAuth } from '@/contexts/auth'
+import { getSavedCredentials, useAuth } from '@/contexts/auth'
 
 function resolveRedirectTarget(value: string | null | undefined) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) {
@@ -18,14 +18,35 @@ interface AuthFormProps {
   mode: 'login' | 'register'
 }
 
+const rememberDayOptions = [
+  { label: '1 天', value: 1 },
+  { label: '3 天', value: 3 },
+  { label: '7 天', value: 7 },
+  { label: '30 天', value: 30 },
+  { label: '永久', value: -1 },
+]
+
 export function AuthForm(props: AuthFormProps) {
   const { mode } = props
   const [submitting, setSubmitting] = useState(false)
+  const [rememberPassword, setRememberPassword] = useState(false)
+  const [rememberDays, setRememberDays] = useState<number>(7)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { login, register } = useAuth()
   const redirectTo = resolveRedirectTarget(searchParams.get('redirect'))
   const peerAuthPath = `${mode === 'login' ? '/register' : '/login'}?redirect=${encodeURIComponent(redirectTo)}`
+  const [form] = Form.useForm<{ username: string, password: string }>()
+
+  useEffect(() => {
+    if (mode === 'login') {
+      const creds = getSavedCredentials()
+      if (creds) {
+        form.setFieldsValue(creds)
+        setRememberPassword(true)
+      }
+    }
+  }, [form, mode])
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
@@ -35,13 +56,17 @@ export function AuthForm(props: AuthFormProps) {
         </Typography.Title>
 
         <Form<{ username: string, password: string }>
+          form={form}
           layout="vertical"
           onFinish={async (values) => {
             setSubmitting(true)
 
             try {
               if (mode === 'login') {
-                await login(values.username, values.password)
+                await login(values.username, values.password, {
+                  rememberPassword,
+                  rememberDays: rememberPassword ? rememberDays : 0,
+                })
               } else {
                 await register(values.username, values.password)
               }
@@ -78,6 +103,30 @@ export function AuthForm(props: AuthFormProps) {
           >
             <Input.Password placeholder="请输入密码" />
           </Form.Item>
+
+          {mode === 'login' && (
+            <>
+              <Form.Item>
+                <Checkbox
+                  checked={rememberPassword}
+                  onChange={(e) => setRememberPassword(e.target.checked)}
+                >
+                  记住密码
+                </Checkbox>
+              </Form.Item>
+
+              {rememberPassword && (
+                <Form.Item label="记住登录状态">
+                  <Select
+                    options={rememberDayOptions}
+                    value={rememberDays}
+                    onChange={(v) => setRememberDays(v)}
+                    style={{ width: 120 }}
+                  />
+                </Form.Item>
+              )}
+            </>
+          )}
 
           <Form.Item>
             <Button block htmlType="submit" loading={submitting} type="primary">
