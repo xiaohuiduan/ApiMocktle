@@ -293,8 +293,7 @@ export function ApiTransferPanel() {
       >
         <Typography.Title level={4}>导入接口</Typography.Title>
         <Typography.Paragraph type="secondary">
-          支持导入 OpenAPI 3.x / Swagger 2.0 的 JSON 或 YAML，以及 Postman Collection v2/v2.1 的 JSON 文件。
-          导入后会静默合并到当前项目里的接口、请求目录与模型数据，不会清空已有内容。
+          支持导入 OpenAPI 3.x / Swagger 2.0 的 JSON 或 YAML，导入后会静默合并到当前项目里的接口、请求目录与模型数据，不会清空已有内容。
         </Typography.Paragraph>
         <Typography.Paragraph className="!mb-4" type="secondary">
           选择文件或从 URL 导入后会直接开始合并，不再弹出覆盖确认。URL 需可被本服务访问（例如本机后端请使用局域网 IP 或主机名，勿写浏览器专属地址）。

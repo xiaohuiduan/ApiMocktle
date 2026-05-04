@@ -109,7 +109,7 @@ function sectionMeta(section: SettingsSectionKey) {
 
   return {
     title: '导入导出接口',
-    description: '导入导出 OpenAPI 或 Postman 文档，并静默合并到当前项目资源。',
+    description: '导入导出 OpenAPI 或 Swagger 文档，并静默合并到当前项目资源。',
   }
 }
 

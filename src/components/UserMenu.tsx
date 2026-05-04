@@ -102,7 +102,7 @@ export function UserMenu() {
 
       <Modal title="管理个人 Token" open={tokenOpen} onCancel={() => setTokenOpen(false)} footer={null} destroyOnClose>
         {yapiPort > 0 && (
-          <Typography.Paragraph type="secondary" className="mb-3" copyable>
+          <Typography.Paragraph type="secondary" className="mb-3" copyable={{ text: `http://127.0.0.1:${yapiPort}` }}>
             服务地址：http://127.0.0.1:{yapiPort}
           </Typography.Paragraph>
         )}

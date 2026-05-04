@@ -5,7 +5,7 @@ use crate::db::client::Db;
 use crate::models::PersonalToken;
 
 fn generate_token() -> String {
-    let bytes: [u8; 32] = rand::random();
+    let bytes: [u8; 16] = rand::random();
     hex::encode(bytes)
 }
 
