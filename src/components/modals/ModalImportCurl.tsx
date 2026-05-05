@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { create, useModal } from '@ebay/nice-modal-react'
 import { Form, Input, Modal, type ModalProps, Switch, Typography } from 'antd'
 
+import type { ApiMenuData } from '@/components/ApiMenu'
 import { convertCurlToApiMenuItem } from '@/curl-import'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
@@ -10,6 +11,7 @@ import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 
 interface ModalImportCurlProps extends Omit<ModalProps, 'open' | 'onOk'> {
   parentId?: string
+  onImport?: (menuItem: ApiMenuData) => void
 }
 
 interface FormData {
@@ -17,7 +19,7 @@ interface FormData {
   ignoreCommonHeaders: boolean
 }
 
-export const ModalImportCurl = create(({ parentId, ...props }: ModalImportCurlProps) => {
+export const ModalImportCurl = create(({ parentId, onImport, ...props }: ModalImportCurlProps) => {
   const modal = useModal()
   const [form] = Form.useForm<FormData>()
 
@@ -44,17 +46,23 @@ export const ModalImportCurl = create(({ parentId, ...props }: ModalImportCurlPr
           parentId,
         })
 
-        addMenuItem(menuItem)
-        addTabItem({
-          key: menuItem.id,
-          label: menuItem.name,
-          contentType: menuItem.type,
-        })
-        handleHide()
+        if (onImport) {
+          onImport(menuItem)
+        }
+        else {
+          addMenuItem(menuItem)
+          addTabItem({
+            key: menuItem.id,
+            label: menuItem.name,
+            contentType: menuItem.type,
+          })
+        }
       }
       catch (error) {
         messageApi.error(error instanceof Error ? error.message : 'cURL 导入失败')
+        return
       }
+      handleHide()
     })
   }
 

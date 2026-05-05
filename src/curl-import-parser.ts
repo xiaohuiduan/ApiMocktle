@@ -48,7 +48,12 @@ export interface CurlParseState {
 }
 
 function normalizeCurlText(value: string) {
-  return value.replace(/\\\r?\n/g, ' ').replace(/\r?\n/g, ' ').trim()
+  return value
+    .replace(/\\\r?\n/g, ' ')
+    .replace(/\^\r?\n/g, ' ')
+    .replace(/\r?\n/g, ' ')
+    .replace(/\^([\s\S])/g, '$1')
+    .trim()
 }
 
 function tokenizeCurlCommand(command: string) {

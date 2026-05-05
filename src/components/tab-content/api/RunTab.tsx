@@ -479,18 +479,15 @@ export function RunTab() {
                             : workCopy.requestBody!.type === BodyType.Raw ? 'plaintext'
                             : 'json'
                         }
+                        deserializeOnChange={false}
                         value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
                         onChange={(val) => {
-                          const text = typeof val === 'string' ? val : (val != null ? JSON.stringify(val, null, 2) : '')
-                          setBodyRawText(text)
+                          setBodyRawText(typeof val === 'string' ? val : '')
                         }}
                         options={{ readOnly: false }}
                         onMount={(editor, monaco) => {
                           monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
                           monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                          setTimeout(() => {
-                            editor.getAction('editor.action.formatDocument')?.run()
-                          }, 100)
                         }}
                       />
                     </div>

@@ -35,7 +35,7 @@ function filterSelectedRecycleIds(
   catalogType: RecycleCatalogType,
   selectedRecycleIds: string[],
 ) {
-  const list = recycleData?.[catalogType].list ?? []
+  const list = recycleData?.[catalogType]?.list ?? []
   const availableIds = new Set(list.map(({ id }) => id))
 
   return selectedRecycleIds.filter((id) => availableIds.has(id))
@@ -71,7 +71,7 @@ function RecycleTable(props: RecycleTableProps) {
     deleteRecycleItems,
   } = useMenuHelpersContext()
   const hasSelection = selectedRecycleIds.length > 0
-  const recycleList = recyleRawData?.[catalogType].list ?? []
+  const recycleList = recyleRawData?.[catalogType]?.list ?? []
 
   return (
     <div className="space-y-3">

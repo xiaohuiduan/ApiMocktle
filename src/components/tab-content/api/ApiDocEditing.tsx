@@ -123,14 +123,11 @@ export function ApiDocEditing() {
 
   const handlePathChange: PathInputProps['onValueChange'] = (pathVal) => {
     if (typeof pathVal === 'string') {
-      // 匹配任意数量的 { 包围的路径参数。
       const regex = /\{+([^{}/]+)\}+/g
       let match: RegExpExecArray | null
       const pathParams: string[] = []
 
-      // 使用 exec 迭代匹配。
       while ((match = regex.exec(pathVal)) !== null) {
-        // match[1] 匹配 {} 包围的参数。
         const param = match[1]
 
         if (param) {
@@ -203,7 +200,7 @@ export function ApiDocEditing() {
             <strong>请求参数</strong>
             的&nbsp;
             <strong>Param</strong>
-&nbsp;中
+	&nbsp;中
           </span>
         ),
         duration: 3,

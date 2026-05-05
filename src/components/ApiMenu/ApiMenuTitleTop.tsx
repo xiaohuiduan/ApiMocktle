@@ -19,7 +19,9 @@ import { ModalImportCurl } from '@/components/modals/ModalImportCurl'
 import { ModalNewCatalog } from '@/components/modals/ModalNewCatalog'
 import { API_MENU_CONFIG, ROOT_CATALOG } from '@/configs/static'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { CatalogType, MenuItemType } from '@/enums'
+import type { ApiDetails } from '@/types'
 import { getCreateType, isMenuFolder } from '@/helpers'
 import { useHelpers } from '@/hooks/useHelpers'
 
@@ -42,7 +44,8 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
 
   const { topMenuType, extraDropdownMenuItems = [] } = props
 
-  const { apiDetailDisplay, setApiDetailDisplay } = useMenuHelpersContext()
+  const { apiDetailDisplay, setApiDetailDisplay, addMenuItem } = useMenuHelpersContext()
+  const { addTabItem } = useMenuTabHelpers()
 
   const {
     groupedMenus,
@@ -134,6 +137,36 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
                         onClick: (ev: MenuClickInfo) => {
                           ev.domEvent.stopPropagation()
                           void show(ModalImportCurl)
+                        },
+                      },
+                    ]
+                  : []),
+                ...(topMenuType === CatalogType.Request
+                  ? [
+                      {
+                        key: 'importCurl',
+                        label: '从 cURL 导入',
+                        icon: <FolderInputIcon size={14} />,
+                        onClick: (ev: MenuClickInfo) => {
+                          ev.domEvent.stopPropagation()
+                          void show(ModalImportCurl, {
+                            onImport: (menuItem) => {
+                              if (menuItem.data && 'path' in menuItem.data) {
+                                const d = menuItem.data as ApiDetails
+                                menuItem.data = {
+                                  ...d,
+                                  path: (d.serverUrl || '') + (d.path || '/'),
+                                }
+                              }
+                              menuItem.type = MenuItemType.HttpRequest
+                              addMenuItem(menuItem)
+                              addTabItem({
+                                key: menuItem.id,
+                                label: menuItem.name,
+                                contentType: MenuItemType.HttpRequest,
+                              })
+                            },
+                          })
                         },
                       },
                     ]

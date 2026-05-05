@@ -9,11 +9,14 @@ import {
 } from '@/project-environment-utils'
 import type {
   ApiEnvironment,
+  Creator,
   ProjectEnvironmentConfig,
+  RecycleCatalogType,
   RecycleData,
   RecycleDataItem,
 } from '@/types'
 import { api } from '@/api-client'
+import { CatalogType, MenuItemType } from '@/enums'
 import { useAuth } from '@/contexts/auth'
 
 interface MenuHelpers {
@@ -90,9 +93,75 @@ function normalizeEnvironmentConfigShape(input: unknown): ProjectEnvironmentConf
   }
 }
 
+interface RawRecycleDataItem {
+  id: string
+  catalogType: string
+  deletedItemJson: ApiMenuData
+  creatorJson: { id: string; username: string }
+  expiresAt: number
+}
+
+const MENU_ITEM_TYPE_TO_CATALOG: Record<string, RecycleCatalogType> = {
+  [MenuItemType.ApiDetail]: CatalogType.Http,
+  [MenuItemType.ApiDetailFolder]: CatalogType.Http,
+  [MenuItemType.Doc]: CatalogType.Http,
+  [MenuItemType.ApiSchema]: CatalogType.Schema,
+  [MenuItemType.ApiSchemaFolder]: CatalogType.Schema,
+  [MenuItemType.HttpRequest]: CatalogType.Request,
+  [MenuItemType.RequestFolder]: CatalogType.Request,
+}
+
+function normalizeRecycleData(raw: unknown): RecycleData {
+  const empty: RecycleData = {
+    [CatalogType.Http]: { list: [] },
+    [CatalogType.Schema]: { list: [] },
+    [CatalogType.Request]: { list: [] },
+  }
+
+  if (!Array.isArray(raw)) {
+    if (!raw || typeof raw !== 'object') {
+      return empty
+    }
+
+    const obj = raw as Record<string, unknown>
+
+    return {
+      [CatalogType.Http]: { list: Array.isArray((obj[CatalogType.Http] as { list?: unknown })?.list) ? (obj[CatalogType.Http] as { list: RecycleDataItem[] }).list : [] },
+      [CatalogType.Schema]: { list: Array.isArray((obj[CatalogType.Schema] as { list?: unknown })?.list) ? (obj[CatalogType.Schema] as { list: RecycleDataItem[] }).list : [] },
+      [CatalogType.Request]: { list: Array.isArray((obj[CatalogType.Request] as { list?: unknown })?.list) ? (obj[CatalogType.Request] as { list: RecycleDataItem[] }).list : [] },
+    }
+  }
+
+  const list = raw as RawRecycleDataItem[]
+
+  for (const item of list) {
+    const ct = MENU_ITEM_TYPE_TO_CATALOG[item.catalogType]
+    if (!ct) continue
+
+    const days = Math.ceil((item.expiresAt - Date.now()) / (1000 * 60 * 60 * 24))
+    const expiredAt = `${Math.max(0, days)}天`
+
+    const creator: Creator = {
+      id: item.creatorJson.id,
+      name: item.creatorJson.username,
+      username: item.creatorJson.username,
+    }
+
+    empty[ct].list!.push({
+      id: item.id,
+      deletedItem: item.deletedItemJson,
+      creator,
+      expiredAt,
+    })
+  }
+
+  return empty
+}
+
 function normalizeStatePayload(state: StatePayload): StatePayload {
   return {
     ...state,
+    recyleRawData: normalizeRecycleData(state.recyleRawData),
     projectEnvironments: Array.isArray(state.projectEnvironments) ? state.projectEnvironments : [],
     projectEnvironmentConfig: normalizeEnvironmentConfigShape(state.projectEnvironmentConfig),
   }
