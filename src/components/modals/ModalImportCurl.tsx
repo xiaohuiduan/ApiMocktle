@@ -6,12 +6,10 @@ import { Form, Input, Modal, type ModalProps, Switch, Typography } from 'antd'
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { convertCurlToApiMenuItem } from '@/curl-import'
 import { useGlobalContext } from '@/contexts/global'
-import { useMenuHelpersContext } from '@/contexts/menu-helpers'
-import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 
 interface ModalImportCurlProps extends Omit<ModalProps, 'open' | 'onOk'> {
   parentId?: string
-  onImport?: (menuItem: ApiMenuData) => void
+  onImport: (menuItem: ApiMenuData) => void
 }
 
 interface FormData {
@@ -24,8 +22,6 @@ export const ModalImportCurl = create(({ parentId, onImport, ...props }: ModalIm
   const [form] = Form.useForm<FormData>()
 
   const { messageApi } = useGlobalContext()
-  const { addMenuItem } = useMenuHelpersContext()
-  const { addTabItem } = useMenuTabHelpers()
 
   useEffect(() => {
     if (modal.visible) {
@@ -46,17 +42,7 @@ export const ModalImportCurl = create(({ parentId, onImport, ...props }: ModalIm
           parentId,
         })
 
-        if (onImport) {
-          onImport(menuItem)
-        }
-        else {
-          addMenuItem(menuItem)
-          addTabItem({
-            key: menuItem.id,
-            label: menuItem.name,
-            contentType: menuItem.type,
-          })
-        }
+        onImport(menuItem)
       }
       catch (error) {
         messageApi.error(error instanceof Error ? error.message : 'cURL 导入失败')

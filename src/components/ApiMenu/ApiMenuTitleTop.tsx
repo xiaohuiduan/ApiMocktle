@@ -136,7 +136,16 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
                         icon: <FolderInputIcon size={14} />,
                         onClick: (ev: MenuClickInfo) => {
                           ev.domEvent.stopPropagation()
-                          void show(ModalImportCurl)
+                          void show(ModalImportCurl, {
+                            onImport: (menuItem) => {
+                              addMenuItem(menuItem)
+                              addTabItem({
+                                key: menuItem.id,
+                                label: menuItem.name,
+                                contentType: menuItem.type,
+                              })
+                            },
+                          })
                         },
                       },
                     ]

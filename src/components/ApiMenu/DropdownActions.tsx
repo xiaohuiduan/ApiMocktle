@@ -12,6 +12,7 @@ import { ModalRename } from '@/components/modals/ModalRename'
 import { API_MENU_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { MenuItemType } from '@/enums'
 import { getCatalogType, getCreateType } from '@/helpers'
 import { useHelpers } from '@/hooks/useHelpers'
@@ -33,6 +34,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
 
   const { modal } = useGlobalContext()
   const { addMenuItem, removeMenuItem } = useMenuHelpersContext()
+  const { addTabItem } = useMenuTabHelpers()
   const { createTabItem } = useHelpers()
 
   const { tipTitle } = API_MENU_CONFIG[getCatalogType(catalog.type)]
@@ -93,7 +95,17 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
           icon: <FolderInputIcon size={14} />,
           onClick: (ev: MenuClickInfo) => {
             ev.domEvent.stopPropagation()
-            void show(ModalImportCurl, { parentId: catalog.id })
+            void show(ModalImportCurl, {
+              parentId: catalog.id,
+              onImport: (menuItem) => {
+                addMenuItem(menuItem)
+                addTabItem({
+                  key: menuItem.id,
+                  label: menuItem.name,
+                  contentType: menuItem.type,
+                })
+              },
+            })
           },
         }]
       : []),

@@ -7,6 +7,8 @@ import { FileIcon } from '@/components/icons/FileIcon'
 import { ModalImportCurl } from '@/components/modals/ModalImportCurl'
 import { ModalNewCatalog } from '@/components/modals/ModalNewCatalog'
 import { API_MENU_CONFIG } from '@/configs/static'
+import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { CatalogType, MenuItemType } from '@/enums'
 import { useHelpers } from '@/hooks/useHelpers'
 
@@ -57,6 +59,8 @@ export function Blank() {
 
   const { createApiDetails, createApiRequest, createDoc, createApiSchema } = useHelpers()
   const { tabData } = useTabContentContext()
+  const { addMenuItem } = useMenuHelpersContext()
+  const { addTabItem } = useMenuTabHelpers()
 
   return (
     <div className="flex h-full flex-col items-center justify-center py-8">
@@ -115,7 +119,16 @@ export function Blank() {
               label: '导入 cURL',
               icon: <FolderInputIcon size={18} />,
               onClick: () => {
-                void show(ModalImportCurl)
+                void show(ModalImportCurl, {
+                  onImport: (menuItem) => {
+                    addMenuItem(menuItem)
+                    addTabItem({
+                      key: menuItem.id,
+                      label: menuItem.name,
+                      contentType: menuItem.type,
+                    })
+                  },
+                })
               },
             },
           ],
