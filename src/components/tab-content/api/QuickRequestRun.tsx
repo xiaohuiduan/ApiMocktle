@@ -26,6 +26,7 @@ import { BodyType, MenuItemType } from '@/enums'
 import type { ApiDetails, ApiRunResult } from '@/types'
 
 import { ParamsEditableTable } from './components/ParamsEditableTable'
+import { ResponseBodyViewer } from './components/ResponseBodyViewer'
 import { ParamsAuth } from './params/ParamsAuth'
 import { ParamsTab } from './params/ParamsTab'
 import { useApiRequestRunner } from './useApiRequestRunner'
@@ -491,11 +492,9 @@ export function QuickRequestRun() {
                             label: '响应内容',
                             children: result.body != null
                               ? (
-                                  <MonacoEditor
-                                    height={`${Math.min((result.body.split('\n').length) * 18, 400)}px`}
-                                    language={detectLanguage(result.contentType)}
-                                    value={result.body}
-                                    options={{ readOnly: true, lineNumbers: 'on', minimap: { enabled: false }, scrollBeyondLastLine: false }}
+                                  <ResponseBodyViewer
+                                    body={result.body}
+                                    contentType={result.contentType}
                                   />
                                 )
                               : <Typography.Text type="secondary" className="text-xs">无响应体</Typography.Text>,
