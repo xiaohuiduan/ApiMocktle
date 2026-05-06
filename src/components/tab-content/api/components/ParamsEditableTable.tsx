@@ -294,13 +294,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
         return (
           <ParamsEditableCell className="py-0">
             <Input.TextArea
-              style={{
-                height: '32px',
-                minHeight: '100%',
-                maxHeight: '100%',
-                overflowY: 'hidden',
-                resize: 'none',
-              }}
+              autoSize={{ minRows: 1, maxRows: 6 }}
               value={typeof text === 'string' ? text : undefined}
               variant="borderless"
               onChange={(ev) => {

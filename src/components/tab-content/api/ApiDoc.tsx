@@ -551,11 +551,15 @@ export function ApiDoc() {
                             ? requestSchemaRows.map((row) => (
                                 <div key={row.key} className="schema-row">
                                   <span style={{ paddingLeft: row.depth * 16 }}>
-                                    <span className="schema-field-name">{row.name}</span>
+                                    <Tooltip title={row.name}>
+                                      <span className="schema-field-name">{row.name}</span>
+                                    </Tooltip>
                                   </span>
                                   <span className="schema-type-text">{row.typeLabel}</span>
                                   <span className={`schema-required${row.required ? ' is-required' : ''}`}>{row.required ? '必填' : '可选'}</span>
-                                  <span className="schema-desc">{row.description ?? '-'}</span>
+                                  <Tooltip title={row.description ?? '-'}>
+                                    <span className="schema-desc">{row.description ?? '-'}</span>
+                                  </Tooltip>
                                 </div>
                               ))
                             : <div className="schema-empty">暂无字段定义</div>}
@@ -648,11 +652,15 @@ export function ApiDoc() {
                                 ? resSchemaRows.map((row) => (
                                     <div key={row.key} className="schema-row">
                                       <span style={{ paddingLeft: row.depth * 16 }}>
-                                        <span className="schema-field-name">{row.name}</span>
+                                        <Tooltip title={row.name}>
+                                          <span className="schema-field-name">{row.name}</span>
+                                        </Tooltip>
                                       </span>
                                       <span className="schema-type-text">{row.typeLabel}</span>
                                       <span className={`schema-required${row.required ? ' is-required' : ''}`}>{row.required ? '必填' : '可选'}</span>
-                                      <span className="schema-desc">{row.description ?? '-'}</span>
+                                      <Tooltip title={row.description ?? '-'}>
+                                        <span className="schema-desc">{row.description ?? '-'}</span>
+                                      </Tooltip>
                                     </div>
                                   ))
                                 : <div className="schema-empty">暂无字段定义</div>}
