@@ -113,13 +113,14 @@ function mergeParams(
   globalValues: { name: string; value?: string; enable?: boolean }[],
   envValues: { name: string; value?: string; enable?: boolean }[],
   localParams: { name?: string; enable?: boolean; example?: unknown }[],
+  disabledNames?: Set<string>,
 ): { name: string; enable?: boolean; example?: unknown }[] {
   const map = new Map<string, { name: string; enable?: boolean; example?: unknown }>()
   for (const g of globalValues) {
-    if (g.name) map.set(g.name, { name: g.name, enable: g.enable, example: g.value })
+    if (g.name && !disabledNames?.has(g.name)) map.set(g.name, { name: g.name, enable: g.enable, example: g.value })
   }
   for (const e of envValues) {
-    if (e.name) map.set(e.name, { name: e.name, enable: e.enable, example: e.value })
+    if (e.name && !disabledNames?.has(e.name)) map.set(e.name, { name: e.name, enable: e.enable, example: e.value })
   }
   for (const l of localParams) {
     if (l.name) map.set(l.name, { name: l.name, enable: l.enable, example: l.example })
@@ -190,6 +191,30 @@ export function RunTab() {
   })
 
   const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
+
+  const [disabledInheritedParams, setDisabledInheritedParams] = useState<{
+    query: Set<string>
+    header: Set<string>
+    cookie: Set<string>
+    body: Set<string>
+  }>({
+    query: new Set(),
+    header: new Set(),
+    cookie: new Set(),
+    body: new Set(),
+  })
+
+  const handleToggleInheritedParam = useCallback(
+    (section: 'query' | 'header' | 'cookie', name: string, enabled: boolean) => {
+      setDisabledInheritedParams((prev) => {
+        const next = new Set(prev[section])
+        if (enabled) next.delete(name)
+        else next.add(name)
+        return { ...prev, [section]: next }
+      })
+    },
+    [],
+  )
 
   // 用数据库表列的 updatedAt 追踪文档版本（data_json 内部 updatedAt 不会随保存变化）
   const docVersionRef = useRef((menuApiItem as { updatedAt?: string } | undefined)?.updatedAt)
@@ -298,6 +323,7 @@ export function RunTab() {
       (projectEnvironmentConfig?.globalParameters?.query ?? []).filter(p => p.enable !== false),
       envParams.query.filter(p => p.enable !== false),
       workCopy.parameters?.query ?? [],
+      disabledInheritedParams.query,
     )
     const queryParams = mergedQuery
       .filter(p => p.name && p.enable !== false)
@@ -310,6 +336,7 @@ export function RunTab() {
       (projectEnvironmentConfig?.globalParameters?.header ?? []).filter(p => p.enable !== false),
       envParams.header.filter(p => p.enable !== false),
       workCopy.parameters?.header ?? [],
+      disabledInheritedParams.header,
     )
     const headers = mergedHeader
       .filter(h => h.name && h.enable !== false)
@@ -320,6 +347,7 @@ export function RunTab() {
       (projectEnvironmentConfig?.globalParameters?.cookie ?? []).filter(p => p.enable !== false),
       envParams.cookie.filter(p => p.enable !== false),
       workCopy.parameters?.cookie ?? [],
+      disabledInheritedParams.cookie,
     )
     const cookiePairs = mergedCookie
       .filter(c => c.name && c.enable !== false)
@@ -344,6 +372,7 @@ export function RunTab() {
           (projectEnvironmentConfig?.globalParameters?.body ?? []).filter(p => p.enable !== false),
           envParams.body.filter(p => p.enable !== false),
           (body.parameters ?? []).map(p => ({ name: p.name, enable: p.enable, example: p.example })),
+          disabledInheritedParams.body,
         )
         bodyText = mergedBody
           .filter(p => p.name && p.enable !== false)
@@ -483,6 +512,8 @@ export function RunTab() {
             globalParameters={projectEnvironmentConfig?.globalParameters}
             envParameters={currentEnv?.parameters}
             varMap={varMap}
+            disabledInheritedNames={disabledInheritedParams}
+            onToggleInheritedParam={handleToggleInheritedParam}
             onChange={(parameters) => {
               const next = { ...workCopy, parameters }
               setWorkCopy(next)

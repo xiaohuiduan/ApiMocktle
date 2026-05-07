@@ -36,21 +36,24 @@ interface ParamsTabProps {
   globalParameters?: ProjectEnvironmentConfig['globalParameters']
   envParameters?: ProjectEnvironmentConfig['globalParameters']
   varMap?: Map<string, string>
+  disabledInheritedNames?: { query: Set<string>; header: Set<string>; cookie: Set<string> }
+  onToggleInheritedParam?: (section: 'query' | 'header' | 'cookie', name: string, enabled: boolean) => void
 }
 
 /**
  * 环境/全局参数参考条（只读，带启用/禁用开关）。
- * 当用户切换开关时，通过保存/删除同名本地覆盖来生效。
+ * 切换开关时通过 disabledNames Set 控制，不影响用户参数列表。
  */
 function InheritedParamsBar(props: {
   globalRows?: ApiEnvironmentValue[]
   envRows?: ApiEnvironmentValue[]
   localParams?: { name?: string; enable?: boolean }[]
   sourceLabel: string
+  disabledNames?: Set<string>
   onToggle: (name: string, enabled: boolean) => void
 }) {
   const { token } = theme.useToken()
-  const { globalRows, envRows, localParams, sourceLabel, onToggle } = props
+  const { globalRows, envRows, localParams, sourceLabel, disabledNames, onToggle } = props
 
   const localNames = new Set((localParams ?? []).map(p => p.name).filter(Boolean))
 
@@ -83,7 +86,8 @@ function InheritedParamsBar(props: {
       <div className="grid gap-2">
         {allRows.map((r) => {
           const overridden = localNames.has(r.name)
-          const enabled = r.enable !== false && !overridden
+          const disabled = disabledNames?.has(r.name) ?? false
+          const enabled = r.enable !== false && !overridden && !disabled
 
           return (
             <div
@@ -125,19 +129,7 @@ function InheritedParamsBar(props: {
  * 全局/环境参数在独立参考区展示，本地参数在可编辑表格中。
  */
 export function ParamsTab(props: ParamsTabProps) {
-  const { value: parameters, onChange, globalParameters, envParameters, varMap } = props
-
-  function handleToggleGlobal(section: 'query' | 'header' | 'cookie', name: string, enabled: boolean) {
-    const current = parameters?.[section] ?? []
-    if (!enabled) {
-      // User disabled → save as local override with enable: false
-      const filtered = current.filter(p => p.name !== name)
-      onChange?.({ ...parameters, [section]: [...filtered, { name, enable: false }] })
-    } else {
-      // User re-enabled → remove local override
-      onChange?.({ ...parameters, [section]: current.filter(p => !(p.name === name && p.enable === false)) })
-    }
-  }
+  const { value: parameters, onChange, globalParameters, envParameters, varMap, disabledInheritedNames, onToggleInheritedParam } = props
 
   const queryCount = (parameters?.query?.length ?? 0) + (parameters?.path?.length ?? 0)
     + (globalParameters?.query?.length ?? 0) + (envParameters?.query?.length ?? 0)
@@ -162,7 +154,8 @@ export function ParamsTab(props: ParamsTabProps) {
                 envRows={envParameters?.query}
                 localParams={parameters?.query}
                 sourceLabel="当前全局/环境 Query 参数"
-                onToggle={(name, enabled) => handleToggleGlobal('query', name, enabled)}
+                disabledNames={disabledInheritedNames?.query}
+                onToggle={(name, enabled) => onToggleInheritedParam?.('query', name, enabled)}
               />
               <div className="py-2">
                 <Typography.Text type="secondary">Query 参数</Typography.Text>
@@ -211,7 +204,8 @@ export function ParamsTab(props: ParamsTabProps) {
                 envRows={envParameters?.header}
                 localParams={parameters?.header}
                 sourceLabel="当前全局/环境 Header 参数"
-                onToggle={(name, enabled) => handleToggleGlobal('header', name, enabled)}
+                disabledNames={disabledInheritedNames?.header}
+                onToggle={(name, enabled) => onToggleInheritedParam?.('header', name, enabled)}
               />
               <ParamsEditableTable
                 varMap={varMap}
@@ -238,7 +232,8 @@ export function ParamsTab(props: ParamsTabProps) {
                 envRows={envParameters?.cookie}
                 localParams={parameters?.cookie}
                 sourceLabel="当前全局/环境 Cookie 参数"
-                onToggle={(name, enabled) => handleToggleGlobal('cookie', name, enabled)}
+                disabledNames={disabledInheritedNames?.cookie}
+                onToggle={(name, enabled) => onToggleInheritedParam?.('cookie', name, enabled)}
               />
               <ParamsEditableTable
                 varMap={varMap}
