@@ -109,6 +109,24 @@ function getStatusColor(code: number) {
   return 'success'
 }
 
+function mergeParams(
+  globalValues: { name: string; value?: string; enable?: boolean }[],
+  envValues: { name: string; value?: string; enable?: boolean }[],
+  localParams: { name?: string; enable?: boolean; example?: unknown }[],
+): { name: string; enable?: boolean; example?: unknown }[] {
+  const map = new Map<string, { name: string; enable?: boolean; example?: unknown }>()
+  for (const g of globalValues) {
+    if (g.name) map.set(g.name, { name: g.name, enable: g.enable, example: g.value })
+  }
+  for (const e of envValues) {
+    if (e.name) map.set(e.name, { name: e.name, enable: e.enable, example: e.value })
+  }
+  for (const l of localParams) {
+    if (l.name) map.set(l.name, { name: l.name, enable: l.enable, example: l.example })
+  }
+  return Array.from(map.values())
+}
+
 function detectLanguage(contentType?: string): string {
   if (!contentType) return 'plaintext'
   const ct = contentType.toLowerCase()
@@ -211,12 +229,27 @@ export function RunTab() {
   const currentEnv = useMemo(() => {
     const envId = workCopy?.serverId || currentProjectEnvironmentId
     return projectEnvironments?.find((e) => e.id === envId)
-  }, [workCopy?.serverId, currentProjectEnvironmentId, projectEnvironments])
+      ?? projectEnvironmentConfig?.environments.find((e) => e.id === envId)
+  }, [workCopy?.serverId, currentProjectEnvironmentId, projectEnvironments, projectEnvironmentConfig?.environments])
 
   const envBaseUrl = useMemo(() => {
     if (!currentEnv) return ''
     return getPrimaryEnvironmentUrl(currentEnv)
   }, [currentEnv])
+
+  // 收集所有可用变量用于 {{var}} 自动补全和高亮
+  const varMap = useMemo(() => {
+    const map = new Map<string, string>()
+    const envVars = [
+      ...(projectEnvironmentConfig?.globalVariables ?? []),
+      ...(projectEnvironmentConfig?.vaultSecrets ?? []),
+      ...(currentEnv?.variables ?? []),
+    ]
+    for (const v of envVars) {
+      if (v.name && v.value != null) map.set(v.name, v.value)
+    }
+    return map
+  }, [projectEnvironmentConfig?.globalVariables, projectEnvironmentConfig?.vaultSecrets, currentEnv?.variables])
 
   // 一键复原
   const handleReset = () => {
@@ -252,6 +285,8 @@ export function RunTab() {
 
     const resolveVars = (s: string) => s.replace(/\{\{(\w+)\}\}/g, (_, name) => varMap.get(name) ?? `{{${name}}}`)
 
+    const envParams = currentEnv?.parameters ?? { header: [], cookie: [], query: [], body: [] }
+
     // 构建完整 URL（含 query 参数）
     const base = envBaseUrl ? envBaseUrl.replace(/\/$/, '') : ''
     const path = resolveVars(workCopy.path ?? '/')
@@ -259,16 +294,39 @@ export function RunTab() {
       ? path
       : base ? `${base}${path}` : path
 
-    const queryParams = (workCopy.parameters?.query ?? [])
+    const mergedQuery = mergeParams(
+      (projectEnvironmentConfig?.globalParameters?.query ?? []).filter(p => p.enable !== false),
+      envParams.query.filter(p => p.enable !== false),
+      workCopy.parameters?.query ?? [],
+    )
+    const queryParams = mergedQuery
       .filter(p => p.name && p.enable !== false)
-      .map(p => `${encodeURIComponent(p.name!)}=${encodeURIComponent(resolveVars(String(p.example ?? '')))}`)
+      .map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(resolveVars(String(p.example ?? '')))}`)
       .join('&')
     const url = queryParams ? `${fullPath}${fullPath.includes('?') ? '&' : '?'}${queryParams}` : fullPath
 
     // 构建 Header
-    const headers = (workCopy.parameters?.header ?? [])
+    const mergedHeader = mergeParams(
+      (projectEnvironmentConfig?.globalParameters?.header ?? []).filter(p => p.enable !== false),
+      envParams.header.filter(p => p.enable !== false),
+      workCopy.parameters?.header ?? [],
+    )
+    const headers = mergedHeader
       .filter(h => h.name && h.enable !== false)
-      .map(h => ({ name: h.name!, value: resolveVars(String(h.example ?? '')) }))
+      .map(h => ({ name: h.name, value: resolveVars(String(h.example ?? '')) }))
+
+    // 构建 Cookie（序列化为 Cookie header）
+    const mergedCookie = mergeParams(
+      (projectEnvironmentConfig?.globalParameters?.cookie ?? []).filter(p => p.enable !== false),
+      envParams.cookie.filter(p => p.enable !== false),
+      workCopy.parameters?.cookie ?? [],
+    )
+    const cookiePairs = mergedCookie
+      .filter(c => c.name && c.enable !== false)
+      .map(c => `${encodeURIComponent(c.name)}=${encodeURIComponent(resolveVars(String(c.example ?? '')))}`)
+    if (cookiePairs.length > 0) {
+      headers.push({ name: 'Cookie', value: cookiePairs.join('; ') })
+    }
 
     // 构建 Body
     const body = workCopy.requestBody
@@ -282,11 +340,15 @@ export function RunTab() {
           : body.type === BodyType.Raw ? 'text/plain'
           : 'application/json'
       } else if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
-        const params = (body.parameters ?? [])
+        const mergedBody = mergeParams(
+          (projectEnvironmentConfig?.globalParameters?.body ?? []).filter(p => p.enable !== false),
+          envParams.body.filter(p => p.enable !== false),
+          (body.parameters ?? []).map(p => ({ name: p.name, enable: p.enable, example: p.example })),
+        )
+        bodyText = mergedBody
           .filter(p => p.name && p.enable !== false)
-        bodyText = params.map(p =>
-          `${encodeURIComponent(p.name!)}=${encodeURIComponent(resolveVars(String(p.example ?? '')))}`
-        ).join('&')
+          .map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(resolveVars(String(p.example ?? '')))}`)
+          .join('&')
         contentType = body.type === BodyType.FormData ? 'multipart/form-data' : 'application/x-www-form-urlencoded'
       }
     }
@@ -418,6 +480,9 @@ export function RunTab() {
         <div className="px-3">
           <ParamsTab
             value={workCopy.parameters}
+            globalParameters={projectEnvironmentConfig?.globalParameters}
+            envParameters={currentEnv?.parameters}
+            varMap={varMap}
             onChange={(parameters) => {
               const next = { ...workCopy, parameters }
               setWorkCopy(next)

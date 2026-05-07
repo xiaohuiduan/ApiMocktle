@@ -177,6 +177,7 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
                   <EnvironmentEditor
                     editable={editable}
                     environment={selectedEnvironment}
+                    globalParameters={draftConfig.globalParameters}
                     onDelete={() => {
                       setDraftConfig((current) => {
                         const nextEnvironments = current.environments.filter(({ id }) => id !== selectedEnvironment.id)

@@ -1,4 +1,4 @@
-import { Button, Input, Typography, theme } from 'antd'
+import { Button, Input, Switch, Typography, theme } from 'antd'
 import { PlusIcon, TrashIcon } from 'lucide-react'
 
 import type { ApiEnvironmentValue } from '@/types'
@@ -7,7 +7,7 @@ function updateValueRow(
   list: ApiEnvironmentValue[],
   targetId: string,
   field: keyof ApiEnvironmentValue,
-  value: string,
+  value: string | boolean,
 ) {
   return list.map((item) => (item.id === targetId ? { ...item, [field]: value } : item))
 }
@@ -17,9 +17,10 @@ function ValueRowsTable(props: {
   rows: ApiEnvironmentValue[]
   onChange: (nextRows: ApiEnvironmentValue[]) => void
   emptyText?: string
+  showEnable?: boolean
 }) {
   const { token } = theme.useToken()
-  const { editable, rows, onChange, emptyText = '当前还没有内容，点击右上角“添加”开始配置。' } = props
+  const { editable, rows, onChange, emptyText = '当前还没有内容，点击右上角"添加"开始配置。', showEnable } = props
 
   if (rows.length === 0) {
     return (
@@ -34,7 +35,9 @@ function ValueRowsTable(props: {
       key={row.id}
       className="grid"
       style={{
-        gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.5fr) minmax(0,1.5fr) 56px',
+        gridTemplateColumns: showEnable
+          ? 'minmax(0,1fr) minmax(0,1.5fr) 60px 56px'
+          : 'minmax(0,1fr) minmax(0,1.5fr) minmax(0,1.5fr) 56px',
         borderBottom: index === rows.length - 1 ? 'none' : `1px solid ${token.colorBorderSecondary}`,
       }}
     >
@@ -56,6 +59,18 @@ function ValueRowsTable(props: {
           onChange(updateValueRow(rows, row.id, 'value', event.target.value))
         }}
       />
+      {showEnable && (
+        <div className="flex items-center justify-center">
+          <Switch
+            checked={row.enable !== false}
+            disabled={!editable}
+            size="small"
+            onChange={(checked) => {
+              onChange(updateValueRow(rows, row.id, 'enable', checked))
+            }}
+          />
+        </div>
+      )}
       <div className="flex items-center justify-center">
         <Button
           danger
@@ -76,14 +91,16 @@ function ValueTable(props: {
   rows: ApiEnvironmentValue[]
   onChange: (nextRows: ApiEnvironmentValue[]) => void
   emptyText?: string
+  showEnable?: boolean
 }) {
   const { token } = theme.useToken()
-  const { editable, rows, onChange, emptyText } = props
+  const { editable, rows, onChange, emptyText, showEnable } = props
+  const headers = showEnable ? ['变量名', '值', '启用', ''] : ['变量名', '值', '', '']
 
   return (
     <div style={{ border: `1px solid ${token.colorBorderSecondary}`, borderRadius: token.borderRadiusLG }}>
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
-        {['变量名', '值', ''].map((header) => (
+      <div className="grid" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
+        {headers.map((header) => (
           <div
             key={header}
             className="px-3 py-2 text-sm"
@@ -93,7 +110,7 @@ function ValueTable(props: {
           </div>
         ))}
       </div>
-      <ValueRowsTable editable={editable} emptyText={emptyText} rows={rows} onChange={onChange} />
+      <ValueRowsTable editable={editable} emptyText={emptyText} rows={rows} showEnable={showEnable} onChange={onChange} />
     </div>
   )
 }
@@ -105,8 +122,9 @@ export function ValueEditor(props: {
   rows: ApiEnvironmentValue[]
   onAdd: () => void
   onChange: (nextRows: ApiEnvironmentValue[]) => void
+  showEnable?: boolean
 }) {
-  const { editable, title, description, rows, onAdd, onChange } = props
+  const { editable, title, description, rows, onAdd, onChange, showEnable } = props
 
   return (
     <section className="space-y-3">
@@ -120,7 +138,7 @@ export function ValueEditor(props: {
         </Button>
       </div>
 
-      <ValueTable editable={editable} rows={rows} onChange={onChange} />
+      <ValueTable editable={editable} rows={rows} showEnable={showEnable} onChange={onChange} />
     </section>
   )
 }
@@ -131,8 +149,9 @@ export function TabValueEditor(props: {
   onAdd: () => void
   onChange: (nextRows: ApiEnvironmentValue[]) => void
   emptyText?: string
+  showEnable?: boolean
 }) {
-  const { editable, rows, onAdd, onChange, emptyText } = props
+  const { editable, rows, onAdd, onChange, emptyText, showEnable } = props
 
   return (
     <div className="space-y-3 pt-3">
@@ -141,7 +160,7 @@ export function TabValueEditor(props: {
           添加
         </Button>
       </div>
-      <ValueTable editable={editable} emptyText={emptyText} rows={rows} onChange={onChange} />
+      <ValueTable editable={editable} emptyText={emptyText} rows={rows} showEnable={showEnable} onChange={onChange} />
     </div>
   )
 }

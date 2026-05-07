@@ -1,10 +1,8 @@
-import { Tabs, theme, Typography } from 'antd'
+import { Switch, Tabs, Tag, theme, Typography } from 'antd'
 
-import type { ApiDetails, ProjectEnvironmentConfig } from '@/types'
+import type { ApiEnvironmentValue, ApiDetails, ProjectEnvironmentConfig } from '@/types'
 
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
-
-import { GlobalParametersNotice } from './GlobalParametersNotice'
 
 function TabLabel(props: React.PropsWithChildren<{ count?: number, hasContent?: boolean }>) {
   const { token } = theme.useToken()
@@ -36,25 +34,118 @@ interface ParamsTabProps {
   value?: ApiDetails['parameters']
   onChange?: (value: ParamsTabProps['value']) => void
   globalParameters?: ProjectEnvironmentConfig['globalParameters']
+  envParameters?: ProjectEnvironmentConfig['globalParameters']
+  varMap?: Map<string, string>
 }
 
-function getParamNameSet(params?: Array<{ name?: string, enable?: boolean }>) {
-  return new Set(
-    (params ?? [])
-      .filter((item) => item.name && item.enable !== false)
-      .map((item) => item.name as string),
+/**
+ * 环境/全局参数参考条（只读，带启用/禁用开关）。
+ * 当用户切换开关时，通过保存/删除同名本地覆盖来生效。
+ */
+function InheritedParamsBar(props: {
+  globalRows?: ApiEnvironmentValue[]
+  envRows?: ApiEnvironmentValue[]
+  localParams?: { name?: string; enable?: boolean }[]
+  sourceLabel: string
+  onToggle: (name: string, enabled: boolean) => void
+}) {
+  const { token } = theme.useToken()
+  const { globalRows, envRows, localParams, sourceLabel, onToggle } = props
+
+  const localNames = new Set((localParams ?? []).map(p => p.name).filter(Boolean))
+
+  const allRows: { name: string; value?: string; enable?: boolean; source: 'global' | 'env' }[] = []
+  for (const g of (globalRows ?? [])) {
+    if (g.name && !allRows.some(r => r.name === g.name)) {
+      allRows.push({ name: g.name, value: g.value, enable: g.enable, source: 'global' })
+    }
+  }
+  for (const e of (envRows ?? [])) {
+    if (e.name && !allRows.some(r => r.name === e.name)) {
+      // env overrides global by replacing it
+      const existing = allRows.findIndex(r => r.name === e.name)
+      if (existing >= 0) allRows[existing] = { name: e.name, value: e.value, enable: e.enable, source: 'env' }
+      else allRows.push({ name: e.name, value: e.value, enable: e.enable, source: 'env' })
+    }
+  }
+
+  if (allRows.length === 0) return null
+
+  return (
+    <div
+      className="mb-3 rounded-lg border px-3 py-2"
+      style={{ borderColor: token.colorBorderSecondary, backgroundColor: token.colorFillQuaternary }}
+    >
+      <Typography.Text type="secondary" className="text-xs">{sourceLabel}</Typography.Text>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        {allRows.map((r) => {
+          const overridden = localNames.has(r.name)
+          const enabled = r.enable !== false && !overridden
+
+          return (
+            <div
+              key={r.name}
+              className="flex items-center gap-1 rounded px-2 py-0.5"
+              style={{
+                backgroundColor: token.colorBgContainer,
+                border: `1px solid ${token.colorBorderSecondary}`,
+                opacity: overridden ? 0.5 : 1,
+              }}
+            >
+              <Tag
+                color={overridden ? 'default' : r.source === 'env' ? 'purple' : 'blue'}
+                style={{ marginInlineEnd: 0, fontSize: 10, lineHeight: '14px', paddingInline: 4 }}
+              >
+                {r.source === 'env' ? '环境' : '全局'}
+                {overridden ? ' (已覆盖)' : ''}
+              </Tag>
+              <Typography.Text code className="text-xs max-w-24 truncate">{r.name}</Typography.Text>
+              {r.value
+                ? (
+                    <Typography.Text type="secondary" className="text-xs max-w-32 truncate">
+                      {r.value}
+                    </Typography.Text>
+                  )
+                : null}
+              <Switch
+                checked={enabled}
+                disabled={overridden}
+                size="small"
+                onChange={(checked) => {
+                  onToggle(r.name, checked)
+                }}
+              />
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
 /**
  * 请求参数及 Headers/Cookie 页签。
- * Body 和 Auth 在 ApiDocEditing / RunTab 中独立渲染。
+ * 全局/环境参数在独立参考区展示，本地参数在可编辑表格中。
  */
 export function ParamsTab(props: ParamsTabProps) {
-  const { value: parameters, onChange, globalParameters } = props
-  const queryNames = getParamNameSet(parameters?.query)
-  const headerNames = new Set(Array.from(getParamNameSet(parameters?.header)).map(name => name.toLowerCase()))
-  const cookieNames = getParamNameSet(parameters?.cookie)
+  const { value: parameters, onChange, globalParameters, envParameters, varMap } = props
+
+  function handleToggleGlobal(section: 'query' | 'header' | 'cookie', name: string, enabled: boolean) {
+    const current = parameters?.[section] ?? []
+    if (!enabled) {
+      // User disabled → save as local override with enable: false
+      const filtered = current.filter(p => p.name !== name)
+      onChange?.({ ...parameters, [section]: [...filtered, { name, enable: false }] })
+    } else {
+      // User re-enabled → remove local override
+      onChange?.({ ...parameters, [section]: current.filter(p => !(p.name === name && p.enable === false)) })
+    }
+  }
+
+  const queryCount = (parameters?.query?.length ?? 0) + (parameters?.path?.length ?? 0)
+    + (globalParameters?.query?.length ?? 0) + (envParameters?.query?.length ?? 0)
+  const hasAnyHeader = (parameters?.header?.length ?? 0) + (globalParameters?.header?.length ?? 0) + (envParameters?.header?.length ?? 0) > 0
+  const hasAnyCookie = (parameters?.cookie?.length ?? 0) + (globalParameters?.cookie?.length ?? 0) + (envParameters?.cookie?.length ?? 0) > 0
 
   return (
     <Tabs
@@ -63,21 +154,24 @@ export function ParamsTab(props: ParamsTabProps) {
         {
           key: 'params',
           label: (
-            <TabLabel count={(parameters?.query?.length ?? 0) + (parameters?.path?.length ?? 0)}>
+            <TabLabel count={queryCount}>
               Params
             </TabLabel>
           ),
           children: (
             <div>
-              <GlobalParametersNotice
-                overriddenNames={queryNames}
-                rows={globalParameters?.query}
-                title="当前全局 Query 参数"
+              <InheritedParamsBar
+                globalRows={globalParameters?.query}
+                envRows={envParameters?.query}
+                localParams={parameters?.query}
+                sourceLabel="当前全局/环境 Query 参数"
+                onToggle={(name, enabled) => handleToggleGlobal('query', name, enabled)}
               />
               <div className="py-2">
                 <Typography.Text type="secondary">Query 参数</Typography.Text>
               </div>
               <ParamsEditableTable
+                varMap={varMap}
                 value={parameters?.query}
                 onChange={(query) => {
                   onChange?.({ ...parameters, query })
@@ -109,19 +203,21 @@ export function ParamsTab(props: ParamsTabProps) {
         {
           key: 'headers',
           label: (
-            <TabLabel hasContent={headerNames.size > 0}>
+            <TabLabel hasContent={hasAnyHeader}>
               Headers
             </TabLabel>
           ),
           children: (
             <div className="pt-2">
-              <GlobalParametersNotice
-                overriddenNames={headerNames}
-                normalizeName={name => name.toLowerCase()}
-                rows={globalParameters?.header}
-                title="当前全局 Header 参数"
+              <InheritedParamsBar
+                globalRows={globalParameters?.header}
+                envRows={envParameters?.header}
+                localParams={parameters?.header}
+                sourceLabel="当前全局/环境 Header 参数"
+                onToggle={(name, enabled) => handleToggleGlobal('header', name, enabled)}
               />
               <ParamsEditableTable
+                varMap={varMap}
                 value={parameters?.header}
                 onChange={(header) => {
                   onChange?.({ ...parameters, header })
@@ -134,18 +230,21 @@ export function ParamsTab(props: ParamsTabProps) {
         {
           key: 'cookie',
           label: (
-            <TabLabel hasContent={cookieNames.size > 0}>
+            <TabLabel hasContent={hasAnyCookie}>
               Cookie
             </TabLabel>
           ),
           children: (
             <div className="pt-2">
-              <GlobalParametersNotice
-                overriddenNames={cookieNames}
-                rows={globalParameters?.cookie}
-                title="当前全局 Cookie 参数"
+              <InheritedParamsBar
+                globalRows={globalParameters?.cookie}
+                envRows={envParameters?.cookie}
+                localParams={parameters?.cookie}
+                sourceLabel="当前全局/环境 Cookie 参数"
+                onToggle={(name, enabled) => handleToggleGlobal('cookie', name, enabled)}
               />
               <ParamsEditableTable
+                varMap={varMap}
                 value={parameters?.cookie}
                 onChange={(cookie) => {
                   onChange?.({ ...parameters, cookie })

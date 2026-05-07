@@ -1,5 +1,5 @@
 import { CloseCircleFilled } from '@ant-design/icons'
-import { Input, Select, theme, Tooltip } from 'antd'
+import { Input, Select, Switch, theme, Tooltip } from 'antd'
 import { PlusCircleIcon, XCircleIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
@@ -10,6 +10,8 @@ import { PARAMS_CONFIG } from '@/configs/static'
 import { ParamType } from '@/enums'
 import { useStyles } from '@/hooks/useStyle'
 import type { Parameter, UnsafeAny } from '@/types'
+
+import { VarHighlightInput } from './VarHighlightInput'
 
 import { css } from '@emotion/css'
 
@@ -26,6 +28,7 @@ interface ParamsEditableTableProps extends Pick<EditableTableProps, 'autoNewRow'
   onChange?: (value: ParamsEditableTableProps['value']) => void
   removable?: boolean
   isPathParamsTable?: boolean
+  varMap?: Map<string, string>
 }
 
 export function ParamsEditableTable(props: ParamsEditableTableProps) {
@@ -37,6 +40,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     isPathParamsTable = false,
     autoNewRow = !isPathParamsTable,
     removable = true,
+    varMap,
   } = props
 
   const newRowRecordId = nanoid(6)
@@ -59,7 +63,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
   const handleDuplicate = (rowIdx: number, v: Partial<Parameter>) => {
     onChange?.(
       value
-        ?.filter((_, i) => i !== rowIdx) // 首先排除当前行，避免重复。
+        ?.filter((_, i) => i !== rowIdx)
         .map((it) => {
           if (it.name === v.name) {
             if (it.type === ParamType.Array) {
@@ -275,13 +279,25 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
 
         return (
           <ParamsEditableCell>
-            <Input
-              value={typeof exampleVal === 'string' ? exampleVal : undefined}
-              variant="borderless"
-              onChange={(ev) => {
-                handleChange(ridx, { example: ev.target.value })
-              }}
-            />
+            {varMap
+              ? (
+                  <VarHighlightInput
+                    value={typeof exampleVal === 'string' ? exampleVal : ''}
+                    varMap={varMap}
+                    onChange={(newVal) => {
+                      handleChange(ridx, { example: newVal })
+                    }}
+                  />
+                )
+              : (
+                  <Input
+                    value={typeof exampleVal === 'string' ? exampleVal : undefined}
+                    variant="borderless"
+                    onChange={(ev) => {
+                      handleChange(ridx, { example: ev.target.value })
+                    }}
+                  />
+                )}
           </ParamsEditableCell>
         )
       },
@@ -301,6 +317,24 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
                 handleChange(ridx, { description: ev.target.value })
               }}
             />
+          </ParamsEditableCell>
+        )
+      },
+    },
+    {
+      width: 50,
+      render: (_, record, ridx) => {
+        return (
+          <ParamsEditableCell>
+            <div className="flex items-center justify-center size-full">
+              <Switch
+                checked={record.enable !== false}
+                size="small"
+                onChange={(checked) => {
+                  handleChange(ridx, { enable: checked })
+                }}
+              />
+            </div>
           </ParamsEditableCell>
         )
       },

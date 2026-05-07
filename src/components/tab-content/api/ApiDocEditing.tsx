@@ -259,13 +259,13 @@ export function ApiDocEditing() {
 
         <GroupTitle className="mt-2">请求参数</GroupTitle>
         <Form.Item noStyle name="parameters">
-          <ParamsTab globalParameters={projectEnvironmentConfig.globalParameters} />
+          <ParamsTab />
         </Form.Item>
 
         <div className="mt-4">
           <Typography.Text strong className="mb-2 block text-sm">Body</Typography.Text>
           <Form.Item noStyle name="requestBody">
-            <ParamsBody globalRows={projectEnvironmentConfig.globalParameters?.body} />
+            <ParamsBody />
           </Form.Item>
         </div>
 

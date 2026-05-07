@@ -9,7 +9,7 @@ import {
 
 import { TabValueEditor } from './ValueEditor'
 
-const GLOBAL_PARAMETER_LABELS: Record<ApiEnvironmentGlobalParameterSection, string> = {
+export const GLOBAL_PARAMETER_LABELS: Record<ApiEnvironmentGlobalParameterSection, string> = {
   header: 'Header',
   cookie: 'Cookie',
   query: 'Query',
@@ -54,6 +54,7 @@ export function GlobalParametersEditor(props: {
           children: (
             <TabValueEditor
               editable={editable}
+              showEnable
               rows={value[section]}
               onAdd={() => {
                 onChange(updateGlobalParameterRows(value, section, [...value[section], createEnvironmentValue()]))

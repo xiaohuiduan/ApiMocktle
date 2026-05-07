@@ -1,10 +1,18 @@
-import { Button, Input, Switch, Typography, theme } from 'antd'
+import { Button, Input, Switch, Tabs, Tag, Typography, theme } from 'antd'
 import { GlobeIcon, KeyRoundIcon, PlusIcon, ShieldIcon, TrashIcon } from 'lucide-react'
 
 import { createEnvironmentBaseUrl, createEnvironmentValue } from '@/project-environment-utils'
-import type { ApiEnvironment, ApiEnvironmentBaseUrl, ProjectEnvironmentConfig } from '@/types'
+import {
+  GLOBAL_PARAMETER_SECTIONS,
+  type ApiEnvironment,
+  type ApiEnvironmentBaseUrl,
+  type ApiEnvironmentGlobalParameterSection,
+  type ApiEnvironmentValue,
+  type ProjectEnvironmentConfig,
+} from '@/types'
 
-import { ValueEditor } from './ValueEditor'
+import { GLOBAL_PARAMETER_LABELS } from './GlobalParametersEditor'
+import { TabValueEditor, ValueEditor } from './ValueEditor'
 
 export type GlobalSectionKey = 'globalVariables' | 'globalParameters' | 'vaultSecrets'
 export type EnvironmentSectionKey = `environment:${string}`
@@ -106,9 +114,10 @@ export function EnvironmentEditor(props: {
   environment: ApiEnvironment
   onChange: (nextEnvironment: ApiEnvironment) => void
   onDelete: () => void
+  globalParameters?: ProjectEnvironmentConfig['globalParameters']
 }) {
   const { token } = theme.useToken()
-  const { editable, environment, onChange, onDelete } = props
+  const { editable, environment, onChange, onDelete, globalParameters } = props
   const baseUrls = environment.baseUrls ?? []
   const variables = environment.variables ?? []
 
@@ -210,6 +219,87 @@ export function EnvironmentEditor(props: {
           onChange({ ...environment, variables: nextRows })
         }}
       />
+
+      <section className="space-y-3">
+        <div>
+          <Typography.Title level={5}>环境参数</Typography.Title>
+          <Typography.Paragraph className="!mb-0" type="secondary">
+            按 Header、Cookie、Query、Body 分类维护当前环境的请求参数。同名参数将覆盖全局值。
+          </Typography.Paragraph>
+        </div>
+
+        <Tabs
+          animated={false}
+          items={GLOBAL_PARAMETER_SECTIONS.map((section) => {
+            const sectionParams = environment.parameters?.[section] ?? []
+            const globalSectionRows = globalParameters?.[section] ?? []
+            const envNames = new Set(sectionParams.map((p) => p.name))
+
+            return {
+              key: section,
+              label: GLOBAL_PARAMETER_LABELS[section],
+              children: (
+                <div className="space-y-3 pt-3">
+                  {globalSectionRows.length > 0 && (
+                    <div
+                      className="rounded-lg border px-3 py-2"
+                      style={{ borderColor: token.colorBorderSecondary, backgroundColor: token.colorFillQuaternary }}
+                    >
+                      <Typography.Text type="secondary" className="text-xs">
+                        全局已设置：
+                      </Typography.Text>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {globalSectionRows.map((g) => {
+                          const overridden = envNames.has(g.name)
+                          const label = g.value ? `${g.name}: ${g.value}` : g.name
+                          return (
+                            <Tag key={g.id} color={overridden ? 'default' : 'blue'}>
+                              {label}
+                              {overridden ? ' (已覆盖)' : g.value ? '' : ' (未配置值)'}
+                            </Tag>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <TabValueEditor
+                    editable={editable}
+                    showEnable
+                    rows={sectionParams}
+                    onAdd={() => {
+                      onChange({
+                        ...environment,
+                        parameters: {
+                          header: [],
+                          cookie: [],
+                          query: [],
+                          body: [],
+                          ...environment.parameters,
+                          [section]: [...sectionParams, createEnvironmentValue()],
+                        },
+                      })
+                    }}
+                    onChange={(nextRows: ApiEnvironmentValue[]) => {
+                      onChange({
+                        ...environment,
+                        parameters: {
+                          header: [],
+                          cookie: [],
+                          query: [],
+                          body: [],
+                          ...environment.parameters,
+                          [section]: nextRows,
+                        },
+                      })
+                    }}
+                  />
+                </div>
+              ),
+            }
+          })}
+        />
+      </section>
     </div>
   )
 }

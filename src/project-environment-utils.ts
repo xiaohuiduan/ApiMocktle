@@ -32,6 +32,7 @@ export function createEnvironmentValue(): ApiEnvironmentValue {
     id: nanoid(6),
     name: '',
     value: '',
+    enable: true,
   }
 }
 
@@ -51,6 +52,7 @@ export function createEnvironment(): ApiEnvironment {
     shared: true,
     baseUrls: [createEnvironmentBaseUrl()],
     variables: [],
+    parameters: createGlobalParameters(),
   }
 }
 

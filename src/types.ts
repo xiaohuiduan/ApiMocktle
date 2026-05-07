@@ -108,6 +108,7 @@ export interface ApiEnvironmentValue {
   id: string
   name: string
   value?: string
+  enable?: boolean
 }
 
 export const GLOBAL_PARAMETER_SECTIONS = ['header', 'cookie', 'query', 'body'] as const
@@ -128,6 +129,7 @@ export interface ApiEnvironment {
   shared?: boolean
   baseUrls?: ApiEnvironmentBaseUrl[]
   variables?: ApiEnvironmentValue[]
+  parameters?: ApiEnvironmentGlobalParameters
 }
 
 export interface ProjectEnvironmentConfig {
