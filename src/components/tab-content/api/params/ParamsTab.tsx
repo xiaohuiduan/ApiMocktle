@@ -73,11 +73,14 @@ function InheritedParamsBar(props: {
 
   return (
     <div
-      className="mb-3 rounded-lg border px-3 py-2"
+      className="mb-3 rounded-lg border px-4 py-3"
       style={{ borderColor: token.colorBorderSecondary, backgroundColor: token.colorFillQuaternary }}
     >
-      <Typography.Text type="secondary" className="text-xs">{sourceLabel}</Typography.Text>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
+      <Typography.Text strong>{sourceLabel}</Typography.Text>
+      <Typography.Paragraph type="secondary" className="!mb-2 mt-1">
+        这些参数来自全局/环境配置，同名接口参数优先。
+      </Typography.Paragraph>
+      <div className="grid gap-2">
         {allRows.map((r) => {
           const overridden = localNames.has(r.name)
           const enabled = r.enable !== false && !overridden
@@ -85,36 +88,30 @@ function InheritedParamsBar(props: {
           return (
             <div
               key={r.name}
-              className="flex items-center gap-1 rounded px-2 py-0.5"
+              className="grid items-center gap-3 rounded-md px-3 py-2"
               style={{
                 backgroundColor: token.colorBgContainer,
-                border: `1px solid ${token.colorBorderSecondary}`,
-                opacity: overridden ? 0.5 : 1,
+                gridTemplateColumns: '72px minmax(0,1fr) minmax(0,1fr) 48px',
               }}
             >
-              <Tag
-                color={overridden ? 'default' : r.source === 'env' ? 'purple' : 'blue'}
-                style={{ marginInlineEnd: 0, fontSize: 10, lineHeight: '14px', paddingInline: 4 }}
-              >
+              <Tag color={overridden ? 'default' : r.source === 'env' ? 'purple' : 'blue'}>
                 {r.source === 'env' ? '环境' : '全局'}
                 {overridden ? ' (已覆盖)' : ''}
               </Tag>
-              <Typography.Text code className="text-xs max-w-24 truncate">{r.name}</Typography.Text>
-              {r.value
-                ? (
-                    <Typography.Text type="secondary" className="text-xs max-w-32 truncate">
-                      {r.value}
-                    </Typography.Text>
-                  )
-                : null}
-              <Switch
-                checked={enabled}
-                disabled={overridden}
-                size="small"
-                onChange={(checked) => {
-                  onToggle(r.name, checked)
-                }}
-              />
+              <Typography.Text code className="truncate">{r.name}</Typography.Text>
+              <Typography.Text type="secondary" className="truncate">
+                {r.value || '—'}
+              </Typography.Text>
+              <div className="flex justify-center">
+                <Switch
+                  checked={enabled}
+                  disabled={overridden}
+                  size="small"
+                  onChange={(checked) => {
+                    onToggle(r.name, checked)
+                  }}
+                />
+              </div>
             </div>
           )
         })}

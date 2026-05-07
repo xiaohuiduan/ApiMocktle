@@ -31,7 +31,7 @@ export function GlobalParametersNotice(props: {
 
   return (
     <div
-      className="mb-3 rounded-lg border px-3 py-3"
+      className="mb-3 rounded-lg border px-4 py-3"
       style={{ borderColor: token.colorBorderSecondary, backgroundColor: token.colorFillQuaternary }}
     >
       <div className="mb-2">
@@ -49,10 +49,10 @@ export function GlobalParametersNotice(props: {
           return (
             <div
               key={row.id}
-              className="grid items-center gap-2 rounded-md px-3 py-2"
+              className="grid items-center gap-2 rounded-md px-3 py-2.5"
               style={{
                 backgroundColor: token.colorBgContainer,
-                gridTemplateColumns: '88px 180px minmax(0,1fr) 80px',
+                gridTemplateColumns: '80px minmax(0,1fr) minmax(0,1fr) 72px',
               }}
             >
               <Tag color={overridden ? 'default' : 'blue'}>{overridden ? '已覆盖' : '全局生效'}</Tag>

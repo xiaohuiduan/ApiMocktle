@@ -100,9 +100,9 @@ function ValueTable(props: {
   return (
     <div style={{ border: `1px solid ${token.colorBorderSecondary}`, borderRadius: token.borderRadiusLG }}>
       <div className="grid" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
-        {headers.map((header) => (
+        {headers.map((header, i) => (
           <div
-            key={header}
+            key={i}
             className="px-3 py-2 text-sm"
             style={{ borderBottom: `1px solid ${token.colorBorderSecondary}`, color: token.colorTextSecondary }}
           >
