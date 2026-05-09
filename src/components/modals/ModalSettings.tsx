@@ -4,6 +4,7 @@ import { Viewer } from '@bytemd/react'
 import { create, useModal } from '@ebay/nice-modal-react'
 import { ConfigProvider, Menu, type MenuProps, Modal, type ModalProps, theme } from 'antd'
 import { InfoIcon, ShirtIcon } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
 
 import { PROJECT_ABOUT_MARKDOWN } from '@/content/project-about'
 import { ThemeEditor, useThemeContext } from '@/components/ThemeEditor'
@@ -48,8 +49,25 @@ const renderMenuContent = (props: { menuKey: SettingsMenuKey }) => {
       return <ThemeEditorWrapper />
 
     case SettingsMenuKey.About:
-      return <Viewer value={PROJECT_ABOUT_MARKDOWN} />
+      return <AboutContent />
   }
+}
+
+function AboutContent() {
+  const [version, setVersion] = useState<string>('')
+
+  useEffect(() => {
+    invoke<string>('get_app_version').then(setVersion).catch(() => setVersion(''))
+  }, [])
+
+  return (
+    <div>
+      <Viewer value={PROJECT_ABOUT_MARKDOWN} />
+      {version && (
+        <div className="mt-4 text-sm text-gray-500">版本 {version}</div>
+      )}
+    </div>
+  )
 }
 
 interface ModalSettingsProps extends Omit<ModalProps, 'open' | 'footer'> {

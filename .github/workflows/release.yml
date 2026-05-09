@@ -28,6 +28,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Set version from tag
+        shell: bash
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$TAG"
+          jq --arg v "$TAG" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
+
       - name: Build Tauri (Windows)
         run: pnpm tauri:build
         env:
@@ -59,6 +66,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - run: pnpm install --frozen-lockfile
+
+      - name: Set version from tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$TAG"
+          jq --arg v "$TAG" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
 
       - name: Build Tauri (macOS)
         run: pnpm tauri:build
@@ -96,6 +109,12 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
 
       - run: pnpm install --frozen-lockfile
+
+      - name: Set version from tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$TAG"
+          jq --arg v "$TAG" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
 
       - name: Build Tauri (Linux)
         run: pnpm tauri:build

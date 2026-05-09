@@ -76,6 +76,8 @@ pub fn run() {
             commands::exports::write_export_file,
             // Request runner
             commands::request_runner::run_api_request,
+            // App info
+            commands::app_info::get_app_version,
             // Tokens
         ])
         .run(tauri::generate_context!())
