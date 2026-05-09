@@ -3,10 +3,11 @@ import { useMemo } from 'react'
 import { ConfigProvider, Menu, Popover, Select, theme, Tooltip } from 'antd'
 import { Settings2Icon, XIcon } from 'lucide-react'
 
+import type { ApiMenuData } from '@/components/ApiMenu'
 import { SchemaType } from '@/components/JsonSchema'
 import { defaultSchemaTypeConfig } from '@/components/JsonSchema/constants'
 import type { RefSchema } from '@/components/JsonSchema/JsonSchema.type'
-import { apiDirectoryData } from '@/data/remote'
+import { MenuItemType } from '@/enums'
 import { useStyles } from '@/hooks/useStyle'
 
 import { css } from '@emotion/css'
@@ -16,6 +17,8 @@ interface DataTypeSelectProps {
   disabled?: boolean
   readOnly?: boolean
   $ref?: RefSchema['$ref']
+  menuRawList?: ApiMenuData[]
+  onRefSelect?: ($ref: string) => void
   onTypeSelect?: (type: SchemaType) => void
 }
 
@@ -44,7 +47,7 @@ const tyepList = [
 ] satisfies SchemaType[]
 
 export function DataTypeSelect(props: DataTypeSelectProps) {
-  const { type, disabled, readOnly, $ref, onTypeSelect } = props
+  const { type, disabled, readOnly, $ref, menuRawList, onRefSelect, onTypeSelect } = props
 
   const { token } = theme.useToken()
 
@@ -60,16 +63,23 @@ export function DataTypeSelect(props: DataTypeSelectProps) {
     }
   })
 
+  // 获取所有 ApiSchema 模型
+  const schemaModels = useMemo(() => {
+    return (menuRawList ?? []).filter((item) => item.type === MenuItemType.ApiSchema)
+  }, [menuRawList])
+
   const typeName = useMemo(() => {
     if (type) {
       if ($ref) {
-        return apiDirectoryData.find((it) => it.id === $ref)?.name
+        // 从 $ref 中提取模型名称
+        const name = $ref.split('/').pop() || $ref
+        return schemaModels.find((it) => it.name === name)?.name ?? name
       }
       else {
         return defaultSchemaTypeConfig[type].text
       }
     }
-  }, [type, $ref])
+  }, [type, $ref, schemaModels])
 
   if (type) {
     return (
@@ -125,18 +135,35 @@ export function DataTypeSelect(props: DataTypeSelectProps) {
                 </span>
               </div>
 
-              <Select
-                className="[&_.ant-select-selector]:!text-current"
-                options={tyepList.map((it) => ({
-                  label: defaultSchemaTypeConfig[it].text,
-                  value: it,
-                }))}
-                style={{ color: `var(${defaultSchemaTypeConfig[type].varColor})` }}
-                value={type}
-                onChange={(v) => {
-                  onTypeSelect?.(v)
-                }}
-              />
+              {type === SchemaType.Refer
+                ? (
+                    <Select
+                      className="w-full"
+                      placeholder="请选择引用的模型"
+                      options={schemaModels.map((it) => ({
+                        label: it.name,
+                        value: `#/components/schemas/${it.name}`,
+                      }))}
+                      value={$ref}
+                      onChange={(v) => {
+                        onRefSelect?.(v)
+                      }}
+                    />
+                  )
+                : (
+                    <Select
+                      className="[&_.ant-select-selector]:!text-current"
+                      options={tyepList.map((it) => ({
+                        label: defaultSchemaTypeConfig[it].text,
+                        value: it,
+                      }))}
+                      style={{ color: `var(${defaultSchemaTypeConfig[type].varColor})` }}
+                      value={type}
+                      onChange={(v) => {
+                        onTypeSelect?.(v)
+                      }}
+                    />
+                  )}
             </div>
           )}
           placement="right"

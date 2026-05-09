@@ -5,6 +5,7 @@ import { Input, Tooltip } from 'antd'
 import { omit } from 'lodash-es'
 import { CirclePlusIcon } from 'lucide-react'
 
+import type { ApiMenuData } from '@/components/ApiMenu'
 import { cssSchemaType, DataTypeSelect } from '@/components/DataTypeSelect'
 import { DoubleCheckRemoveBtn } from '@/components/DoubleCheckRemoveBtn'
 import { useStyles } from '@/hooks/useStyle'
@@ -27,6 +28,8 @@ export interface JsonSchemaNodeRowProps {
   fromRef?: RefSchema['$ref']
   /** 是否禁止编辑。 */
   disabled?: boolean
+  /** 模型列表，用于引用模型选择 */
+  menuRawList?: ApiMenuData[]
 }
 
 export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
@@ -38,6 +41,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
     onRemoveField,
     fromRef,
     disabled = false,
+    menuRawList,
   } = props
 
   const { styles } = useStyles(({ token }) => {
@@ -330,6 +334,10 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
           disabled={disabled}
           readOnly={readOnly}
           type={type}
+          menuRawList={menuRawList}
+          onRefSelect={($ref) => {
+            triggerChange?.({ ...value, $ref } as JsonSchema)
+          }}
           onTypeSelect={(newType) => {
             const oldType = value.type
             let newValue = { ...value, type: newType } as JsonSchema

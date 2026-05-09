@@ -74,6 +74,7 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
     onAddField,
     value,
     onChange,
+    menuRawList,
     ...restProps,
   }
 
@@ -185,6 +186,12 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (value.type === SchemaType.Refer) {
         const { $ref, ...restValue } = value
+
+        // $ref 不存在或为空时，当作普通字段处理
+        if (!$ref) {
+          return <JsonSchemaNodeRow {...rowProps} />
+        }
+
         const refJsonSchema = menuRawList ? getRefJsonSchema(menuRawList, $ref) : undefined
 
         // 为了避免循环引用，需要判断一下，如果是同一个引用，就不再往下展示了。
