@@ -175,6 +175,8 @@ export function QuickRequestRun() {
     const body = workCopy.requestBody
     let bodyText = ''
     let contentType: string | undefined
+    let formDataFiles: Array<{ name: string, path: string }> | undefined
+
     if (body && body.type !== BodyType.None) {
       if (body.type === BodyType.Json || body.type === BodyType.Xml || body.type === BodyType.Raw) {
         const raw = bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)
@@ -183,12 +185,34 @@ export function QuickRequestRun() {
           : body.type === BodyType.Raw ? 'text/plain'
           : 'application/json'
       } else if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
-        const params = (body.parameters ?? [])
-          .filter(p => p.name && p.enable !== false)
-        bodyText = params.map(p =>
-          `${encodeURIComponent(p.name!)}={encodeURIComponent(String(p.example ?? ''))}`
-        ).join('&')
+        const allParams = (body.parameters ?? []).map(p => ({
+          name: p.name,
+          enable: p.enable,
+          example: p.example,
+          type: p.type,
+          filePath: (p as any).filePath,
+        }))
+
+        const textParams: Array<{ name: string, example: string }> = []
+        const fileParams: Array<{ name: string, path: string }> = []
+
+        for (const p of allParams) {
+          if (!p.name || p.enable === false) continue
+          if (p.type === 'file') {
+            const filePath = p.filePath
+            if (filePath) {
+              fileParams.push({ name: p.name, path: filePath })
+            }
+          } else {
+            textParams.push({ name: p.name, example: String(p.example ?? '') })
+          }
+        }
+
+        bodyText = textParams
+          .map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.example)}`)
+          .join('&')
         contentType = body.type === BodyType.FormData ? 'multipart/form-data' : 'application/x-www-form-urlencoded'
+        formDataFiles = fileParams.length > 0 ? fileParams : undefined
       }
     }
 
@@ -207,7 +231,7 @@ export function QuickRequestRun() {
       }
     }
 
-    await run(url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, contentType)
+    await run(url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, contentType, formDataFiles)
   }
 
   const handleSave = async () => {

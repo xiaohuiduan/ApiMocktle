@@ -31,6 +31,8 @@ interface ParameterBase {
 interface NonArrayParameter extends ParameterBase {
   type: Exclude<ParamType, ParamType.Array>
   example?: string
+  /** 文件上传时的文件路径（仅 type === 'file' 时有效） */
+  filePath?: string
 }
 
 /** 请求参数信息（数组类型）。 */

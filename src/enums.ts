@@ -75,6 +75,7 @@ export const enum ParamType {
   Boolean = 'boolean',
   Number = 'number',
   Array = 'array',
+  File = 'file',
 }
 
 export const enum ContentType {

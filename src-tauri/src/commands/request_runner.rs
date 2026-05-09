@@ -45,8 +45,10 @@ pub async fn run_api_request(
         }
     }
 
-    // Content-Type
-    if let Some(ct) = &payload.content_type {
+    // Content-Type (skip if we'll use multipart)
+    if !payload.form_data_files.is_empty() {
+        // multipart 请求不需要手动设置 Content-Type，reqwest 会自动生成
+    } else if let Some(ct) = &payload.content_type {
         if !payload.headers.iter().any(|h| h.name.to_lowercase() == "content-type") {
             req = req.header("Content-Type", ct.as_str());
         }
@@ -54,7 +56,55 @@ pub async fn run_api_request(
 
     // Set body
     if !payload.body.is_empty() && method != "GET" {
-        req = req.body(payload.body.clone());
+        if !payload.form_data_files.is_empty() {
+            // multipart/form-data with files
+            let mut form = reqwest::multipart::Form::new();
+            // 添加普通文本字段
+            for pair in payload.body.split('&') {
+                let (key, value) = if let Some((k, v)) = pair.split_once('=') {
+                    let decoded_key = urlencoding::decode(k).unwrap_or_default().to_string();
+                    let decoded_val = urlencoding::decode(v).unwrap_or_default().to_string();
+                    (decoded_key, decoded_val)
+                } else if !pair.is_empty() {
+                    (urlencoding::decode(pair).unwrap_or_default().to_string(), String::new())
+                } else {
+                    continue;
+                };
+                form = form.part(key.clone(), reqwest::multipart::Part::text(value));
+            }
+            // 添加文件字段
+            for file in &payload.form_data_files {
+                if let Ok(file_bytes) = std::fs::read(&file.path) {
+                    let filename = std::path::Path::new(&file.path)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or(&file.name)
+                        .to_string();
+                    let part = reqwest::multipart::Part::bytes(file_bytes)
+                        .file_name(filename);
+                    form = form.part(file.name.clone(), part);
+                }
+            }
+            req = req.multipart(form);
+        } else {
+            req = req.body(payload.body.clone());
+        }
+    } else if !payload.form_data_files.is_empty() && method != "GET" {
+        // 没有 body text 但有文件的情况
+        let mut form = reqwest::multipart::Form::new();
+        for file in &payload.form_data_files {
+            if let Ok(file_bytes) = std::fs::read(&file.path) {
+                let filename = std::path::Path::new(&file.path)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(&file.name)
+                    .to_string();
+                let part = reqwest::multipart::Part::bytes(file_bytes)
+                    .file_name(filename);
+                form = form.part(file.name.clone(), part);
+            }
+        }
+        req = req.multipart(form);
     }
 
     match req.send().await {

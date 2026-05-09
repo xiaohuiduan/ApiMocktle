@@ -59,3 +59,4 @@ src-tauri/target/
 
 # Electron/Tauri release output
 /release/
+test_server.py

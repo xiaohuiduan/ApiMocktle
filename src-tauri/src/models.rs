@@ -204,6 +204,12 @@ pub struct ImportPayload {
 
 // Request Runner
 #[derive(Debug, Serialize, Deserialize)]
+pub struct FormDataFile {
+    pub name: String,
+    pub path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RunRequestPayload {
     pub url: String,
     pub method: String,
@@ -213,6 +219,8 @@ pub struct RunRequestPayload {
     pub body: String,
     #[serde(rename = "contentType", default)]
     pub content_type: Option<String>,
+    #[serde(rename = "formDataFiles", default)]
+    pub form_data_files: Vec<FormDataFile>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

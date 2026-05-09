@@ -186,12 +186,10 @@ export const PARAMS_CONFIG = {
   [ParamType.Array]: {
     varColor: '--color-green-6',
   },
-} as const satisfies Record<
-  ParamType,
-  {
-    varColor: string
-  }
->
+  [ParamType.File]: {
+    varColor: '--color-blue-6',
+  },
+} as const satisfies Record<ParamType, { varColor: string }>
 
 export const API_MENU_CONFIG = {
   [CatalogType.Overview]: {

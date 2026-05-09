@@ -21,6 +21,7 @@ export function useApiRequestRunner() {
     headers: Array<{ name: string, value: string }>,
     body: string,
     contentType?: string,
+    formDataFiles?: Array<{ name: string, path: string }>,
   ) => {
     if (!projectId || !sessionId) {
       const msg = '当前不在项目页面，无法运行请求'
@@ -37,7 +38,7 @@ export function useApiRequestRunner() {
       const payload = await api<ApiRunResult>('run_api_request', {
         sessionId,
         projectId,
-        payload: { url, method, headers, body, contentType },
+        payload: { url, method, headers, body, contentType, formDataFiles },
       })
       setResult(payload)
     } catch (err) {

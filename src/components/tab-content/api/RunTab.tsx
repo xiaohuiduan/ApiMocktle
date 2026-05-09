@@ -360,6 +360,8 @@ export function RunTab() {
     const body = workCopy.requestBody
     let bodyText = ''
     let contentType: string | undefined
+    let formDataFiles: Array<{ name: string, path: string }> | undefined
+
     if (body && body.type !== BodyType.None) {
       if (body.type === BodyType.Json || body.type === BodyType.Xml || body.type === BodyType.Raw) {
         const raw = bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)
@@ -368,21 +370,37 @@ export function RunTab() {
           : body.type === BodyType.Raw ? 'text/plain'
           : 'application/json'
       } else if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
-        const mergedBody = mergeParams(
-          (projectEnvironmentConfig?.globalParameters?.body ?? []).filter(p => p.enable !== false),
-          envParams.body.filter(p => p.enable !== false),
-          (body.parameters ?? []).map(p => ({ name: p.name, enable: p.enable, example: p.example })),
-          disabledInheritedParams.body,
-        )
-        bodyText = mergedBody
-          .filter(p => p.name && p.enable !== false)
-          .map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(resolveVars(String(p.example ?? '')))}`)
+        const allParams: Array<{ name?: string, enable?: boolean, example?: string | string[], type?: string, filePath?: string }> = [
+          ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map(p => ({ name: p.name, enable: p.enable, example: p.value as string })),
+          ...envParams.body.map(p => ({ name: p.name, enable: p.enable, example: p.value as string })),
+          ...(body.parameters ?? []).map(p => ({ name: p.name, enable: p.enable, example: p.example, type: p.type as string, filePath: (p as any).filePath })),
+        ]
+
+        // 分离普通参数和文件参数
+        const textParams: Array<{ name: string, example: string }> = []
+        const fileParams: Array<{ name: string, path: string }> = []
+
+        for (const p of allParams) {
+          if (!p.name || p.enable === false) continue
+          if (p.type === 'file') {
+            const filePath = p.filePath
+            if (filePath) {
+              fileParams.push({ name: p.name, path: filePath })
+            }
+          } else {
+            textParams.push({ name: p.name, example: resolveVars(String(p.example ?? '')) })
+          }
+        }
+
+        bodyText = textParams
+          .map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.example)}`)
           .join('&')
         contentType = body.type === BodyType.FormData ? 'multipart/form-data' : 'application/x-www-form-urlencoded'
+        formDataFiles = fileParams.length > 0 ? fileParams : undefined
       }
     }
 
-    await run(url, workCopy.method ?? 'GET', headers, bodyText, contentType)
+    await run(url, workCopy.method ?? 'GET', headers, bodyText, contentType, formDataFiles)
   }
 
   // 一键填充 Body

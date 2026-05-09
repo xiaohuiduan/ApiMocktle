@@ -1,6 +1,7 @@
 import { CloseCircleFilled } from '@ant-design/icons'
-import { Input, Select, Switch, theme, Tooltip } from 'antd'
+import { Button, Input, Select, Switch, theme, Tooltip } from 'antd'
 import { PlusCircleIcon, XCircleIcon } from 'lucide-react'
+import { open } from '@tauri-apps/plugin-dialog'
 import { nanoid } from 'nanoid'
 
 import { DoubleCheckRemoveBtn } from '@/components/DoubleCheckRemoveBtn'
@@ -87,7 +88,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     )
   }
 
-  const handleChange = (rowIdx: number, v: Partial<Record<keyof Parameter, UnsafeAny>>) => {
+  const handleChange = (rowIdx: number, v: Record<string, any>) => {
     const target = value?.at(rowIdx)
 
     const isNewRow = testIsNewRow(target)
@@ -197,6 +198,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
                 { label: 'boolean', value: ParamType.Boolean },
                 { label: 'number', value: ParamType.Number },
                 { label: 'array', value: ParamType.Array, hidden: isPathParamsTable },
+                { label: 'file', value: ParamType.File },
               ].filter((it) => !it.hidden)}
               popupClassName="min-w-[90px]"
               style={{
@@ -222,8 +224,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
         )
       },
     },
-    {
-      title: '请求值',
+    {title: '请求值',
       dataIndex: 'example',
       width: '25%',
       render: (exampleVal, record, ridx) => {
@@ -274,6 +275,33 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
                 )
               })}
             </div>
+          )
+        }
+
+        if (record.type === ParamType.File) {
+          return (
+            <ParamsEditableCell>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-400 truncate max-w-[100px]" title={record.filePath}>
+                  {record.filePath ? record.filePath.split(/[/\\]/).pop() : '未选择'}
+                </span>
+                <Button
+                  size="small"
+                  type="link"
+                  onClick={async () => {
+                    const selected = await open({
+                      multiple: false,
+                      directory: false,
+                    })
+                    if (selected) {
+                      handleChange(ridx, { filePath: selected as string })
+                    }
+                  }}
+                >
+                  选择文件
+                </Button>
+              </div>
+            </ParamsEditableCell>
           )
         }
 
