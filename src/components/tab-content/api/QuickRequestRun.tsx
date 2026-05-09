@@ -478,7 +478,15 @@ export function QuickRequestRun() {
                                     height={`${Math.min((result.requestBodyText.split('\n').length) * 18, 300)}px`}
                                     language={detectLanguage(result.contentType)}
                                     value={result.requestBodyText}
-                                    options={{ readOnly: true, lineNumbers: 'on', minimap: { enabled: false }, scrollBeyondLastLine: false }}
+                                    options={{
+                                      readOnly: true,
+                                      lineNumbers: 'on',
+                                      minimap: { enabled: false },
+                                      scrollBeyondLastLine: false,
+                                      wordWrap: 'on',
+                                      renderValidationDecorations: 'off',
+                                      showDeprecated: false,
+                                    }}
                                   />
                                 )}
                                 {result.requestBodyParameters && result.requestBodyParameters.length > 0 && (
