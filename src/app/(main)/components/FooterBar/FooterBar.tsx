@@ -1,9 +1,7 @@
-import { show } from '@ebay/nice-modal-react'
-import { Button, type ButtonProps, Space } from 'antd'
-import { ArrowLeftToLine, ArrowRightToLine, ShirtIcon } from 'lucide-react'
+import { Button, type ButtonProps } from 'antd'
+import { ArrowLeftToLine, ArrowRightToLine } from 'lucide-react'
 
 import { IconText } from '@/components/IconText'
-import { ModalSettings, SettingsMenuKey } from '@/components/modals/ModalSettings'
 import { useLayoutContext } from '@/contexts/layout-settings'
 
 function SmallButton({ children, ...props }: React.PropsWithChildren<ButtonProps>) {
@@ -39,15 +37,6 @@ export function FooterBar() {
             </SmallButton>
           )}
 
-      <Space className="ml-auto flex items-center" size={0}>
-        <SmallButton
-          onClick={() => {
-            void show(ModalSettings, { selectedKey: SettingsMenuKey.Appearance })
-          }}
-        >
-          <IconText icon={<ShirtIcon size={14} />} />
-        </SmallButton>
-      </Space>
     </div>
   )
 }

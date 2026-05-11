@@ -1,8 +1,15 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import { Viewer } from '@bytemd/react'
 import { Button, Card, Select, type SelectProps, Space, Tabs, theme, Tooltip } from 'antd'
 import dayjs from 'dayjs'
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+  type ImperativePanelHandle,
+} from 'react-resizable-panels'
 
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { ApiRemoveButton } from '@/components/tab-content/api/ApiRemoveButton'
@@ -153,6 +160,88 @@ function buildQueryStringForCopy(params?: Parameter[]): string {
   return queryText ? `?${queryText}` : ''
 }
 
+interface SchemaLayoutProps {
+  leftPanel: React.ReactNode
+  rightPanel: React.ReactNode
+  autoSaveId: string
+}
+
+function SchemaLayout({ leftPanel, rightPanel, autoSaveId }: SchemaLayoutProps) {
+  const { token } = theme.useToken()
+  const leftPanelRef = useRef<ImperativePanelHandle>(null)
+  const rightPanelRef = useRef<ImperativePanelHandle>(null)
+  const [isLeftCollapsed, setIsLeftCollapsed] = useState(false)
+  const [isRightCollapsed, setIsRightCollapsed] = useState(false)
+
+  return (
+    <div className="relative flex">
+      {isLeftCollapsed && (
+        <div
+          className={`absolute left-0 top-1/2 z-50 flex h-12 w-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-r-lg ${css({
+            backgroundColor: token.colorFillAlter,
+            boxShadow: '1px 0 4px rgba(16 24 40 / 0.08)',
+            color: token.colorPrimary,
+            '&:hover': {
+              backgroundColor: token.colorFillSecondary,
+            },
+          })}`}
+          onClick={() => leftPanelRef.current?.expand()}
+        >
+          <ChevronRightIcon size={12} strokeWidth={3} />
+        </div>
+      )}
+
+      <PanelGroup
+        className="schema-layout"
+        direction="horizontal"
+        autoSaveId={autoSaveId}
+      >
+        <Panel
+          className="schema-panel"
+          collapsible
+          defaultSize={58}
+          minSize={15}
+          onCollapse={() => setIsLeftCollapsed(true)}
+          onExpand={() => setIsLeftCollapsed(false)}
+          ref={leftPanelRef}
+        >
+          {leftPanel}
+        </Panel>
+
+        <PanelResizeHandle className="schema-resize-handle" />
+
+        <Panel
+          className="schema-panel"
+          collapsible
+          defaultSize={42}
+          minSize={15}
+          onCollapse={() => setIsRightCollapsed(true)}
+          onExpand={() => setIsRightCollapsed(false)}
+          ref={rightPanelRef}
+        >
+          {rightPanel}
+        </Panel>
+      </PanelGroup>
+
+      {isRightCollapsed && (
+        <div
+          className={`absolute right-0 top-1/2 z-50 flex h-12 w-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-l-lg ${css({
+            backgroundColor: token.colorFillAlter,
+            boxShadow: '-1px 0 4px rgba(16 24 40 / 0.08)',
+            color: token.colorPrimary,
+            '&:hover': {
+              backgroundColor: token.colorFillSecondary,
+            },
+          })}`}
+          onClick={() => rightPanelRef.current?.expand()}
+        >
+          <ChevronLeftIcon size={12} strokeWidth={3} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ApiDoc() {
   const { token } = theme.useToken()
 
@@ -218,18 +307,47 @@ export function ApiDoc() {
         },
 
         '.schema-layout': {
-          display: 'grid',
-          gridTemplateColumns: 'minmax(440px, 1fr) minmax(280px, 0.9fr)',
+          display: 'flex',
           minHeight: 380,
           background: token.colorBgContainer,
         },
 
         '.schema-panel': {
           minWidth: 0,
+          overflow: 'auto',
         },
 
-        '.schema-panel + .schema-panel': {
-          borderLeft: `1px solid ${token.colorBorderSecondary}`,
+        '.schema-resize-handle': {
+          width: 3,
+          background: token.colorBorderSecondary,
+          cursor: 'col-resize',
+          transition: 'background-color 0.2s',
+          '&:hover, &[data-resize-handle-state="hover"], &[data-resize-handle-state="drag"]': {
+            background: token.colorPrimary,
+          },
+        },
+
+        '.schema-expand-trigger': {
+          position: 'absolute',
+          right: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          zIndex: 50,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 16,
+          height: 48,
+          backgroundColor: token.colorFillAlter,
+          boxShadow: '-1px 0 4px rgba(16 24 40 / 0.08)',
+          borderRadius: token.borderRadius,
+          cursor: 'pointer',
+          color: token.colorPrimary,
+          transition: 'background-color 0.2s',
+          '&:hover': {
+            backgroundColor: token.colorFillSecondary,
+          },
         },
 
         '.schema-sub-title': {
@@ -534,66 +652,70 @@ export function ApiDoc() {
                       <span>application/json</span>
                       <span>Body 参数</span>
                     </div>
-                    <div className="schema-layout">
-                      <div className="schema-panel">
-                        <div className="schema-sub-title">
-                          <span>参数结构</span>
-                          <span>{requestSchemaRows.length} fields</span>
-                        </div>
-                        <div className="schema-table-head">
-                          <span>字段名</span>
-                          <span>类型</span>
-                          <span>必填</span>
-                          <span>说明</span>
-                        </div>
-                        <div className="schema-rows">
-                          {requestSchemaRows.length > 0
-                            ? requestSchemaRows.map((row) => (
-                                <div key={row.key} className="schema-row">
-                                  <span style={{ paddingLeft: row.depth * 16 }}>
-                                    <Tooltip title={row.name}>
-                                      <span className="schema-field-name">{row.name}</span>
+                    <SchemaLayout
+                      autoSaveId="api-doc-req-body"
+                      leftPanel={
+                        <>
+                          <div className="schema-sub-title">
+                            <span>参数结构</span>
+                            <span>{requestSchemaRows.length} fields</span>
+                          </div>
+                          <div className="schema-table-head">
+                            <span>字段名</span>
+                            <span>类型</span>
+                            <span>必填</span>
+                            <span>说明</span>
+                          </div>
+                          <div className="schema-rows">
+                            {requestSchemaRows.length > 0
+                              ? requestSchemaRows.map((row) => (
+                                  <div key={row.key} className="schema-row">
+                                    <span style={{ paddingLeft: row.depth * 16 }}>
+                                      <Tooltip title={row.name}>
+                                        <span className="schema-field-name">{row.name}</span>
+                                      </Tooltip>
+                                    </span>
+                                    <span className="schema-type-text">{row.typeLabel}</span>
+                                    <span className={`schema-required${row.required ? ' is-required' : ''}`}>{row.required ? '必填' : '可选'}</span>
+                                    <Tooltip title={row.description ?? '-'}>
+                                      <span className="schema-desc">{row.description ?? '-'}</span>
                                     </Tooltip>
-                                  </span>
-                                  <span className="schema-type-text">{row.typeLabel}</span>
-                                  <span className={`schema-required${row.required ? ' is-required' : ''}`}>{row.required ? '必填' : '可选'}</span>
-                                  <Tooltip title={row.description ?? '-'}>
-                                    <span className="schema-desc">{row.description ?? '-'}</span>
-                                  </Tooltip>
-                                </div>
-                              ))
-                            : <div className="schema-empty">暂无字段定义</div>}
-                        </div>
-                      </div>
-
-                      <div className="schema-panel">
-                        <div className="schema-sub-title">
-                          <span>示例</span>
-                          <Space size={8}>
-                            <span>JSON</span>
-                            <Button
-                              size="small"
-                              type="link"
-                              onClick={() => {
-                                const bodyExample = JSON.stringify(
-                                  requestSchemaExample ?? displayRequestSchema,
-                                  null,
-                                  2,
-                                )
-                                void navigator.clipboard.writeText(bodyExample).then(() => {
-                                  messageApi.success('Body 示例已复制')
-                                })
-                              }}
-                            >
-                              复制
-                            </Button>
-                          </Space>
-                        </div>
-                        <pre className="schema-code">
-                          {JSON.stringify(requestSchemaExample ?? displayRequestSchema, null, 2)}
-                        </pre>
-                      </div>
-                    </div>
+                                  </div>
+                                ))
+                              : <div className="schema-empty">暂无字段定义</div>}
+                          </div>
+                        </>
+                      }
+                      rightPanel={
+                        <>
+                          <div className="schema-sub-title">
+                            <span>示例</span>
+                            <Space size={8}>
+                              <span>JSON</span>
+                              <Button
+                                size="small"
+                                type="link"
+                                onClick={() => {
+                                  const bodyExample = JSON.stringify(
+                                    requestSchemaExample ?? displayRequestSchema,
+                                    null,
+                                    2,
+                                  )
+                                  void navigator.clipboard.writeText(bodyExample).then(() => {
+                                    messageApi.success('Body 示例已复制')
+                                  })
+                                }}
+                              >
+                                复制
+                              </Button>
+                            </Space>
+                          </div>
+                          <pre className="schema-code">
+                            {JSON.stringify(requestSchemaExample ?? displayRequestSchema, null, 2)}
+                          </pre>
+                        </>
+                      }
+                    />
                   </div>
                 )}
               </Card>
@@ -635,66 +757,70 @@ export function ApiDoc() {
                           <span>{res.contentType}</span>
                           <span>Body 参数</span>
                         </div>
-                        <div className="schema-layout">
-                          <div className="schema-panel">
-                            <div className="schema-sub-title">
-                              <span>参数结构</span>
-                              <span>{resSchemaRows.length} fields</span>
-                            </div>
-                            <div className="schema-table-head">
-                              <span>字段名</span>
-                              <span>类型</span>
-                              <span>必填</span>
-                              <span>说明</span>
-                            </div>
-                            <div className="schema-rows">
-                              {resSchemaRows.length > 0
-                                ? resSchemaRows.map((row) => (
-                                    <div key={row.key} className="schema-row">
-                                      <span style={{ paddingLeft: row.depth * 16 }}>
-                                        <Tooltip title={row.name}>
-                                          <span className="schema-field-name">{row.name}</span>
+                        <SchemaLayout
+                          autoSaveId={`api-doc-res-body-${res.id}`}
+                          leftPanel={
+                            <>
+                              <div className="schema-sub-title">
+                                <span>参数结构</span>
+                                <span>{resSchemaRows.length} fields</span>
+                              </div>
+                              <div className="schema-table-head">
+                                <span>字段名</span>
+                                <span>类型</span>
+                                <span>必填</span>
+                                <span>说明</span>
+                              </div>
+                              <div className="schema-rows">
+                                {resSchemaRows.length > 0
+                                  ? resSchemaRows.map((row) => (
+                                      <div key={row.key} className="schema-row">
+                                        <span style={{ paddingLeft: row.depth * 16 }}>
+                                          <Tooltip title={row.name}>
+                                            <span className="schema-field-name">{row.name}</span>
+                                          </Tooltip>
+                                        </span>
+                                        <span className="schema-type-text">{row.typeLabel}</span>
+                                        <span className={`schema-required${row.required ? ' is-required' : ''}`}>{row.required ? '必填' : '可选'}</span>
+                                        <Tooltip title={row.description ?? '-'}>
+                                          <span className="schema-desc">{row.description ?? '-'}</span>
                                         </Tooltip>
-                                      </span>
-                                      <span className="schema-type-text">{row.typeLabel}</span>
-                                      <span className={`schema-required${row.required ? ' is-required' : ''}`}>{row.required ? '必填' : '可选'}</span>
-                                      <Tooltip title={row.description ?? '-'}>
-                                        <span className="schema-desc">{row.description ?? '-'}</span>
-                                      </Tooltip>
-                                    </div>
-                                  ))
-                                : <div className="schema-empty">暂无字段定义</div>}
-                            </div>
-                          </div>
-
-                          <div className="schema-panel">
-                            <div className="schema-sub-title">
-                              <span>示例</span>
-                              <Space size={8}>
-                                <span>JSON</span>
-                                <Button
-                                  size="small"
-                                  type="link"
-                                  onClick={() => {
-                                    const bodyExample = JSON.stringify(
-                                      resSchemaExample ?? displayResSchema,
-                                      null,
-                                      2,
-                                    )
-                                    void navigator.clipboard.writeText(bodyExample).then(() => {
-                                      messageApi.success('Body 示例已复制')
-                                    })
-                                  }}
-                                >
-                                  复制
-                                </Button>
-                              </Space>
-                            </div>
-                            <pre className="schema-code">
-                              {JSON.stringify(resSchemaExample ?? displayResSchema, null, 2)}
-                            </pre>
-                          </div>
-                        </div>
+                                      </div>
+                                    ))
+                                  : <div className="schema-empty">暂无字段定义</div>}
+                              </div>
+                            </>
+                          }
+                          rightPanel={
+                            <>
+                              <div className="schema-sub-title">
+                                <span>示例</span>
+                                <Space size={8}>
+                                  <span>JSON</span>
+                                  <Button
+                                    size="small"
+                                    type="link"
+                                    onClick={() => {
+                                      const bodyExample = JSON.stringify(
+                                        resSchemaExample ?? displayResSchema,
+                                        null,
+                                        2,
+                                      )
+                                      void navigator.clipboard.writeText(bodyExample).then(() => {
+                                        messageApi.success('Body 示例已复制')
+                                      })
+                                    }}
+                                  >
+                                    复制
+                                  </Button>
+                                </Space>
+                              </div>
+                              <pre className="schema-code">
+                                {JSON.stringify(resSchemaExample ?? displayResSchema, null, 2)}
+                              </pre>
+                            </>
+                          }
+                        />
                       </div>
                     )}
                   </div>
