@@ -1,24 +1,19 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
-import { Button, ConfigProvider, Tabs, type TabsProps, theme, Tooltip } from 'antd'
-import { PanelRightIcon } from 'lucide-react'
+import { ConfigProvider, Tabs, type TabsProps, theme } from 'antd'
 
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { ApiTabContentWrapper } from '@/components/ApiTab/ApiTabContentWrapper'
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
-import { IconText } from '@/components/IconText'
 
 import { ApiDoc } from './ApiDoc'
 import { ApiDocEditing } from './ApiDocEditing'
-import { ApiSidePanel } from './ApiSidePanel'
 import { RunTab } from './RunTab'
 
 export function Api() {
   const { token } = theme.useToken()
 
   const { tabData } = useTabContentContext()
-
-  const [panelOpen, setPanelOpen] = useState(false)
 
   const apiTabItems = useMemo<TabsProps['items']>(() => {
     return [
@@ -82,31 +77,6 @@ export function Api() {
                   className="api-details-tabs flex-1"
                   defaultActiveKey="doc"
                   items={apiTabItems}
-                  tabBarExtraContent={(
-                    <>
-                      <Tooltip placement="topLeft" title="历史记录、SEO 设置">
-                        <Button
-                          size="small"
-                          style={{
-                            backgroundColor: panelOpen ? token.colorFillSecondary : undefined,
-                          }}
-                          type="text"
-                          onClick={() => {
-                            setPanelOpen(!panelOpen)
-                          }}
-                        >
-                          <IconText icon={<PanelRightIcon size={18} />} />
-                        </Button>
-                      </Tooltip>
-                    </>
-                  )}
-                />
-
-                <ApiSidePanel
-                  open={panelOpen}
-                  onClose={() => {
-                    setPanelOpen(false)
-                  }}
                 />
               </div>
             )}
