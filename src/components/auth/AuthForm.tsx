@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 
-import { Button, Card, Checkbox, Form, Input, Select, Typography, message } from 'antd'
+import { Button, Card, Checkbox, Form, Input, Select, Typography, message, theme } from 'antd'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 
+import { ParticleCanvas } from '@/components/ParticleCanvas'
 import { getSavedCredentials, useAuth } from '@/contexts/auth'
 
 function resolveRedirectTarget(value: string | null | undefined) {
@@ -28,6 +29,7 @@ const rememberDayOptions = [
 
 export function AuthForm(props: AuthFormProps) {
   const { mode } = props
+  const { token } = theme.useToken()
   const [submitting, setSubmitting] = useState(false)
   const [rememberPassword, setRememberPassword] = useState(false)
   const [rememberDays, setRememberDays] = useState<number>(7)
@@ -49,8 +51,12 @@ export function AuthForm(props: AuthFormProps) {
   }, [form, mode])
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <Card className="w-full max-w-md">
+    <div className="relative flex min-h-screen items-center justify-center px-4">
+      <ParticleCanvas variant="fullscreen" preset="login" primaryColor={token.colorPrimary} />
+      <Card
+        className="w-full max-w-md"
+        style={{ animation: 'card-slide-up 0.5s ease-out' }}
+      >
         <Typography.Title level={3}>
           {mode === 'login' ? '登录' : '注册'}
         </Typography.Title>

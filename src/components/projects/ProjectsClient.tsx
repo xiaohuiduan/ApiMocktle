@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Button, Card, Form, Input, Modal, Space, Spin, Typography, message, theme } from 'antd'
 import { useNavigate } from 'react-router'
 
+import { ParticleCanvas } from '@/components/ParticleCanvas'
 import { UserMenu } from '@/components/UserMenu'
 
 import { useAuth } from '@/contexts/auth'
@@ -187,8 +188,9 @@ export function ProjectsClient() {
   }
 
   return (
-    <div style={{ minHeight: '100%', backgroundColor: token.colorFillTertiary }}>
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="relative" style={{ minHeight: '100%', backgroundColor: token.colorFillTertiary }}>
+      <ParticleCanvas variant="embedded" preset="projects" primaryColor={token.colorPrimary} />
+      <div className="relative z-10 mx-auto max-w-5xl px-6 py-10">
       {contextHolder}
 
       <div className="mb-6 flex items-center">
