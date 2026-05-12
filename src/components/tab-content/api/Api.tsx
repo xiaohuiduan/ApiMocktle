@@ -74,7 +74,7 @@ export function Api() {
               <div className="flex h-full overflow-hidden">
                 <Tabs
                   animated={false}
-                  className="api-details-tabs flex-1"
+                  className="api-details-tabs flex-1 min-w-0"
                   defaultActiveKey="doc"
                   items={apiTabItems}
                 />

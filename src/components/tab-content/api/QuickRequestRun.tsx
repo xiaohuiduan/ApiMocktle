@@ -1,17 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import {
   Button,
   Input,
   Select,
   Space,
-  Table,
-  Tabs,
   Tag,
   Typography,
   theme,
 } from 'antd'
-import { PlayIcon, TerminalIcon } from 'lucide-react'
+import { PlayIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
@@ -23,13 +21,14 @@ import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { BodyType, MenuItemType } from '@/enums'
-import type { ApiDetails, ApiRunResult } from '@/types'
+import type { ApiDetails } from '@/types'
 
 import { ParamsEditableTable } from './components/ParamsEditableTable'
-import { ResponseBodyViewer } from './components/ResponseBodyViewer'
 import { ParamsAuth } from './params/ParamsAuth'
 import { ParamsTab } from './params/ParamsTab'
 import { useApiRequestRunner } from './useApiRequestRunner'
+import { ResponsePanel } from './components/ResponsePanel'
+import { ResultViewer } from './components/ResultViewer'
 
 function buildBodyExample(apiDetails: ApiDetails, menuRawList?: unknown): string {
   const body = apiDetails.requestBody
@@ -52,36 +51,6 @@ function buildBodyFillText(apiDetails: ApiDetails, menuRawList?: unknown): strin
   if (body.rawText?.trim()) return body.rawText
   return JSON.stringify({}, null, 2)
 }
-
-function getStatusColor(code: number) {
-  if (code >= 500) return 'error'
-  if (code >= 400) return 'warning'
-  if (code >= 300) return 'processing'
-  return 'success'
-}
-
-function detectLanguage(contentType?: string): string {
-  if (!contentType) return 'plaintext'
-  const ct = contentType.toLowerCase()
-  if (ct.includes('json')) return 'json'
-  if (ct.includes('html')) return 'html'
-  if (ct.includes('xml')) return 'xml'
-  if (ct.includes('javascript')) return 'javascript'
-  if (ct.includes('css')) return 'css'
-  return 'plaintext'
-}
-
-function calcBodySize(body?: string): string {
-  if (!body) return ''
-  const bytes = new Blob([body]).size
-  if (bytes < 1024) return `${bytes}B`
-  return `${(bytes / 1024).toFixed(1)}KB`
-}
-
-const headerTableColumns = [
-  { title: 'Name', dataIndex: 'name', key: 'name', width: 200 },
-  { title: 'Value', dataIndex: 'value', key: 'value' },
-]
 
 const bodyTypeOptions = [
   { n: 'none', t: BodyType.None },
@@ -275,7 +244,7 @@ export function QuickRequestRun() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden" style={{ minWidth: 0, maxWidth: '100%' }}>
       {/* URL 行 */}
       <div className="flex items-center gap-2 px-3 py-2 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
         <Select
@@ -327,247 +296,151 @@ export function QuickRequestRun() {
       </div>
 
       {/* 参数编辑区 */}
-      <div className="flex-1 overflow-auto">
-        <div className="px-3">
-          <ParamsTab
-            value={workCopy.parameters}
-            onChange={(parameters) => {
-              setWorkCopy((prev) => ({ ...prev, parameters }))
-            }}
-          />
-        </div>
+      <ResponsePanel
+        paramsArea={
+          <>
+            {/* 参数编辑区 */}
+            <div className="px-3">
+              <ParamsTab
+                value={workCopy.parameters}
+                onChange={(parameters) => {
+                  setWorkCopy((prev) => ({ ...prev, parameters }))
+                }}
+              />
+            </div>
 
-        {/* Body 编辑区 */}
-        <div className="px-3 pb-3">
-          <div className="mb-2 flex items-center justify-between">
-            <Typography.Text strong className="text-sm">Body</Typography.Text>
-            {((workCopy.requestBody?.type === BodyType.Json
-              || workCopy.requestBody?.type === BodyType.Xml
-              || workCopy.requestBody?.type === BodyType.Raw)) && (
-                <Button size="small" onClick={handleFillBody}>一键填充</Button>
-            )}
-          </div>
-          {(() => {
-            const body = workCopy.requestBody || { type: BodyType.None }
-            const showEditor = body.type === BodyType.Json
-              || body.type === BodyType.Xml
-              || body.type === BodyType.Raw
-
-            return (
-              <div>
-                <div className="mb-2 flex flex-wrap items-center gap-1">
-                  {bodyTypeOptions.map(({ n, t }) => {
-                    const hasContent = t === BodyType.FormData || t === BodyType.UrlEncoded
-                      ? (body.parameters ?? []).some(p => p.name && p.enable !== false)
-                      : t === BodyType.Json || t === BodyType.Xml
-                        ? !!((body.jsonSchema as { properties?: unknown[] })?.properties?.length)
-                        : t === BodyType.Raw || t === BodyType.Binary
-                          ? !!(body.rawText?.trim())
-                          : false
-                    return (
-                      <Tag.CheckableTag
-                        key={t}
-                        checked={body.type === t}
-                        onChange={(checked) => {
-                          if (checked) {
-                            setWorkCopy((prev) => ({
-                              ...prev,
-                              requestBody: { ...(prev.requestBody || { type: BodyType.None }), type: t },
-                            }))
-                          }
-                        }}
-                      >
-                        {n}
-                        {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
-                      </Tag.CheckableTag>
-                    )
-                  })}
-                </div>
-
-                {showEditor && (
-                  <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: 'rgb(245, 245, 245)' }}>
-                    <MonacoEditor
-                      height="200px"
-                      language={
-                        body.type === BodyType.Xml ? 'xml'
-                          : body.type === BodyType.Raw ? 'plaintext'
-                          : 'json'
-                      }
-                      deserializeOnChange={false}
-                      value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
-                      onChange={(val) => {
-                        setBodyRawText(typeof val === 'string' ? val : '')
-                      }}
-                      options={{ readOnly: false }}
-                      onMount={(editor, monaco) => {
-                        monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                        monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                      }}
-                    />
-                  </div>
-                )}
-
-                {(body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) && (
-                  <div>
-                    <Typography.Text type="secondary" className="mb-2 block text-xs">
-                      {body.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
-                    </Typography.Text>
-                    <ParamsEditableTable
-                      value={body.parameters}
-                      onChange={(parameters) => {
-                        setWorkCopy((prev) => ({
-                          ...prev,
-                          requestBody: { ...(prev.requestBody || { type: BodyType.None }), parameters },
-                        }))
-                      }}
-                    />
-                  </div>
+            {/* Body 编辑区 */}
+            <div className="px-3 pb-3">
+              <div className="mb-2 flex items-center justify-between">
+                <Typography.Text strong className="text-sm">Body</Typography.Text>
+                {((workCopy.requestBody?.type === BodyType.Json
+                  || workCopy.requestBody?.type === BodyType.Xml
+                  || workCopy.requestBody?.type === BodyType.Raw)) && (
+                    <Button size="small" onClick={handleFillBody}>一键填充</Button>
                 )}
               </div>
-            )
-          })()}
-        </div>
+              {(() => {
+                const body = workCopy.requestBody || { type: BodyType.None }
+                const showEditor = body.type === BodyType.Json
+                  || body.type === BodyType.Xml
+                  || body.type === BodyType.Raw
 
-        {/* Auth 编辑区 */}
-        <div className="px-3 pb-3">
-          <Typography.Text strong className="mb-2 block text-sm">Auth</Typography.Text>
-          <ParamsAuth
-            value={workCopy.auth}
-            onChange={(auth) => {
-              setWorkCopy((prev) => ({ ...prev, auth }))
-            }}
-          />
-        </div>
+                return (
+                  <div>
+                    <div className="mb-2 flex flex-wrap items-center gap-1">
+                      {bodyTypeOptions.map(({ n, t }) => {
+                        const hasContent = t === BodyType.FormData || t === BodyType.UrlEncoded
+                          ? (body.parameters ?? []).some(p => p.name && p.enable !== false)
+                          : t === BodyType.Json || t === BodyType.Xml
+                            ? !!((body.jsonSchema as { properties?: unknown[] })?.properties?.length)
+                            : t === BodyType.Raw || t === BodyType.Binary
+                              ? !!(body.rawText?.trim())
+                              : false
+                        return (
+                          <Tag.CheckableTag
+                            key={t}
+                            checked={body.type === t}
+                            onChange={(checked) => {
+                              if (checked) {
+                                setWorkCopy((prev) => ({
+                                  ...prev,
+                                  requestBody: { ...(prev.requestBody || { type: BodyType.None }), type: t },
+                                }))
+                              }
+                            }}
+                          >
+                            {n}
+                            {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
+                          </Tag.CheckableTag>
+                        )
+                      })}
+                    </div>
 
-        {/* 运行结果 */}
-        {(result || error) && (
-          <div className="border-t px-3 py-3" style={{ borderColor: token.colorBorderSecondary }}>
-            {error && !result
-              ? (
-                  <>
-                    <Typography.Text strong className="mb-2 block">运行结果</Typography.Text>
-                    <Typography.Text type="danger">{error}</Typography.Text>
-                  </>
-                )
-              : result
-                ? (
-                    <>
-                      <div className="mb-3 flex flex-wrap items-center gap-3">
-                        <Tag color={getStatusColor(result.status)}>{result.status} {result.statusText}</Tag>
-                        <span className="text-xs opacity-50">
-                          {result.method?.toUpperCase()} | {result.durationMs}ms
-                          {result.body ? ` | ${calcBodySize(result.body)}` : ''}
-                        </span>
+                    {showEditor && (
+                      <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: 'rgb(245, 245, 245)' }}>
+                        <MonacoEditor
+                          height="200px"
+                          language={
+                            body.type === BodyType.Xml ? 'xml'
+                              : body.type === BodyType.Raw ? 'plaintext'
+                              : 'json'
+                          }
+                          deserializeOnChange={false}
+                          value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
+                          onChange={(val) => {
+                            setBodyRawText(typeof val === 'string' ? val : '')
+                          }}
+                          options={{ readOnly: false }}
+                          onMount={(editor, monaco) => {
+                            monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
+                            monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
+                          }}
+                        />
                       </div>
+                    )}
 
-                      <Tabs
-                        size="small"
-                        className="mb-3"
-                        items={[
-                          {
-                            key: 'reqContent',
-                            label: '请求内容',
-                            children: (
-                              <div className="flex flex-col gap-2">
-                                <div className="rounded bg-gray-50 p-2 text-xs" style={{ fontFamily: 'monospace' }}>
-                                  <span className="font-medium opacity-60">URL: </span>
-                                  <span className="break-all">{result.url ?? '-'}</span>
-                                </div>
-                                {result.requestBodyText && (
-                                  <MonacoEditor
-                                    height={`${Math.min((result.requestBodyText.split('\n').length) * 18, 300)}px`}
-                                    language={detectLanguage(result.contentType)}
-                                    value={result.requestBodyText}
-                                    options={{
-                                      readOnly: true,
-                                      lineNumbers: 'on',
-                                      minimap: { enabled: false },
-                                      scrollBeyondLastLine: false,
-                                      wordWrap: 'on',
-                                      renderValidationDecorations: 'off',
-                                      showDeprecated: false,
-                                    }}
-                                  />
-                                )}
-                                {result.requestBodyParameters && result.requestBodyParameters.length > 0 && (
-                                  <Table
-                                    size="small"
-                                    dataSource={result.requestBodyParameters}
-                                    columns={headerTableColumns}
-                                    pagination={false}
-                                    rowKey="name"
-                                  />
-                                )}
-                                {!result.requestBodyText && (!result.requestBodyParameters || result.requestBodyParameters.length === 0) && (
-                                  <Typography.Text type="secondary" className="text-xs">无请求体</Typography.Text>
-                                )}
-                              </div>
-                            ),
-                          },
-                          {
-                            key: 'reqHeaders',
-                            label: `请求头${result.requestHeaders?.length ? ` (${result.requestHeaders.length})` : ''}`,
-                            children: result.requestHeaders && result.requestHeaders.length > 0
-                              ? (
-                                  <Table
-                                    size="small"
-                                    dataSource={result.requestHeaders}
-                                    columns={headerTableColumns}
-                                    pagination={false}
-                                    rowKey="name"
-                                  />
-                                )
-                              : <Typography.Text type="secondary" className="text-xs">无请求头</Typography.Text>,
-                          },
-                          {
-                            key: 'resContent',
-                            label: '响应内容',
-                            children: result.body != null
-                              ? (
-                                  <ResponseBodyViewer
-                                    body={result.body}
-                                    contentType={result.contentType}
-                                  />
-                                )
-                              : <Typography.Text type="secondary" className="text-xs">无响应体</Typography.Text>,
-                          },
-                          {
-                            key: 'resHeaders',
-                            label: `响应头${result.headers?.length ? ` (${result.headers.length})` : ''}`,
-                            children: result.headers && result.headers.length > 0
-                              ? (
-                                  <Table
-                                    size="small"
-                                    dataSource={result.headers}
-                                    columns={headerTableColumns}
-                                    pagination={false}
-                                    rowKey="name"
-                                  />
-                                )
-                              : <Typography.Text type="secondary" className="text-xs">无响应头</Typography.Text>,
-                          },
-                          {
-                            key: 'curl',
-                            label: (
-                              <span className="flex items-center gap-1">
-                                <TerminalIcon size={14} />
-                                cURL
-                              </span>
-                            ),
-                            children: (
-                              <pre className="m-0 rounded bg-gray-100 p-2 text-xs overflow-auto" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                                {`curl -X ${workCopy.method ?? DEFAULT_METHOD} "${buildRunUrl()}"`}
-                              </pre>
-                            ),
-                          },
-                        ]}
-                      />
-                    </>
-                  )
-                : null}
-          </div>
-        )}
-      </div>
+                    {(body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) && (
+                      <div>
+                        <Typography.Text type="secondary" className="mb-2 block text-xs">
+                          {body.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
+                        </Typography.Text>
+                        <ParamsEditableTable
+                          value={body.parameters}
+                          onChange={(parameters) => {
+                            setWorkCopy((prev) => ({
+                              ...prev,
+                              requestBody: { ...(prev.requestBody || { type: BodyType.None }), parameters },
+                            }))
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* Auth 编辑区 */}
+            <div className="px-3 pb-3">
+              <Typography.Text strong className="mb-2 block text-sm">Auth</Typography.Text>
+              <ParamsAuth
+                value={workCopy.auth}
+                onChange={(auth) => {
+                  setWorkCopy((prev) => ({ ...prev, auth }))
+                }}
+              />
+            </div>
+          </>
+        }
+        resultArea={
+          <ResultViewer
+            result={result}
+            error={error}
+            curlContent={(() => {
+              const url = buildRunUrl()
+              const method = workCopy.method ?? DEFAULT_METHOD
+              return (
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <Typography.Text strong className="mb-1 block text-xs">Windows</Typography.Text>
+                    <pre className="m-0 rounded bg-gray-100 p-2 text-xs overflow-auto" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                      {`curl -X ${method} "${url}"`}
+                    </pre>
+                  </div>
+                  <div>
+                    <Typography.Text strong className="mb-1 block text-xs">Linux / macOS</Typography.Text>
+                    <pre className="m-0 rounded bg-gray-100 p-2 text-xs overflow-auto" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                      {`curl -X ${method} '${url}'`}
+                    </pre>
+                  </div>
+                </div>
+              )
+            })()}
+          />
+        }
+        hasResult={!!(result || error)}
+        autoSaveId="quick-request-run"
+      />
     </div>
   )
 }

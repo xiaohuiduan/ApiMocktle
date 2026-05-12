@@ -6,13 +6,11 @@ import {
   Modal,
   Select,
   Space,
-  Table,
-  Tabs,
   Tag,
   Typography,
   theme,
 } from 'antd'
-import { PlayIcon, RotateCcwIcon, TerminalIcon } from 'lucide-react'
+import { PlayIcon, RotateCcwIcon } from 'lucide-react'
 
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { buildSchemaExample } from '@/components/JsonSchema/schema-normalizer'
@@ -22,12 +20,13 @@ import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { BodyType } from '@/enums'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
-import type { ApiDetails, ApiRunResult } from '@/types'
+import type { ApiDetails } from '@/types'
 
 import { ParamsEditableTable } from './components/ParamsEditableTable'
-import { ResponseBodyViewer } from './components/ResponseBodyViewer'
 import { ParamsTab } from './params/ParamsTab'
 import { useApiRequestRunner } from './useApiRequestRunner'
+import { ResponsePanel } from './components/ResponsePanel'
+import { ResultViewer } from './components/ResultViewer'
 
 const STORAGE_PREFIX = 'run_tab_'
 
@@ -102,13 +101,6 @@ function buildBodyFillText(apiDetails: ApiDetails, menuRawList?: unknown): strin
   return JSON.stringify({}, null, 2)
 }
 
-function getStatusColor(code: number) {
-  if (code >= 500) return 'error'
-  if (code >= 400) return 'warning'
-  if (code >= 300) return 'processing'
-  return 'success'
-}
-
 function mergeParams(
   globalValues: { name: string; value?: string; enable?: boolean }[],
   envValues: { name: string; value?: string; enable?: boolean }[],
@@ -127,29 +119,6 @@ function mergeParams(
   }
   return Array.from(map.values())
 }
-
-function detectLanguage(contentType?: string): string {
-  if (!contentType) return 'plaintext'
-  const ct = contentType.toLowerCase()
-  if (ct.includes('json')) return 'json'
-  if (ct.includes('html')) return 'html'
-  if (ct.includes('xml')) return 'xml'
-  if (ct.includes('javascript')) return 'javascript'
-  if (ct.includes('css')) return 'css'
-  return 'plaintext'
-}
-
-function calcBodySize(body?: string): string {
-  if (!body) return ''
-  const bytes = new Blob([body]).size
-  if (bytes < 1024) return `${bytes}B`
-  return `${(bytes / 1024).toFixed(1)}KB`
-}
-
-const headerTableColumns = [
-  { title: 'Name', dataIndex: 'name', key: 'name', width: 200 },
-  { title: 'Value', dataIndex: 'value', key: 'value' },
-]
 
 const bodyTypeOptions = [
   { n: 'none', t: BodyType.None },
@@ -434,13 +403,13 @@ export function RunTab() {
   if (!docValue || !workCopy) return null
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      {/* 环境选择器 */}
-      <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+    <div className="flex h-full flex-col overflow-hidden" style={{ minWidth: 0, maxWidth: '100%' }}>
+      {/* 环境选择器 + URL 行 */}
+      <div className="flex items-center gap-2 px-3 py-2 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
         <Typography.Text type="secondary" className="text-xs shrink-0">环境：</Typography.Text>
         <Select
           size="small"
-          className="min-w-[160px]"
+          className="min-w-[120px]"
           value={workCopy.serverId || currentProjectEnvironmentId || undefined}
           options={projectEnvironments?.map((env) => ({
             value: env.id,
@@ -457,10 +426,7 @@ export function RunTab() {
             persist(next)
           }}
         />
-      </div>
 
-      {/* URL 行 */}
-      <div className="flex items-center gap-2 px-3 py-2 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
         <Select
           className="shrink-0"
           style={{ minWidth: 90 }}
@@ -479,7 +445,8 @@ export function RunTab() {
           style={{
             backgroundColor: token.colorFillQuaternary,
             borderColor: token.colorBorderSecondary,
-            flex: 1,
+            flex: '1 1 0',
+            minWidth: 0,
           }}
         >
           {envBaseUrl && !/^https?:\/\//i.test(workCopy.path ?? '')
@@ -505,7 +472,7 @@ export function RunTab() {
           />
         </div>
 
-        <Space.Compact className="shrink-0">
+        <Space className="shrink-0" style={{ marginLeft: 'auto' }}>
           <Button
             loading={running}
             type="primary"
@@ -519,261 +486,149 @@ export function RunTab() {
             onClick={handleReset}
             title="一键复原"
           />
-        </Space.Compact>
+        </Space>
       </div>
 
-      {/* 参数编辑区 */}
-      <div className="flex-1 overflow-auto">
-        <div className="px-3">
-          <ParamsTab
-            value={workCopy.parameters}
-            globalParameters={projectEnvironmentConfig?.globalParameters}
-            envParameters={currentEnv?.parameters}
-            varMap={varMap}
-            disabledInheritedNames={disabledInheritedParams}
-            onToggleInheritedParam={handleToggleInheritedParam}
-            onChange={(parameters) => {
-              const next = { ...workCopy, parameters }
-              setWorkCopy(next)
-              persist(next)
-            }}
-          />
-        </div>
+      <ResponsePanel
+        paramsArea={
+          <>
+            {/* 参数编辑区 */}
+            <div className="px-3 min-w-0 overflow-hidden">
+              <ParamsTab
+                value={workCopy.parameters}
+                globalParameters={projectEnvironmentConfig?.globalParameters}
+                envParameters={currentEnv?.parameters}
+                varMap={varMap}
+                disabledInheritedNames={disabledInheritedParams}
+                onToggleInheritedParam={handleToggleInheritedParam}
+                onChange={(parameters) => {
+                  const next = { ...workCopy, parameters }
+                  setWorkCopy(next)
+                  persist(next)
+                }}
+              />
+            </div>
 
-        {/* Body 编辑区 */}
-        <div className="px-3 pb-3">
-          <div className="mb-2 flex items-center justify-between">
-            <Typography.Text strong className="text-sm">Body</Typography.Text>
-            {showBodyEditor && (
-              <Button size="small" onClick={handleFillBody}>一键填充</Button>
-            )}
-          </div>
-          {workCopy.requestBody
-            ? (
-                <div>
-                  <div className="mb-2 flex flex-wrap items-center gap-1">
-                    {bodyTypeOptions.map(({ n, t }) => {
-                      const b = workCopy.requestBody
-                      const hasContent = b
-                        ? t === BodyType.FormData || t === BodyType.UrlEncoded
-                          ? (b.parameters ?? []).some(p => p.name && p.enable !== false)
-                          : t === BodyType.Json || t === BodyType.Xml
-                            ? !!((b.jsonSchema as { properties?: unknown[] })?.properties?.length)
-                            : t === BodyType.Raw || t === BodyType.Binary
-                              ? !!(b.rawText?.trim())
-                              : false
-                        : false
-                      return (
-                        <Tag.CheckableTag
-                          key={t}
-                          checked={workCopy.requestBody!.type === t}
-                          onChange={(checked) => {
-                            if (checked) {
+            {/* Body 编辑区 */}
+            <div className="px-3 pb-3">
+              <div className="mb-2 flex items-center justify-between">
+                <Typography.Text strong className="text-sm">Body</Typography.Text>
+                {showBodyEditor && (
+                  <Button size="small" onClick={handleFillBody}>一键填充</Button>
+                )}
+              </div>
+              {workCopy.requestBody
+                ? (
+                    <div>
+                      <div className="mb-2 flex flex-wrap items-center gap-1">
+                        {bodyTypeOptions.map(({ n, t }) => {
+                          const b = workCopy.requestBody
+                          const hasContent = b
+                            ? t === BodyType.FormData || t === BodyType.UrlEncoded
+                              ? (b.parameters ?? []).some(p => p.name && p.enable !== false)
+                              : t === BodyType.Json || t === BodyType.Xml
+                                ? !!((b.jsonSchema as { properties?: unknown[] })?.properties?.length)
+                                : t === BodyType.Raw || t === BodyType.Binary
+                                  ? !!(b.rawText?.trim())
+                                  : false
+                            : false
+                          return (
+                            <Tag.CheckableTag
+                              key={t}
+                              checked={workCopy.requestBody!.type === t}
+                              onChange={(checked) => {
+                                if (checked) {
+                                  const next = {
+                                    ...workCopy,
+                                    requestBody: { ...workCopy.requestBody!, type: t },
+                                  }
+                                  setWorkCopy(next)
+                                  persist(next)
+                                }
+                              }}
+                            >
+                              {n}
+                              {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
+                            </Tag.CheckableTag>
+                          )
+                        })}
+                      </div>
+
+                      {showBodyEditor && (
+                        <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: 'rgb(245, 245, 245)' }}>
+                          <MonacoEditor
+                            height="200px"
+                            language={
+                              workCopy.requestBody!.type === BodyType.Xml ? 'xml'
+                                : workCopy.requestBody!.type === BodyType.Raw ? 'plaintext'
+                                : 'json'
+                            }
+                            deserializeOnChange={false}
+                            value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
+                            onChange={(val) => {
+                              setBodyRawText(typeof val === 'string' ? val : '')
+                            }}
+                            options={{ readOnly: false }}
+                            onMount={(editor, monaco) => {
+                              monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
+                              monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {(workCopy.requestBody.type === BodyType.FormData
+                        || workCopy.requestBody.type === BodyType.UrlEncoded) && (
+                        <div>
+                          <Typography.Text type="secondary" className="mb-2 block text-xs">
+                            {workCopy.requestBody.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
+                          </Typography.Text>
+                          <ParamsEditableTable
+                            value={workCopy.requestBody.parameters}
+                            onChange={(parameters) => {
                               const next = {
                                 ...workCopy,
-                                requestBody: { ...workCopy.requestBody!, type: t },
+                                requestBody: { ...workCopy.requestBody!, parameters },
                               }
                               setWorkCopy(next)
                               persist(next)
-                            }
-                          }}
-                        >
-                          {n}
-                          {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
-                        </Tag.CheckableTag>
-                      )
-                    })}
-                  </div>
-
-                  {showBodyEditor && (
-                    <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: 'rgb(245, 245, 245)' }}>
-                      <MonacoEditor
-                        height="200px"
-                        language={
-                          workCopy.requestBody!.type === BodyType.Xml ? 'xml'
-                            : workCopy.requestBody!.type === BodyType.Raw ? 'plaintext'
-                            : 'json'
-                        }
-                        deserializeOnChange={false}
-                        value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
-                        onChange={(val) => {
-                          setBodyRawText(typeof val === 'string' ? val : '')
-                        }}
-                        options={{ readOnly: false }}
-                        onMount={(editor, monaco) => {
-                          monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                          monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                        }}
-                      />
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  {(workCopy.requestBody.type === BodyType.FormData
-                    || workCopy.requestBody.type === BodyType.UrlEncoded) && (
-                    <div>
-                      <Typography.Text type="secondary" className="mb-2 block text-xs">
-                        {workCopy.requestBody.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
-                      </Typography.Text>
-                      <ParamsEditableTable
-                        value={workCopy.requestBody.parameters}
-                        onChange={(parameters) => {
-                          const next = {
-                            ...workCopy,
-                            requestBody: { ...workCopy.requestBody!, parameters },
-                          }
-                          setWorkCopy(next)
-                          persist(next)
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              )
-            : (
-                <Typography.Text type="secondary">无</Typography.Text>
-              )}
-        </div>
-
-        {/* 运行结果 */}
-        {(result || error) && (
-          <div className="border-t px-3 py-3" style={{ borderColor: token.colorBorderSecondary }}>
-            {error && !result
-              ? (
-                  <>
-                    <Typography.Text strong className="mb-2 block">运行结果</Typography.Text>
-                    <Typography.Text type="danger">{error}</Typography.Text>
-                  </>
-                )
-              : result
-                ? (
-                    <>
-                      <div className="mb-3 flex flex-wrap items-center gap-3">
-                        <Tag color={getStatusColor(result.status)}>{result.status} {result.statusText}</Tag>
-                        <span className="text-xs opacity-50">
-                          {result.method?.toUpperCase()} | {result.durationMs}ms
-                          {result.body ? ` | ${calcBodySize(result.body)}` : ''}
-                        </span>
-                      </div>
-
-                      <Tabs
-                        size="small"
-                        className="mb-3"
-                        items={[
-                          {
-                            key: 'reqContent',
-                            label: '请求内容',
-                            children: (
-                              <div className="flex flex-col gap-2">
-                                <div className="rounded bg-gray-50 p-2 text-xs" style={{ fontFamily: 'monospace' }}>
-                                  <span className="font-medium opacity-60">URL: </span>
-                                  <span className="break-all">{result.url ?? '-'}</span>
-                                </div>
-                                {result.requestBodyText && (
-                                  <MonacoEditor
-                                    height={`${Math.min((result.requestBodyText.split('\n').length) * 18, 300)}px`}
-                                    language={detectLanguage(result.contentType)}
-                                    value={result.requestBodyText}
-                                    options={{
-                                      readOnly: true,
-                                      lineNumbers: 'on',
-                                      minimap: { enabled: false },
-                                      scrollBeyondLastLine: false,
-                                      wordWrap: 'on',
-                                      renderValidationDecorations: 'off',
-                                      showDeprecated: false,
-                                    }}
-                                  />
-                                )}
-                                {result.requestBodyParameters && result.requestBodyParameters.length > 0 && (
-                                  <Table
-                                    size="small"
-                                    dataSource={result.requestBodyParameters}
-                                    columns={headerTableColumns}
-                                    pagination={false}
-                                    rowKey="name"
-                                  />
-                                )}
-                                {!result.requestBodyText && (!result.requestBodyParameters || result.requestBodyParameters.length === 0) && (
-                                  <Typography.Text type="secondary" className="text-xs">无请求体</Typography.Text>
-                                )}
-                              </div>
-                            ),
-                          },
-                          {
-                            key: 'reqHeaders',
-                            label: `请求头${result.requestHeaders?.length ? ` (${result.requestHeaders.length})` : ''}`,
-                            children: result.requestHeaders && result.requestHeaders.length > 0
-                              ? (
-                                  <Table
-                                    size="small"
-                                    dataSource={result.requestHeaders}
-                                    columns={headerTableColumns}
-                                    pagination={false}
-                                    rowKey="name"
-                                  />
-                                )
-                              : <Typography.Text type="secondary" className="text-xs">无请求头</Typography.Text>,
-                          },
-                          {
-                            key: 'resContent',
-                            label: '响应内容',
-                            children: result.body != null
-                              ? (
-                                  <ResponseBodyViewer
-                                    body={result.body}
-                                    contentType={result.contentType}
-                                  />
-                                )
-                              : <Typography.Text type="secondary" className="text-xs">无响应体</Typography.Text>,
-                          },
-                          {
-                            key: 'resHeaders',
-                            label: `响应头${result.headers?.length ? ` (${result.headers.length})` : ''}`,
-                            children: result.headers && result.headers.length > 0
-                              ? (
-                                  <Table
-                                    size="small"
-                                    dataSource={result.headers}
-                                    columns={headerTableColumns}
-                                    pagination={false}
-                                    rowKey="name"
-                                  />
-                                )
-                              : <Typography.Text type="secondary" className="text-xs">无响应头</Typography.Text>,
-                          },
-                          {
-                            key: 'curl',
-                            label: (
-                              <span className="flex items-center gap-1">
-                                <TerminalIcon size={14} />
-                                cURL
-                              </span>
-                            ),
-                            children: (
-                              <div className="flex flex-col gap-3">
-                                <div>
-                                  <Typography.Text strong className="mb-1 block text-xs">Windows</Typography.Text>
-                                  <pre className="m-0 rounded bg-gray-100 p-2 text-xs overflow-auto" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                                    {curlCommands.windows}
-                                  </pre>
-                                </div>
-                                <div>
-                                  <Typography.Text strong className="mb-1 block text-xs">Linux / macOS</Typography.Text>
-                                  <pre className="m-0 rounded bg-gray-100 p-2 text-xs overflow-auto" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                                    {curlCommands.linux}
-                                  </pre>
-                                </div>
-                              </div>
-                            ),
-                          },
-                        ]}
-                      />
-                    </>
                   )
-                : null}
-          </div>
-        )}
-      </div>
+                : (
+                    <Typography.Text type="secondary">无</Typography.Text>
+                  )}
+            </div>
+          </>
+        }
+        resultArea={
+          <ResultViewer
+            result={result}
+            error={error}
+            curlContent={
+              <div className="flex flex-col gap-3">
+                <div>
+                  <Typography.Text strong className="mb-1 block text-xs">Windows</Typography.Text>
+                  <pre className="m-0 rounded bg-gray-100 p-2 text-xs overflow-auto" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                    {curlCommands.windows}
+                  </pre>
+                </div>
+                <div>
+                  <Typography.Text strong className="mb-1 block text-xs">Linux / macOS</Typography.Text>
+                  <pre className="m-0 rounded bg-gray-100 p-2 text-xs overflow-auto" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                    {curlCommands.linux}
+                  </pre>
+                </div>
+              </div>
+            }
+          />
+        }
+        hasResult={!!(result || error)}
+        autoSaveId={`run-tab-${docValue.id}`}
+      />
     </div>
   )
 }

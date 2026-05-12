@@ -76,7 +76,7 @@ function InheritedParamsBar(props: {
 
   return (
     <div
-      className="mb-3 rounded-lg border px-4 py-3"
+      className="mb-3 rounded-lg border px-4 py-3 min-w-0 overflow-hidden"
       style={{ borderColor: token.colorBorderSecondary, backgroundColor: token.colorFillQuaternary }}
     >
       <Typography.Text strong>{sourceLabel}</Typography.Text>
@@ -139,6 +139,7 @@ export function ParamsTab(props: ParamsTabProps) {
   return (
     <Tabs
       animated={false}
+      className="min-w-0"
       items={[
         {
           key: 'params',

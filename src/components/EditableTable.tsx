@@ -102,6 +102,8 @@ export function EditableTable<RecordType = AnyType>(props: EditableTableProps<Re
         style={{
           border: `1px solid ${token.colorBorderSecondary}`,
           borderRadius: token.borderRadius,
+          tableLayout: 'fixed',
+          maxWidth: '100%',
         }}
       >
         <colgroup>

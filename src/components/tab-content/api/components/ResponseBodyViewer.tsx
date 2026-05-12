@@ -4,6 +4,9 @@ import { Button, Typography, theme } from 'antd'
 import { MinusIcon, PlusIcon } from 'lucide-react'
 
 import { MonacoEditor } from '@/components/MonacoEditor'
+import { useStyles } from '@/hooks/useStyle'
+
+import { css } from '@emotion/css'
 
 interface ResponseBodyViewerProps {
   body: string
@@ -42,6 +45,15 @@ export function ResponseBodyViewer({ body, contentType }: ResponseBodyViewerProp
   const isJson = contentType?.toLowerCase().includes('json')
   const bodySize = useMemo(() => new Blob([body]).size, [body])
 
+  const { styles } = useStyles(() => ({
+    editorContainer: css({
+      display: 'flex',
+      flexDirection: 'column',
+      flex: '1 1 0',
+      minHeight: 0,
+    }),
+  }))
+
   const formatted = useMemo(() => {
     if (!isJson) return null
     return tryFormatJson(body)
@@ -54,9 +66,9 @@ export function ResponseBodyViewer({ body, contentType }: ResponseBodyViewerProp
   const language = detectLanguage(contentType)
 
   return (
-    <div>
+    <div className="flex flex-col h-full min-h-0">
       {isJson && (
-        <div className="mb-1 flex items-center gap-2">
+        <div className="mb-1 flex items-center gap-2 flex-shrink-0">
           <Button
             size="small"
             icon={showFormatted ? <MinusIcon size={12} /> : <PlusIcon size={12} />}
@@ -77,12 +89,14 @@ export function ResponseBodyViewer({ body, contentType }: ResponseBodyViewerProp
           )}
         </div>
       )}
-      <MonacoEditor
-        height={`${Math.min((displayBody.split('\n').length) * 18, 400)}px`}
-        language={language}
-        value={displayBody}
-        options={{ readOnly: true, lineNumbers: 'on', minimap: { enabled: false }, scrollBeyondLastLine: false }}
-      />
+      <div className={styles.editorContainer}>
+        <MonacoEditor
+          height="100%"
+          language={language}
+          value={displayBody}
+          options={{ readOnly: true, lineNumbers: 'on', minimap: { enabled: false }, scrollBeyondLastLine: false }}
+        />
+      </div>
     </div>
   )
 }
