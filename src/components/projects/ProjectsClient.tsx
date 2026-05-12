@@ -1,15 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { Button, Card, Form, Input, Modal, Space, Spin, Typography, message, theme } from 'antd'
+import { SearchOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router'
 
 import { ParticleCanvas } from '@/components/ParticleCanvas'
 import { UserMenu } from '@/components/UserMenu'
 
 import { useAuth } from '@/contexts/auth'
-import { ICON_OPTIONS, ICON_MAP, ProjectIcon, getIconColor } from '@/components/ProjectIcon'
+import { type IconCategory, ICON_OPTIONS, ICON_MAP, ICON_CATEGORIES, ProjectIcon, getIconColor, kebabToPascal } from '@/components/ProjectIcon'
 import {
   ApiRequestError,
   requestCreateProject,
@@ -36,23 +37,109 @@ const roleText: Record<ProjectItem['role'], string> = {
 }
 
 function IconPicker({ value, onChange }: { value?: string, onChange?: (val: string) => void }) {
+  const [category, setCategory] = useState('全部')
+  const [searchText, setSearchText] = useState('')
+
+  const filteredCategories = useMemo(() => {
+    if (!searchText) return ICON_CATEGORIES
+    const t = searchText.toLowerCase()
+    return ICON_CATEGORIES.filter(c => c.label.includes(t) || c.icons.some(name => name.toLowerCase().includes(t)))
+  }, [searchText])
+
+  const shownIcons = useMemo(() => {
+    if (category === '全部') return ICON_OPTIONS
+    const cat = ICON_CATEGORIES.find(c => c.label === category)
+    if (!cat) return []
+    return cat.icons
+      .map(kebabToPascal)
+      .filter(name => name in ICON_MAP)
+  }, [category])
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {ICON_OPTIONS.map((name) => (
-        <button
-          key={name}
-          type="button"
-          className="flex size-10 cursor-pointer items-center justify-center rounded-lg border-2 transition-colors"
-          style={{
-            borderColor: value === name ? '#1677ff' : 'transparent',
-            backgroundColor: value === name ? '#e6f4ff' : '#f5f5f5',
-          }}
-          onClick={() => onChange?.(value === name ? '' : name)}
-          title={name}
-        >
-          <ProjectIcon icon={name} size={28} />
-        </button>
-      ))}
+    <div className="flex gap-3" style={{ minHeight: 300 }}>
+      {/* 左侧分类列表 */}
+      <div className="flex shrink-0 flex-col" style={{ width: 140 }}>
+        <div className="mb-1.5 px-1">
+          <Input
+            size="small"
+            placeholder="搜索..."
+            prefix={<SearchOutlined className="text-gray-400" />}
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            variant="borderless"
+            className="bg-gray-100 !rounded-md !px-2"
+          />
+        </div>
+        <div className="flex-1 space-y-0.5 overflow-y-auto px-1" style={{ scrollbarWidth: 'thin' }}>
+          <button
+            type="button"
+            className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs transition-colors ${
+              category === '全部'
+                ? 'bg-blue-50 text-blue-600 font-medium'
+                : 'text-gray-500 hover:bg-gray-100'
+            }`}
+            onClick={() => { setCategory('全部'); setSearchText('') }}
+          >
+            <span className="flex-1">全部</span>
+            <span className="text-[10px] tabular-nums text-gray-400">
+              {ICON_OPTIONS.length}
+            </span>
+          </button>
+          {filteredCategories.map(cat => {
+            const availableInMap = category === cat.label
+              ? shownIcons.length
+              : cat.icons.map(kebabToPascal).filter(n => n in ICON_MAP).length
+            return (
+              <button
+                key={cat.label}
+                type="button"
+                className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs transition-colors ${
+                  category === cat.label
+                    ? 'bg-blue-50 text-blue-600 font-medium'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}
+                onClick={() => setCategory(cat.label)}
+              >
+                <span className="flex-1 truncate">{cat.label}</span>
+                <span className="text-[10px] tabular-nums text-gray-400">
+                  {availableInMap}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* 右侧图标网格 */}
+      <div className="flex-1 bg-gray-100 rounded-lg p-2.5" style={{ minHeight: 260, maxHeight: 340 }}>
+        {shownIcons.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-xs text-gray-400">暂无图标</div>
+        ) : (
+          <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+            <div className="flex flex-wrap gap-1.5">
+              {shownIcons.map((name) => {
+                const isSelected = value === name
+                const iconColor = getIconColor(name)
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    className="relative flex size-9 cursor-pointer items-center justify-center rounded-lg border-2 transition-all duration-150 hover:scale-110 hover:shadow-md"
+                    style={{
+                      borderColor: isSelected ? iconColor : 'transparent',
+                      backgroundColor: isSelected ? `${iconColor}0f` : '#f5f5f5',
+                    }}
+                    onClick={() => onChange?.(isSelected ? '' : name)}
+                    title={name}
+                  >
+                    <ProjectIcon icon={name} size={22} />
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
