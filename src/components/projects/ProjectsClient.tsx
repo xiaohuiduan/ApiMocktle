@@ -9,7 +9,7 @@ import { ParticleCanvas } from '@/components/ParticleCanvas'
 import { UserMenu } from '@/components/UserMenu'
 
 import { useAuth } from '@/contexts/auth'
-import { ICON_OPTIONS, ProjectIcon } from '@/components/ProjectIcon'
+import { ICON_OPTIONS, ICON_MAP, ProjectIcon, getIconColor } from '@/components/ProjectIcon'
 import {
   ApiRequestError,
   requestCreateProject,
@@ -190,7 +190,7 @@ export function ProjectsClient() {
   return (
     <div className="relative" style={{ minHeight: '100%', backgroundColor: token.colorFillTertiary }}>
       <ParticleCanvas variant="embedded" preset="projects" primaryColor={token.colorPrimary} />
-      <div className="relative z-10 mx-auto max-w-5xl px-6 py-10">
+      <div className="relative z-10 px-8 py-10">
       {contextHolder}
 
       <div className="mb-6 flex items-center">
@@ -207,19 +207,48 @@ export function ProjectsClient() {
       </div>
 
       <Spin spinning={loading}>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {projects.map((project) => (
-            <Card
-              key={project.id}
-              extra={project.role === 'owner'
-                ? (
-                    <Space
-                      onClick={(event) => {
-                        event.stopPropagation()
-                      }}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {projects.map((project) => {
+            const iconColor = getIconColor(project.icon || '')
+            const IconComp = ICON_MAP[project.icon || '']
+
+            return (
+              <Card
+                key={project.id}
+                hoverable
+                className="group"
+                styles={{ body: { padding: '16px' } }}
+                style={{
+                  backgroundColor: `${iconColor}12`,
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.backgroundColor = `${iconColor}20`
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.backgroundColor = `${iconColor}12`
+                }}
+                onClick={() => {
+                  navigate(`/projects/${project.id}/home`)
+                }}
+              >
+                <div className="relative">
+                  {/* 水印图标 */}
+                  {IconComp && (
+                    <div className="pointer-events-none absolute -bottom-2 -right-2 opacity-[0.06]">
+                      <IconComp size={90} strokeWidth={0.8} />
+                    </div>
+                  )}
+
+                  {/* 操作按钮 */}
+                  {project.role === 'owner' && (
+                    <div
+                      className="absolute right-0 top-0 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100"
+                      onClick={(event) => { event.stopPropagation() }}
                     >
                       <Button
                         size="small"
+                        className="!rounded-md"
                         onClick={(event) => {
                           event.stopPropagation()
                           openEditDialog(project)
@@ -230,6 +259,7 @@ export function ProjectsClient() {
                       <Button
                         danger
                         size="small"
+                        className="!rounded-md"
                         onClick={(event) => {
                           event.stopPropagation()
                           confirmDeleteProject(project)
@@ -237,25 +267,28 @@ export function ProjectsClient() {
                       >
                         删除
                       </Button>
-                    </Space>
-                  )
-                : null}
-              hoverable
-              onClick={() => {
-                navigate(`/projects/${project.id}/home`)
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <ProjectIcon icon={project.icon} size={40} />
-                <div>
-                  <Typography.Title level={5} className="!mb-0">{project.name}</Typography.Title>
-                  <Typography.Text type="secondary">
-                    角色：{roleText[project.role]}
-                  </Typography.Text>
+                    </div>
+                  )}
+
+                  {/* 内容区 */}
+                  <div className="flex flex-col items-center gap-2 pt-1">
+                    <ProjectIcon icon={project.icon} size={36} />
+                    <Typography.Title
+                      level={5}
+                      className="!mb-0 !mt-1 truncate text-center"
+                      style={{ maxWidth: '100%' }}
+                      title={project.name}
+                    >
+                      {project.name}
+                    </Typography.Title>
+                    <Typography.Text type="secondary" className="text-xs">
+                      {roleText[project.role]}
+                    </Typography.Text>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            )
+          })}
         </div>
       </Spin>
 

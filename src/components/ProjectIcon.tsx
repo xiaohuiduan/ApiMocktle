@@ -103,7 +103,7 @@ import { theme } from 'antd'
 
 type IconComponent = ComponentType<SVGAttributes<SVGElement> & { size?: string | number }>
 
-const ICON_MAP: Record<string, IconComponent> = {
+export const ICON_MAP: Record<string, IconComponent> = {
   Rocket, Star, Heart, Home, User, Users, Settings, Cog,
   Search, Bell, Calendar, Clock, Map, MapPin, Compass,
   Code, Terminal, Database, Server, Globe, Cloud, Shield, Key, Lock, Wifi, Link, Zap, Power,
@@ -127,7 +127,7 @@ const ICON_COLORS = [
   '#13c2c2', '#faad14', '#2f54eb', '#a0d911', '#f5222d',
 ]
 
-function getIconColor(name: string): string {
+export function getIconColor(name: string): string {
   let hash = 0
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash)
