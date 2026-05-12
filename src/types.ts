@@ -69,38 +69,6 @@ export interface ApiRequestBody {
   rawText?: string
 }
 
-export const API_REQUEST_AUTH_TARGETS = ['header', 'query', 'cookie'] as const
-
-export type ApiRequestAuthTarget = typeof API_REQUEST_AUTH_TARGETS[number]
-
-export interface ApiRequestNoAuth {
-  type: 'none'
-}
-
-export interface ApiRequestBearerAuth {
-  type: 'bearer'
-  token: string
-}
-
-export interface ApiRequestBasicAuth {
-  type: 'basic'
-  username: string
-  password: string
-}
-
-export interface ApiRequestApiKeyAuth {
-  type: 'apiKey'
-  key: string
-  value: string
-  target: ApiRequestAuthTarget
-}
-
-export type ApiRequestAuth =
-  | ApiRequestNoAuth
-  | ApiRequestBearerAuth
-  | ApiRequestBasicAuth
-  | ApiRequestApiKeyAuth
-
 export interface ApiRunHeader {
   name: string
   value: string
@@ -192,8 +160,6 @@ export interface ApiDetails {
   }
   /** 请求参数 - Body */
   requestBody?: ApiRequestBody
-  /** 请求鉴权 */
-  auth?: ApiRequestAuth
   /** 返回响应 */
   responses?: ApiDetailsResponse[]
   /** 响应示例 */

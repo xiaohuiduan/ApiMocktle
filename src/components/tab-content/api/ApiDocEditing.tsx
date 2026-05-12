@@ -8,7 +8,6 @@ import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { InputUnderline } from '@/components/InputUnderline'
 import { ApiRemoveButton } from '@/components/tab-content/api/ApiRemoveButton'
 import { ResponseTab } from '@/components/tab-content/api/components/ResponseTab'
-import { ParamsAuth } from './params/ParamsAuth'
 import { ParamsBody } from './params/ParamsBody'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
@@ -266,13 +265,6 @@ export function ApiDocEditing() {
           <Typography.Text strong className="mb-2 block text-sm">Body</Typography.Text>
           <Form.Item noStyle name="requestBody">
             <ParamsBody />
-          </Form.Item>
-        </div>
-
-        <div className="mt-4">
-          <Typography.Text strong className="mb-2 block text-sm">Auth</Typography.Text>
-          <Form.Item noStyle name="auth">
-            <ParamsAuth />
           </Form.Item>
         </div>
 

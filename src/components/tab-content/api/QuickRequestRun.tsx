@@ -24,7 +24,6 @@ import { BodyType, MenuItemType } from '@/enums'
 import type { ApiDetails } from '@/types'
 
 import { ParamsEditableTable } from './components/ParamsEditableTable'
-import { ParamsAuth } from './params/ParamsAuth'
 import { ParamsTab } from './params/ParamsTab'
 import { useApiRequestRunner } from './useApiRequestRunner'
 import { ResponsePanel } from './components/ResponsePanel'
@@ -80,7 +79,6 @@ function createEmptyApiDetails(): ApiDetails {
       cookie: [],
     },
     requestBody: { type: BodyType.None },
-    auth: undefined,
     responses: [],
     responseExamples: [],
   }
@@ -182,21 +180,6 @@ export function QuickRequestRun() {
           .join('&')
         contentType = body.type === BodyType.FormData ? 'multipart/form-data' : 'application/x-www-form-urlencoded'
         formDataFiles = fileParams.length > 0 ? fileParams : undefined
-      }
-    }
-
-    // Apply auth to headers/query
-    const auth = workCopy.auth
-    if (auth) {
-      if (auth.type === 'bearer' && auth.token) {
-        headers.push({ name: 'Authorization', value: `Bearer ${auth.token}` })
-      } else if (auth.type === 'basic' && auth.username) {
-        const basic = btoa(`${auth.username}:${auth.password ?? ''}`)
-        headers.push({ name: 'Authorization', value: `Basic ${basic}` })
-      } else if (auth.type === 'apiKey' && auth.key && auth.value) {
-        if (auth.target === 'header') {
-          headers.push({ name: auth.key, value: auth.value })
-        }
       }
     }
 
@@ -400,16 +383,6 @@ export function QuickRequestRun() {
               })()}
             </div>
 
-            {/* Auth 编辑区 */}
-            <div className="px-3 pb-3">
-              <Typography.Text strong className="mb-2 block text-sm">Auth</Typography.Text>
-              <ParamsAuth
-                value={workCopy.auth}
-                onChange={(auth) => {
-                  setWorkCopy((prev) => ({ ...prev, auth }))
-                }}
-              />
-            </div>
           </>
         }
         resultArea={

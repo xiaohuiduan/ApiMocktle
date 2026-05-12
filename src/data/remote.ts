@@ -570,7 +570,6 @@ export const initialCreateApiDetailsData: ApiDetails = {
   method: HttpMethod.Get,
   status: ApiStatus.Developing,
   serverId: SERVER_INHERIT,
-  auth: { type: 'none' },
   responses: [defaultResponse()],
 }
 
