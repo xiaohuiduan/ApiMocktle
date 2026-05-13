@@ -3,15 +3,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { Viewer } from '@bytemd/react'
 import { create, useModal } from '@ebay/nice-modal-react'
 import { ConfigProvider, Menu, type MenuProps, Modal, type ModalProps, theme } from 'antd'
-import { InfoIcon, ShirtIcon } from 'lucide-react'
+import { Globe, InfoIcon, ShirtIcon } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 
 import { PROJECT_ABOUT_MARKDOWN } from '@/content/project-about'
 import { ThemeEditor, useThemeContext } from '@/components/ThemeEditor'
+import { ProxySettingsForm } from '@/components/proxy-settings/ProxySettingsForm'
 
 export const enum SettingsMenuKey {
   Appearance = '0',
   About = '1',
+  Proxy = '2',
 }
 
 const settingMenuItems = [
@@ -19,6 +21,11 @@ const settingMenuItems = [
     key: SettingsMenuKey.Appearance,
     icon: <ShirtIcon size={16} />,
     label: '外观',
+  },
+  {
+    key: SettingsMenuKey.Proxy,
+    icon: <Globe size={16} />,
+    label: '网络代理',
   },
   {
     key: SettingsMenuKey.About,
@@ -47,6 +54,9 @@ const renderMenuContent = (props: { menuKey: SettingsMenuKey }) => {
   switch (props.menuKey) {
     case SettingsMenuKey.Appearance:
       return <ThemeEditorWrapper />
+
+    case SettingsMenuKey.Proxy:
+      return <ProxySettingsForm />
 
     case SettingsMenuKey.About:
       return <AboutContent />

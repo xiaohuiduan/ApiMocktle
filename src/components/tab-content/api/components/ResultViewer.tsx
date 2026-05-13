@@ -6,10 +6,12 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd'
 import { TerminalIcon } from 'lucide-react'
 
+import { useProxyConfig } from '@/contexts/proxy-config'
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { useStyles } from '@/hooks/useStyle'
 import type { ApiRunResult } from '@/types'
@@ -26,6 +28,11 @@ interface ResultViewerProps {
 }
 
 export function ResultViewer({ result, error, curlContent }: ResultViewerProps) {
+  const { proxyConfig } = useProxyConfig()
+  const proxyTooltip = proxyConfig && proxyConfig.proxyType !== 'none'
+    ? `${proxyConfig.host}:${proxyConfig.port}`
+    : null
+
   const monacoOptions = useMemo(() => ({
     readOnly: true,
     lineNumbers: 'on' as const,
@@ -158,7 +165,12 @@ export function ResultViewer({ result, error, curlContent }: ResultViewerProps) 
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="mb-2 flex flex-wrap items-center gap-3 flex-shrink-0">
-        <Tag color={getStatusColor(result.status)}>{result.status} {result.statusText}</Tag>
+        <Tag color={getStatusColor(result.status)}>{result.status > 0 ? `${result.status} ${result.statusText}` : result.statusText}</Tag>
+        {result.proxyType && result.proxyType !== 'none' && (
+          <Tooltip title={proxyTooltip ? `代理: ${proxyTooltip}` : undefined}>
+            <Tag color="blue">{result.proxyType === 'socks5' ? 'SOCKS5' : 'HTTP'} 代理</Tag>
+          </Tooltip>
+        )}
         <span className="text-xs opacity-50">
           {result.method?.toUpperCase()} | {result.durationMs}ms
           {result.body ? ` | ${calcBodySize(result.body)}` : ''}

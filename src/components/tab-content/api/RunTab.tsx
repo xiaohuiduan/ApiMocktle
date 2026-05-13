@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useProxyConfig } from '@/contexts/proxy-config'
 
 import {
   Button,
@@ -7,6 +8,7 @@ import {
   Select,
   Space,
   Tag,
+  Tooltip,
   Typography,
   theme,
 } from 'antd'
@@ -149,6 +151,14 @@ export function RunTab() {
   const storageKey = docValue ? `${STORAGE_PREFIX}${docValue.id}` : ''
 
   const { run, running, result, error, resetResult } = useApiRequestRunner()
+
+  const { proxyConfig } = useProxyConfig()
+  const proxyInfo = proxyConfig && proxyConfig.proxyType !== 'none'
+    ? {
+        label: proxyConfig.proxyType === 'socks5' ? 'SOCKS5' : 'HTTP',
+        tooltip: `${proxyConfig.host}:${proxyConfig.port}`,
+      }
+    : null
 
   const [workCopy, setWorkCopy] = useState<ApiDetails | undefined>(() => {
     if (!docValue) return undefined
@@ -471,6 +481,12 @@ export function RunTab() {
             }}
           />
         </div>
+
+        {proxyInfo && (
+          <Tooltip title={`代理: ${proxyInfo.tooltip}`}>
+            <Tag color="blue" className="shrink-0">{proxyInfo.label} 代理</Tag>
+          </Tooltip>
+        )}
 
         <Space className="shrink-0" style={{ marginLeft: 'auto' }}>
           <Button

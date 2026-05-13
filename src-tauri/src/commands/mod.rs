@@ -1,3 +1,4 @@
+pub mod app_config_cmd;
 pub mod auth;
 pub mod projects;
 pub mod menu_items;

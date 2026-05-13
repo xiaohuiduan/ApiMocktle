@@ -9,6 +9,7 @@ mod services;
 use std::sync::Arc;
 
 use db::client::init_database;
+use services::app_config::AppConfigService;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -22,6 +23,9 @@ pub fn run() {
             let db = Arc::new(init_database(&app_data_dir));
             let db_http = db.clone();
             app.manage(db);
+
+            let app_config = Arc::new(AppConfigService::new(&app_data_dir));
+            app.manage(app_config);
 
             // Start YApi HTTP server for EasyAPI plugin
             let yapi_handle = Arc::new(http::yapi_server::YApiServerHandle::new());
@@ -76,6 +80,10 @@ pub fn run() {
             commands::exports::write_export_file,
             // Request runner
             commands::request_runner::run_api_request,
+            commands::request_runner::test_proxy_connection,
+            // App config
+            commands::app_config_cmd::get_app_config,
+            commands::app_config_cmd::set_app_config,
             // App info
             commands::app_info::get_app_version,
             // Tokens

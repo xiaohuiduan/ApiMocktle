@@ -4,6 +4,7 @@ import { useParams } from 'react-router'
 import { api } from '@/api-client'
 import { useAuth } from '@/contexts/auth'
 import { useGlobalContext } from '@/contexts/global'
+import { useProxyConfig } from '@/contexts/proxy-config'
 import type { ApiRunResult } from '@/types'
 
 export function useApiRequestRunner() {
@@ -11,6 +12,7 @@ export function useApiRequestRunner() {
   const [result, setResult] = useState<ApiRunResult>()
   const [error, setError] = useState<string>()
 
+  const { proxyConfig } = useProxyConfig()
   const { projectId } = useParams()
   const { sessionId } = useAuth()
   const { messageApi } = useGlobalContext()
@@ -35,12 +37,20 @@ export function useApiRequestRunner() {
     setResult(undefined)
 
     try {
-      const payload = await api<ApiRunResult>('run_api_request', {
+      const payload: Record<string, unknown> = {
         sessionId,
         projectId,
         payload: { url, method, headers, body, contentType, formDataFiles },
-      })
-      setResult(payload)
+      }
+
+      // Attach proxy config if configured
+      const pc = proxyConfig
+      if (pc && pc.proxyType !== 'none') {
+        (payload.payload as Record<string, unknown>).proxyConfig = { ...pc }
+      }
+
+      const result = await api<ApiRunResult>('run_api_request', payload)
+      setResult(result)
     } catch (err) {
       const msg = err instanceof Error ? err.message : '运行失败'
       messageApi.error(msg)
@@ -48,7 +58,7 @@ export function useApiRequestRunner() {
     } finally {
       setRunning(false)
     }
-  }, [messageApi, projectId, sessionId])
+  }, [messageApi, projectId, sessionId, proxyConfig])
 
   const resetResult = useCallback(() => {
     setResult(undefined)

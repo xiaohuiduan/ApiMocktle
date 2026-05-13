@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useProxyConfig } from '@/contexts/proxy-config'
 
 import {
   Button,
@@ -6,6 +7,7 @@ import {
   Select,
   Space,
   Tag,
+  Tooltip,
   Typography,
   theme,
 } from 'antd'
@@ -115,6 +117,14 @@ export function QuickRequestRun() {
   }, [savedData?.id, isCreating])
 
   const { run, running, result, error, resetResult } = useApiRequestRunner()
+
+  const { proxyConfig } = useProxyConfig()
+  const proxyInfo = proxyConfig && proxyConfig.proxyType !== 'none'
+    ? {
+        label: proxyConfig.proxyType === 'socks5' ? 'SOCKS5' : 'HTTP',
+        tooltip: `${proxyConfig.host}:${proxyConfig.port}`,
+      }
+    : null
 
   const methodOptions = useMemo(() =>
     Object.entries(HTTP_METHOD_CONFIG).map(([method, { color }]) => ({
@@ -259,6 +269,12 @@ export function QuickRequestRun() {
             }}
           />
         </div>
+
+        {proxyInfo && (
+          <Tooltip title={`代理: ${proxyInfo.tooltip}`}>
+            <Tag color="blue" className="shrink-0">{proxyInfo.label} 代理</Tag>
+          </Tooltip>
+        )}
 
         <Space.Compact className="shrink-0">
           <Button

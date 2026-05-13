@@ -124,6 +124,22 @@ export interface ApiRunResult {
   headers: ApiRunHeader[]
   contentType?: string
   body?: string
+  proxyType?: string
+}
+
+export interface ProxyConfig {
+  proxyType: 'socks5' | 'http' | 'none'
+  host: string
+  port: number
+  username?: string
+  password?: string
+}
+
+export interface ProxyTestResult {
+  ok: boolean
+  statusCode?: number
+  durationMs?: number
+  error?: string
 }
 
 export interface ApiDetails {

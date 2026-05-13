@@ -210,6 +210,18 @@ pub struct FormDataFile {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ProxyConfig {
+    #[serde(rename = "proxyType")]
+    pub proxy_type: String,
+    pub host: String,
+    pub port: u16,
+    #[serde(default)]
+    pub username: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RunRequestPayload {
     pub url: String,
     pub method: String,
@@ -221,6 +233,8 @@ pub struct RunRequestPayload {
     pub content_type: Option<String>,
     #[serde(rename = "formDataFiles", default)]
     pub form_data_files: Vec<FormDataFile>,
+    #[serde(rename = "proxyConfig", default)]
+    pub proxy_config: Option<ProxyConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

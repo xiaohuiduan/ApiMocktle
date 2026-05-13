@@ -1,4 +1,5 @@
 export function getStatusColor(code: number): string {
+  if (code <= 0) return 'error'
   if (code >= 500) return 'error'
   if (code >= 400) return 'warning'
   if (code >= 300) return 'processing'

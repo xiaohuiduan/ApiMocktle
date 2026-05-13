@@ -25,10 +25,7 @@ pub async fn run_api_request(
     let url = &payload.url;
 
     let start = Instant::now();
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .build()
-        .unwrap_or_default();
+    let client = build_client_with_proxy(payload.proxy_config.as_ref());
 
     let mut req = match method.as_str() {
         "POST" => client.post(url),
@@ -148,6 +145,7 @@ pub async fn run_api_request(
                 "headers": resp_headers,
                 "contentType": resp_content_type,
                 "body": body,
+                "proxyType": payload.proxy_config.as_ref().map(|pc| pc.proxy_type.clone()).unwrap_or_default(),
             })))
         }
         Err(e) => {
@@ -165,6 +163,7 @@ pub async fn run_api_request(
                 "headers": [],
                 "contentType": "",
                 "body": "",
+                "proxyType": payload.proxy_config.as_ref().map(|pc| pc.proxy_type.clone()).unwrap_or_default(),
             })))
         }
     }
@@ -334,6 +333,60 @@ fn build_schema_example(schema: &serde_json::Value) -> serde_json::Value {
     }
 }
 
+fn build_client_with_proxy(proxy_config: Option<&ProxyConfig>) -> reqwest::Client {
+    let mut builder = reqwest::Client::builder();
+    if let Some(pc) = proxy_config {
+        match pc.proxy_type.as_str() {
+            "socks5" => {
+                let url = format!("socks5://{}:{}", pc.host, pc.port);
+                if let Ok(mut p) = reqwest::Proxy::all(&url) {
+                    if let (Some(u), Some(pw)) = (&pc.username, &pc.password) {
+                        p = p.basic_auth(u.as_str(), pw.as_str());
+                    }
+                    builder = builder.proxy(p);
+                    return builder.build().unwrap_or_default();
+                }
+            }
+            "http" => {
+                let url = format!("http://{}:{}", pc.host, pc.port);
+                if let Ok(mut p) = reqwest::Proxy::all(&url) {
+                    if let (Some(u), Some(pw)) = (&pc.username, &pc.password) {
+                        p = p.basic_auth(u.as_str(), pw.as_str());
+                    }
+                    builder = builder.proxy(p);
+                    return builder.build().unwrap_or_default();
+                }
+            }
+            _ => {}
+        }
+    }
+    builder.no_proxy().build().unwrap_or_default()
+}
+
+#[tauri::command]
+pub async fn test_proxy_connection(
+    proxy_config: ProxyConfig,
+    test_url: String,
+) -> Result<ApiResult<serde_json::Value>, String> {
+    let start = Instant::now();
+    let client = build_client_with_proxy(Some(&proxy_config));
+    match client.get(&test_url).send().await {
+        Ok(resp) => {
+            let status = resp.status().as_u16();
+            let duration = start.elapsed().as_millis() as u64;
+            Ok(ApiResult::success(serde_json::json!({
+                "ok": (200..400).contains(&status),
+                "statusCode": status,
+                "durationMs": duration,
+            })))
+        }
+        Err(e) => Ok(ApiResult::success(serde_json::json!({
+            "ok": false,
+            "error": e.to_string(),
+        }))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -479,5 +532,53 @@ mod tests {
         let (body_text, content_type, _) = build_body(&details, "none");
         assert!(body_text.is_empty());
         assert_eq!(content_type, None);
+    }
+
+    #[test]
+    fn test_proxy_config_socks5_serde() {
+        let json = serde_json::json!({
+            "proxyType": "socks5",
+            "host": "127.0.0.1",
+            "port": 7890
+        });
+        let config: ProxyConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(config.proxy_type, "socks5");
+        assert_eq!(config.host, "127.0.0.1");
+        assert_eq!(config.port, 7890);
+        assert!(config.username.is_none());
+        assert!(config.password.is_none());
+    }
+
+    #[test]
+    fn test_proxy_config_http_with_auth() {
+        let json = serde_json::json!({
+            "proxyType": "http",
+            "host": "proxy.example.com",
+            "port": 8080,
+            "username": "user",
+            "password": "pass"
+        });
+        let config: ProxyConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(config.proxy_type, "http");
+        assert_eq!(config.username.unwrap(), "user");
+        assert_eq!(config.password.unwrap(), "pass");
+    }
+
+    #[test]
+    fn test_proxy_config_none() {
+        let json = serde_json::json!({
+            "proxyType": "none",
+            "host": "",
+            "port": 0
+        });
+        let config: ProxyConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(config.proxy_type, "none");
+    }
+
+    #[test]
+    fn test_build_client_no_proxy() {
+        let client = build_client_with_proxy(None);
+        // 验证客户端构建不 panic
+        let _ = client;
     }
 }
