@@ -16,6 +16,13 @@
 
 :root[theme='lightDefault'],
 :root[theme='lark'] {
+  --color-bg-panel: #ffffff;
+  --color-border: #e4e7ec;
+  --color-text-primary: #1d2939;
+  --color-text-secondary: #667085;
+  --color-accent: #22c55e;
+  --color-accent-bg: #ecfdf5;
+  --color-bg-hover: #eef0f4;
   --color-green-6: #4caf50;
   --color-orange-6: #fa8c16;
   --color-blue-6: #1890ff;
@@ -32,7 +39,23 @@
   color-scheme: light;
 }
 
+/* Lark theme overrides */
+:root[theme='lark'] {
+  --color-accent: #059669;
+  --color-accent-bg: #ecfdf5;
+  --color-border: #d0dfd5;
+  --color-text-secondary: #5a7a65;
+  --color-bg-hover: #e8f0eb;
+}
+
 :root[theme='darkDefault'] {
+  --color-bg-panel: #1a2332;
+  --color-border: #2a3444;
+  --color-text-primary: #ecedee;
+  --color-text-secondary: #9ba1b0;
+  --color-accent: #22c55e;
+  --color-accent-bg: rgba(34, 197, 94, 0.12);
+  --color-bg-hover: #1e293b;
   --color-green-6: #49aa19;
   --color-orange-6: #d87a16;
   --color-blue-6: #177ddc;
