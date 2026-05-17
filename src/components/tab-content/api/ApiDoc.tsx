@@ -16,7 +16,6 @@ import { ApiRemoveButton } from '@/components/tab-content/api/ApiRemoveButton'
 import { API_STATUS_CONFIG, HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
-import { creator } from '@/data/remote'
 import { useStyles } from '@/hooks/useStyle'
 import { BodyType } from '@/enums'
 import type { JsonSchema } from '@/components/JsonSchema'
@@ -552,9 +551,6 @@ export function ApiDoc() {
         <Space wrap size="large">
           <BaseInfoItem label="创建时间" value={dayjs(docValue.createdAt).format('YYYY年M月D日')} />
           <BaseInfoItem label="修改时间" value={dayjs(docValue.updatedAt).format('YYYY年M月D日')} />
-          <BaseInfoItem label="修改者" value={creator.name} />
-          <BaseInfoItem label="创建者" value={creator.name} />
-          <BaseInfoItem label="责任人" value={creator.name} />
         </Space>
       </div>
 

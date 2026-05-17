@@ -1,13 +1,10 @@
 import { useState } from 'react'
 
 import { Col, Form, Row, Select, type SelectProps } from 'antd'
-import { Link } from 'react-router'
 import useResizeObserver from 'use-resize-observer'
 
-import { SelectorService } from '@/components/SelectorService'
 import { InputDesc } from '@/components/tab-content/api/components/InputDesc'
 import { API_STATUS_CONFIG } from '@/configs/static'
-import { creator } from '@/data/remote'
 
 const statusOptions: SelectProps['options'] = Object.entries(API_STATUS_CONFIG).map(
   ([method, { text, color }]) => {
@@ -72,35 +69,8 @@ export function BaseFormItems() {
         </Col>
 
         <Col span={colSpan}>
-          <Form.Item label="责任人" labelCol={{ span: 24 }} name="responsibleId">
-            <Select
-              options={[{ label: `${creator.name}（@${creator.username}）`, value: creator.id }]}
-            />
-          </Form.Item>
-        </Col>
-
-        <Col span={colSpan}>
           <Form.Item label="标签" labelCol={{ span: 24 }} name="tags">
             <Select mode="tags" placeholder="查找或回车创建标签" />
-          </Form.Item>
-        </Col>
-
-        <Col span={colSpan}>
-          <Form.Item
-            label="服务（前置 URL）"
-            labelCol={{ span: 24 }}
-            name="serverId"
-            tooltip={(
-              <span>
-                指定服务后，该接口运行时会使用该服务对应的
-                <b>前置 URL</b>
-                （在
-                <Link to="/">环境</Link>
-                里设置）。
-              </span>
-            )}
-          >
-            <SelectorService />
           </Form.Item>
         </Col>
 
