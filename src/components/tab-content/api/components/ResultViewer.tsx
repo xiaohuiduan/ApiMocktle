@@ -192,7 +192,7 @@ export function ResultViewer({ result, error, curlContent, onRetry }: ResultView
         </span>
       </div>
 
-      <Tabs size="small" className={styles.resultContent} items={tabsItems} />
+      <Tabs size="small" className={styles.resultContent} defaultActiveKey={result.body ? 'resContent' : 'reqContent'} items={tabsItems} />
     </div>
   )
 }
