@@ -135,7 +135,7 @@ pub async fn run_api_request(
     let url = &payload.url;
 
     let start = Instant::now();
-    let client = build_client_with_proxy(payload.proxy_config.as_ref());
+    let client = build_client_with_proxy(payload.proxy_config.as_ref(), payload.insecure_skip_verify);
 
     let mut req = match method.as_str() {
         "POST" => client.post(url),
@@ -445,8 +445,11 @@ fn build_schema_example(schema: &serde_json::Value) -> serde_json::Value {
     }
 }
 
-fn build_client_with_proxy(proxy_config: Option<&ProxyConfig>) -> reqwest::Client {
+fn build_client_with_proxy(proxy_config: Option<&ProxyConfig>, insecure_skip_verify: bool) -> reqwest::Client {
     let mut builder = reqwest::Client::builder();
+    if insecure_skip_verify {
+        builder = builder.danger_accept_invalid_certs(true);
+    }
     if let Some(pc) = proxy_config {
         match pc.proxy_type.as_str() {
             "socks5" => {
@@ -481,7 +484,7 @@ pub async fn test_proxy_connection(
     test_url: String,
 ) -> Result<ApiResult<serde_json::Value>, String> {
     let start = Instant::now();
-    let client = build_client_with_proxy(Some(&proxy_config));
+    let client = build_client_with_proxy(Some(&proxy_config), false);
     match client.get(&test_url).send().await {
         Ok(resp) => {
             let status = resp.status().as_u16();

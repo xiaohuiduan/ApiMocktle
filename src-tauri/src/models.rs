@@ -235,6 +235,8 @@ pub struct RunRequestPayload {
     pub form_data_files: Vec<FormDataFile>,
     #[serde(rename = "proxyConfig", default)]
     pub proxy_config: Option<ProxyConfig>,
+    #[serde(rename = "insecureSkipVerify", default)]
+    pub insecure_skip_verify: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -170,6 +170,7 @@ export function RunTab() {
   })
 
   const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
+  const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
 
   const [disabledInheritedParams, setDisabledInheritedParams] = useState<{
     query: Set<string>
@@ -379,7 +380,7 @@ export function RunTab() {
       }
     }
 
-    await run(url, workCopy.method ?? 'GET', headers, bodyText, contentType, formDataFiles)
+    await run(url, workCopy.method ?? 'GET', headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
   }
 
   // 一键填充 Body
@@ -485,6 +486,19 @@ export function RunTab() {
         {proxyInfo && (
           <Tooltip title={`代理: ${proxyInfo.tooltip}`}>
             <Tag color="blue" className="shrink-0">{proxyInfo.label} 代理</Tag>
+          </Tooltip>
+        )}
+
+        {(/^https:\/\//i.test(workCopy.path ?? '') || /^https:\/\//i.test(envBaseUrl)) && (
+          <Tooltip title={insecureSkipVerify ? '证书验证已关闭' : '点击跳过 HTTPS 证书验证'}>
+            <Tag
+              color={insecureSkipVerify ? 'warning' : 'green'}
+              className="cursor-pointer shrink-0"
+              onClick={() => setInsecureSkipVerify(v => !v)}
+              style={{ cursor: 'pointer' }}
+            >
+              {insecureSkipVerify ? '跳过证书' : 'SSL'}
+            </Tag>
           </Tooltip>
         )}
 

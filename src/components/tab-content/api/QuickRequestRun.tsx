@@ -108,6 +108,7 @@ export function QuickRequestRun() {
 
   const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
   const [saving, setSaving] = useState(false)
+  const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
 
   useEffect(() => {
     if (savedData && !isCreating) {
@@ -193,7 +194,7 @@ export function QuickRequestRun() {
       }
     }
 
-    await run(url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, contentType, formDataFiles)
+    await run(url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
   }
 
   const handleSave = async () => {
@@ -273,6 +274,19 @@ export function QuickRequestRun() {
         {proxyInfo && (
           <Tooltip title={`代理: ${proxyInfo.tooltip}`}>
             <Tag color="blue" className="shrink-0">{proxyInfo.label} 代理</Tag>
+          </Tooltip>
+        )}
+
+        {/^https:\/\//i.test(workCopy.path ?? '') && (
+          <Tooltip title={insecureSkipVerify ? '证书验证已关闭' : '点击跳过 HTTPS 证书验证'}>
+            <Tag
+              color={insecureSkipVerify ? 'warning' : 'green'}
+              className="cursor-pointer shrink-0"
+              onClick={() => setInsecureSkipVerify(v => !v)}
+              style={{ cursor: 'pointer' }}
+            >
+              {insecureSkipVerify ? '跳过证书' : 'SSL'}
+            </Tag>
           </Tooltip>
         )}
 

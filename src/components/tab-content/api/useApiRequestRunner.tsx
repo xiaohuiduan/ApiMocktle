@@ -24,6 +24,7 @@ export function useApiRequestRunner() {
     body: string,
     contentType?: string,
     formDataFiles?: Array<{ name: string, path: string }>,
+    insecureSkipVerify?: boolean,
   ) => {
     if (!projectId || !sessionId) {
       const msg = '当前不在项目页面，无法运行请求'
@@ -40,7 +41,7 @@ export function useApiRequestRunner() {
       const payload: Record<string, unknown> = {
         sessionId,
         projectId,
-        payload: { url, method, headers, body, contentType, formDataFiles },
+        payload: { url, method, headers, body, contentType, formDataFiles, insecureSkipVerify },
       }
 
       // Attach proxy config if configured
