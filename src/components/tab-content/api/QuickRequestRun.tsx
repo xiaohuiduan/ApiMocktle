@@ -6,12 +6,13 @@ import {
   Input,
   Select,
   Space,
+  Switch,
   Tag,
   Tooltip,
   Typography,
   theme,
 } from 'antd'
-import { PlayIcon } from 'lucide-react'
+import { PlayIcon, PencilIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
@@ -22,6 +23,7 @@ import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
+import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { BodyType, MenuItemType } from '@/enums'
 import type { ApiDetails } from '@/types'
 
@@ -109,6 +111,8 @@ export function QuickRequestRun() {
   const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
   const [saving, setSaving] = useState(false)
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
 
   useEffect(() => {
     if (savedData && !isCreating) {
@@ -232,13 +236,61 @@ export function QuickRequestRun() {
     }
   }
 
+  useCtrlSave(handleSave)
+
   const handleFillBody = () => {
     const text = buildBodyFillText(workCopy, menuRawList)
     setBodyRawText(text)
   }
 
+  const handleTitleConfirm = async () => {
+    const newName = titleDraft.trim() || '快捷请求'
+    setEditingTitle(false)
+    setWorkCopy(prev => ({ ...prev, name: newName }))
+    if (!isCreating) {
+      await updateMenuItem({
+        id: tabData.key,
+        name: newName,
+        data: { ...workCopy, name: newName },
+      }).catch(() => {})
+    }
+  }
+
+  const handleTitleCancel = () => {
+    setEditingTitle(false)
+  }
+
   return (
     <div className="flex h-full flex-col overflow-hidden" style={{ minWidth: 0, maxWidth: '100%' }}>
+      {/* 标题栏 */}
+      <div className="flex items-center gap-2 px-3 py-1.5 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+        {editingTitle
+          ? (
+            <>
+              <Input
+                size="small"
+                value={titleDraft}
+                onChange={e => setTitleDraft(e.target.value)}
+                onPressEnter={() => void handleTitleConfirm()}
+                className="max-w-[300px]"
+                autoFocus
+              />
+              <Button size="small" type="primary" onClick={() => void handleTitleConfirm()}>确认</Button>
+              <Button size="small" onClick={handleTitleCancel}>取消</Button>
+            </>
+          )
+          : (
+            <>
+              <Typography.Text strong className="text-sm">{workCopy.name || '快捷请求'}</Typography.Text>
+              <Button
+                type="text"
+                size="small"
+                icon={<PencilIcon size={14} />}
+                onClick={() => { setTitleDraft(workCopy.name || '快捷请求'); setEditingTitle(true) }}
+              />
+            </>
+          )}
+      </div>
       {/* URL 行 */}
       <div className="flex items-center gap-2 px-3 py-2 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
         <Select
@@ -278,15 +330,17 @@ export function QuickRequestRun() {
         )}
 
         {/^https:\/\//i.test(workCopy.path ?? '') && (
-          <Tooltip title={insecureSkipVerify ? '证书验证已关闭' : '点击跳过 HTTPS 证书验证'}>
-            <Tag
-              color={insecureSkipVerify ? 'warning' : 'green'}
-              className="cursor-pointer shrink-0"
-              onClick={() => setInsecureSkipVerify(v => !v)}
-              style={{ cursor: 'pointer' }}
-            >
-              {insecureSkipVerify ? '跳过证书' : 'SSL'}
-            </Tag>
+          <Tooltip title={insecureSkipVerify ? 'HTTPS 证书验证已关闭，不推荐用于生产环境' : '开启后将验证 HTTPS 证书，关闭可调试自签名证书接口'}>
+            <label className="shrink-0 flex items-center gap-1.5 cursor-pointer" style={{ userSelect: 'none' }}>
+              <span className="text-xs" style={{ color: insecureSkipVerify ? 'var(--ant-color-warning)' : 'var(--ant-color-success)' }}>
+                SSL
+              </span>
+              <Switch
+                size="small"
+                checked={!insecureSkipVerify}
+                onChange={(v) => setInsecureSkipVerify(!v)}
+              />
+            </label>
           </Tooltip>
         )}
 

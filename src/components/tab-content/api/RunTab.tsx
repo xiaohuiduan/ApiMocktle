@@ -7,6 +7,7 @@ import {
   Modal,
   Select,
   Space,
+  Switch,
   Tag,
   Tooltip,
   Typography,
@@ -490,15 +491,17 @@ export function RunTab() {
         )}
 
         {(/^https:\/\//i.test(workCopy.path ?? '') || /^https:\/\//i.test(envBaseUrl)) && (
-          <Tooltip title={insecureSkipVerify ? '证书验证已关闭' : '点击跳过 HTTPS 证书验证'}>
-            <Tag
-              color={insecureSkipVerify ? 'warning' : 'green'}
-              className="cursor-pointer shrink-0"
-              onClick={() => setInsecureSkipVerify(v => !v)}
-              style={{ cursor: 'pointer' }}
-            >
-              {insecureSkipVerify ? '跳过证书' : 'SSL'}
-            </Tag>
+          <Tooltip title={insecureSkipVerify ? 'HTTPS 证书验证已关闭，不推荐用于生产环境' : '开启后将验证 HTTPS 证书，关闭可调试自签名证书接口'}>
+            <label className="shrink-0 flex items-center gap-1.5 cursor-pointer" style={{ userSelect: 'none' }}>
+              <span className="text-xs" style={{ color: insecureSkipVerify ? 'var(--ant-color-warning)' : 'var(--ant-color-success)' }}>
+                SSL
+              </span>
+              <Switch
+                size="small"
+                checked={!insecureSkipVerify}
+                onChange={(v) => setInsecureSkipVerify(!v)}
+              />
+            </label>
           </Tooltip>
         )}
 

@@ -11,6 +11,7 @@ import {
 } from '@/project-environment-utils'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useCtrlSave } from '@/hooks/useCtrlSave'
 import type { ProjectEnvironmentConfig } from '@/types'
 
 import {
@@ -57,6 +58,22 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
   const [draftConfig, setDraftConfig] = useState<ProjectEnvironmentConfig>(EMPTY_PROJECT_ENVIRONMENT_CONFIG)
   const [selectedKey, setSelectedKey] = useState<SectionKey>('globalVariables')
   const [saving, setSaving] = useState(false)
+
+  const handleEnvSave = () => {
+    setSaving(true)
+    void updateProjectEnvironmentConfig(draftConfig)
+      .then(() => {
+        messageApi.success('环境配置已保存')
+      })
+      .catch((error) => {
+        messageApi.error(error instanceof Error ? error.message : '保存环境失败')
+      })
+      .finally(() => {
+        setSaving(false)
+      })
+  }
+
+  useCtrlSave(handleEnvSave)
 
   useEffect(() => {
     setDraftConfig(cloneConfig(projectEnvironmentConfig))
@@ -243,26 +260,7 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
             >
               重置
             </Button>
-            <Button
-              disabled={!editable}
-              loading={saving}
-              type="primary"
-              onClick={() => {
-                setSaving(true)
-                void updateProjectEnvironmentConfig(draftConfig)
-                  .then(() => {
-                    messageApi.success('环境配置已保存')
-                  })
-                  .catch((error) => {
-                    messageApi.error(error instanceof Error ? error.message : '保存环境失败')
-                  })
-                  .finally(() => {
-                    setSaving(false)
-                  })
-              }}
-            >
-              保存环境
-            </Button>
+            <Button disabled={!editable} loading={saving} type="primary" onClick={handleEnvSave}>保存环境</Button>
           </div>
         </section>
       </div>

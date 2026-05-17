@@ -8,6 +8,7 @@ use crate::db::{auth_repo, project_repo};
 use crate::models::*;
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RequestErrorInfo {
     pub error_type: String,
     pub error_message: String,
@@ -111,7 +112,7 @@ fn categorize_request_error(e: &reqwest::Error) -> RequestErrorInfo {
         error_type: "unknown".into(),
         error_message: "请求异常".into(),
         error_detail: detail,
-        suggestion: "请检查网络和请求配置\n如果问题持续，请查看技术详情联系管理员".into(),
+        suggestion: "请检查网络和请求配置\n如果问题持续，请查看技术详情进行排查".into(),
     }
 }
 

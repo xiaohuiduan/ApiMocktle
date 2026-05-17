@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { Button, Form, type FormProps, Select, type SelectProps, Space, Typography } from 'antd'
+import { Button, Form, type FormProps, Input, Select, type SelectProps, Space, Typography } from 'antd'
+import { PencilIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
-import { InputUnderline } from '@/components/InputUnderline'
 import { ApiRemoveButton } from '@/components/tab-content/api/ApiRemoveButton'
 import { ResponseTab } from '@/components/tab-content/api/components/ResponseTab'
 import { ParamsBody } from './params/ParamsBody'
@@ -13,6 +13,7 @@ import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
+import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { initialCreateApiDetailsData } from '@/data/remote'
 import { MenuItemType, ParamType } from '@/enums'
 import type { ApiDetails } from '@/types'
@@ -55,6 +56,14 @@ export function ApiDocEditing() {
   const { addTabItem } = useMenuTabHelpers()
   const { tabData } = useTabContentContext()
   const isCreating = tabData.data?.tabStatus === PageTabStatus.Create
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+
+  const menuApiName = useMemo(() => {
+    return menuRawList?.find(({ id }) => id === tabData.key)?.name ?? DEFAULT_NAME
+  }, [menuRawList, tabData.key])
+
+  useCtrlSave(() => form.submit())
 
   useEffect(() => {
     if (isCreating) {
@@ -80,6 +89,27 @@ export function ApiDocEditing() {
       }
     }
   }, [form, menuRawList, isCreating, tabData.key])
+
+  const handleTitleConfirm = async () => {
+    const newName = titleDraft.trim() || DEFAULT_NAME
+    form.setFieldValue('name', newName)
+    setEditingTitle(false)
+    if (!isCreating) {
+      // 保存当前表单状态，reloadState 后会重置表单
+      const currentFormData = form.getFieldsValue() as any
+      await updateMenuItem({
+        id: tabData.key,
+        name: newName,
+        data: { ...currentFormData, name: newName },
+      } as any).catch(() => {})
+      // reloadState 后恢复未保存的修改
+      form.setFieldsValue(currentFormData)
+    }
+  }
+
+  const handleTitleCancel = () => {
+    setEditingTitle(false)
+  }
 
   const handleFinish: FormProps<ApiDetails>['onFinish'] = async (values) => {
     const menuName = values.name ?? DEFAULT_NAME
@@ -218,6 +248,39 @@ export function ApiDocEditing() {
         handleFinish(values)
       }}
     >
+      {/* 保持 name 字段在表单中注册，确保 onFinish 能读取到 */}
+      <Form.Item name="name" hidden><Input /></Form.Item>
+
+      {/* 标题栏 */}
+      <div className="flex items-center gap-2 px-tabContent py-1.5" style={{ borderBottom: '1px solid var(--ant-color-border-secondary)' }}>
+        {editingTitle
+          ? (
+            <>
+              <Input
+                size="small"
+                value={titleDraft}
+                onChange={e => setTitleDraft(e.target.value)}
+                onPressEnter={handleTitleConfirm}
+                className="max-w-[300px]"
+                autoFocus
+              />
+              <Button size="small" type="primary" onClick={handleTitleConfirm}>确认</Button>
+              <Button size="small" onClick={handleTitleCancel}>取消</Button>
+            </>
+          )
+          : (
+            <>
+              <Typography.Text strong className="text-base">{menuApiName}</Typography.Text>
+              <Button
+                type="text"
+                size="small"
+                icon={<PencilIcon size={14} />}
+                onClick={() => { setTitleDraft(menuApiName); setEditingTitle(true) }}
+              />
+            </>
+          )}
+      </div>
+
       <div className="flex items-center px-tabContent py-3">
         <Space.Compact className="flex-1">
           <Form.Item noStyle name="method">
@@ -248,10 +311,6 @@ export function ApiDocEditing() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-tabContent">
-        <Form.Item noStyle name="name">
-          <InputUnderline placeholder={DEFAULT_NAME} />
-        </Form.Item>
-
         <div className="pt-2">
           <BaseFormItems />
         </div>

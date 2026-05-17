@@ -11,6 +11,7 @@ import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
+import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { MenuItemType } from '@/enums'
 import type { ApiDoc } from '@/types'
 
@@ -42,6 +43,41 @@ export function Doc() {
     }
   }, [docValue])
 
+  const handleDocSave = () => {
+    const values: ApiDoc = { id: nanoid(6), name: name ?? DEFAULT_DOC_NAME, content }
+
+    if (isCreating) {
+      const menuItemId = nanoid(6)
+
+      addMenuItem({
+        id: menuItemId,
+        name: name ?? DEFAULT_DOC_NAME,
+        type: MenuItemType.Doc,
+        data: values,
+      })
+
+      addTabItem(
+        {
+          key: menuItemId,
+          label: name,
+          contentType: MenuItemType.Doc,
+        },
+        { replaceTab: tabData.key },
+      )
+    }
+    else {
+      updateMenuItem({
+        id: tabData.key,
+        name: name,
+        data: values,
+      })
+
+      messageApi.success('已保存')
+    }
+  }
+
+  useCtrlSave(handleDocSave)
+
   const isCreating = tabData.data?.tabStatus === PageTabStatus.Create
   const [editing, setEditing] = useState(isCreating)
 
@@ -69,43 +105,7 @@ export function Doc() {
               </Button>
             )}
 
-            <Button
-              type="primary"
-              onClick={() => {
-                const values: ApiDoc = { id: nanoid(6), name: name ?? DEFAULT_DOC_NAME, content }
-
-                if (isCreating) {
-                  const menuItemId = nanoid(6)
-
-                  addMenuItem({
-                    id: menuItemId,
-                    name: name ?? DEFAULT_DOC_NAME,
-                    type: MenuItemType.Doc,
-                    data: values,
-                  })
-
-                  addTabItem(
-                    {
-                      key: menuItemId,
-                      label: name,
-                      contentType: MenuItemType.Doc,
-                    },
-                    { replaceTab: tabData.key },
-                  )
-                }
-                else {
-                  updateMenuItem({
-                    id: tabData.key,
-                    name: name,
-                    data: values,
-                  })
-
-                  messageApi.success('已保存')
-                }
-              }}
-            >
-              保存
-            </Button>
+            <Button type="primary" onClick={handleDocSave}>保存</Button>
           </Space>
         </div>
 

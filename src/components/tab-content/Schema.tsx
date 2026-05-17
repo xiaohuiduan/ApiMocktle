@@ -11,6 +11,7 @@ import { JsonSchemaCard } from '@/components/JsonSchemaCard'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
+import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { initialCreateApiSchemaData } from '@/data/remote'
 import { MenuItemType } from '@/enums'
 import type { ApiSchema } from '@/types'
@@ -28,6 +29,8 @@ export function Schema() {
   const { tabData } = useTabContentContext()
 
   const [schemaName, setSchemaName] = useState<ApiMenuData['name']>()
+
+  useCtrlSave(() => form.submit())
 
   const isCreating = tabData.data?.tabStatus === PageTabStatus.Create
 

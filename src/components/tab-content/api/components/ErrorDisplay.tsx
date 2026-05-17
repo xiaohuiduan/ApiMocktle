@@ -49,25 +49,30 @@ export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
         backgroundColor: token.colorErrorBg,
       }}
     >
-      {/* 顶部：图标 + 错误消息 */}
-      <div className="flex items-start gap-3">
-        <span className="shrink-0 mt-0.5" style={{ color: token.colorError }}>
-          {errorIconMap[errorInfo.errorType] || <AlertTriangleIcon size={28} />}
+      {/* 标题栏：图标 + 请求失败 */}
+      <div className="flex items-center gap-2 mb-2">
+        <span style={{ color: token.colorError }}>
+          {errorIconMap[errorInfo.errorType] || <AlertTriangleIcon size={18} />}
         </span>
-        <div className="flex-1 min-w-0">
-          <Typography.Text
-            strong
-            className="block text-base leading-relaxed"
-            style={{ color: token.colorError }}
-          >
-            {errorInfo.errorMessage}
-          </Typography.Text>
-        </div>
+        <Typography.Text
+          strong
+          className="text-sm"
+          style={{ color: token.colorError }}
+        >
+          请求失败
+        </Typography.Text>
+      </div>
+
+      {/* 错误消息 */}
+      <div className="ml-[26px]">
+        <Typography.Text className="block text-base leading-relaxed">
+          {errorInfo.errorMessage}
+        </Typography.Text>
       </div>
 
       {/* 修复建议 */}
       {errorInfo.suggestion && (
-        <div className="mt-3 ml-[44px]">
+        <div className="mt-3 ml-[26px]">
           <Typography.Text className="block text-sm font-medium mb-1" style={{ color: token.colorTextSecondary }}>
             建议排查方向
           </Typography.Text>
@@ -87,7 +92,7 @@ export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
 
       {/* 技术详情（可展开） */}
       {errorInfo.errorDetail && (
-        <div className="mt-3 ml-[44px]">
+        <div className="mt-3 ml-[26px]">
           <button
             type="button"
             onClick={() => setShowDetail(v => !v)}
@@ -118,7 +123,7 @@ export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
 
       {/* 重试按钮 */}
       {onRetry && (
-        <div className="mt-4 ml-[44px]">
+        <div className="mt-4 ml-[26px]">
           <Button
             size="small"
             icon={<RefreshCwIcon size={14} />}
