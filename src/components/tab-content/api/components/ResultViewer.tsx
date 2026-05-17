@@ -17,6 +17,7 @@ import { useStyles } from '@/hooks/useStyle'
 import type { ApiRunResult } from '@/types'
 
 import { ResponseBodyViewer } from './ResponseBodyViewer'
+import { ErrorDisplay } from './ErrorDisplay'
 import { calcBodySize, detectLanguage, getStatusColor, headerTableColumns } from '../utils'
 
 import { css } from '@emotion/css'
@@ -25,9 +26,10 @@ interface ResultViewerProps {
   result?: ApiRunResult
   error?: string
   curlContent?: ReactNode
+  onRetry?: () => void
 }
 
-export function ResultViewer({ result, error, curlContent }: ResultViewerProps) {
+export function ResultViewer({ result, error, curlContent, onRetry }: ResultViewerProps) {
   const { proxyConfig } = useProxyConfig()
   const proxyTooltip = proxyConfig && proxyConfig.proxyType !== 'none'
     ? `${proxyConfig.host}:${proxyConfig.port}`
@@ -63,9 +65,22 @@ export function ResultViewer({ result, error, curlContent }: ResultViewerProps) 
     }),
   }))
 
+  // 网络层错误（status === 0）且有结构化错误信息
+  if (result?.status === 0 && result.errorInfo) {
+    return <ErrorDisplay errorInfo={result.errorInfo} onRetry={onRetry} />
+  }
+
+  // 应用层错误（Tauri 调用失败等）
   if (error && !result) {
     return (
-      <Typography.Text type="danger">{error}</Typography.Text>
+      <ErrorDisplay
+        errorInfo={{
+          errorType: 'unknown',
+          errorMessage: error,
+          errorDetail: '',
+          suggestion: '请检查操作是否正确，如果问题持续请尝试重新登录',
+        }}
+      />
     )
   }
 

@@ -21,7 +21,7 @@ export function GlobalContextProvider(props: React.PropsWithChildren) {
   const { children } = props
 
   const [modal, modalContextHolder] = Modal.useModal()
-  const [messageApi, messageContextHolder] = message.useMessage({ duration: 1 })
+  const [messageApi, messageContextHolder] = message.useMessage({ duration: 2 })
 
   return (
     <MenuHelpersContextProvider>

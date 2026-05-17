@@ -110,6 +110,13 @@ export interface ProjectEnvironmentConfig {
   environments: ApiEnvironment[]
 }
 
+export interface RequestErrorInfo {
+  errorType: string
+  errorMessage: string
+  errorDetail: string
+  suggestion: string
+}
+
 export interface ApiRunResult {
   url: string
   method: HttpMethod
@@ -125,6 +132,7 @@ export interface ApiRunResult {
   contentType?: string
   body?: string
   proxyType?: string
+  errorInfo?: RequestErrorInfo
 }
 
 export interface ProxyConfig {
@@ -140,6 +148,7 @@ export interface ProxyTestResult {
   statusCode?: number
   durationMs?: number
   error?: string
+  errorInfo?: RequestErrorInfo
 }
 
 export interface ApiDetails {

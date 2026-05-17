@@ -624,6 +624,7 @@ export function RunTab() {
           <ResultViewer
             result={result}
             error={error}
+            onRetry={handleRun}
             curlContent={
               <div className="flex flex-col gap-3">
                 <div>

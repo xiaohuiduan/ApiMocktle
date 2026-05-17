@@ -1,9 +1,119 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+use serde::Serialize;
+
 use crate::db::client::Db;
 use crate::db::{auth_repo, project_repo};
 use crate::models::*;
+
+#[derive(Debug, Serialize)]
+pub struct RequestErrorInfo {
+    pub error_type: String,
+    pub error_message: String,
+    pub error_detail: String,
+    pub suggestion: String,
+}
+
+fn categorize_request_error(e: &reqwest::Error) -> RequestErrorInfo {
+    let detail = e.to_string();
+
+    if e.is_connect() {
+        let msg = detail.to_lowercase();
+        if msg.contains("dns") || msg.contains("temporary failure in name resolution") || msg.contains("failed to resolve") {
+            return RequestErrorInfo {
+                error_type: "dns_failure".into(),
+                error_message: "DNS 解析失败，无法找到服务器地址".into(),
+                error_detail: detail,
+                suggestion: "请检查 URL 中的域名是否正确\n检查网络连接是否正常\n尝试使用 IP 地址代替域名".into(),
+            };
+        }
+        if msg.contains("connection refused") {
+            return RequestErrorInfo {
+                error_type: "connection_refused".into(),
+                error_message: "连接被服务器拒绝".into(),
+                error_detail: detail,
+                suggestion: "请确认目标服务器已启动\n检查端口号是否正确\n确认防火墙未阻止连接".into(),
+            };
+        }
+        if msg.contains("connection reset") {
+            return RequestErrorInfo {
+                error_type: "connection_reset".into(),
+                error_message: "连接被重置".into(),
+                error_detail: detail,
+                suggestion: "请检查网络连接是否稳定\n目标服务器可能主动断开了连接".into(),
+            };
+        }
+        if msg.contains("network unreachable") || msg.contains("no route to host") {
+            return RequestErrorInfo {
+                error_type: "network_unreachable".into(),
+                error_message: "网络不可达".into(),
+                error_detail: detail,
+                suggestion: "请检查网络连接是否正常\n确认目标地址是否在本地网络中".into(),
+            };
+        }
+        return RequestErrorInfo {
+            error_type: "connection_failed".into(),
+            error_message: "无法连接到服务器".into(),
+            error_detail: detail,
+            suggestion: "请检查网络连接和 URL 是否正确\n确认目标服务器是否在线".into(),
+        };
+    }
+
+    if e.is_timeout() {
+        return RequestErrorInfo {
+            error_type: "timeout".into(),
+            error_message: "请求超时".into(),
+            error_detail: detail,
+            suggestion: "目标服务器响应过慢，请稍后重试\n检查网络连接是否稳定\n确认目标服务器是否负载过高".into(),
+        };
+    }
+
+    // reqwest 0.12 没有 is_tls() 方法，通过字符串匹配检测 TLS 错误
+    let msg_lower = detail.to_lowercase();
+    if msg_lower.contains("tls") || msg_lower.contains("ssl") || msg_lower.contains("certificate") {
+        return RequestErrorInfo {
+            error_type: "tls_error".into(),
+            error_message: "TLS/SSL 证书验证失败".into(),
+            error_detail: detail,
+            suggestion: "请确认服务器 SSL 证书是否有效\n检查系统时间是否准确\n如果使用自签名证书，需要配置信任".into(),
+        };
+    }
+
+    if e.is_status() {
+        return RequestErrorInfo {
+            error_type: "http_error".into(),
+            error_message: "HTTP 响应状态异常".into(),
+            error_detail: detail,
+            suggestion: "请检查请求参数是否正确".into(),
+        };
+    }
+
+    if e.is_redirect() {
+        return RequestErrorInfo {
+            error_type: "redirect_error".into(),
+            error_message: "重定向处理失败".into(),
+            error_detail: detail,
+            suggestion: "请检查请求 URL 是否被重定向到无效地址".into(),
+        };
+    }
+
+    if e.is_body() {
+        return RequestErrorInfo {
+            error_type: "body_error".into(),
+            error_message: "请求体发送失败".into(),
+            error_detail: detail,
+            suggestion: "请检查请求体数据是否过大或格式不正确".into(),
+        };
+    }
+
+    RequestErrorInfo {
+        error_type: "unknown".into(),
+        error_message: "请求异常".into(),
+        error_detail: detail,
+        suggestion: "请检查网络和请求配置\n如果问题持续，请查看技术详情联系管理员".into(),
+    }
+}
 
 #[tauri::command]
 pub async fn run_api_request(
@@ -150,11 +260,12 @@ pub async fn run_api_request(
         }
         Err(e) => {
             let duration_ms = start.elapsed().as_millis() as u64;
+            let err_info = categorize_request_error(&e);
             Ok(ApiResult::success(serde_json::json!({
                 "url": url,
                 "method": method,
                 "status": 0,
-                "statusText": e.to_string(),
+                "statusText": err_info.error_message,
                 "durationMs": duration_ms,
                 "requestHeaders": [],
                 "requestQuery": [],
@@ -164,6 +275,7 @@ pub async fn run_api_request(
                 "contentType": "",
                 "body": "",
                 "proxyType": payload.proxy_config.as_ref().map(|pc| pc.proxy_type.clone()).unwrap_or_default(),
+                "errorInfo": err_info,
             })))
         }
     }
@@ -380,10 +492,27 @@ pub async fn test_proxy_connection(
                 "durationMs": duration,
             })))
         }
-        Err(e) => Ok(ApiResult::success(serde_json::json!({
-            "ok": false,
-            "error": e.to_string(),
-        }))),
+        Err(e) => {
+            let err_info = categorize_request_error(&e);
+            let proxy_suggestion = match err_info.error_type.as_str() {
+                "connection_refused" => "请确认代理地址和端口是否正确\n确认代理服务是否已启动",
+                "dns_failure" => "请检查代理地址是否为有效的 IP 或域名",
+                "timeout" => "代理服务器响应超时，请检查网络连接\n确认代理地址和端口是否正确",
+                "connection_reset" => "代理连接被重置，请检查代理服务状态",
+                "network_unreachable" => "网络不可达，请检查网络连接",
+                _ => "请检查代理配置是否正确\n确认代理服务是否正常运行",
+            };
+            Ok(ApiResult::success(serde_json::json!({
+                "ok": false,
+                "error": err_info.error_message,
+                "errorInfo": {
+                    "errorType": err_info.error_type,
+                    "errorMessage": err_info.error_message,
+                    "errorDetail": err_info.error_detail,
+                    "suggestion": proxy_suggestion,
+                },
+            })))
+        },
     }
 }
 

@@ -405,6 +405,7 @@ export function QuickRequestRun() {
           <ResultViewer
             result={result}
             error={error}
+            onRetry={handleRun}
             curlContent={(() => {
               const url = buildRunUrl()
               const method = workCopy.method ?? DEFAULT_METHOD

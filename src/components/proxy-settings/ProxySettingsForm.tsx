@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Button, Input, InputNumber, Radio, Space, Tag, Typography } from 'antd'
-import { LoaderIcon } from 'lucide-react'
+import { CheckCircleIcon, LoaderIcon, XCircleIcon } from 'lucide-react'
 
 import { api } from '@/api-client'
 import { useProxyConfig } from '@/contexts/proxy-config'
 import { getProxyConfig, setProxyConfig } from '@/utils/app-config'
+import { ErrorDisplay } from '@/components/tab-content/api/components/ErrorDisplay'
 import type { ProxyConfig, ProxyTestResult } from '@/types'
 
 const DEFAULT_TEST_URL = 'https://baidu.com'
@@ -174,18 +175,22 @@ export function ProxySettingsForm() {
           <div>
             {testResult.ok
               ? (
-                  <Tag color="success">
+                  <Tag color="success" icon={<CheckCircleIcon size={14} />}>
                     连接成功
                     {testResult.statusCode != null && ` | 状态码 ${testResult.statusCode}`}
                     {testResult.durationMs != null && ` | ${testResult.durationMs}ms`}
                   </Tag>
                 )
-              : (
-                  <Tag color="error">
-                    连接失败
-                    {testResult.error ? ` | ${testResult.error}` : ''}
-                  </Tag>
-                )}
+              : testResult.errorInfo
+                ? (
+                    <ErrorDisplay errorInfo={testResult.errorInfo} />
+                  )
+                : (
+                    <Tag color="error" icon={<XCircleIcon size={14} />}>
+                      连接失败
+                      {testResult.error ? ` | ${testResult.error}` : ''}
+                    </Tag>
+                  )}
           </div>
         )}
       </div>

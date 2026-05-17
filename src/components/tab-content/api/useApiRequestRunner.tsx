@@ -53,7 +53,7 @@ export function useApiRequestRunner() {
       setResult(result)
     } catch (err) {
       const msg = err instanceof Error ? err.message : '运行失败'
-      messageApi.error(msg)
+      messageApi.error({ content: msg, duration: 4 })
       setError(msg)
     } finally {
       setRunning(false)
