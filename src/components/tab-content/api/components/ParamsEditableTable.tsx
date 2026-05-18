@@ -319,7 +319,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
                 )
               : (
                   <Input
-                    value={typeof exampleVal === 'string' ? exampleVal : undefined}
+                    value={exampleVal ?? ''}
                     variant="borderless"
                     onChange={(ev) => {
                       handleChange(ridx, { example: ev.target.value })
@@ -339,7 +339,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
           <ParamsEditableCell className="py-0">
             <Input.TextArea
               autoSize={{ minRows: 1, maxRows: 6 }}
-              value={typeof text === 'string' ? text : undefined}
+              value={text ?? ''}
               variant="borderless"
               onChange={(ev) => {
                 handleChange(ridx, { description: ev.target.value })

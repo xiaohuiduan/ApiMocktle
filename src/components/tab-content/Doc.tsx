@@ -33,7 +33,7 @@ export function Doc() {
     return { docValue: apiDocValue }
   }, [menuRawList, tabData.key])
 
-  const [name, setName] = useState<ApiDoc['name']>()
+  const [name, setName] = useState<ApiDoc['name']>('')
   const [content, setContent] = useState('')
 
   useEffect(() => {
@@ -88,7 +88,7 @@ export function Doc() {
           <InputUnderline
             placeholder={DEFAULT_DOC_NAME}
             style={{ fontWeight: 'bold', fontSize: '18px' }}
-            value={name}
+            value={name ?? ''}
             onChange={(ev) => {
               setName(ev.target.value)
             }}

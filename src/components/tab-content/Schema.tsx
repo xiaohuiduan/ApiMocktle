@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button, Form, Popconfirm, Space, theme } from 'antd'
 import { nanoid } from 'nanoid'
@@ -29,6 +29,7 @@ export function Schema() {
   const { tabData } = useTabContentContext()
 
   const [schemaName, setSchemaName] = useState<ApiMenuData['name']>()
+  const initialLoadKey = useRef<string | undefined>()
 
   useCtrlSave(() => form.submit())
 
@@ -54,11 +55,14 @@ export function Schema() {
   }, [menuRawList, isCreating, tabData.key])
 
   useEffect(() => {
-    if (fieldsValue) {
-      setSchemaName(fieldsValue.name)
-      form.setFieldsValue(fieldsValue as any)
-    }
-  }, [form, fieldsValue])
+    if (initialLoadKey.current === tabData.key) return
+    if (!fieldsValue) return
+
+    initialLoadKey.current = tabData.key
+    setSchemaName(fieldsValue.name)
+    form.setFieldsValue(fieldsValue as any)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldsValue, tabData.key])
 
   return (
     <div className="p-tabContent">

@@ -317,7 +317,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
                         <Input
                           disabled={disabled}
                           placeholder="字段名"
-                          value={name}
+                          value={name ?? ''}
                           onChange={(ev) => {
                             triggerChange?.({ ...value, name: ev.target.value })
                           }}
@@ -380,7 +380,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
         <Input
           disabled={disabled}
           placeholder="中文名"
-          value={displayName}
+          value={displayName ?? ''}
           onChange={(ev) => {
             triggerChange?.({ ...value, displayName: ev.target.value })
           }}
@@ -391,7 +391,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
         <Input
           disabled={disabled}
           placeholder="说明"
-          value={description}
+          value={description ?? ''}
           onChange={(ev) => {
             triggerChange?.({ ...value, description: ev.target.value })
           }}

@@ -328,3 +328,49 @@ export function buildSchemaExample(
     default: return {}
   }
 }
+
+// ─── 工具：从 JSON 示例推断 Schema ─────────────────────────────────────────
+
+/**
+ * 从 JSON 示例值推断出内部格式的 JsonSchema。
+ * - `null` → Null
+ * - `string` → String（携带 example）
+ * - `number` → Integer 或 Number（携带 example）
+ * - `boolean` → Boolean（携带 example）
+ * - `array` → Array（items 从首元素推断；空数组默认 string）
+ * - `object` → Object（每个属性递归推断，required: true）
+ */
+export function inferSchemaFromExample(json: unknown): JsonSchema {
+  if (json === null) {
+    return { type: SchemaType.Null }
+  }
+  if (typeof json === 'string') {
+    return { type: SchemaType.String, example: json }
+  }
+  if (typeof json === 'number') {
+    return {
+      type: Number.isInteger(json) ? SchemaType.Integer : SchemaType.Number,
+      example: json,
+    }
+  }
+  if (typeof json === 'boolean') {
+    return { type: SchemaType.Boolean, example: json }
+  }
+  if (Array.isArray(json)) {
+    return {
+      type: SchemaType.Array,
+      items: json.length > 0 ? inferSchemaFromExample(json[0]) : { type: SchemaType.String },
+    }
+  }
+  if (typeof json === 'object') {
+    return {
+      type: SchemaType.Object,
+      properties: Object.entries(json as Record<string, unknown>).map(([key, val]) => ({
+        name: key,
+        ...inferSchemaFromExample(val),
+        required: true,
+      })),
+    }
+  }
+  return { type: SchemaType.Any }
+}

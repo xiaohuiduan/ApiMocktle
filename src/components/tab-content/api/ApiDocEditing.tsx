@@ -58,6 +58,7 @@ export function ApiDocEditing() {
   const isCreating = tabData.data?.tabStatus === PageTabStatus.Create
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
+  const initialLoadKey = useRef<string | undefined>()
 
   const menuApiName = useMemo(() => {
     return menuRawList?.find(({ id }) => id === tabData.key)?.name ?? DEFAULT_NAME
@@ -68,27 +69,31 @@ export function ApiDocEditing() {
   useEffect(() => {
     if (isCreating) {
       form.setFieldsValue(initialCreateApiDetailsData as any)
+      return
     }
-    else {
-      if (menuRawList) {
-        const menuData = menuRawList.find(({ id }) => id === tabData.key)
 
-        if (
-          menuData
-          && (
-            menuData.type === MenuItemType.ApiDetail
-            || menuData.type === MenuItemType.HttpRequest
-          )
-        ) {
-          const apiDetails = menuData.data
+    if (initialLoadKey.current === tabData.key) return
+    initialLoadKey.current = tabData.key
 
-          if (apiDetails) {
-            form.setFieldsValue(apiDetails as any)
-          }
+    if (menuRawList) {
+      const menuData = menuRawList.find(({ id }) => id === tabData.key)
+
+      if (
+        menuData
+        && (
+          menuData.type === MenuItemType.ApiDetail
+          || menuData.type === MenuItemType.HttpRequest
+        )
+      ) {
+        const apiDetails = menuData.data
+
+        if (apiDetails) {
+          form.setFieldsValue(apiDetails as any)
         }
       }
     }
-  }, [form, menuRawList, isCreating, tabData.key])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabData.key, isCreating])
 
   const handleTitleConfirm = async () => {
     const newName = titleDraft.trim() || DEFAULT_NAME
