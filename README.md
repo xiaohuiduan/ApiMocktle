@@ -55,14 +55,16 @@
 
 ## 软件部分功能截图
 1. 项目管理列表
-![项目管理](./assets/project-list.png)
+<img width="1814" height="1178" alt="image" src="https://github.com/user-attachments/assets/9869cabb-4cb3-4e86-962f-def1888b19db" />
 
-2. 接口管理
+3. 接口管理
 
-![接口文档](./assets/url-doc.png)
+<img width="1814" height="1178" alt="image" src="https://github.com/user-attachments/assets/8f16fe8f-9e3e-4744-92b2-461d84953700" />
+
 
 3. 接口运行
-![接口运行](./assets/url-run.png)
+<img width="2019" height="1277" alt="image" src="https://github.com/user-attachments/assets/4faf4b92-1e3e-4add-961c-a7398a35e600" />
+
 
 4. 项目设置
 ![项目设置](./assets/settting.png)
