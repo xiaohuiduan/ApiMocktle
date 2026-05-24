@@ -55,7 +55,7 @@ export function AuthForm(props: AuthFormProps) {
     <div className="relative flex min-h-screen items-center justify-center px-4">
       <ParticleCanvas variant="fullscreen" preset="login" primaryColor={token.colorPrimary} />
       <div
-        className="w-full max-w-md overflow-hidden rounded-xl"
+        className="relative z-10 w-full max-w-md overflow-hidden rounded-xl"
         style={{
           backgroundColor: 'var(--color-bg-panel)',
           boxShadow: '0 4px 24px rgba(0,0,0,0.08), 0 0 0 1px var(--color-border)',
