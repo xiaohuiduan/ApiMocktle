@@ -10,6 +10,7 @@ import { ParticleCanvas } from '@/components/ParticleCanvas'
 import { UserMenu } from '@/components/UserMenu'
 
 import { useAuth } from '@/contexts/auth'
+import { useProjectTabsContext } from '@/contexts/project-tabs'
 import { type IconCategory, ICON_OPTIONS, ICON_MAP, ICON_CATEGORIES, ProjectIcon, getIconColor, kebabToPascal } from '@/components/ProjectIcon'
 import {
   ApiRequestError,
@@ -160,6 +161,7 @@ export function ProjectsClient() {
   const { token } = theme.useToken()
   const navigate = useNavigate()
   const { sessionId } = useAuth()
+  const { openProject } = useProjectTabsContext()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [projects, setProjects] = useState<ProjectItem[]>([])
@@ -226,7 +228,12 @@ export function ProjectsClient() {
 
       closeDialog()
       await fetchProjects()
-      navigate(`/projects/${project.id}/home`)
+      openProject({
+        projectId: project.id,
+        name: project.name,
+        icon: project.icon,
+        role: 'owner',
+      })
     }
     catch (error) {
       if (isUnauthorized(error)) {
@@ -316,7 +323,12 @@ export function ProjectsClient() {
                   (e.currentTarget as HTMLElement).style.backgroundColor = `${iconColor}12`
                 }}
                 onClick={() => {
-                  navigate(`/projects/${project.id}/home`)
+                  openProject({
+                    projectId: project.id,
+                    name: project.name,
+                    icon: project.icon,
+                    role: project.role,
+                  })
                 }}
               >
                 <div className="relative">

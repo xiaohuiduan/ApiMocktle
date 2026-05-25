@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useMemo } from 'react'
 import { useEvent } from 'react-use-event-hook'
 
 import type { ApiTabItem, EditStatus } from '@/components/ApiTab'
 import { API_MENU_CONFIG } from '@/configs/static'
 import { CatalogType } from '@/enums'
+import { useProjectTabsContext } from '@/contexts/project-tabs'
 
 function createDefaultTabItems(): ApiTabItem[] {
   return [
@@ -31,35 +32,63 @@ interface MenuTabContextData {
 
 const MenuTabContext = createContext({} as MenuTabContextData)
 
-interface MenuTabProviderProps extends React.PropsWithChildren {
-  projectId?: string
-}
+export function MenuTabProvider(props: React.PropsWithChildren) {
+  const { children } = props
+  const { activeProjectId, activeTabState, updateProjectTabState } = useProjectTabsContext()
 
-export function MenuTabProvider(props: MenuTabProviderProps) {
-  const { children, projectId } = props
-  const [tabItems, setTabItems] = useState<ApiTabItem[]>([])
-  const [activeTabKey, setActiveTabKey] = useState<ApiTabItem['key']>()
-  const [lastActiveTabKey, setLastActiveTabKey] = useState<ApiTabItem['key']>()
+  // ----- 从 ProjectTabsContext 派生 -----
+  const tabItems = activeTabState?.tabItems ?? createDefaultTabItems()
+  const activeTabKey = activeTabState?.activeTabKey
+  const lastActiveTabKey = activeTabState?.lastActiveTabKey
 
-  useEffect(() => {
-    setTabItems(createDefaultTabItems())
-    setActiveTabKey(CatalogType.Overview)
-    setLastActiveTabKey(undefined)
-  }, [projectId])
+  // ----- Setters 包装器（写入 ProjectTabsContext） -----
+  const setTabItems = useCallback(
+    (value: ApiTabItem[] | ((prev: ApiTabItem[]) => ApiTabItem[])) => {
+      if (!activeProjectId) return
+      updateProjectTabState(activeProjectId, (prev) => {
+        const newItems = typeof value === 'function' ? value(prev.tabItems) : value
+        return { ...prev, tabItems: newItems }
+      })
+    },
+    [activeProjectId, updateProjectTabState],
+  )
+
+  const setActiveTabKey = useCallback(
+    (value: ApiTabItem['key'] | undefined | ((prev: ApiTabItem['key'] | undefined) => ApiTabItem['key'] | undefined)) => {
+      if (!activeProjectId) return
+      updateProjectTabState(activeProjectId, (prev) => ({
+        ...prev,
+        activeTabKey: typeof value === 'function' ? value(prev.activeTabKey) : value,
+      }))
+    },
+    [activeProjectId, updateProjectTabState],
+  )
+
+  const setLastActiveTabKey = useCallback(
+    (value: ApiTabItem['key'] | undefined | ((prev: ApiTabItem['key'] | undefined) => ApiTabItem['key'] | undefined)) => {
+      if (!activeProjectId) return
+      updateProjectTabState(activeProjectId, (prev) => ({
+        ...prev,
+        lastActiveTabKey: typeof value === 'function' ? value(prev.lastActiveTabKey) : value,
+      }))
+    },
+    [activeProjectId, updateProjectTabState],
+  )
+
+  const value = useMemo<MenuTabContextData>(
+    () => ({
+      tabItems,
+      setTabItems,
+      activeTabKey,
+      setActiveTabKey,
+      lastActiveTabKey,
+      setLastActiveTabKey,
+    }),
+    [tabItems, setTabItems, activeTabKey, setActiveTabKey, lastActiveTabKey, setLastActiveTabKey],
+  )
 
   return (
-    <MenuTabContext.Provider
-      value={{
-        tabItems,
-        setTabItems,
-
-        activeTabKey,
-        setActiveTabKey,
-
-        lastActiveTabKey,
-        setLastActiveTabKey,
-      }}
-    >
+    <MenuTabContext.Provider value={value}>
       {children}
     </MenuTabContext.Provider>
   )

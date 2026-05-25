@@ -313,7 +313,7 @@ export function QuickRequestRun() {
           }}
         >
           <Input
-            bordered={false}
+            variant="borderless"
             className="flex-1 min-w-0"
             placeholder="输入完整 URL，如 https://api.example.com/users"
             value={workCopy.path ?? ''}

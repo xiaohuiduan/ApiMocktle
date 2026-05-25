@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router'
 
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { normalizeMenuRawList } from '@/components/JsonSchema/schema-normalizer'
@@ -18,6 +17,7 @@ import type {
 import { api } from '@/api-client'
 import { CatalogType, MenuItemType } from '@/enums'
 import { useAuth } from '@/contexts/auth'
+import { useProjectTabsContext } from '@/contexts/project-tabs'
 
 interface MenuHelpers {
   addMenuItem: (menuData: ApiMenuData) => void
@@ -215,113 +215,181 @@ function writeCachedEnvironmentId(projectId: string, environmentId?: string) {
   }
 }
 
-function useProjectId() {
-  const { pathname } = useLocation()
-  const parts = pathname.split('/').filter(Boolean)
-
-  if (parts[0] === 'projects' && parts[1]) {
-    return parts[1]
-  }
-
-  return undefined
-}
-
 export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
   const { children } = props
 
-  const projectId = useProjectId()
   const { sessionId } = useAuth()
-  const [menuRawList, setMenuRawList] = useState<ApiMenuData[]>()
-  const [recyleRawData, setRecyleRawData] = useState<RecycleData>()
-  const [projectEnvironments, setProjectEnvironments] = useState<ApiEnvironment[]>([])
-  const [projectEnvironmentConfig, setProjectEnvironmentConfig]
-    = useState<ProjectEnvironmentConfig>(EMPTY_PROJECT_ENVIRONMENT_CONFIG)
-  const [currentProjectEnvironmentId, setCurrentProjectEnvironmentId] = useState<string>()
-  const [menuSearchWord, setMenuSearchWord] = useState<string>()
-  const [apiDetailDisplay, setApiDetailDisplay]
-    = useState<MenuHelpersContextData['apiDetailDisplay']>('name')
+  const {
+    activeProjectId,
+    activeTabState,
+    updateProjectHelpersState,
+    openProject,
+  } = useProjectTabsContext()
 
-  const applyState = useCallback((state: StatePayload) => {
+  // ----- 从 ProjectTabsContext 派生状态 -----
+  const menuRawList = activeTabState?.projectState.menuRawList
+  const recyleRawData = activeTabState?.projectState.recyleRawData
+  const projectEnvironments = activeTabState?.projectState.projectEnvironments ?? []
+  const projectEnvironmentConfig = activeTabState?.projectState.projectEnvironmentConfig ?? EMPTY_PROJECT_ENVIRONMENT_CONFIG
+  const currentProjectEnvironmentId = activeTabState?.projectState.currentProjectEnvironmentId
+  const menuSearchWord = activeTabState?.projectState.menuSearchWord
+  const apiDetailDisplay = activeTabState?.projectState.apiDetailDisplay ?? 'name'
+
+  // ----- Setters 包装器（写入 ProjectTabsContext） -----
+  const setCurrentProjectEnvironmentId = useCallback(
+    (value: string | undefined | ((prev: string | undefined) => string | undefined)) => {
+      if (!activeProjectId) return
+      updateProjectHelpersState(activeProjectId, (prev) => ({
+        ...prev,
+        currentProjectEnvironmentId:
+          typeof value === 'function'
+            ? (value as (prev: string | undefined) => string | undefined)(prev.currentProjectEnvironmentId)
+            : value,
+      }))
+    },
+    [activeProjectId, updateProjectHelpersState],
+  )
+
+  const setMenuSearchWord = useCallback(
+    (value: string | undefined | ((prev: string | undefined) => string | undefined)) => {
+      if (!activeProjectId) return
+      updateProjectHelpersState(activeProjectId, (prev) => ({
+        ...prev,
+        menuSearchWord:
+          typeof value === 'function'
+            ? (value as (prev: string | undefined) => string | undefined)(prev.menuSearchWord)
+            : value,
+      }))
+    },
+    [activeProjectId, updateProjectHelpersState],
+  )
+
+  const setApiDetailDisplay = useCallback(
+    (value: 'name' | 'path' | ((prev: 'name' | 'path') => 'name' | 'path')) => {
+      if (!activeProjectId) return
+      updateProjectHelpersState(activeProjectId, (prev) => ({
+        ...prev,
+        apiDetailDisplay:
+          typeof value === 'function'
+            ? (value as (prev: 'name' | 'path') => 'name' | 'path')(prev.apiDetailDisplay ?? 'name')
+            : value,
+      }))
+    },
+    [activeProjectId, updateProjectHelpersState],
+  )
+
+  // ----- applyState：归一化并写入 ProjectTabsContext -----
+  const applyState = useCallback((projectId: string, state: StatePayload) => {
     const normalizedState = normalizeStatePayload(state)
-
-    // 统一归一化所有 JSON Schema（外部格式 → 内部格式），后续所有组件直接使用
+    // 统一归一化所有 JSON Schema（外部格式 → 内部格式）
     normalizedState.menuRawList = normalizeMenuRawList(normalizedState.menuRawList) as ApiMenuData[]
 
-    setMenuRawList(normalizedState.menuRawList)
-    setRecyleRawData(normalizedState.recyleRawData)
-    setProjectEnvironments(normalizedState.projectEnvironments)
-    setProjectEnvironmentConfig(normalizedState.projectEnvironmentConfig)
+    updateProjectHelpersState(projectId, (prev) => ({
+      ...prev,
+      menuRawList: normalizedState.menuRawList,
+      recyleRawData: normalizedState.recyleRawData,
+      projectEnvironments: normalizedState.projectEnvironments,
+      projectEnvironmentConfig: normalizedState.projectEnvironmentConfig,
+    }))
 
-    if (projectId) {
-      writeCachedState(projectId, normalizedState)
-    }
-  }, [projectId])
+    writeCachedState(projectId, normalizedState)
+  }, [updateProjectHelpersState])
 
   const applyServerState = useCallback((state: ProjectStateSnapshot) => {
-    applyState(state)
-  }, [applyState])
+    if (activeProjectId) {
+      applyState(activeProjectId, state)
+    }
+  }, [applyState, activeProjectId])
 
+  // ----- reloadState -----
   const reloadState = useCallback(async () => {
-    if (!projectId || !sessionId) {
-      setMenuRawList(undefined)
-      setRecyleRawData(undefined)
-      setProjectEnvironments([])
-      setProjectEnvironmentConfig(EMPTY_PROJECT_ENVIRONMENT_CONFIG)
-
+    if (!activeProjectId || !sessionId) {
       return
     }
 
     try {
       const state = await api<StatePayload>('get_project_state', {
         sessionId,
-        projectId,
+        projectId: activeProjectId,
       })
-      applyState(state)
+      applyState(activeProjectId, state)
     }
     catch (error) {
       console.error(error)
     }
-  }, [projectId, sessionId, applyState])
+  }, [activeProjectId, sessionId, applyState])
 
+  // ----- 当 activeProjectId 变化时：自动打开未在标签栏中的项目，加载缓存 + 刷新 -----
   useEffect(() => {
-    if (projectId) {
-      const cachedState = readCachedState(projectId)
-
-      if (cachedState) {
-        applyState(cachedState)
-      }
-
-      setCurrentProjectEnvironmentId(readCachedEnvironmentId(projectId))
-    }
-
-    void reloadState()
-  }, [applyState, projectId, reloadState])
-
-  useEffect(() => {
-    if (!projectId) {
-      setCurrentProjectEnvironmentId(undefined)
+    // 如果 activeProjectId 有值但不在 ProjectTabsContext 中（例如直接输入 URL），自动打开
+    if (activeProjectId && !activeTabState) {
+      openProject({
+        projectId: activeProjectId,
+        name: 'Loading...',
+        role: 'viewer',
+      })
 
       return
     }
+
+    if (activeProjectId) {
+      const cachedState = readCachedState(activeProjectId)
+
+      if (cachedState) {
+        applyState(activeProjectId, cachedState)
+      }
+
+      // 恢复缓存的 environmentId
+      const cachedEnvId = readCachedEnvironmentId(activeProjectId)
+
+      if (cachedEnvId) {
+        updateProjectHelpersState(activeProjectId, (prev) => {
+          if (!prev.currentProjectEnvironmentId) {
+            return { ...prev, currentProjectEnvironmentId: cachedEnvId }
+          }
+
+          return prev
+        })
+      }
+    }
+
+    void reloadState()
+    // 只在 activeProjectId 变化时触发（activeTabState 会随 openTabs 变化而变化，
+    // 但这里只需要检测「是否有值」，不需要在它变化时重新执行）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId])
+
+  // ----- Environment ID fallback -----
+  useEffect(() => {
+    if (!activeProjectId) return
 
     if (currentProjectEnvironmentId) {
       const exists = projectEnvironments.some(({ id }) => id === currentProjectEnvironmentId)
 
       if (exists) {
-        writeCachedEnvironmentId(projectId, currentProjectEnvironmentId)
+        writeCachedEnvironmentId(activeProjectId, currentProjectEnvironmentId)
 
         return
       }
     }
 
     const fallbackId = projectEnvironments.at(0)?.id
-    setCurrentProjectEnvironmentId(fallbackId)
-    writeCachedEnvironmentId(projectId, fallbackId)
-  }, [currentProjectEnvironmentId, projectEnvironments, projectId])
 
+    if (fallbackId === undefined && currentProjectEnvironmentId === undefined) return
+
+    if (fallbackId !== currentProjectEnvironmentId) {
+      setCurrentProjectEnvironmentId(fallbackId)
+
+      if (fallbackId) {
+        writeCachedEnvironmentId(activeProjectId, fallbackId)
+      }
+    }
+  }, [activeProjectId, currentProjectEnvironmentId, projectEnvironments, setCurrentProjectEnvironmentId])
+
+  // ----- MenuHelpers（mutation 辅助方法） -----
   const menuHelpers = useMemo<MenuHelpers>(() => {
     const guardProject = () => {
-      if (!projectId) {
+      if (!activeProjectId) {
         console.error(new Error('当前不在项目页面'))
 
         return undefined
@@ -331,7 +399,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         return undefined
       }
 
-      return projectId
+      return activeProjectId
     }
 
     const mutateRecycleItems = (method: 'DELETE' | 'POST', recycleIds: string[]) => {
@@ -342,7 +410,6 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
       }
 
       if (method === 'POST') {
-        // Restore each item
         void Promise.all(
           recycleIds.map((recycleId) =>
             api<unknown>('restore_recycle_item', {
@@ -356,7 +423,8 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
           .catch((error: unknown) => {
             console.error(error)
           })
-      } else {
+      }
+      else {
         void api<unknown>('delete_recycle_items', {
           sessionId,
           projectId: id,
@@ -473,10 +541,10 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
           projectId: id,
           payload: { config },
         })
-        applyState(state)
+        applyState(id, state)
       },
     }
-  }, [applyServerState, projectId, sessionId, reloadState, applyState])
+  }, [applyServerState, activeProjectId, sessionId, reloadState, applyState])
 
   return (
     <MenuHelpersContext.Provider

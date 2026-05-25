@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { Button, Dropdown, theme, Typography, type MenuProps } from 'antd'
 import { CheckIcon, ChevronDownIcon, FolderIcon } from 'lucide-react'
-import { useLocation, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 
 import { useAuth } from '@/contexts/auth'
+import { useProjectTabsContext } from '@/contexts/project-tabs'
 import {
   ApiRequestError,
   requestProjects,
@@ -18,75 +19,20 @@ const roleText: Record<ProjectItem['role'], string> = {
   viewer: '查看者',
 }
 
-function resolveProjectId(pathname: string) {
-  const parts = pathname.split('/').filter(Boolean)
-  return parts.at(0) === 'projects' ? parts.at(1) : undefined
-}
-
 function getProjectMark(name: string) {
   return name.trim().charAt(0).toUpperCase() || '项'
-}
-
-function buildProjectItems(payload: {
-  currentProjectId?: string
-  error?: string
-  navigate: ReturnType<typeof useNavigate>
-  projects: ProjectItem[]
-}) {
-  const items: DropdownItem[] = payload.projects.map((project) => ({
-    key: project.id,
-    label: (
-      <div className="flex min-w-[240px] items-center gap-3 py-1">
-        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-black/5 text-xs font-semibold">
-          {getProjectMark(project.name)}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-medium">{project.name}</div>
-          <div className="truncate text-xs opacity-60">角色：{roleText[project.role]}</div>
-        </div>
-        {payload.currentProjectId === project.id && <CheckIcon size={14} />}
-      </div>
-    ),
-    onClick: () => {
-      payload.navigate(`/projects/${project.id}/home`)
-    },
-  }))
-
-  if (payload.error) {
-    items.unshift({
-      key: 'error',
-      disabled: true,
-      label: <Typography.Text type="danger">{payload.error}</Typography.Text>,
-    })
-  }
-
-  if (items.length > 0) {
-    items.push({ type: 'divider' })
-  }
-
-  items.push({
-    key: 'projects',
-    icon: <FolderIcon size={14} />,
-    label: '查看项目列表',
-    onClick: () => {
-      payload.navigate('/projects')
-    },
-  })
-
-  return items
 }
 
 export function ProjectQuickSwitch() {
   const { token } = theme.useToken()
   const navigate = useNavigate()
-  const { pathname } = useLocation()
   const { sessionId } = useAuth()
+  const { activeProjectId, openProject } = useProjectTabsContext()
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [error, setError] = useState<string>()
-  const projectId = useMemo(() => resolveProjectId(pathname), [pathname])
 
   useEffect(() => {
-    if (!projectId || !sessionId) {
+    if (!sessionId) {
       setProjects([])
       setError(undefined)
       return
@@ -126,28 +72,66 @@ export function ProjectQuickSwitch() {
     return () => {
       cancelled = true
     }
-  }, [navigate, projectId, sessionId])
+  }, [navigate, sessionId])
 
   const currentProject = useMemo(
-    () => projects.find((project) => project.id === projectId),
-    [projectId, projects],
+    () => projects.find((project) => project.id === activeProjectId),
+    [activeProjectId, projects],
   )
 
-  if (!projectId) {
-    return null
-  }
+  const items = useMemo<DropdownItem[]>(() => {
+    const result: DropdownItem[] = projects.map((project) => ({
+      key: project.id,
+      label: (
+        <div className="flex min-w-[240px] items-center gap-3 py-1">
+          <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-black/5 text-xs font-semibold">
+            {getProjectMark(project.name)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium">{project.name}</div>
+            <div className="truncate text-xs opacity-60">角色：{roleText[project.role]}</div>
+          </div>
+          {activeProjectId === project.id && <CheckIcon size={14} />}
+        </div>
+      ),
+      onClick: () => {
+        openProject({
+          projectId: project.id,
+          name: project.name,
+          icon: project.icon,
+          role: project.role,
+        })
+      },
+    }))
+
+    if (error) {
+      result.unshift({
+        key: 'error',
+        disabled: true,
+        label: <Typography.Text type="danger">{error}</Typography.Text>,
+      })
+    }
+
+    if (result.length > 0) {
+      result.push({ type: 'divider' })
+    }
+
+    result.push({
+      key: 'projects',
+      icon: <FolderIcon size={14} />,
+      label: '查看项目列表',
+      onClick: () => {
+        navigate('/projects')
+      },
+    })
+
+    return result
+  }, [projects, error, activeProjectId, openProject, navigate])
 
   return (
     <Dropdown
       trigger={['click']}
-      menu={{
-        items: buildProjectItems({
-          currentProjectId: projectId,
-          error,
-          navigate,
-          projects,
-        }),
-      }}
+      menu={{ items }}
     >
       <Button
         className="min-w-[160px] justify-between"

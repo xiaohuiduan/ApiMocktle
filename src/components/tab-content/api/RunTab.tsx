@@ -472,7 +472,7 @@ export function RunTab() {
               )
             : null}
           <Input
-            bordered={false}
+            variant="borderless"
             className="flex-1 min-w-0"
             style={{ paddingLeft: envBaseUrl ? 0 : 8 }}
             value={workCopy.path ?? ''}

@@ -64,9 +64,9 @@ export function PanelLayout(props: PanelLayoutProps) {
     }
   })
 
-  const [defaultSize, setDefaultSize] = useState<PanelProps['defaultSize']>()
-  const [minSize, setMinSize] = useState<PanelProps['minSize']>()
-  const [maxSize, setMaxSize] = useState<PanelProps['maxSize']>()
+  const [defaultSize, setDefaultSize] = useState<PanelProps['defaultSize']>(20)
+  const [minSize, setMinSize] = useState<PanelProps['minSize']>(15)
+  const [maxSize, setMaxSize] = useState<PanelProps['maxSize']>(50)
 
   useLayoutEffect(() => {
     const panelGroup = getPanelGroupElement('panel-group')
