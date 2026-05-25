@@ -30,6 +30,7 @@ interface ParamsEditableTableProps extends Pick<EditableTableProps, 'autoNewRow'
   removable?: boolean
   isPathParamsTable?: boolean
   varMap?: Map<string, string>
+  exampleColumnTitle?: string
 }
 
 export function ParamsEditableTable(props: ParamsEditableTableProps) {
@@ -42,6 +43,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     autoNewRow = !isPathParamsTable,
     removable = true,
     varMap,
+    exampleColumnTitle = '请求值',
   } = props
 
   const newRowRecordId = nanoid(6)
@@ -224,7 +226,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
         )
       },
     },
-    {title: '请求值',
+    {title: exampleColumnTitle,
       dataIndex: 'example',
       width: '25%',
       render: (exampleVal, record, ridx) => {

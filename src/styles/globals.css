@@ -103,6 +103,7 @@
 
     .ant-tree-node-content-wrapper {
       @apply flex items-center w-0;
+      user-select: none;
     }
 
     .ant-tree-treenode {

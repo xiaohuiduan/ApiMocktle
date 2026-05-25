@@ -38,6 +38,7 @@ interface ParamsTabProps {
   varMap?: Map<string, string>
   disabledInheritedNames?: { query: Set<string>; header: Set<string>; cookie: Set<string> }
   onToggleInheritedParam?: (section: 'query' | 'header' | 'cookie', name: string, enabled: boolean) => void
+  exampleColumnTitle?: string
 }
 
 /**
@@ -129,7 +130,7 @@ function InheritedParamsBar(props: {
  * 全局/环境参数在独立参考区展示，本地参数在可编辑表格中。
  */
 export function ParamsTab(props: ParamsTabProps) {
-  const { value: parameters, onChange, globalParameters, envParameters, varMap, disabledInheritedNames, onToggleInheritedParam } = props
+  const { value: parameters, onChange, globalParameters, envParameters, varMap, disabledInheritedNames, onToggleInheritedParam, exampleColumnTitle } = props
 
   const queryCount = (parameters?.query?.length ?? 0) + (parameters?.path?.length ?? 0)
     + (globalParameters?.query?.length ?? 0) + (envParameters?.query?.length ?? 0)
@@ -163,6 +164,7 @@ export function ParamsTab(props: ParamsTabProps) {
               </div>
               <ParamsEditableTable
                 varMap={varMap}
+                exampleColumnTitle={exampleColumnTitle}
                 value={parameters?.query}
                 onChange={(query) => {
                   onChange?.({ ...parameters, query })
@@ -179,6 +181,7 @@ export function ParamsTab(props: ParamsTabProps) {
                         isPathParamsTable
                         autoNewRow={false}
                         removable={false}
+                        exampleColumnTitle={exampleColumnTitle}
                         value={parameters.path}
                         onChange={(path) => {
                           onChange?.({ ...parameters, path })
@@ -210,6 +213,7 @@ export function ParamsTab(props: ParamsTabProps) {
               />
               <ParamsEditableTable
                 varMap={varMap}
+                exampleColumnTitle={exampleColumnTitle}
                 value={parameters?.header}
                 onChange={(header) => {
                   onChange?.({ ...parameters, header })
@@ -238,6 +242,7 @@ export function ParamsTab(props: ParamsTabProps) {
               />
               <ParamsEditableTable
                 varMap={varMap}
+                exampleColumnTitle={exampleColumnTitle}
                 value={parameters?.cookie}
                 onChange={(cookie) => {
                   onChange?.({ ...parameters, cookie })

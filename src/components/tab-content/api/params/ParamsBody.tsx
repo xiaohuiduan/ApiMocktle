@@ -71,6 +71,7 @@ function BodyComp(props: BodyCompProps) {
   if (value.type === BodyType.FormData || value.type === BodyType.UrlEncoded) {
     return (
       <ParamsEditableTable
+        exampleColumnTitle="示例值"
         value={value.parameters}
         onChange={(values) => {
           onChange?.({ ...value, parameters: values })

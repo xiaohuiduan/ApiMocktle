@@ -322,7 +322,7 @@ export function ApiDocEditing() {
 
         <GroupTitle className="mt-2">请求参数</GroupTitle>
         <Form.Item noStyle name="parameters">
-          <ParamsTab />
+          <ParamsTab exampleColumnTitle="示例值" />
         </Form.Item>
 
         <div className="mt-4">
