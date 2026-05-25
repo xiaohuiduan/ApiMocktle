@@ -15,7 +15,11 @@ interface PersonalToken {
   createdAt: string
 }
 
-export function UserMenu() {
+interface UserMenuProps {
+  showUsername?: boolean
+}
+
+export function UserMenu({ showUsername = true }: UserMenuProps) {
   const navigate = useNavigate()
   const { user, sessionId, logout, changePassword } = useAuth()
 
@@ -66,6 +70,8 @@ export function UserMenu() {
       <Dropdown
         menu={{
           items: [
+            { key: 'user', label: user.username, icon: <UserCircle2Icon size={16} />, disabled: true },
+            { type: 'divider' as const },
             { key: 'projects', label: '项目列表', icon: <UserCircle2Icon size={16} /> },
             { key: 'tokens', label: '管理 Token', icon: <KeyRoundIcon size={16} /> },
             { key: 'changePassword', label: '修改密码', icon: <KeyIcon size={16} /> },
@@ -81,7 +87,7 @@ export function UserMenu() {
         }}
       >
         <Button size="small" type="text" icon={<UserCircle2Icon size={16} />}>
-          {user.username}
+          {showUsername && user.username}
         </Button>
       </Dropdown>
 

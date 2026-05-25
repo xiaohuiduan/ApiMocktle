@@ -47,6 +47,12 @@ pub struct ProjectItem {
     pub icon: String,
     #[serde(rename = "memberCount")]
     pub member_count: i32,
+    #[serde(rename = "apiCount")]
+    pub api_count: i32,
+    #[serde(rename = "schemaCount")]
+    pub schema_count: i32,
+    #[serde(rename = "requestCount")]
+    pub request_count: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

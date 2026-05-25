@@ -24,7 +24,7 @@ export function SideNav() {
 
       {/* 底部用户区域 */}
       <div className="mt-auto flex flex-col items-center gap-1 pb-3">
-        <UserMenu />
+        <UserMenu showUsername={false} />
         <Button
           type="text"
           size="small"

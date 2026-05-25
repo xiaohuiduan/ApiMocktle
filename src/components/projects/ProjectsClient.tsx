@@ -383,6 +383,13 @@ export function ProjectsClient() {
                     <Typography.Text type="secondary" className="text-xs">
                       {roleText[project.role]}
                     </Typography.Text>
+                    <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                      <span>API {project.apiCount}</span>
+                      <span className="text-gray-300">|</span>
+                      <span>模型 {project.schemaCount}</span>
+                      <span className="text-gray-300">|</span>
+                      <span>快捷请求 {project.requestCount}</span>
+                    </div>
                   </div>
                 </div>
               </Card>

@@ -7,6 +7,9 @@ export interface ProjectItem {
   ownerId: string
   createdAt: string
   icon?: string
+  apiCount: number
+  schemaCount: number
+  requestCount: number
 }
 
 export class ApiRequestError extends Error {

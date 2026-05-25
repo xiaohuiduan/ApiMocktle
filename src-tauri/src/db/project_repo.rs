@@ -9,7 +9,10 @@ pub fn list_projects(db: &Db, user_id: &str) -> Result<Vec<ProjectItem>, crate::
     let mut stmt = conn.prepare(
         "SELECT p.id, p.name, p.owner_id, p.created_at, COALESCE(p.icon, '') as icon,
                 pm.role,
-                (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count
+                (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count,
+                (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'apiDetail') as api_count,
+                (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'apiSchema') as schema_count,
+                (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'httpRequest') as request_count
          FROM projects p
          JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?1
          ORDER BY p.created_at DESC",
@@ -24,6 +27,9 @@ pub fn list_projects(db: &Db, user_id: &str) -> Result<Vec<ProjectItem>, crate::
             icon: row.get::<_, String>(4).unwrap_or_default(),
             role: row.get(5)?,
             member_count: row.get(6)?,
+            api_count: row.get(7)?,
+            schema_count: row.get(8)?,
+            request_count: row.get(9)?,
         })
     })?;
 
@@ -58,6 +64,9 @@ pub fn create_project(
         icon: icon.to_string(),
         role: "owner".to_string(),
         member_count: 1,
+        api_count: 0,
+        schema_count: 0,
+        request_count: 0,
     })
 }
 
@@ -69,7 +78,10 @@ pub fn get_project(
     let conn = db.0.lock().unwrap();
     let result = conn.query_row(
         "SELECT p.id, p.name, p.owner_id, p.created_at, COALESCE(p.icon, ''), pm.role,
-                (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count
+                (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count,
+                (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'apiDetail') as api_count,
+                (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'apiSchema') as schema_count,
+                (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'httpRequest') as request_count
          FROM projects p
          JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?2
          WHERE p.id = ?1",
@@ -83,6 +95,9 @@ pub fn get_project(
                 icon: row.get::<_, String>(4).unwrap_or_default(),
                 role: row.get(5)?,
                 member_count: row.get(6)?,
+                api_count: row.get(7)?,
+                schema_count: row.get(8)?,
+                request_count: row.get(9)?,
             })
         },
     );
