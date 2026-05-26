@@ -12,7 +12,7 @@ import {
   Typography,
   theme,
 } from 'antd'
-import { PlayIcon, PencilIcon } from 'lucide-react'
+import { ClockIcon, PlayIcon, PencilIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
@@ -32,6 +32,7 @@ import { ParamsTab } from './params/ParamsTab'
 import { useApiRequestRunner } from './useApiRequestRunner'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
+import { HistoryPanel } from './components/HistoryPanel'
 
 function buildBodyExample(apiDetails: ApiDetails, menuRawList?: unknown): string {
   const body = apiDetails.requestBody
@@ -110,6 +111,7 @@ export function QuickRequestRun() {
 
   const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
   const [saving, setSaving] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
@@ -198,7 +200,7 @@ export function QuickRequestRun() {
       }
     }
 
-    await run(url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
+    await run(isCreating ? undefined : tabData.key, url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
   }
 
   const handleSave = async () => {
@@ -345,6 +347,7 @@ export function QuickRequestRun() {
         )}
 
         <Space.Compact className="shrink-0">
+          <Button icon={<ClockIcon size={14} />} title="历史记录" disabled={isCreating} onClick={() => setHistoryOpen(true)} />
           <Button
             loading={running}
             type="primary"
@@ -499,6 +502,8 @@ export function QuickRequestRun() {
         hasResult={!!(result || error)}
         autoSaveId="quick-request-run"
       />
+
+      {!isCreating && <HistoryPanel menuItemId={tabData.key} open={historyOpen} onClose={() => setHistoryOpen(false)} />}
     </div>
   )
 }

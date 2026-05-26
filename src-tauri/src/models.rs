@@ -251,6 +251,24 @@ pub struct RunRequestHeader {
     pub value: String,
 }
 
+// Request History
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RequestHistoryItem {
+    pub id: String,
+    #[serde(rename = "menuItemId")]
+    pub menu_item_id: String,
+    #[serde(rename = "requestJson")]
+    pub request_json: serde_json::Value,
+    #[serde(rename = "responseJson")]
+    pub response_json: serde_json::Value,
+    #[serde(rename = "statusCode")]
+    pub status_code: i32,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: i64,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+}
+
 // Personal Tokens
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PersonalToken {

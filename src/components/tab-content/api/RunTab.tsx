@@ -13,7 +13,7 @@ import {
   Typography,
   theme,
 } from 'antd'
-import { PlayIcon, RotateCcwIcon } from 'lucide-react'
+import { ClockIcon, PlayIcon, RotateCcwIcon } from 'lucide-react'
 
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { buildSchemaExample } from '@/components/JsonSchema/schema-normalizer'
@@ -30,6 +30,7 @@ import { ParamsTab } from './params/ParamsTab'
 import { useApiRequestRunner } from './useApiRequestRunner'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
+import { HistoryPanel } from './components/HistoryPanel'
 
 const STORAGE_PREFIX = 'run_tab_'
 
@@ -172,6 +173,7 @@ export function RunTab() {
 
   const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const [disabledInheritedParams, setDisabledInheritedParams] = useState<{
     query: Set<string>
@@ -381,7 +383,7 @@ export function RunTab() {
       }
     }
 
-    await run(url, workCopy.method ?? 'GET', headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
+    await run(tabData.key, url, workCopy.method ?? 'GET', headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
   }
 
   // 一键填充 Body
@@ -390,6 +392,7 @@ export function RunTab() {
     const text = buildBodyFillText(workCopy, menuRawList)
     setBodyRawText(text)
   }
+
 
   // 判断是否显示 JSON 输入框
   const showBodyEditor = workCopy?.requestBody
@@ -506,6 +509,7 @@ export function RunTab() {
         )}
 
         <Space className="shrink-0" style={{ marginLeft: 'auto' }}>
+          <Button icon={<ClockIcon size={14} />} title="历史记录" onClick={() => setHistoryOpen(true)} />
           <Button
             loading={running}
             type="primary"
@@ -663,6 +667,8 @@ export function RunTab() {
         hasResult={!!(result || error)}
         autoSaveId={`run-tab-${docValue.id}`}
       />
+
+      <HistoryPanel menuItemId={tabData.key} open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </div>
   )
 }

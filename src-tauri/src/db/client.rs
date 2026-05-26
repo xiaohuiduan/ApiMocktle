@@ -131,6 +131,22 @@ fn run_migrations(conn: &Connection) {
         conn.execute("ALTER TABLE projects ADD COLUMN icon TEXT NOT NULL DEFAULT ''", [])
             .ok();
     }
+
+    // request_history table
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS request_history (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            menu_item_id TEXT NOT NULL,
+            request_json TEXT NOT NULL,
+            response_json TEXT NOT NULL,
+            status_code INTEGER NOT NULL,
+            duration_ms INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_request_history_menu ON request_history(project_id, menu_item_id);",
+    ).ok();
 }
 
 pub fn init_database(app_data_dir: &PathBuf) -> Db {

@@ -4,3 +4,4 @@ pub mod project_repo;
 pub mod menu_repo;
 pub mod recycle_repo;
 pub mod personal_token_repo;
+pub mod history_repo;

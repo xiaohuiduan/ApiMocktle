@@ -18,6 +18,7 @@ export function useApiRequestRunner() {
   const { messageApi } = useGlobalContext()
 
   const run = useCallback(async (
+    menuItemId: string | undefined,
     url: string,
     method: string,
     headers: Array<{ name: string, value: string }>,
@@ -52,10 +53,56 @@ export function useApiRequestRunner() {
 
       const result = await api<ApiRunResult>('run_api_request', payload)
       setResult(result)
+
+      // Save history (fire-and-forget)
+      if (menuItemId && projectId && sessionId) {
+        const requestData = { url, method, headers, body, contentType }
+        api('save_request_history', {
+          sessionId,
+          projectId,
+          menuItemId,
+          requestJson: requestData,
+          responseJson: result,
+          statusCode: result.status,
+          durationMs: result.durationMs,
+        }).catch(() => {})
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '运行失败'
       messageApi.error({ content: msg, duration: 4 })
       setError(msg)
+
+      // Save error history
+      if (menuItemId && projectId && sessionId) {
+        const requestData = { url, method, headers, body, contentType }
+        const errorResult: ApiRunResult = {
+          url,
+          method: method as ApiRunResult['method'],
+          status: 0,
+          statusText: msg,
+          durationMs: 0,
+          requestHeaders: headers.map(h => ({ name: h.name, value: h.value })),
+          requestQuery: [],
+          requestCookie: [],
+          requestBodyParameters: [],
+          headers: [],
+          errorInfo: {
+            errorType: 'application_error',
+            errorMessage: msg,
+            errorDetail: err instanceof Error ? err.stack ?? '' : String(err),
+            suggestion: '请检查操作是否正确，如果问题持续请尝试重新登录',
+          },
+        }
+        api('save_request_history', {
+          sessionId,
+          projectId,
+          menuItemId,
+          requestJson: requestData,
+          responseJson: errorResult,
+          statusCode: 0,
+          durationMs: 0,
+        }).catch(() => {})
+      }
     } finally {
       setRunning(false)
     }
@@ -66,5 +113,5 @@ export function useApiRequestRunner() {
     setError(undefined)
   }, [])
 
-  return { run, running, result, error, resetResult }
+  return { run, running, result, error, resetResult, setResult }
 }

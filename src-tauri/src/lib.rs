@@ -81,6 +81,10 @@ pub fn run() {
             // Request runner
             commands::request_runner::run_api_request,
             commands::request_runner::test_proxy_connection,
+            // History
+            commands::history::save_request_history,
+            commands::history::list_request_history,
+            commands::history::delete_request_history,
             // App config
             commands::app_config_cmd::get_app_config,
             commands::app_config_cmd::set_app_config,

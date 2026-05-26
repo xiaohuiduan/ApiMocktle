@@ -710,7 +710,7 @@ mod tests {
 
     #[test]
     fn test_build_client_no_proxy() {
-        let client = build_client_with_proxy(None);
+        let client = build_client_with_proxy(None, false);
         // 验证客户端构建不 panic
         let _ = client;
     }
