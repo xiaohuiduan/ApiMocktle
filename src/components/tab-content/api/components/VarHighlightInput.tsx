@@ -118,14 +118,16 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
 
       {showDropdown && matchingVars.length > 0 && (
         <div
-          className="absolute z-50 mt-1 w-max min-w-[160px] rounded-lg border bg-white py-1 shadow-lg"
-          style={{ borderColor: token.colorBorderSecondary }}
+          className="absolute z-50 mt-1 w-max min-w-[160px] rounded-lg border py-1 shadow-lg"
+          style={{ backgroundColor: token.colorBgElevated, borderColor: token.colorBorderSecondary }}
         >
           {matchingVars.map((v) => (
             <div
               key={v}
-              className="cursor-pointer px-3 py-1.5 text-sm hover:bg-gray-50"
+              className="cursor-pointer px-3 py-1.5 text-sm"
               style={{ color: token.colorText }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = token.colorFillTertiary }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '' }}
               onMouseDown={(e) => {
                 e.preventDefault()
                 selectVariable(v)

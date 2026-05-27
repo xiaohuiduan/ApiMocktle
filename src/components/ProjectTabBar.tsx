@@ -10,6 +10,7 @@ import { ProjectQuickSwitch } from '@/components/ProjectQuickSwitch'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useProjectTabsContext } from '@/contexts/project-tabs'
 import type { ProjectTabState } from '@/contexts/project-tabs'
+import { useDesignStyle } from '@/hooks/useDesignStyle'
 
 /* ------------------------------------------------------------------ */
 /*  TabItem — 单个标签（含右键菜单）                                     */
@@ -159,6 +160,7 @@ function TabItem({
 export function ProjectTabBar() {
   const navigate = useNavigate()
   const { token } = theme.useToken()
+  const { isGlassStyle } = useDesignStyle()
   const [refreshing, setRefreshing] = useState(false)
   const { reloadState } = useMenuHelpersContext()
   const {
@@ -178,8 +180,12 @@ export function ProjectTabBar() {
       className="flex shrink-0 items-stretch overflow-hidden"
       style={{
         height: 38,
-        backgroundColor: token.colorFillAlter,
-        borderBottom: `1px solid ${token.colorBorderSecondary}`,
+        backgroundColor: isGlassStyle ? 'var(--ds-bg-surface)' : token.colorFillAlter,
+        backdropFilter: isGlassStyle ? 'blur(var(--ds-blur))' : undefined,
+        WebkitBackdropFilter: isGlassStyle ? 'blur(var(--ds-blur))' : undefined,
+        borderBottom: isGlassStyle
+          ? 'var(--ds-border-subtle)'
+          : `1px solid ${token.colorBorderSecondary}`,
       }}
     >
       {/* 标签列表 */}

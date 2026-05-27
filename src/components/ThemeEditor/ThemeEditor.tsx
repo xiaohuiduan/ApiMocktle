@@ -1,13 +1,12 @@
 import { useEffect } from 'react'
 
-import { Form, Radio, theme } from 'antd'
+import { Form, theme } from 'antd'
 
 import { defaultThemeSetting } from './theme-data'
-import { ThemeColorPicker } from './ThemeColorPicker'
+import { DesignStylePicker } from './DesignStylePicker'
 import { storeThemeSetting } from './ThemeEditor.helper'
 import type { ThemeSetting } from './ThemeEditor.type'
 import { ThemePicker } from './ThemePicker'
-import { ThemeRadiusPicker } from './ThemeRadiusPicker'
 
 interface ThemeEditorProps {
   value?: ThemeSetting
@@ -20,21 +19,20 @@ interface ThemeEditorProps {
  */
 export function ThemeEditor(props: ThemeEditorProps) {
   const { token } = theme.useToken()
-  const { borderRadius } = token
 
   const { value, onChange, autoSaveId } = props
 
   const [form] = Form.useForm<ThemeSetting>()
 
   useEffect(() => {
-    const newThemeSetting = { ...defaultThemeSetting, ...value, borderRadius }
+    const newThemeSetting = { ...defaultThemeSetting, ...value }
 
     form.setFieldsValue(newThemeSetting)
 
     if (autoSaveId) {
       storeThemeSetting(autoSaveId, newThemeSetting)
     }
-  }, [form, value, borderRadius, autoSaveId])
+  }, [form, value, autoSaveId])
 
   return (
     <div>
@@ -51,19 +49,8 @@ export function ThemeEditor(props: ThemeEditorProps) {
           <ThemePicker />
         </Form.Item>
 
-        <Form.Item label="主色" name="colorPrimary">
-          <ThemeColorPicker />
-        </Form.Item>
-
-        <Form.Item label="圆角" name="borderRadius">
-          <ThemeRadiusPicker />
-        </Form.Item>
-
-        <Form.Item label="页面空间" name="spaceType">
-          <Radio.Group>
-            <Radio value="default">适中</Radio>
-            <Radio value="compact">紧凑</Radio>
-          </Radio.Group>
+        <Form.Item label="设计风格" name="designStyle">
+          <DesignStylePicker />
         </Form.Item>
       </Form>
     </div>

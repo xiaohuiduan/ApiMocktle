@@ -592,7 +592,7 @@ export function RunTab() {
                       </div>
 
                       {showBodyEditor && (
-                        <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: 'rgb(245, 245, 245)' }}>
+                        <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: token.colorBorderSecondary }}>
                           <MonacoEditor
                             height="200px"
                             language={
@@ -650,13 +650,13 @@ export function RunTab() {
               <div className="flex flex-col gap-3">
                 <div>
                   <Typography.Text strong className="mb-1 block text-xs">Windows</Typography.Text>
-                  <pre className="m-0 rounded bg-gray-100 p-2 text-xs overflow-auto" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                  <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                     {curlCommands.windows}
                   </pre>
                 </div>
                 <div>
                   <Typography.Text strong className="mb-1 block text-xs">Linux / macOS</Typography.Text>
-                  <pre className="m-0 rounded bg-gray-100 p-2 text-xs overflow-auto" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                  <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                     {curlCommands.linux}
                   </pre>
                 </div>

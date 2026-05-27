@@ -8,6 +8,7 @@ import {
   Tag,
   Tooltip,
   Typography,
+  theme,
 } from 'antd'
 import { TerminalIcon } from 'lucide-react'
 
@@ -30,6 +31,7 @@ interface ResultViewerProps {
 }
 
 export function ResultViewer({ result, error, curlContent, onRetry }: ResultViewerProps) {
+  const { token } = theme.useToken()
   const { proxyConfig } = useProxyConfig()
   const proxyTooltip = proxyConfig && proxyConfig.proxyType !== 'none'
     ? `${proxyConfig.host}:${proxyConfig.port}`
@@ -92,7 +94,7 @@ export function ResultViewer({ result, error, curlContent, onRetry }: ResultView
       label: '请求内容',
       children: (
         <div className="flex flex-col h-full min-h-0">
-          <div className="rounded bg-gray-50 p-2 text-xs flex-shrink-0" style={{ fontFamily: 'monospace' }}>
+          <div className="rounded p-2 text-xs flex-shrink-0" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace' }}>
             <span className="font-medium opacity-60">URL: </span>
             <span className="break-all">{result.url ?? '-'}</span>
           </div>

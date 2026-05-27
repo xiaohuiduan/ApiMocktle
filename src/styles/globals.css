@@ -1,3 +1,5 @@
+@import './design-styles.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,8 +16,7 @@
   --p-tab-content: 16px;
 }
 
-:root[theme='lightDefault'],
-:root[theme='lark'] {
+:root[theme='lightDefault'] {
   --color-bg-panel: #ffffff;
   --color-border: #e4e7ec;
   --color-text-primary: #1d2939;
@@ -37,15 +38,6 @@
   --color-scrollbar-thumb: rgb(0 0 0 / 15%);
 
   color-scheme: light;
-}
-
-/* Lark theme overrides */
-:root[theme='lark'] {
-  --color-accent: #059669;
-  --color-accent-bg: #ecfdf5;
-  --color-border: #d0dfd5;
-  --color-text-secondary: #5a7a65;
-  --color-bg-hover: #e8f0eb;
 }
 
 :root[theme='darkDefault'] {

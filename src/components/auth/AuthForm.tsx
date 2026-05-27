@@ -2,12 +2,16 @@
 
 import { useEffect, useState } from 'react'
 
-import { Button, Checkbox, Form, Input, Select, Typography, message, theme } from 'antd'
+import { Button, Checkbox, Form, Input, Select, Tooltip, Typography, message, theme } from 'antd'
+import { show } from '@ebay/nice-modal-react'
+import { SettingsIcon } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 
 import { IconLogo } from '@/components/icons/IconLogo'
+import { ModalSettings } from '@/components/modals/ModalSettings'
 import { ParticleCanvas } from '@/components/ParticleCanvas'
 import { getSavedCredentials, useAuth } from '@/contexts/auth'
+import { useDesignStyle } from '@/hooks/useDesignStyle'
 
 function resolveRedirectTarget(value: string | null | undefined) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) {
@@ -31,6 +35,7 @@ const rememberDayOptions = [
 export function AuthForm(props: AuthFormProps) {
   const { mode } = props
   const { token } = theme.useToken()
+  const { isGlassStyle, isNeumorphism, isSkeuomorphism } = useDesignStyle()
   const [submitting, setSubmitting] = useState(false)
   const [rememberPassword, setRememberPassword] = useState(false)
   const [rememberDays, setRememberDays] = useState<number>(7)
@@ -54,37 +59,56 @@ export function AuthForm(props: AuthFormProps) {
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4">
       <ParticleCanvas variant="fullscreen" preset="login" primaryColor={token.colorPrimary} />
+      <div className="fixed right-4 top-4 z-50">
+        <Tooltip title="设置">
+          <Button
+            type="text"
+            icon={<SettingsIcon size={18} />}
+            onClick={() => void show(ModalSettings)}
+          />
+        </Tooltip>
+      </div>
       <div
         className="relative z-10 w-full max-w-md overflow-hidden rounded-xl"
         style={{
-          backgroundColor: 'var(--color-bg-panel)',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.08), 0 0 0 1px var(--color-border)',
+          backgroundColor: isGlassStyle ? 'var(--ds-bg-elevated)' : token.colorBgContainer,
+          backdropFilter: isGlassStyle ? 'blur(var(--ds-blur)) saturate(var(--ds-saturate)) brightness(var(--ds-brightness))' : undefined,
+          WebkitBackdropFilter: isGlassStyle ? 'blur(var(--ds-blur)) saturate(var(--ds-saturate)) brightness(var(--ds-brightness))' : undefined,
+          border: isGlassStyle ? 'var(--ds-border)' : isNeumorphism ? 'none' : undefined,
+          borderTop: isGlassStyle ? 'var(--ds-border-top)' : undefined,
+          boxShadow: isGlassStyle
+            ? 'var(--ds-shadow-lg)'
+            : isNeumorphism
+              ? 'var(--ds-shadow-lg)'
+              : isSkeuomorphism
+                ? 'var(--ds-shadow-lg)'
+                : '0 4px 24px rgba(0,0,0,0.08), 0 0 0 1px var(--color-border)',
           animation: 'card-slide-up 0.5s ease-out',
         }}
       >
         {/* Brand header */}
         <div
           className="flex items-center gap-3 px-6 pt-6 pb-4"
-          style={{ borderBottom: '1px solid var(--color-border)' }}
+          style={{ borderBottom: isGlassStyle ? 'var(--ds-border-subtle)' : `1px solid ${token.colorBorderSecondary}` }}
         >
           <span
             className="inline-flex size-10 items-center justify-center rounded-xl"
-            style={{ backgroundColor: 'var(--color-accent-bg)' }}
+            style={{ backgroundColor: token.colorPrimaryBg }}
           >
-            <span style={{ color: 'var(--color-accent)' }}>
+            <span style={{ color: token.colorPrimary }}>
               <IconLogo />
             </span>
           </span>
           <div>
             <div
               className="text-base font-semibold"
-              style={{ color: 'var(--color-text-primary)' }}
+              style={{ color: token.colorText }}
             >
               ApiMocktle
             </div>
             <div
               className="text-xs"
-              style={{ color: 'var(--color-text-secondary)' }}
+              style={{ color: token.colorTextSecondary }}
             >
               本地 API 管理工具
             </div>
@@ -137,7 +161,7 @@ export function AuthForm(props: AuthFormProps) {
                 variant="borderless"
                 className="border-b"
                 style={{
-                  borderBottom: '2px solid var(--color-border)',
+                  borderBottom: `2px solid ${token.colorBorderSecondary}`,
                   borderRadius: 0,
                   paddingLeft: 0,
                 }}
@@ -157,7 +181,7 @@ export function AuthForm(props: AuthFormProps) {
                 variant="borderless"
                 className="border-b"
                 style={{
-                  borderBottom: '2px solid var(--color-border)',
+                  borderBottom: `2px solid ${token.colorBorderSecondary}`,
                   borderRadius: 0,
                   paddingLeft: 0,
                 }}
@@ -196,8 +220,6 @@ export function AuthForm(props: AuthFormProps) {
                 type="primary"
                 size="large"
                 style={{
-                  backgroundColor: 'var(--color-accent)',
-                  borderColor: 'var(--color-accent)',
                   borderRadius: 8,
                   height: 44,
                 }}
@@ -210,7 +232,7 @@ export function AuthForm(props: AuthFormProps) {
           <Typography.Text type="secondary">
             {mode === 'login' ? '没有账号？' : '已有账号？'}
             {' '}
-            <Link to={peerAuthPath} style={{ color: 'var(--color-accent)' }}>
+            <Link to={peerAuthPath} style={{ color: token.colorPrimary }}>
               {mode === 'login' ? '去注册' : '去登录'}
             </Link>
           </Typography.Text>

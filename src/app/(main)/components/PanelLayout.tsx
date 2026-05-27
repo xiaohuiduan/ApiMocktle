@@ -15,6 +15,7 @@ import { ChevronRightIcon } from 'lucide-react'
 import useResizeObserver from 'use-resize-observer'
 
 import { useLayoutContext } from '@/contexts/layout-settings'
+import { useDesignStyle } from '@/hooks/useDesignStyle'
 import { useStyles } from '@/hooks/useStyle'
 
 import { FooterBar } from '../components/FooterBar'
@@ -33,6 +34,7 @@ interface PanelLayoutProps {
 
 export function PanelLayout(props: PanelLayoutProps) {
   const { token } = theme.useToken()
+  const { isGlassStyle, isNeumorphism } = useDesignStyle()
 
   const { layoutName, left, right } = props
 
@@ -40,7 +42,7 @@ export function PanelLayout(props: PanelLayoutProps) {
 
   const { styles } = useStyles(({ token }) => {
     const resizeHandleInner = css({
-      backgroundColor: token.colorBorderSecondary,
+      backgroundColor: isNeumorphism ? 'transparent' : token.colorBorderSecondary,
     })
 
     return {
@@ -55,10 +57,13 @@ export function PanelLayout(props: PanelLayoutProps) {
 
       expandTrigger: css({
         color: token.colorPrimary,
-        backgroundColor: token.colorFillAlter,
-        boxShadow: '1px 0 4px rgba(16 24 40 / 0.08)',
+        backgroundColor: isGlassStyle ? 'rgba(255,255,255,0.15)' : token.colorFillAlter,
+        backdropFilter: isGlassStyle ? 'blur(8px)' : undefined,
+        boxShadow: isNeumorphism
+          ? 'var(--ds-shadow-sm)'
+          : '1px 0 4px rgba(16 24 40 / 0.08)',
         '&:hover': {
-          backgroundColor: token.colorFillSecondary,
+          backgroundColor: isGlassStyle ? 'rgba(255,255,255,0.25)' : token.colorFillSecondary,
         },
       }),
     }

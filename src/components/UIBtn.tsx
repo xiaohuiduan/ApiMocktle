@@ -1,3 +1,4 @@
+import { useDesignStyle } from '@/hooks/useDesignStyle'
 import { useStyles } from '@/hooks/useStyle'
 
 import { css } from '@emotion/css'
@@ -8,6 +9,7 @@ interface UIBtnProps extends React.PropsWithChildren, React.ComponentProps<'butt
 
 export function UIButton(props: UIBtnProps) {
   const { children, primary, className = '', ...rest } = props
+  const { isGlassStyle, isNeumorphism, isSkeuomorphism } = useDesignStyle()
 
   const { styles } = useStyles(({ token }) => ({
     btn: css({
@@ -15,9 +17,21 @@ export function UIButton(props: UIBtnProps) {
       backgroundColor: primary ? token.colorPrimaryBg : token.colorFillTertiary,
       borderRadius: token.borderRadiusSM,
       color: primary ? token.colorPrimary : token.colorTextSecondary,
+      border: isNeumorphism ? 'none' : undefined,
+      boxShadow: isNeumorphism
+        ? 'var(--ds-shadow-sm)'
+        : isSkeuomorphism
+          ? 'var(--ds-shadow-sm)'
+          : undefined,
+      backdropFilter: isGlassStyle ? 'blur(8px)' : undefined,
+      WebkitBackdropFilter: isGlassStyle ? 'blur(8px)' : undefined,
 
       '&:hover': {
         backgroundColor: primary ? token.colorPrimaryBg : token.colorFillSecondary,
+      },
+      '&:active': {
+        boxShadow: isNeumorphism || isSkeuomorphism ? 'var(--ds-inner-shadow)' : undefined,
+        transform: isNeumorphism || isSkeuomorphism ? 'translateY(1px)' : undefined,
       },
     }),
   }))

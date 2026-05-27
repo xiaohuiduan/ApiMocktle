@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router'
 
-import { Button, Drawer, List, Spin, Table, Tag, Typography } from 'antd'
+import { Button, Drawer, List, Spin, Table, Tag, Typography, theme } from 'antd'
 
 import { api } from '@/api-client'
 import { MonacoEditor } from '@/components/MonacoEditor'
@@ -39,6 +39,7 @@ export function formatTime(iso: string) {
 }
 
 export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
+  const { token } = theme.useToken()
   const { projectId } = useParams()
   const { sessionId } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -89,7 +90,7 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
       styles={{ body: { padding: 0, display: 'flex', overflow: 'hidden' } }}
     >
       {/* 左侧列表 */}
-      <div className="flex shrink-0 flex-col" style={{ width: 220, borderRight: '1px solid #f0f0f0' }}>
+      <div className="flex shrink-0 flex-col" style={{ width: 220, borderRight: `1px solid ${token.colorBorderSecondary}` }}>
         <div className="flex items-center justify-between px-3 py-2">
           <Typography.Text strong className="text-xs">共 {items.length} 条</Typography.Text>
           <Button size="small" type="link" onClick={() => void loadHistory()}>刷新</Button>
@@ -106,9 +107,18 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
                 dataSource={items}
                 renderItem={(item) => (
                   <div
-                    className={`cursor-pointer px-3 py-2 transition-colors ${selectedId === item.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                    className="cursor-pointer px-3 py-2 transition-colors"
                     onClick={() => setSelectedId(item.id)}
-                    style={{ borderLeft: selectedId === item.id ? '2px solid #1677ff' : '2px solid transparent' }}
+                    style={{
+                      backgroundColor: selectedId === item.id ? token.colorPrimaryBg : undefined,
+                      borderLeft: selectedId === item.id ? `2px solid ${token.colorPrimary}` : '2px solid transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedId !== item.id) e.currentTarget.style.backgroundColor = token.colorFillTertiary
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedId !== item.id) e.currentTarget.style.backgroundColor = ''
+                    }}
                   >
                     <div className="flex items-center gap-1.5">
                       <Tag color={getStatusColor(item.statusCode)} className="!m-0" style={{ fontSize: 11, lineHeight: '16px', padding: '0 4px' }}>
@@ -146,7 +156,7 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
 
             {/* 请求区 */}
             <Typography.Text strong className="mb-2 block text-sm">请求</Typography.Text>
-            <div className="mb-4 rounded bg-gray-50 p-2 text-xs" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+            <div className="mb-4 rounded p-2 text-xs" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace', wordBreak: 'break-all' }}>
               <span className="font-medium opacity-60">URL: </span>{result?.url ?? '-'}
             </div>
 

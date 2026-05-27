@@ -2,14 +2,18 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
-import { Button, Card, Form, Input, Modal, Space, Spin, Typography, message, theme } from 'antd'
+import { Button, Card, Form, Input, Modal, Space, Spin, Tooltip, Typography, message, theme } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
+import { show } from '@ebay/nice-modal-react'
+import { SettingsIcon } from 'lucide-react'
 import { useNavigate } from 'react-router'
 
+import { ModalSettings } from '@/components/modals/ModalSettings'
 import { ParticleCanvas } from '@/components/ParticleCanvas'
 import { UserMenu } from '@/components/UserMenu'
 
 import { useAuth } from '@/contexts/auth'
+import { useDesignStyle } from '@/hooks/useDesignStyle'
 import { useProjectTabsContext } from '@/contexts/project-tabs'
 import { type IconCategory, ICON_OPTIONS, ICON_MAP, ICON_CATEGORIES, ProjectIcon, getIconColor, kebabToPascal } from '@/components/ProjectIcon'
 import {
@@ -159,6 +163,7 @@ function getSubmitErrorTitle(dialog: ProjectDialogState) {
 
 export function ProjectsClient() {
   const { token } = theme.useToken()
+  const { isGlassStyle, isNeumorphism, isSkeuomorphism } = useDesignStyle()
   const navigate = useNavigate()
   const { sessionId } = useAuth()
   const { openProject } = useProjectTabsContext()
@@ -293,6 +298,13 @@ export function ProjectsClient() {
         </Typography.Title>
 
         <Space className="ml-auto">
+          <Tooltip title="设置">
+            <Button
+              type="text"
+              icon={<SettingsIcon size={16} />}
+              onClick={() => void show(ModalSettings)}
+            />
+          </Tooltip>
           <UserMenu />
           <Button type="primary" onClick={openCreateDialog}>
             新建项目
@@ -306,6 +318,29 @@ export function ProjectsClient() {
             const iconColor = getIconColor(project.icon || '')
             const IconComp = ICON_MAP[project.icon || '']
 
+            const cardBaseStyle: React.CSSProperties = isGlassStyle
+              ? {
+                  backgroundColor: `color-mix(in srgb, ${iconColor} 10%, rgba(255,255,255,0.1))`,
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                }
+              : isNeumorphism
+                ? {
+                    backgroundColor: token.colorBgContainer,
+                    boxShadow: 'var(--ds-shadow-md)',
+                    border: 'none',
+                  }
+                : isSkeuomorphism
+                  ? {
+                      backgroundColor: `${iconColor}12`,
+                      boxShadow: 'var(--ds-shadow-md)',
+                    }
+                  : {
+                      backgroundColor: `${iconColor}12`,
+                    }
+
             return (
               <Card
                 key={project.id}
@@ -313,14 +348,22 @@ export function ProjectsClient() {
                 className="group"
                 styles={{ body: { padding: '16px' } }}
                 style={{
-                  backgroundColor: `${iconColor}12`,
+                  ...cardBaseStyle,
                   transition: 'all 0.2s',
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = `${iconColor}20`
+                  if (!isNeumorphism) {
+                    (e.currentTarget as HTMLElement).style.backgroundColor = isGlassStyle
+                      ? `color-mix(in srgb, ${iconColor} 15%, rgba(255,255,255,0.15))`
+                      : `${iconColor}20`
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = `${iconColor}12`
+                  if (!isNeumorphism) {
+                    (e.currentTarget as HTMLElement).style.backgroundColor = isGlassStyle
+                      ? `color-mix(in srgb, ${iconColor} 10%, rgba(255,255,255,0.1))`
+                      : `${iconColor}12`
+                  }
                 }}
                 onClick={() => {
                   openProject({

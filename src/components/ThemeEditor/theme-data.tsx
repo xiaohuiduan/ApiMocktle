@@ -1,20 +1,46 @@
-import { type GlobalToken, theme } from 'antd'
+import type { GlobalToken } from 'antd'
 
-import type { ThemeMode, ThemeSetting } from './ThemeEditor.type'
-
-const globalToken = theme.getDesignToken()
+import type { DesignStyle, ThemeMode, ThemeSetting } from './ThemeEditor.type'
 
 export const defaultThemeSetting: ThemeSetting = {
   themeMode: 'lightDefault',
-  colorPrimary: globalToken.colorPrimary,
-  borderRadius: globalToken.borderRadius,
-  spaceType: 'default',
+  designStyle: 'default',
 }
 
-const defaultThemeToken: Partial<GlobalToken> = {
-  colorPrimary: defaultThemeSetting.colorPrimary,
-  borderRadius: defaultThemeSetting.borderRadius,
+/** 每种设计风格自动配色参数 */
+export const designStylePresets: Record<
+  DesignStyle,
+  { colorPrimary: string; borderRadius: number; borderRadiusLG: number; borderRadiusSM: number }
+> = {
+  default: {
+    colorPrimary: '#1677ff',
+    borderRadius: 6,
+    borderRadiusLG: 8,
+    borderRadiusSM: 4,
+  },
+  glassmorphism: {
+    colorPrimary: '#6366f1',
+    borderRadius: 10,
+    borderRadiusLG: 14,
+    borderRadiusSM: 6,
+  },
+  skeuomorphism: {
+    colorPrimary: '#b8860b',
+    borderRadius: 6,
+    borderRadiusLG: 8,
+    borderRadiusSM: 4,
+  },
+  neumorphism: {
+    colorPrimary: '#5b8fa8',
+    borderRadius: 16,
+    borderRadiusLG: 20,
+    borderRadiusSM: 10,
+  },
 }
+
+/* ------------------------------------------------------------------ */
+/*  Theme preview SVGs                                                 */
+/* ------------------------------------------------------------------ */
 
 const previewDefault = (
   <svg version="1.1" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
@@ -175,115 +201,16 @@ const previewDark = (
   </svg>
 )
 
-const previewGreen = (
-  <svg version="1.1" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <polygon id="path-1" points="0 0 120 0 120 80 0 80" />
-      <path
-        d="M25.1277704,20 L134.87223,20 C136.655267,20 137.30184,20.1856512 137.953691,20.5342654 C138.605543,20.8828796 139.11712,21.3944567 139.465735,22.0463086 C139.814349,22.6981604 140,23.3447329 140,25.1277704 L140,94.8722296 C140,96.6552671 139.814349,97.3018396 139.465735,97.9536914 C139.11712,98.6055433 138.605543,99.1171204 137.953691,99.4657346 C137.30184,99.8143488 136.655267,100 134.87223,100 L25.1277704,100 C23.3447329,100 22.6981604,99.8143488 22.0463086,99.4657346 C21.3944567,99.1171204 20.8828796,98.6055433 20.5342654,97.9536914 C20.1856512,97.3018396 20,96.6552671 20,94.8722296 L20,25.1277704 C20,23.3447329 20.1856512,22.6981604 20.5342654,22.0463086 C20.8828796,21.3944567 21.3944567,20.8828796 22.0463086,20.5342654 C22.6981604,20.1856512 23.3447329,20 25.1277704,20 Z"
-        id="path-3"
-      />
-      <filter
-        filterUnits="objectBoundingBox"
-        height="122.5%"
-        id="filter-4"
-        width="115.0%"
-        x="-7.5%"
-        y="-10.0%"
-      >
-        <feOffset dx="0" dy="2" in="SourceAlpha" result="shadowOffsetOuter1" />
-        <feGaussianBlur in="shadowOffsetOuter1" result="shadowBlurOuter1" stdDeviation="2" />
-        <feColorMatrix
-          in="shadowBlurOuter1"
-          result="shadowMatrixOuter1"
-          type="matrix"
-          values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.02 0"
-        />
-        <feMorphology in="SourceAlpha" operator="erode" radius="0.5" result="shadowSpreadOuter2" />
-        <feOffset dx="0" dy="1" in="shadowSpreadOuter2" result="shadowOffsetOuter2" />
-        <feGaussianBlur in="shadowOffsetOuter2" result="shadowBlurOuter2" stdDeviation="3" />
-        <feColorMatrix
-          in="shadowBlurOuter2"
-          result="shadowMatrixOuter2"
-          type="matrix"
-          values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.02 0"
-        />
-        <feOffset dx="0" dy="1" in="SourceAlpha" result="shadowOffsetOuter3" />
-        <feGaussianBlur in="shadowOffsetOuter3" result="shadowBlurOuter3" stdDeviation="1" />
-        <feColorMatrix
-          in="shadowBlurOuter3"
-          result="shadowMatrixOuter3"
-          type="matrix"
-          values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.03 0"
-        />
-        <feMerge>
-          <feMergeNode in="shadowMatrixOuter1" />
-          <feMergeNode in="shadowMatrixOuter2" />
-          <feMergeNode in="shadowMatrixOuter3" />
-        </feMerge>
-      </filter>
-      <path
-        d="M61.1277704,40 L170.87223,40 C172.655267,40 173.30184,40.1856512 173.953691,40.5342654 C174.605543,40.8828796 175.11712,41.3944567 175.465735,42.0463086 C175.814349,42.6981604 176,43.3447329 176,45.1277704 L176,114.87223 C176,116.655267 175.814349,117.30184 175.465735,117.953691 C175.11712,118.605543 174.605543,119.11712 173.953691,119.465735 C173.30184,119.814349 172.655267,120 170.87223,120 L61.1277704,120 C59.3447329,120 58.6981604,119.814349 58.0463086,119.465735 C57.3944567,119.11712 56.8828796,118.605543 56.5342654,117.953691 C56.1856512,117.30184 56,116.655267 56,114.87223 L56,45.1277704 C56,43.3447329 56.1856512,42.6981604 56.5342654,42.0463086 C56.8828796,41.3944567 57.3944567,40.8828796 58.0463086,40.5342654 C58.6981604,40.1856512 59.3447329,40 61.1277704,40 Z"
-        id="path-5"
-      />
-      <filter
-        filterUnits="objectBoundingBox"
-        height="112.5%"
-        id="filter-6"
-        width="108.3%"
-        x="-4.2%"
-        y="-5.0%"
-      >
-        <feOffset dx="0" dy="1" in="SourceAlpha" result="shadowOffsetOuter1" />
-        <feGaussianBlur in="shadowOffsetOuter1" result="shadowBlurOuter1" stdDeviation="1.5" />
-        <feColorMatrix
-          in="shadowBlurOuter1"
-          type="matrix"
-          values="0 0 0 0 0.0898254103   0 0 0 0 0.115558755   0 0 0 0 0.227270154  0 0 0 0.210473121 0"
-        />
-      </filter>
-    </defs>
-    <g fill="none" fillRule="evenodd" id="正式版" stroke="none" strokeWidth="1">
-      <g id="Ant-Design-5.0-官网-PC" transform="translate(-874.000000, -1542.000000)">
-        <g id="编组-28" transform="translate(506.000000, 1542.000000)">
-          <g id="矩形-+-矩形备份蒙版备份-2" transform="translate(368.000000, 0.000000)">
-            <mask fill="white" id="mask-2">
-              <use xlinkHref="#path-1" />
-            </mask>
-            <use fill="#E1EDE5" id="蒙版" xlinkHref="#path-1" />
-            <g id="矩形" mask="url(#mask-2)">
-              <use fill="black" fillOpacity="1" filter="url(#filter-4)" xlinkHref="#path-3" />
-              <use fill="#66C08D" fillRule="evenodd" xlinkHref="#path-3" />
-            </g>
-            <g id="矩形备份" mask="url(#mask-2)">
-              <use fill="black" fillOpacity="1" filter="url(#filter-6)" xlinkHref="#path-5" />
-              <use fill="#FFFFFF" fillRule="evenodd" xlinkHref="#path-5" />
-            </g>
-          </g>
-        </g>
-      </g>
-    </g>
-  </svg>
-)
-
 export const presetThemes = {
   lightDefault: {
     preview: previewDefault,
-    name: '默认',
-    token: defaultThemeToken,
+    name: '浅色',
+    token: {} as Partial<GlobalToken>,
   },
   darkDefault: {
     preview: previewDark,
-    name: '暗黑',
-    token: defaultThemeToken,
-  },
-  lark: {
-    preview: previewGreen,
-    name: '知识协作',
-    token: {
-      colorPrimary: '#00b96b',
-      colorLink: '#00b96b',
-    },
+    name: '暗色',
+    token: {} as Partial<GlobalToken>,
   },
 } as const satisfies Record<
   ThemeMode,
@@ -294,16 +221,24 @@ export const presetThemes = {
   }
 >
 
-export const presetRadius: ThemeSetting['borderRadius'][] = [2, 4, 6]
-
-export const presetColors: ThemeSetting['colorPrimary'][] = [
-  '#1677ff',
-  '#9373ee',
-  '#5f80e9',
-  '#587df1',
-  '#9a7d56',
-  '#039e74',
-  '#e86ca4',
-  '#fd6874',
-  '#8e8374',
-]
+export const presetDesignStyles: Record<
+  DesignStyle,
+  { name: string; description: string }
+> = {
+  default: {
+    name: '默认',
+    description: '标准界面风格',
+  },
+  glassmorphism: {
+    name: '毛玻璃',
+    description: '半透明模糊、细腻边界光感、层次叠加',
+  },
+  skeuomorphism: {
+    name: '拟物化',
+    description: '真实材质纹理、复杂光影、立体感',
+  },
+  neumorphism: {
+    name: '新拟态',
+    description: '柔和浮雕、低对比投影、微妙平衡',
+  },
+}
