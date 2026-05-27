@@ -75,16 +75,34 @@ export function useApiRequestRunner() {
       // Save error history
       if (menuItemId && projectId && sessionId) {
         const requestData = { url, method, headers, body, contentType }
+        const isFormData = contentType === 'application/x-www-form-urlencoded'
+        const bodyParams = isFormData && body
+          ? body.split('&').filter(Boolean).map((p) => {
+              const [name, ...rest] = p.split('=')
+              return { name: decodeURIComponent(name), value: decodeURIComponent(rest.join('=')) }
+            })
+          : []
+        // 从 URL 中解析 query 参数
+        let queryFromUrl: Array<{ name: string, value: string }> = []
+        try {
+          const urlObj = new URL(url)
+          urlObj.searchParams.forEach((value, name) => {
+            queryFromUrl.push({ name, value })
+          })
+        } catch { /* url 可能不完整，忽略 */ }
+
         const errorResult: ApiRunResult = {
           url,
           method: method as ApiRunResult['method'],
           status: 0,
           statusText: msg,
           durationMs: 0,
+          contentType,
           requestHeaders: headers.map(h => ({ name: h.name, value: h.value })),
-          requestQuery: [],
+          requestQuery: queryFromUrl,
           requestCookie: [],
-          requestBodyParameters: [],
+          requestBodyParameters: bodyParams,
+          requestBodyText: !isFormData ? body : undefined,
           headers: [],
           errorInfo: {
             errorType: 'application_error',

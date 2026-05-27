@@ -79,6 +79,24 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
   }), [])
 
   const result = selectedItem?.responseJson
+  const reqJson = selectedItem?.requestJson as { url?: string, method?: string, headers?: Array<{ name: string, value: string }>, body?: string, contentType?: string } | undefined
+
+  // 优先用 responseJson 中的，回退到 requestJson
+  const effectiveRequestBodyText = result?.requestBodyText ?? (reqJson?.body ? reqJson.body : undefined)
+  const effectiveContentType = result?.contentType ?? reqJson?.contentType
+  const effectiveRequestHeaders = (result?.requestHeaders && result.requestHeaders.length > 0)
+    ? result.requestHeaders
+    : (reqJson?.headers && reqJson.headers.length > 0) ? reqJson.headers : undefined
+  const effectiveRequestQuery = (result?.requestQuery && result.requestQuery.length > 0)
+    ? result.requestQuery
+    : (() => {
+        try {
+          if (!result?.url) return undefined
+          const params: Array<{ name: string, value: string }> = []
+          new URL(result.url).searchParams.forEach((value, name) => params.push({ name, value }))
+          return params.length > 0 ? params : undefined
+        } catch { return undefined }
+      })()
 
   return (
     <Drawer
@@ -160,24 +178,24 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
               <span className="font-medium opacity-60">URL: </span>{result?.url ?? '-'}
             </div>
 
-            {result?.requestHeaders && result.requestHeaders.length > 0 && (
+            {effectiveRequestHeaders && (
               <div className="mb-3">
-                <Typography.Text type="secondary" className="mb-1 block text-xs">请求头 ({result.requestHeaders.length})</Typography.Text>
-                <Table size="small" dataSource={result.requestHeaders} columns={headerTableColumns} pagination={false} rowKey="name" />
+                <Typography.Text type="secondary" className="mb-1 block text-xs">请求头 ({effectiveRequestHeaders.length})</Typography.Text>
+                <Table size="small" dataSource={effectiveRequestHeaders} columns={headerTableColumns} pagination={false} rowKey="name" />
               </div>
             )}
 
-            {result?.requestQuery && result.requestQuery.length > 0 && (
+            {effectiveRequestQuery && (
               <div className="mb-3">
-                <Typography.Text type="secondary" className="mb-1 block text-xs">Query 参数 ({result.requestQuery.length})</Typography.Text>
-                <Table size="small" dataSource={result.requestQuery} columns={headerTableColumns} pagination={false} rowKey="name" />
+                <Typography.Text type="secondary" className="mb-1 block text-xs">Query 参数 ({effectiveRequestQuery.length})</Typography.Text>
+                <Table size="small" dataSource={effectiveRequestQuery} columns={headerTableColumns} pagination={false} rowKey="name" />
               </div>
             )}
 
-            {result?.requestBodyText && (
+            {effectiveRequestBodyText && (
               <div className="mb-3" style={{ height: 200 }}>
                 <Typography.Text type="secondary" className="mb-1 block text-xs">请求体</Typography.Text>
-                <MonacoEditor height="100%" language={detectLanguage(result.contentType)} value={result.requestBodyText} options={monacoOptions} />
+                <MonacoEditor height="100%" language={detectLanguage(effectiveContentType)} value={effectiveRequestBodyText} options={monacoOptions} />
               </div>
             )}
 
