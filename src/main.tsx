@@ -7,6 +7,7 @@ import { loader } from '@monaco-editor/react'
 import { AuthProvider } from '@/contexts/auth'
 import { ProxyConfigProvider } from '@/contexts/proxy-config'
 import { ProjectTabsProvider } from '@/contexts/project-tabs'
+import { SessionVariablesProvider } from '@/contexts/session-variables'
 
 // Monaco Editor 本地加载（离线可用）
 loader.config({ paths: { vs: '/monaco-editor/vs' } })
@@ -21,9 +22,11 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <ProxyConfigProvider>
           <ProjectTabsProvider>
-            <Routes>
-              {appRoutes}
-            </Routes>
+            <SessionVariablesProvider>
+              <Routes>
+                {appRoutes}
+              </Routes>
+            </SessionVariablesProvider>
           </ProjectTabsProvider>
         </ProxyConfigProvider>
       </AuthProvider>

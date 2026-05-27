@@ -8,12 +8,13 @@ import {
   Select,
   Space,
   Switch,
+  Tabs,
   Tag,
   Tooltip,
   Typography,
   theme,
 } from 'antd'
-import { ClockIcon, PlayIcon, RotateCcwIcon } from 'lucide-react'
+import { ClockIcon, PlayIcon, RotateCcwIcon, SaveIcon } from 'lucide-react'
 
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { buildSchemaExample } from '@/components/JsonSchema/schema-normalizer'
@@ -21,6 +22,8 @@ import { MonacoEditor } from '@/components/MonacoEditor'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useSessionVariablesContext } from '@/contexts/session-variables'
+import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { BodyType } from '@/enums'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 import type { ApiDetails } from '@/types'
@@ -31,6 +34,8 @@ import { useApiRequestRunner } from './useApiRequestRunner'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
 import { HistoryPanel } from './components/HistoryPanel'
+import { ScriptTab, executeScript } from './scripts'
+import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
 
 const STORAGE_PREFIX = 'run_tab_'
 
@@ -143,7 +148,10 @@ export function RunTab() {
     projectEnvironments,
     currentProjectEnvironmentId,
     projectEnvironmentConfig,
+    updateMenuItem,
   } = useMenuHelpersContext()
+
+  const { sessionVars, setSessionVars } = useSessionVariablesContext()
 
   const { menuApiItem, docValue } = useMemo(() => {
     const item = menuRawList?.find(({ id }) => id === tabData.key)
@@ -162,6 +170,12 @@ export function RunTab() {
       }
     : null
 
+  // 保存原始文档定义的 ref（用于一键复原）
+  const originalDocRef = useRef<ApiDetails | undefined>(undefined)
+  if (docValue && (!originalDocRef.current || originalDocRef.current.id !== docValue.id)) {
+    originalDocRef.current = cloneApiDetails(docValue)
+  }
+
   const [workCopy, setWorkCopy] = useState<ApiDetails | undefined>(() => {
     if (!docValue) return undefined
     try {
@@ -174,6 +188,16 @@ export function RunTab() {
   const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [resetCounter, setResetCounter] = useState(0)
+
+  // 脚本相关状态
+  const [preScriptConsole, setPreScriptConsole] = useState<ScriptConsoleEntry[]>([])
+  const [preScriptTests, setPreScriptTests] = useState<ScriptTestResult[]>([])
+  const [postScriptConsole, setPostScriptConsole] = useState<ScriptConsoleEntry[]>([])
+  const [postScriptTests, setPostScriptTests] = useState<ScriptTestResult[]>([])
+  const [preScriptRunning, setPreScriptRunning] = useState(false)
+  const [postScriptRunning, setPostScriptRunning] = useState(false)
 
   const [disabledInheritedParams, setDisabledInheritedParams] = useState<{
     query: Set<string>
@@ -208,6 +232,7 @@ export function RunTab() {
     // 文档有更新时，重新从文档初始化 workCopy
     if (menuUpdatedAt && menuUpdatedAt !== docVersionRef.current) {
       docVersionRef.current = menuUpdatedAt
+      originalDocRef.current = cloneApiDetails(docValue)
       setWorkCopy(cloneApiDetails(docValue))
       setBodyRawText(undefined)
       resetResult()
@@ -261,20 +286,51 @@ export function RunTab() {
 
   // 一键复原
   const handleReset = () => {
+    if (!originalDocRef.current) return
+
     Modal.confirm({
       title: '一键复原',
-      content: '确定要放弃所有临时修改，恢复为文档定义的原始值吗？',
+      content: '确定要放弃所有临时修改（包括参数、请求头、Body、脚本等），恢复为文档定义的原始值吗？',
+      okText: '确认复原',
+      cancelText: '取消',
       onOk: () => {
-        if (!docValue) return
-        const fresh = cloneApiDetails(docValue)
+        const fresh = cloneApiDetails(originalDocRef.current!)
         setWorkCopy(fresh)
         setBodyRawText(undefined)
         resetResult()
+        setDisabledInheritedParams({
+          query: new Set(),
+          header: new Set(),
+          cookie: new Set(),
+          body: new Set(),
+        })
         try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
-        messageApi.success('已复原')
+        setResetCounter(c => c + 1)
+        messageApi.success('已复原为文档原始值')
       },
     })
   }
+
+  // 保存到数据库
+  const handleSave = async () => {
+    if (!workCopy) return
+    setSaving(true)
+    try {
+      await updateMenuItem({
+        id: tabData.key,
+        name: workCopy.name,
+        data: { ...workCopy },
+      })
+      try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
+      messageApi.success('保存成功')
+    } catch {
+      messageApi.error('保存失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  useCtrlSave(handleSave)
 
   // 运行
   const handleRun = async () => {
@@ -290,8 +346,64 @@ export function RunTab() {
     for (const v of envVars) {
       if (v.name && v.value != null) varMap.set(v.name, v.value)
     }
+    // 会话变量覆盖环境变量（最高优先级）
+    for (const [k, v] of Object.entries(sessionVars)) {
+      varMap.set(k, v)
+    }
+
+    const globalsMap: Record<string, string> = {}
+    for (const v of [...(projectEnvironmentConfig?.globalVariables ?? []), ...(projectEnvironmentConfig?.vaultSecrets ?? [])]) {
+      if (v.name && v.value != null) globalsMap[v.name] = v.value
+    }
+    const envMap: Record<string, string> = {}
+    for (const v of (currentEnv?.variables ?? [])) {
+      if (v.name && v.value != null) envMap[v.name] = v.value
+    }
+    // 会话变量合并到 envMap
+    Object.assign(envMap, sessionVars)
 
     const resolveVars = (s: string) => s.replace(/\{\{(\w+)\}\}/g, (_, name) => varMap.get(name) ?? `{{${name}}}`)
+
+    // ====== 前置脚本执行 ======
+    if (workCopy.preScript?.trim()) {
+      setPreScriptRunning(true)
+      setPreScriptConsole([])
+      setPreScriptTests([])
+      try {
+        const preResult = await executeScript(workCopy.preScript, {
+          environment: envMap,
+          globals: globalsMap,
+          variables: Object.fromEntries(varMap),
+          request: {
+            url: workCopy.path ?? '/',
+            method: workCopy.method ?? 'GET',
+            headers: (workCopy.parameters?.header ?? [])
+              .filter(h => h.name && h.enable !== false)
+              .map(h => ({ name: h.name!, value: String(h.example ?? '') })),
+            body: bodyRawText ?? '',
+          },
+        })
+
+        setPreScriptConsole(preResult.consoleEntries)
+        setPreScriptTests(preResult.testResults)
+
+        // 应用变量变更到 varMap
+        for (const [key, value] of Object.entries(preResult.variableDeltas)) {
+          varMap.set(key, value)
+        }
+
+        if (!preResult.success) {
+          setPreScriptRunning(false)
+          messageApi.error(`前置脚本执行失败: ${preResult.error}`)
+          return
+        }
+      } catch (err) {
+        setPreScriptRunning(false)
+        messageApi.error(`前置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
+        return
+      }
+      setPreScriptRunning(false)
+    }
 
     const envParams = currentEnv?.parameters ?? { header: [], cookie: [], query: [], body: [] }
 
@@ -383,7 +495,44 @@ export function RunTab() {
       }
     }
 
-    await run(tabData.key, url, workCopy.method ?? 'GET', headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
+    const runResult = await run(tabData.key, url, workCopy.method ?? 'GET', headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
+
+    // ====== 后置脚本执行 ======
+    if (workCopy.postScript?.trim() && runResult) {
+      setPostScriptRunning(true)
+      setPostScriptConsole([])
+      setPostScriptTests([])
+      try {
+        const postResult = await executeScript(workCopy.postScript, {
+          environment: envMap,
+          globals: globalsMap,
+          variables: Object.fromEntries(varMap),
+          request: { url, method: workCopy.method ?? 'GET', headers, body: bodyText },
+          response: {
+            status: runResult.status,
+            statusText: runResult.statusText,
+            headers: runResult.headers ?? [],
+            body: runResult.body ?? '',
+            responseTime: runResult.durationMs,
+          },
+        })
+
+        setPostScriptConsole(postResult.consoleEntries)
+        setPostScriptTests(postResult.testResults)
+
+        // 将脚本设置的变量存入会话变量（跨请求共享，不永久持久化）
+        if (Object.keys(postResult.variableDeltas).length > 0) {
+          setSessionVars(postResult.variableDeltas)
+        }
+
+        if (!postResult.success) {
+          messageApi.error(`后置脚本执行失败: ${postResult.error}`)
+        }
+      } catch (err) {
+        messageApi.error(`后置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
+      }
+      setPostScriptRunning(false)
+    }
   }
 
   // 一键填充 Body
@@ -510,6 +659,7 @@ export function RunTab() {
 
         <Space className="shrink-0" style={{ marginLeft: 'auto' }}>
           <Button icon={<ClockIcon size={14} />} title="历史记录" onClick={() => setHistoryOpen(true)} />
+          <Button icon={<SaveIcon size={14} />} title="保存 (Ctrl+S)" loading={saving} onClick={() => void handleSave()} />
           <Button
             loading={running}
             type="primary"
@@ -518,128 +668,171 @@ export function RunTab() {
           >
             运行
           </Button>
-          <Button
-            icon={<RotateCcwIcon size={14} />}
-            onClick={handleReset}
-            title="一键复原"
-          />
+          <Tooltip title="复原为文档原始值（清除所有临时修改：参数、请求头、Body、脚本等）">
+            <Button
+              icon={<RotateCcwIcon size={14} />}
+              onClick={handleReset}
+            />
+          </Tooltip>
         </Space>
       </div>
 
       <ResponsePanel
         paramsArea={
-          <>
-            {/* 参数编辑区 */}
-            <div className="px-3 min-w-0 overflow-hidden">
-              <ParamsTab
-                value={workCopy.parameters}
-                globalParameters={projectEnvironmentConfig?.globalParameters}
-                envParameters={currentEnv?.parameters}
-                varMap={varMap}
-                disabledInheritedNames={disabledInheritedParams}
-                onToggleInheritedParam={handleToggleInheritedParam}
-                onChange={(parameters) => {
-                  const next = { ...workCopy, parameters }
-                  setWorkCopy(next)
-                  persist(next)
-                }}
-              />
-            </div>
-
-            {/* Body 编辑区 */}
-            <div className="px-3 pb-3">
-              <div className="mb-2 flex items-center justify-between">
-                <Typography.Text strong className="text-sm">Body</Typography.Text>
-                {showBodyEditor && (
-                  <Button size="small" onClick={handleFillBody}>一键填充</Button>
-                )}
-              </div>
-              {workCopy.requestBody
-                ? (
-                    <div>
-                      <div className="mb-2 flex flex-wrap items-center gap-1">
-                        {bodyTypeOptions.map(({ n, t }) => {
-                          const b = workCopy.requestBody
-                          const hasContent = b
-                            ? t === BodyType.FormData || t === BodyType.UrlEncoded
-                              ? (b.parameters ?? []).some(p => p.name && p.enable !== false)
-                              : t === BodyType.Json || t === BodyType.Xml
-                                ? !!((b.jsonSchema as { properties?: unknown[] })?.properties?.length)
-                                : t === BodyType.Raw || t === BodyType.Binary
-                                  ? !!(b.rawText?.trim())
-                                  : false
-                            : false
-                          return (
-                            <Tag.CheckableTag
-                              key={t}
-                              checked={workCopy.requestBody!.type === t}
-                              onChange={(checked) => {
-                                if (checked) {
-                                  const next = {
-                                    ...workCopy,
-                                    requestBody: { ...workCopy.requestBody!, type: t },
-                                  }
-                                  setWorkCopy(next)
-                                  persist(next)
-                                }
-                              }}
-                            >
-                              {n}
-                              {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
-                            </Tag.CheckableTag>
-                          )
-                        })}
-                      </div>
-
-                      {showBodyEditor && (
-                        <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: token.colorBorderSecondary }}>
-                          <MonacoEditor
-                            height="200px"
-                            language={
-                              workCopy.requestBody!.type === BodyType.Xml ? 'xml'
-                                : workCopy.requestBody!.type === BodyType.Raw ? 'plaintext'
-                                : 'json'
-                            }
-                            deserializeOnChange={false}
-                            value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
-                            onChange={(val) => {
-                              setBodyRawText(typeof val === 'string' ? val : '')
-                            }}
-                            options={{ readOnly: false }}
-                            onMount={(editor, monaco) => {
-                              monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                              monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {(workCopy.requestBody.type === BodyType.FormData
-                        || workCopy.requestBody.type === BodyType.UrlEncoded) && (
-                        <div>
-                          <Typography.Text type="secondary" className="mb-2 block text-xs">
-                            {workCopy.requestBody.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
-                          </Typography.Text>
-                          <ParamsEditableTable
-                            value={workCopy.requestBody.parameters}
-                            onChange={(parameters) => {
-                              const next = {
-                                ...workCopy,
-                                requestBody: { ...workCopy.requestBody!, parameters },
-                              }
-                              setWorkCopy(next)
-                              persist(next)
-                            }}
-                          />
-                        </div>
-                      )}
+          <Tabs
+            key={`run-tabs-${resetCounter}`}
+            animated={false}
+            className="min-w-0 h-full"
+            tabBarStyle={{ paddingLeft: 12, marginBottom: 0 }}
+            items={[
+              {
+                key: 'params',
+                label: 'Params & Body',
+                children: (
+                  <>
+                    {/* 参数编辑区 */}
+                    <div className="px-3 min-w-0 overflow-hidden">
+                      <ParamsTab
+                        key={`params-tab-${resetCounter}`}
+                        value={workCopy.parameters}
+                        globalParameters={projectEnvironmentConfig?.globalParameters}
+                        envParameters={currentEnv?.parameters}
+                        varMap={varMap}
+                        disabledInheritedNames={disabledInheritedParams}
+                        onToggleInheritedParam={handleToggleInheritedParam}
+                        onChange={(parameters) => {
+                          const next = { ...workCopy, parameters }
+                          setWorkCopy(next)
+                          persist(next)
+                        }}
+                      />
                     </div>
-                  )
-                : (
-                    <Typography.Text type="secondary">无</Typography.Text>
-                  )}
-            </div>
-          </>
+
+                    {/* Body 编辑区 */}
+                    <div className="px-3 pb-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <Typography.Text strong className="text-sm">Body</Typography.Text>
+                        {showBodyEditor && (
+                          <Button size="small" onClick={handleFillBody}>一键填充</Button>
+                        )}
+                      </div>
+                      {workCopy.requestBody
+                        ? (
+                            <div>
+                              <div className="mb-2 flex flex-wrap items-center gap-1">
+                                {bodyTypeOptions.map(({ n, t }) => {
+                                  const b = workCopy.requestBody
+                                  const hasContent = b
+                                    ? t === BodyType.FormData || t === BodyType.UrlEncoded
+                                      ? (b.parameters ?? []).some(p => p.name && p.enable !== false)
+                                      : t === BodyType.Json || t === BodyType.Xml
+                                        ? !!((b.jsonSchema as { properties?: unknown[] })?.properties?.length)
+                                        : t === BodyType.Raw || t === BodyType.Binary
+                                          ? !!(b.rawText?.trim())
+                                          : false
+                                    : false
+                                  return (
+                                    <Tag.CheckableTag
+                                      key={t}
+                                      checked={workCopy.requestBody!.type === t}
+                                      onChange={(checked) => {
+                                        if (checked) {
+                                          const next = {
+                                            ...workCopy,
+                                            requestBody: { ...workCopy.requestBody!, type: t },
+                                          }
+                                          setWorkCopy(next)
+                                          persist(next)
+                                        }
+                                      }}
+                                    >
+                                      {n}
+                                      {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
+                                    </Tag.CheckableTag>
+                                  )
+                                })}
+                              </div>
+
+                              {showBodyEditor && (
+                                <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: token.colorBorderSecondary }}>
+                                  <MonacoEditor
+                                    height="200px"
+                                    language={
+                                      workCopy.requestBody!.type === BodyType.Xml ? 'xml'
+                                        : workCopy.requestBody!.type === BodyType.Raw ? 'plaintext'
+                                        : 'json'
+                                    }
+                                    deserializeOnChange={false}
+                                    value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
+                                    onChange={(val) => {
+                                      setBodyRawText(typeof val === 'string' ? val : '')
+                                    }}
+                                    options={{ readOnly: false }}
+                                    onMount={(editor, monaco) => {
+                                      monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
+                                      monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
+                                    }}
+                                  />
+                                </div>
+                              )}
+
+                              {(workCopy.requestBody.type === BodyType.FormData
+                                || workCopy.requestBody.type === BodyType.UrlEncoded) && (
+                                <div>
+                                  <Typography.Text type="secondary" className="mb-2 block text-xs">
+                                    {workCopy.requestBody.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
+                                  </Typography.Text>
+                                  <ParamsEditableTable
+                                    value={workCopy.requestBody.parameters}
+                                    onChange={(parameters) => {
+                                      const next = {
+                                        ...workCopy,
+                                        requestBody: { ...workCopy.requestBody!, parameters },
+                                      }
+                                      setWorkCopy(next)
+                                      persist(next)
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )
+                        : (
+                            <Typography.Text type="secondary">无</Typography.Text>
+                          )}
+                    </div>
+                  </>
+                ),
+              },
+              {
+                key: 'scripts',
+                label: 'Scripts',
+                children: (
+                  <div className="px-3 pb-3">
+                    <ScriptTab
+                      key={`script-tab-${resetCounter}`}
+                      preScript={workCopy.preScript}
+                      postScript={workCopy.postScript}
+                      onPreScriptChange={(value) => {
+                        const next = { ...workCopy, preScript: value }
+                        setWorkCopy(next)
+                        persist(next)
+                      }}
+                      onPostScriptChange={(value) => {
+                        const next = { ...workCopy, postScript: value }
+                        setWorkCopy(next)
+                        persist(next)
+                      }}
+                      preScriptConsole={preScriptConsole}
+                      preScriptTests={preScriptTests}
+                      postScriptConsole={postScriptConsole}
+                      postScriptTests={postScriptTests}
+                    />
+                  </div>
+                ),
+              },
+            ]}
+          />
         }
         resultArea={
           <ResultViewer

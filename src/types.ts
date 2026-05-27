@@ -193,6 +193,40 @@ export interface ApiDetails {
   createdAt?: string
   /** 接口文档更新时间 */
   updatedAt?: string
+  /** 前置脚本（JavaScript） */
+  preScript?: string
+  /** 后置脚本（JavaScript） */
+  postScript?: string
+}
+
+/** 脚本控制台输出条目 */
+export interface ScriptConsoleEntry {
+  level: 'log' | 'warn' | 'error' | 'info'
+  args: string[]
+  timestamp: number
+}
+
+/** 脚本测试断言结果 */
+export interface ScriptTestResult {
+  name: string
+  passed: boolean
+  error?: string
+}
+
+/** 脚本执行结果 */
+export interface ScriptExecutionResult {
+  success: boolean
+  consoleEntries: ScriptConsoleEntry[]
+  testResults: ScriptTestResult[]
+  /** 变量变更（pm.env.set / pm.globals.set） */
+  variableDeltas: Record<string, string>
+  /** 前置脚本修改的 headers */
+  headerDeltas?: Array<{ name: string; value: string }>
+  /** 前置脚本修改的 URL */
+  urlDelta?: string
+  /** 前置脚本修改的 body */
+  bodyDelta?: string
+  error?: string
 }
 
 export interface ApiDoc {

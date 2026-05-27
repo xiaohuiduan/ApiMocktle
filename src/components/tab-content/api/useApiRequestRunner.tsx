@@ -26,7 +26,7 @@ export function useApiRequestRunner() {
     contentType?: string,
     formDataFiles?: Array<{ name: string, path: string }>,
     insecureSkipVerify?: boolean,
-  ) => {
+  ): Promise<ApiRunResult | undefined> => {
     if (!projectId || !sessionId) {
       const msg = '当前不在项目页面，无法运行请求'
       messageApi.error(msg)
@@ -51,8 +51,8 @@ export function useApiRequestRunner() {
         (payload.payload as Record<string, unknown>).proxyConfig = { ...pc }
       }
 
-      const result = await api<ApiRunResult>('run_api_request', payload)
-      setResult(result)
+      const apiResult = await api<ApiRunResult>('run_api_request', payload)
+      setResult(apiResult)
 
       // Save history (fire-and-forget)
       if (menuItemId && projectId && sessionId) {
@@ -62,11 +62,13 @@ export function useApiRequestRunner() {
           projectId,
           menuItemId,
           requestJson: requestData,
-          responseJson: result,
-          statusCode: result.status,
-          durationMs: result.durationMs,
+          responseJson: apiResult,
+          statusCode: apiResult.status,
+          durationMs: apiResult.durationMs,
         }).catch(() => {})
       }
+
+      return apiResult
     } catch (err) {
       const msg = err instanceof Error ? err.message : '运行失败'
       messageApi.error({ content: msg, duration: 4 })
@@ -121,6 +123,8 @@ export function useApiRequestRunner() {
           durationMs: 0,
         }).catch(() => {})
       }
+
+      return undefined
     } finally {
       setRunning(false)
     }

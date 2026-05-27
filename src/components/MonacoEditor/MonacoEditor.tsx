@@ -70,6 +70,11 @@ function EditorX<ValueType = unknown>(
       return serialize(value, 2)
     }
 
+    // 确保 undefined 和 null 被转换为空字符串，以便编辑器能正确更新
+    if (value === undefined || value === null) {
+      return ''
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return value
   }

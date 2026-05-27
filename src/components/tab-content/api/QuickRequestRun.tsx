@@ -7,6 +7,7 @@ import {
   Select,
   Space,
   Switch,
+  Tabs,
   Tag,
   Tooltip,
   Typography,
@@ -22,6 +23,7 @@ import { MonacoEditor } from '@/components/MonacoEditor'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { BodyType, MenuItemType } from '@/enums'
@@ -33,6 +35,8 @@ import { useApiRequestRunner } from './useApiRequestRunner'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
 import { HistoryPanel } from './components/HistoryPanel'
+import { ScriptTab, executeScript } from './scripts'
+import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
 
 function buildBodyExample(apiDetails: ApiDetails, menuRawList?: unknown): string {
   const body = apiDetails.requestBody
@@ -95,6 +99,7 @@ export function QuickRequestRun() {
   const { messageApi } = useGlobalContext()
   const { menuRawList, addMenuItem, updateMenuItem } = useMenuHelpersContext()
   const { addTabItem } = useMenuTabHelpers()
+  const { sessionVars, setSessionVars } = useSessionVariablesContext()
 
   const isCreating = tabData.data?.tabStatus === PageTabStatus.Create
 
@@ -115,6 +120,12 @@ export function QuickRequestRun() {
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
+
+  // 脚本相关状态
+  const [preScriptConsole, setPreScriptConsole] = useState<ScriptConsoleEntry[]>([])
+  const [preScriptTests, setPreScriptTests] = useState<ScriptTestResult[]>([])
+  const [postScriptConsole, setPostScriptConsole] = useState<ScriptConsoleEntry[]>([])
+  const [postScriptTests, setPostScriptTests] = useState<ScriptTestResult[]>([])
 
   useEffect(() => {
     if (savedData && !isCreating) {
@@ -200,7 +211,79 @@ export function QuickRequestRun() {
       }
     }
 
-    await run(isCreating ? undefined : tabData.key, url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
+    // ====== 前置脚本执行 ======
+    if (workCopy.preScript?.trim()) {
+      setPreScriptConsole([])
+      setPreScriptTests([])
+      try {
+        const preResult = await executeScript(workCopy.preScript, {
+          environment: sessionVars,
+          globals: {},
+          variables: {},
+          request: { url, method: workCopy.method ?? DEFAULT_METHOD, headers, body: bodyText },
+        })
+
+        setPreScriptConsole(preResult.consoleEntries)
+        setPreScriptTests(preResult.testResults)
+
+        // 将脚本设置的变量存入会话变量
+        if (Object.keys(preResult.variableDeltas).length > 0) {
+          setSessionVars(preResult.variableDeltas)
+        }
+
+        // 应用变量变更到 headers
+        for (const [key, value] of Object.entries(preResult.variableDeltas)) {
+          headers.forEach(h => {
+            h.value = h.value.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value)
+          })
+        }
+
+        if (!preResult.success) {
+          messageApi.error(`前置脚本执行失败: ${preResult.error}`)
+          return
+        }
+      } catch (err) {
+        messageApi.error(`前置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
+        return
+      }
+    }
+
+    const runResult = await run(isCreating ? undefined : tabData.key, url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
+
+    // ====== 后置脚本执行 ======
+    if (workCopy.postScript?.trim() && runResult) {
+      setPostScriptConsole([])
+      setPostScriptTests([])
+      try {
+        const postResult = await executeScript(workCopy.postScript, {
+          environment: sessionVars,
+          globals: {},
+          variables: {},
+          request: { url, method: workCopy.method ?? DEFAULT_METHOD, headers, body: bodyText },
+          response: {
+            status: runResult.status,
+            statusText: runResult.statusText,
+            headers: runResult.headers ?? [],
+            body: runResult.body ?? '',
+            responseTime: runResult.durationMs,
+          },
+        })
+
+        setPostScriptConsole(postResult.consoleEntries)
+        setPostScriptTests(postResult.testResults)
+
+        // 将脚本设置的变量存入会话变量
+        if (Object.keys(postResult.variableDeltas).length > 0) {
+          setSessionVars(postResult.variableDeltas)
+        }
+
+        if (!postResult.success) {
+          messageApi.error(`后置脚本执行失败: ${postResult.error}`)
+        }
+      } catch (err) {
+        messageApi.error(`后置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
   }
 
   const handleSave = async () => {
@@ -368,109 +451,143 @@ export function QuickRequestRun() {
       {/* 参数编辑区 */}
       <ResponsePanel
         paramsArea={
-          <>
-            {/* 参数编辑区 */}
-            <div className="px-3">
-              <ParamsTab
-                value={workCopy.parameters}
-                onChange={(parameters) => {
-                  setWorkCopy((prev) => ({ ...prev, parameters }))
-                }}
-              />
-            </div>
-
-            {/* Body 编辑区 */}
-            <div className="px-3 pb-3">
-              <div className="mb-2 flex items-center justify-between">
-                <Typography.Text strong className="text-sm">Body</Typography.Text>
-                {((workCopy.requestBody?.type === BodyType.Json
-                  || workCopy.requestBody?.type === BodyType.Xml
-                  || workCopy.requestBody?.type === BodyType.Raw)) && (
-                    <Button size="small" onClick={handleFillBody}>一键填充</Button>
-                )}
-              </div>
-              {(() => {
-                const body = workCopy.requestBody || { type: BodyType.None }
-                const showEditor = body.type === BodyType.Json
-                  || body.type === BodyType.Xml
-                  || body.type === BodyType.Raw
-
-                return (
-                  <div>
-                    <div className="mb-2 flex flex-wrap items-center gap-1">
-                      {bodyTypeOptions.map(({ n, t }) => {
-                        const hasContent = t === BodyType.FormData || t === BodyType.UrlEncoded
-                          ? (body.parameters ?? []).some(p => p.name && p.enable !== false)
-                          : t === BodyType.Json || t === BodyType.Xml
-                            ? !!((body.jsonSchema as { properties?: unknown[] })?.properties?.length)
-                            : t === BodyType.Raw || t === BodyType.Binary
-                              ? !!(body.rawText?.trim())
-                              : false
-                        return (
-                          <Tag.CheckableTag
-                            key={t}
-                            checked={body.type === t}
-                            onChange={(checked) => {
-                              if (checked) {
-                                setWorkCopy((prev) => ({
-                                  ...prev,
-                                  requestBody: { ...(prev.requestBody || { type: BodyType.None }), type: t },
-                                }))
-                              }
-                            }}
-                          >
-                            {n}
-                            {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
-                          </Tag.CheckableTag>
-                        )
-                      })}
+          <Tabs
+            animated={false}
+            className="min-w-0 h-full"
+            tabBarStyle={{ paddingLeft: 12, marginBottom: 0 }}
+            items={[
+              {
+                key: 'params',
+                label: 'Params & Body',
+                children: (
+                  <>
+                    {/* 参数编辑区 */}
+                    <div className="px-3">
+                      <ParamsTab
+                        value={workCopy.parameters}
+                        onChange={(parameters) => {
+                          setWorkCopy((prev) => ({ ...prev, parameters }))
+                        }}
+                      />
                     </div>
 
-                    {showEditor && (
-                      <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: token.colorBorderSecondary }}>
-                        <MonacoEditor
-                          height="200px"
-                          language={
-                            body.type === BodyType.Xml ? 'xml'
-                              : body.type === BodyType.Raw ? 'plaintext'
-                              : 'json'
-                          }
-                          deserializeOnChange={false}
-                          value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
-                          onChange={(val) => {
-                            setBodyRawText(typeof val === 'string' ? val : '')
-                          }}
-                          options={{ readOnly: false }}
-                          onMount={(editor, monaco) => {
-                            monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                            monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                          }}
-                        />
+                    {/* Body 编辑区 */}
+                    <div className="px-3 pb-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <Typography.Text strong className="text-sm">Body</Typography.Text>
+                        {((workCopy.requestBody?.type === BodyType.Json
+                          || workCopy.requestBody?.type === BodyType.Xml
+                          || workCopy.requestBody?.type === BodyType.Raw)) && (
+                            <Button size="small" onClick={handleFillBody}>一键填充</Button>
+                        )}
                       </div>
-                    )}
+                      {(() => {
+                        const body = workCopy.requestBody || { type: BodyType.None }
+                        const showEditor = body.type === BodyType.Json
+                          || body.type === BodyType.Xml
+                          || body.type === BodyType.Raw
 
-                    {(body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) && (
-                      <div>
-                        <Typography.Text type="secondary" className="mb-2 block text-xs">
-                          {body.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
-                        </Typography.Text>
-                        <ParamsEditableTable
-                          value={body.parameters}
-                          onChange={(parameters) => {
-                            setWorkCopy((prev) => ({
-                              ...prev,
-                              requestBody: { ...(prev.requestBody || { type: BodyType.None }), parameters },
-                            }))
-                          }}
-                        />
-                      </div>
-                    )}
+                        return (
+                          <div>
+                            <div className="mb-2 flex flex-wrap items-center gap-1">
+                              {bodyTypeOptions.map(({ n, t }) => {
+                                const hasContent = t === BodyType.FormData || t === BodyType.UrlEncoded
+                                  ? (body.parameters ?? []).some(p => p.name && p.enable !== false)
+                                  : t === BodyType.Json || t === BodyType.Xml
+                                    ? !!((body.jsonSchema as { properties?: unknown[] })?.properties?.length)
+                                    : t === BodyType.Raw || t === BodyType.Binary
+                                      ? !!(body.rawText?.trim())
+                                      : false
+                                return (
+                                  <Tag.CheckableTag
+                                    key={t}
+                                    checked={body.type === t}
+                                    onChange={(checked) => {
+                                      if (checked) {
+                                        setWorkCopy((prev) => ({
+                                          ...prev,
+                                          requestBody: { ...(prev.requestBody || { type: BodyType.None }), type: t },
+                                        }))
+                                      }
+                                    }}
+                                  >
+                                    {n}
+                                    {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
+                                  </Tag.CheckableTag>
+                                )
+                              })}
+                            </div>
+
+                            {showEditor && (
+                              <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: token.colorBorderSecondary }}>
+                                <MonacoEditor
+                                  height="200px"
+                                  language={
+                                    body.type === BodyType.Xml ? 'xml'
+                                      : body.type === BodyType.Raw ? 'plaintext'
+                                      : 'json'
+                                  }
+                                  deserializeOnChange={false}
+                                  value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
+                                  onChange={(val) => {
+                                    setBodyRawText(typeof val === 'string' ? val : '')
+                                  }}
+                                  options={{ readOnly: false }}
+                                  onMount={(editor, monaco) => {
+                                    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
+                                    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {(body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) && (
+                              <div>
+                                <Typography.Text type="secondary" className="mb-2 block text-xs">
+                                  {body.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
+                                </Typography.Text>
+                                <ParamsEditableTable
+                                  value={body.parameters}
+                                  onChange={(parameters) => {
+                                    setWorkCopy((prev) => ({
+                                      ...prev,
+                                      requestBody: { ...(prev.requestBody || { type: BodyType.None }), parameters },
+                                    }))
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </>
+                ),
+              },
+              {
+                key: 'scripts',
+                label: 'Scripts',
+                children: (
+                  <div className="px-3 pb-3">
+                    <ScriptTab
+                      preScript={workCopy.preScript}
+                      postScript={workCopy.postScript}
+                      onPreScriptChange={(value) => {
+                        setWorkCopy((prev) => ({ ...prev, preScript: value }))
+                      }}
+                      onPostScriptChange={(value) => {
+                        setWorkCopy((prev) => ({ ...prev, postScript: value }))
+                      }}
+                      preScriptConsole={preScriptConsole}
+                      preScriptTests={preScriptTests}
+                      postScriptConsole={postScriptConsole}
+                      postScriptTests={postScriptTests}
+                    />
                   </div>
-                )
-              })()}
-            </div>
-
-          </>
+                ),
+              },
+            ]}
+          />
         }
         resultArea={
           <ResultViewer
