@@ -27,7 +27,7 @@ import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { BodyType, MenuItemType } from '@/enums'
-import type { ApiDetails } from '@/types'
+import type { ApiDetails, RunTabInfo } from '@/types'
 
 import { ParamsEditableTable } from './components/ParamsEditableTable'
 import { ParamsTab } from './params/ParamsTab'
@@ -292,11 +292,21 @@ export function QuickRequestRun() {
       const menuName = workCopy.name || '快捷请求'
       if (isCreating) {
         const menuItemId = nanoid(6)
+        const runTabInfo: RunTabInfo = {
+          serverId: workCopy.serverId,
+          parameters: workCopy.parameters,
+          bodyType: workCopy.requestBody?.type,
+          bodyParameters: workCopy.requestBody?.parameters,
+          bodyRawText: workCopy.requestBody?.rawText,
+          preScript: workCopy.preScript,
+          postScript: workCopy.postScript,
+        }
         addMenuItem({
           id: menuItemId,
           name: menuName,
           type: MenuItemType.HttpRequest,
           data: { ...workCopy, name: menuName },
+          runTabInfo,
         })
         addTabItem(
           {
@@ -307,10 +317,19 @@ export function QuickRequestRun() {
           { replaceTab: tabData.key },
         )
       } else {
+        const runTabInfo: RunTabInfo = {
+          serverId: workCopy.serverId,
+          parameters: workCopy.parameters,
+          bodyType: workCopy.requestBody?.type,
+          bodyParameters: workCopy.requestBody?.parameters,
+          bodyRawText: workCopy.requestBody?.rawText,
+          preScript: workCopy.preScript,
+          postScript: workCopy.postScript,
+        }
         await updateMenuItem({
           id: tabData.key,
           name: menuName,
-          data: { ...workCopy, name: menuName },
+          runTabInfo,
         })
         messageApi.success('保存成功')
       }

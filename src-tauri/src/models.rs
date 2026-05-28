@@ -85,6 +85,8 @@ pub struct ApiMenuData {
     pub menu_type: String,
     #[serde(rename = "data", default)]
     pub data_json: Option<serde_json::Value>,
+    #[serde(rename = "runTabInfo", default)]
+    pub run_tab_json: Option<serde_json::Value>,
     #[serde(rename = "sortOrder")]
     pub sort_order: i32,
     #[serde(rename = "createdAt")]
@@ -103,6 +105,8 @@ pub struct CreateMenuItemPayload {
     pub menu_type: String,
     #[serde(rename = "data", default)]
     pub data_json: Option<serde_json::Value>,
+    #[serde(rename = "runTabInfo", default)]
+    pub run_tab_json: Option<serde_json::Value>,
     #[serde(rename = "sortOrder")]
     pub sort_order: Option<i32>,
 }

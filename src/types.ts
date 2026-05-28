@@ -199,6 +199,29 @@ export interface ApiDetails {
   postScript?: string
 }
 
+/** RunTab 运行时信息 */
+export interface RunTabInfo {
+  /** 运行时选择的环境 ID */
+  serverId?: string
+  /** 运行时修改的参数 */
+  parameters?: {
+    cookie?: Parameter[]
+    header?: Parameter[]
+    query?: Parameter[]
+    path?: Parameter[]
+  }
+  /** 运行时修改的请求体类型 */
+  bodyType?: BodyType
+  /** 运行时修改的请求体参数 */
+  bodyParameters?: Parameter[]
+  /** 运行时修改的请求体原始文本 */
+  bodyRawText?: string
+  /** 运行时修改的前置脚本 */
+  preScript?: string
+  /** 运行时修改的后置脚本 */
+  postScript?: string
+}
+
 /** 脚本控制台输出条目 */
 export interface ScriptConsoleEntry {
   level: 'log' | 'warn' | 'error' | 'info'

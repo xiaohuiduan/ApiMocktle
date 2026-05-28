@@ -102,6 +102,7 @@ fn ensure_default_folder(db: &Db, project_id: &str) -> Result<String, crate::err
         name: "默认分类".to_string(),
         menu_type: "apiDetailFolder".to_string(),
         data_json: None,
+        run_tab_json: None,
         sort_order: Some(sort_order + 1),
     };
     menu_repo::create_menu_item(db, project_id, &payload)?;
@@ -390,7 +391,7 @@ async fn handle_add_cat(
     let sort_order = match menu_repo::get_max_sort_order(&state.db, &project_id) {
         Ok(n) => n + 1, Err(e) => return yapi_error(&format!("查询排序失败: {e}")),
     };
-    let payload = CreateMenuItemPayload { id: folder_id.clone(), parent_id: None, name: name.to_string(), menu_type: "apiDetailFolder".to_string(), data_json: None, sort_order: Some(sort_order) };
+    let payload = CreateMenuItemPayload { id: folder_id.clone(), parent_id: None, name: name.to_string(), menu_type: "apiDetailFolder".to_string(), data_json: None, run_tab_json: None, sort_order: Some(sort_order) };
     match menu_repo::create_menu_item(&state.db, &project_id, &payload) {
         Ok(_) => yapi_ok(serde_json::json!({ "_id": folder_id, "name": name, "desc": "", "index": 0 })),
         Err(e) => yapi_error(&format!("创建分类失败: {e}")),
@@ -452,7 +453,7 @@ async fn handle_interface_save(
     }
     let menu_item_id = Uuid::new_v4().to_string();
     let sort_order = match menu_repo::get_max_sort_order(&state.db, &project_id) { Ok(n) => n + 1, Err(e) => return yapi_error(&format!("查询排序失败: {e}")), };
-    let payload = CreateMenuItemPayload { id: menu_item_id.clone(), parent_id: Some(catid), name: title.to_string(), menu_type: "apiDetail".to_string(), data_json: Some(api_details), sort_order: Some(sort_order) };
+    let payload = CreateMenuItemPayload { id: menu_item_id.clone(), parent_id: Some(catid), name: title.to_string(), menu_type: "apiDetail".to_string(), data_json: Some(api_details), run_tab_json: None, sort_order: Some(sort_order) };
     match menu_repo::create_menu_item(&state.db, &project_id, &payload) {
         Ok(_) => yapi_ok(serde_json::json!({ "_id": menu_item_id })),
         Err(e) => yapi_error(&format!("创建接口失败: {e}")),

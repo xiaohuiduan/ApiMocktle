@@ -336,7 +336,7 @@ pub fn get_project_state(
     let conn = db.0.lock().unwrap();
 
     let mut stmt = conn.prepare(
-        "SELECT id, parent_id, name, type, data_json, sort_order, created_at, updated_at
+        "SELECT id, parent_id, name, type, data_json, run_tab_json, sort_order, created_at, updated_at
          FROM menu_items WHERE project_id = ?1 ORDER BY sort_order",
     )?;
     let mut menu_raw_list: Vec<ApiMenuData> = stmt
@@ -348,9 +348,11 @@ pub fn get_project_state(
                 menu_type: row.get(3)?,
                 data_json: row.get::<_, Option<String>>(4).ok().flatten()
                     .and_then(|s| serde_json::from_str(&s).ok()),
-                sort_order: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
+                run_tab_json: row.get::<_, Option<String>>(5).ok().flatten()
+                    .and_then(|s| serde_json::from_str(&s).ok()),
+                sort_order: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;

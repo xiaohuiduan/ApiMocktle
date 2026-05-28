@@ -1,7 +1,7 @@
 import type { TreeProps } from 'antd'
 
 import type { MenuItemType } from '@/enums'
-import type { ApiDetails, ApiDoc, ApiFolder, ApiSchema } from '@/types'
+import type { ApiDetails, ApiDoc, ApiFolder, ApiSchema, RunTabInfo } from '@/types'
 
 export interface ApiMenuBase {
   id: CatalogId
@@ -13,6 +13,7 @@ export interface ApiMenuBase {
 interface ApiMenuInterface extends ApiMenuBase {
   type: MenuItemType.ApiDetail
   data?: ApiDetails
+  runTabInfo?: RunTabInfo
 }
 
 interface ApiMenuInterfaceFolder extends ApiMenuBase {
@@ -33,6 +34,7 @@ interface ApiMenuSchema extends ApiMenuBase {
 interface ApiMenuRequest extends ApiMenuBase {
   type: MenuItemType.HttpRequest | MenuItemType.RequestFolder
   data?: ApiDetails
+  runTabInfo?: RunTabInfo
 }
 
 export type CatalogId = string

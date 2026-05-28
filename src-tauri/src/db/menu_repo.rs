@@ -13,11 +13,12 @@ pub fn create_menu_item(
     let now = chrono::Utc::now().to_rfc3339();
     let sort_order = item.sort_order.unwrap_or(0);
     let data_json_str = item.data_json.as_ref().map(|v| v.to_string());
+    let run_tab_json_str = item.run_tab_json.as_ref().map(|v| v.to_string());
 
     conn.execute(
-        "INSERT INTO menu_items (project_id, id, parent_id, name, type, data_json, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-        params![project_id, item.id, item.parent_id, item.name, item.menu_type, data_json_str, sort_order, now, now],
+        "INSERT INTO menu_items (project_id, id, parent_id, name, type, data_json, run_tab_json, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        params![project_id, item.id, item.parent_id, item.name, item.menu_type, data_json_str, run_tab_json_str, sort_order, now, now],
     )?;
 
     Ok(ApiMenuData {
@@ -26,6 +27,7 @@ pub fn create_menu_item(
         name: item.name.clone(),
         menu_type: item.menu_type.clone(),
         data_json: item.data_json.clone(),
+        run_tab_json: item.run_tab_json.clone(),
         sort_order,
         created_at: now.clone(),
         updated_at: now,
@@ -53,6 +55,12 @@ pub fn update_menu_item(
             params![data_json.to_string(), now, project_id, menu_id],
         )?;
     }
+    if let Some(run_tab_json) = updates.get("runTabInfo") {
+        conn.execute(
+            "UPDATE menu_items SET run_tab_json = ?1, updated_at = ?2 WHERE project_id = ?3 AND id = ?4",
+            params![run_tab_json.to_string(), now, project_id, menu_id],
+        )?;
+    }
     if let Some(parent_id) = updates.get("parentId").and_then(|v| v.as_str()) {
         conn.execute(
             "UPDATE menu_items SET parent_id = ?1, updated_at = ?2 WHERE project_id = ?3 AND id = ?4",
@@ -61,7 +69,7 @@ pub fn update_menu_item(
     }
 
     let row = conn.query_row(
-        "SELECT id, parent_id, name, type, data_json, sort_order, created_at, updated_at
+        "SELECT id, parent_id, name, type, data_json, run_tab_json, sort_order, created_at, updated_at
          FROM menu_items WHERE project_id = ?1 AND id = ?2",
         params![project_id, menu_id],
         |row| {
@@ -72,9 +80,11 @@ pub fn update_menu_item(
                 menu_type: row.get(3)?,
                 data_json: row.get::<_, Option<String>>(4).ok().flatten()
                     .and_then(|s| serde_json::from_str(&s).ok()),
-                sort_order: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
+                run_tab_json: row.get::<_, Option<String>>(5).ok().flatten()
+                    .and_then(|s| serde_json::from_str(&s).ok()),
+                sort_order: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         },
     )?;
@@ -87,7 +97,7 @@ pub fn delete_menu_item(db: &Db, project_id: &str, menu_id: &str) -> Result<(), 
 
     // Get item before deleting for recycle bin
     let item = conn.query_row(
-        "SELECT id, parent_id, name, type, data_json, sort_order, created_at, updated_at
+        "SELECT id, parent_id, name, type, data_json, run_tab_json, sort_order, created_at, updated_at
          FROM menu_items WHERE project_id = ?1 AND id = ?2",
         params![project_id, menu_id],
         |row| {
@@ -98,9 +108,11 @@ pub fn delete_menu_item(db: &Db, project_id: &str, menu_id: &str) -> Result<(), 
                 menu_type: row.get(3)?,
                 data_json: row.get::<_, Option<String>>(4).ok().flatten()
                     .and_then(|s| serde_json::from_str(&s).ok()),
-                sort_order: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
+                run_tab_json: row.get::<_, Option<String>>(5).ok().flatten()
+                    .and_then(|s| serde_json::from_str(&s).ok()),
+                sort_order: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         },
     )?;
@@ -204,11 +216,12 @@ pub fn restore_recycle_item(
 
     let now = chrono::Utc::now().to_rfc3339();
     let data_json_str = item.data_json.as_ref().map(|v| v.to_string());
+    let run_tab_json_str = item.run_tab_json.as_ref().map(|v| v.to_string());
 
     conn.execute(
-        "INSERT OR REPLACE INTO menu_items (project_id, id, parent_id, name, type, data_json, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-        params![project_id, item.id, item.parent_id, item.name, item.menu_type, data_json_str, item.sort_order, item.created_at, now],
+        "INSERT OR REPLACE INTO menu_items (project_id, id, parent_id, name, type, data_json, run_tab_json, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        params![project_id, item.id, item.parent_id, item.name, item.menu_type, data_json_str, run_tab_json_str, item.sort_order, item.created_at, now],
     )?;
 
     conn.execute(
@@ -258,7 +271,7 @@ pub fn get_menu_item(
 ) -> Result<Option<ApiMenuData>, crate::errors::AppError> {
     let conn = db.0.lock().unwrap();
     conn.query_row(
-        "SELECT id, parent_id, name, type, data_json, sort_order, created_at, updated_at
+        "SELECT id, parent_id, name, type, data_json, run_tab_json, sort_order, created_at, updated_at
          FROM menu_items WHERE project_id = ?1 AND id = ?2",
         params![project_id, menu_id],
         |row| {
@@ -269,9 +282,11 @@ pub fn get_menu_item(
                 menu_type: row.get(3)?,
                 data_json: row.get::<_, Option<String>>(4).ok().flatten()
                     .and_then(|s| serde_json::from_str(&s).ok()),
-                sort_order: row.get(5)?,
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
+                run_tab_json: row.get::<_, Option<String>>(5).ok().flatten()
+                    .and_then(|s| serde_json::from_str(&s).ok()),
+                sort_order: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         },
     )
@@ -303,7 +318,7 @@ pub fn list_menu_items(
 ) -> Result<Vec<ApiMenuData>, crate::errors::AppError> {
     let conn = db.0.lock().unwrap();
     let mut stmt = conn.prepare(
-        "SELECT id, parent_id, name, type, data_json, sort_order, created_at, updated_at
+        "SELECT id, parent_id, name, type, data_json, run_tab_json, sort_order, created_at, updated_at
          FROM menu_items WHERE project_id = ?1 ORDER BY sort_order",
     )?;
     let rows = stmt.query_map(params![project_id], |row| {
@@ -314,9 +329,11 @@ pub fn list_menu_items(
             menu_type: row.get(3)?,
             data_json: row.get::<_, Option<String>>(4).ok().flatten()
                 .and_then(|s| serde_json::from_str(&s).ok()),
-            sort_order: row.get(5)?,
-            created_at: row.get(6)?,
-            updated_at: row.get(7)?,
+            run_tab_json: row.get::<_, Option<String>>(5).ok().flatten()
+                .and_then(|s| serde_json::from_str(&s).ok()),
+            sort_order: row.get(6)?,
+            created_at: row.get(7)?,
+            updated_at: row.get(8)?,
         })
     })?;
     rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.into())

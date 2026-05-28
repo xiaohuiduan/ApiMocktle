@@ -57,6 +57,7 @@ fn create_tables(conn: &Connection) {
             name TEXT NOT NULL,
             type TEXT NOT NULL,
             data_json TEXT,
+            run_tab_json TEXT,
             sort_order INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
@@ -147,6 +148,17 @@ fn run_migrations(conn: &Connection) {
         );
         CREATE INDEX IF NOT EXISTS idx_request_history_menu ON request_history(project_id, menu_item_id);",
     ).ok();
+
+    // Add run_tab_json column to menu_items if not exists
+    let has_run_tab_json: bool = conn
+        .prepare("SELECT 1 AS yes FROM pragma_table_info('menu_items') WHERE name = 'run_tab_json'")
+        .and_then(|mut s| s.exists([]))
+        .unwrap_or(false);
+
+    if !has_run_tab_json {
+        conn.execute("ALTER TABLE menu_items ADD COLUMN run_tab_json TEXT", [])
+            .ok();
+    }
 }
 
 pub fn init_database(app_data_dir: &PathBuf) -> Db {

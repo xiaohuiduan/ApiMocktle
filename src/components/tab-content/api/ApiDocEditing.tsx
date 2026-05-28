@@ -6,6 +6,7 @@ import { nanoid } from 'nanoid'
 
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
+import { useApiSubTabContext } from './Api'
 import { ApiRemoveButton } from '@/components/tab-content/api/ApiRemoveButton'
 import { ResponseTab } from '@/components/tab-content/api/components/ResponseTab'
 import { ParamsBody } from './params/ParamsBody'
@@ -59,12 +60,13 @@ export function ApiDocEditing() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const initialLoadKey = useRef<string | undefined>()
+  const subTabKey = useApiSubTabContext()
 
   const menuApiName = useMemo(() => {
     return menuRawList?.find(({ id }) => id === tabData.key)?.name ?? DEFAULT_NAME
   }, [menuRawList, tabData.key])
 
-  useCtrlSave(() => form.submit())
+  useCtrlSave(() => form.submit(), isCreating || subTabKey === 'docEdit')
 
   useEffect(() => {
     if (isCreating) {

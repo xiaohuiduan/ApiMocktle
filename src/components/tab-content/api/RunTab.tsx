@@ -17,6 +17,7 @@ import {
 import { ClockIcon, PlayIcon, RotateCcwIcon, SaveIcon } from 'lucide-react'
 
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
+import { useApiSubTabContext } from './Api'
 import { buildSchemaExample } from '@/components/JsonSchema/schema-normalizer'
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
@@ -26,7 +27,7 @@ import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { BodyType } from '@/enums'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
-import type { ApiDetails } from '@/types'
+import type { ApiDetails, ApiRequestBody, RunTabInfo } from '@/types'
 
 import { ParamsEditableTable } from './components/ParamsEditableTable'
 import { ParamsTab } from './params/ParamsTab'
@@ -41,6 +42,25 @@ const STORAGE_PREFIX = 'run_tab_'
 
 function cloneApiDetails(source: ApiDetails): ApiDetails {
   return JSON.parse(JSON.stringify(source)) as ApiDetails
+}
+
+function mergeRunTabInfo(docValue: ApiDetails, runTabInfo: RunTabInfo): ApiDetails {
+  const base = cloneApiDetails(docValue)
+  const hasBodyChanges = runTabInfo.bodyType !== undefined || runTabInfo.bodyParameters !== undefined || runTabInfo.bodyRawText !== undefined
+  return {
+    ...base,
+    serverId: runTabInfo.serverId ?? base.serverId,
+    parameters: runTabInfo.parameters ?? base.parameters,
+    requestBody: hasBodyChanges
+      ? {
+          type: runTabInfo.bodyType ?? base.requestBody?.type ?? 'none',
+          parameters: runTabInfo.bodyParameters ?? base.requestBody?.parameters,
+          rawText: runTabInfo.bodyRawText ?? base.requestBody?.rawText,
+        } as ApiRequestBody
+      : base.requestBody,
+    preScript: runTabInfo.preScript ?? base.preScript,
+    postScript: runTabInfo.postScript ?? base.postScript,
+  }
 }
 
 function generateCurl(apiDetails: ApiDetails, fullUrl: string): { windows: string, linux: string } {
@@ -142,6 +162,7 @@ const bodyTypeOptions = [
 export function RunTab() {
   const { token } = theme.useToken()
   const { tabData } = useTabContentContext()
+  const subTabKey = useApiSubTabContext()
   const { messageApi } = useGlobalContext()
   const {
     menuRawList,
@@ -153,9 +174,13 @@ export function RunTab() {
 
   const { sessionVars, setSessionVars } = useSessionVariablesContext()
 
-  const { menuApiItem, docValue } = useMemo(() => {
+  const { menuApiItem, docValue, savedRunTabInfo } = useMemo(() => {
     const item = menuRawList?.find(({ id }) => id === tabData.key)
-    return { menuApiItem: item, docValue: item?.data as ApiDetails | undefined }
+    return {
+      menuApiItem: item,
+      docValue: item?.data as ApiDetails | undefined,
+      savedRunTabInfo: (item as any)?.runTabInfo as RunTabInfo | undefined,
+    }
   }, [menuRawList, tabData.key])
 
   const storageKey = docValue ? `${STORAGE_PREFIX}${docValue.id}` : ''
@@ -233,12 +258,13 @@ export function RunTab() {
     if (menuUpdatedAt && menuUpdatedAt !== docVersionRef.current) {
       docVersionRef.current = menuUpdatedAt
       originalDocRef.current = cloneApiDetails(docValue)
-      setWorkCopy(cloneApiDetails(docValue))
+      const merged = savedRunTabInfo ? mergeRunTabInfo(docValue, savedRunTabInfo) : cloneApiDetails(docValue)
+      setWorkCopy(merged)
       setBodyRawText(undefined)
       resetResult()
       return
     }
-    // 首次加载：有本地副本则恢复，否则从文档初始化
+    // 首次加载：有本地副本则恢复，否则从文档初始化（合并 runTabInfo）
     if (docVersionRef.current === undefined) {
       docVersionRef.current = menuUpdatedAt
       try {
@@ -248,7 +274,8 @@ export function RunTab() {
           return
         }
       } catch { /* ignore */ }
-      setWorkCopy(cloneApiDetails(docValue))
+      const merged = savedRunTabInfo ? mergeRunTabInfo(docValue, savedRunTabInfo) : cloneApiDetails(docValue)
+      setWorkCopy(merged)
       resetResult()
     }
   }, [(menuApiItem as { updatedAt?: string } | undefined)?.updatedAt])
@@ -288,38 +315,116 @@ export function RunTab() {
   const handleReset = () => {
     if (!originalDocRef.current) return
 
-    Modal.confirm({
+    const hasSavedRunTab = savedRunTabInfo && Object.keys(savedRunTabInfo).length > 0
+
+    if (!hasSavedRunTab) {
+      // 没有保存的运行时信息，直接复原到文档定义
+      Modal.confirm({
+        title: '一键复原',
+        content: '确定要放弃所有临时修改，恢复为文档定义的原始值吗？',
+        okText: '确认复原',
+        cancelText: '取消',
+        onOk: () => doReset('define'),
+      })
+      return
+    }
+
+    const modal = Modal.info({
       title: '一键复原',
-      content: '确定要放弃所有临时修改（包括参数、请求头、Body、脚本等），恢复为文档定义的原始值吗？',
-      okText: '确认复原',
-      cancelText: '取消',
-      onOk: () => {
-        const fresh = cloneApiDetails(originalDocRef.current!)
-        setWorkCopy(fresh)
-        setBodyRawText(undefined)
-        resetResult()
-        setDisabledInheritedParams({
-          query: new Set(),
-          header: new Set(),
-          cookie: new Set(),
-          body: new Set(),
-        })
-        try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
-        setResetCounter(c => c + 1)
-        messageApi.success('已复原为文档原始值')
-      },
+      content: '请选择复原来源：',
+      footer: (
+        <div className="flex justify-end gap-2 mt-4">
+          <Button onClick={() => modal.destroy()}>关闭</Button>
+          <Button onClick={() => { modal.destroy(); doReset('define') }}>复原到文档定义</Button>
+          <Button type="primary" onClick={() => { modal.destroy(); doReset('saved') }}>复原到保存点</Button>
+        </div>
+      ),
+      icon: null,
+      closable: true,
+      maskClosable: true,
     })
   }
 
-  // 保存到数据库
-  const handleSave = async () => {
+  const doReset = (source: 'define' | 'saved') => {
+    if (source === 'saved' && savedRunTabInfo) {
+      // 复原到最新保存的运行时信息
+      const merged = mergeRunTabInfo(originalDocRef.current!, savedRunTabInfo)
+      setWorkCopy(merged)
+      messageApi.success('已复原到上次保存点')
+    } else {
+      // 复原到文档定义
+      const fresh = cloneApiDetails(originalDocRef.current!)
+      setWorkCopy(fresh)
+      messageApi.success('已复原为文档原始值')
+    }
+
+    setBodyRawText(undefined)
+    resetResult()
+    setDisabledInheritedParams({
+      query: new Set(),
+      header: new Set(),
+      cookie: new Set(),
+      body: new Set(),
+    })
+    try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
+    setResetCounter(c => c + 1)
+  }
+
+  // 保存到数据库（只保存运行时信息）
+  const handleSave = useCallback(async () => {
     if (!workCopy) return
     setSaving(true)
     try {
+      // 只保存与文档定义不同的部分
+      const original = originalDocRef.current
+      const runTabInfo: RunTabInfo = {}
+
+      // 环境选择
+      if (workCopy.serverId && workCopy.serverId !== original?.serverId) {
+        runTabInfo.serverId = workCopy.serverId
+      }
+
+      // 参数（只保存有修改的）
+      if (workCopy.parameters) {
+        const changedParams: typeof workCopy.parameters = {}
+        for (const section of ['header', 'query', 'cookie', 'path'] as const) {
+          const current = workCopy.parameters[section]
+          const orig = original?.parameters?.[section]
+          if (current && JSON.stringify(current) !== JSON.stringify(orig)) {
+            changedParams[section] = current
+          }
+        }
+        if (Object.keys(changedParams).length > 0) {
+          runTabInfo.parameters = changedParams
+        }
+      }
+
+      // Body
+      const currentBodyRawText = bodyRawText || workCopy.requestBody?.rawText
+      const origBodyRawText = original?.requestBody?.rawText
+      if (currentBodyRawText && currentBodyRawText !== origBodyRawText) {
+        runTabInfo.bodyType = workCopy.requestBody?.type
+        runTabInfo.bodyRawText = currentBodyRawText
+      }
+      if (workCopy.requestBody?.parameters) {
+        const origBodyParams = original?.requestBody?.parameters
+        if (JSON.stringify(workCopy.requestBody.parameters) !== JSON.stringify(origBodyParams)) {
+          runTabInfo.bodyType = workCopy.requestBody?.type
+          runTabInfo.bodyParameters = workCopy.requestBody.parameters
+        }
+      }
+
+      // 脚本
+      if (workCopy.preScript && workCopy.preScript !== original?.preScript) {
+        runTabInfo.preScript = workCopy.preScript
+      }
+      if (workCopy.postScript && workCopy.postScript !== original?.postScript) {
+        runTabInfo.postScript = workCopy.postScript
+      }
+
       await updateMenuItem({
         id: tabData.key,
-        name: workCopy.name,
-        data: { ...workCopy },
+        runTabInfo,
       })
       try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
       messageApi.success('保存成功')
@@ -328,9 +433,9 @@ export function RunTab() {
     } finally {
       setSaving(false)
     }
-  }
+  }, [workCopy, bodyRawText, tabData.key, storageKey, updateMenuItem, messageApi])
 
-  useCtrlSave(handleSave)
+  useCtrlSave(handleSave, subTabKey === 'run')
 
   // 运行
   const handleRun = async () => {

@@ -285,6 +285,7 @@ fn import_openapi3(
             name: tag_name.clone(),
             menu_type: "apiDetailFolder".to_string(),
             data_json: Some(folder_data),
+            run_tab_json: None,
             sort_order: Some(sort_order),
         };
         menu_repo::create_menu_item(db, project_id, &payload)?;
@@ -358,6 +359,7 @@ fn import_openapi3(
                     name: op_name,
                     menu_type: "apiDetail".to_string(),
                     data_json: Some(data_json),
+                    run_tab_json: None,
                     sort_order: Some(sort_order),
                 };
                 menu_repo::create_menu_item(db, project_id, &payload)?;
@@ -426,6 +428,7 @@ fn import_swagger2(
             name: tag_name.clone(),
             menu_type: "apiDetailFolder".to_string(),
             data_json: Some(folder_data),
+            run_tab_json: None,
             sort_order: Some(sort_order),
         };
         menu_repo::create_menu_item(db, project_id, &payload)?;
@@ -506,6 +509,7 @@ fn import_swagger2(
                     name: op_name,
                     menu_type: "apiDetail".to_string(),
                     data_json: Some(data_json),
+                    run_tab_json: None,
                     sort_order: Some(sort_order),
                 };
                 menu_repo::create_menu_item(db, project_id, &payload)?;
@@ -569,6 +573,7 @@ fn import_schemas(
             name: name.clone(),
             menu_type: "apiSchema".to_string(),
             data_json: Some(data_json),
+            run_tab_json: None,
             sort_order: Some(*sort_order),
         };
         menu_repo::create_menu_item(db, project_id, &payload)?;
