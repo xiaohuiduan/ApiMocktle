@@ -203,6 +203,17 @@ pm.request.headers.upsert({ key: 'X-Sign', value: sign })
 pm.request.headers.upsert({ key: 'X-Timestamp', value: String(timestamp) })
 \`\`\`
 
+## 变量使用说明
+
+优先使用环境变量存储需要跨请求共享的数据。在请求参数（Params/Headers/Cookie）或 Body 中，可以直接使用 \`{{变量名}}\` 语法引用变量，请求发送时会自动替换为实际变量值。
+
+示例：
+- Header 中：\`Authorization: Bearer {{authToken}}\`
+- Query 中：\`?userId={{userId}}\`
+- Body 中：\`{ "token": "{{authToken}}" }\`
+
+变量优先级（从高到低）：会话变量 > 环境变量 > 全局变量
+
 请根据我的需求编写脚本代码，直接给出可粘贴的代码即可。`
 
 const HELP_ITEMS = [
