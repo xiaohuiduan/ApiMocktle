@@ -35,6 +35,10 @@ pub fn run() {
             });
             app.manage(yapi_handle);
 
+            // MCP Server handle
+            let mcp_handle = Arc::new(http::mcp_server::McpServerHandle::new());
+            app.manage(mcp_handle);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -90,6 +94,32 @@ pub fn run() {
             commands::app_config_cmd::set_app_config,
             // App info
             commands::app_info::get_app_version,
+            // Test Tasks
+            commands::test_tasks::list_test_tasks,
+            commands::test_tasks::get_test_task,
+            commands::test_tasks::create_test_task,
+            commands::test_tasks::update_test_task,
+            commands::test_tasks::delete_test_task,
+            commands::test_tasks::list_test_steps,
+            commands::test_tasks::create_test_step,
+            commands::test_tasks::update_test_step,
+            commands::test_tasks::delete_test_step,
+            commands::test_tasks::reorder_test_steps,
+            commands::test_tasks::list_test_executions,
+            commands::test_tasks::get_test_execution_detail,
+            commands::test_tasks::delete_test_execution,
+            commands::test_tasks::execute_test_step_request,
+            commands::test_tasks::create_test_execution,
+            commands::test_tasks::finish_test_execution,
+            commands::test_tasks::create_test_step_result,
+            commands::test_tasks::execute_extractors,
+            commands::test_tasks::execute_assertions,
+            // MCP Server
+            commands::mcp_server::get_mcp_server_status,
+            commands::mcp_server::start_mcp_server,
+            commands::mcp_server::stop_mcp_server,
+            commands::mcp_server::get_mcp_server_config,
+            commands::mcp_server::save_mcp_server_config,
             // Tokens
         ])
         .run(tauri::generate_context!())

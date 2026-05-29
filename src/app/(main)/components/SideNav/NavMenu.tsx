@@ -47,6 +47,7 @@ export function NavMenu() {
   const projectId = pathList.at(0) === 'projects' ? pathList.at(1) : undefined
   const homePath = projectId ? `/projects/${projectId}/home` : NavPath.Projects
   const settingsPath = projectId ? `/projects/${projectId}/settings` : NavPath.Projects
+  const testsPath = projectId ? `/projects/${projectId}/tests` : NavPath.Projects
 
   return (
     <Space direction="vertical" size={14}>
@@ -70,6 +71,28 @@ export function NavMenu() {
             </svg>
           )}
           name="接口管理"
+        />
+      </Link>
+
+      <Link to={testsPath}>
+        <NavItem
+          active={pathname.startsWith(testsPath)}
+          icon={(
+            <svg
+              aria-hidden="true"
+              className="size-6"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                clipRule="evenodd"
+                d="M12 2a1 1 0 0 1 .707.293l7 7a1 1 0 0 1 0 1.414l-7 7a1 1 0 0 1-1.414-1.414L17.586 12l-6.293-6.293A1 1 0 0 1 12 2ZM5 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a1 1 0 1 1 2 0v7a4 4 0 0 1-4 4H5a4 4 0 0 1-4-4V5a4 4 0 0 1 4-4h7a1 1 0 1 1 0 2H5Z"
+                fillRule="evenodd"
+              />
+            </svg>
+          )}
+          name="自动化测试"
         />
       </Link>
 

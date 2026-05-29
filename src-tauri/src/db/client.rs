@@ -159,6 +159,89 @@ fn run_migrations(conn: &Connection) {
         conn.execute("ALTER TABLE menu_items ADD COLUMN run_tab_json TEXT", [])
             .ok();
     }
+
+    // Add extractors_json column to test_steps if not exists
+    let has_extractors_json: bool = conn
+        .prepare("SELECT 1 AS yes FROM pragma_table_info('test_steps') WHERE name = 'extractors_json'")
+        .and_then(|mut s| s.exists([]))
+        .unwrap_or(false);
+
+    if !has_extractors_json {
+        conn.execute("ALTER TABLE test_steps ADD COLUMN extractors_json TEXT", [])
+            .ok();
+    }
+
+    // Test automation tables
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS test_tasks (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            environment_id TEXT,
+            environment_json TEXT,
+            status TEXT NOT NULL DEFAULT 'idle',
+            fail_fast INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS test_steps (
+            id TEXT PRIMARY KEY,
+            task_id TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            name TEXT NOT NULL DEFAULT '',
+            menu_item_id TEXT NOT NULL,
+            request_override_json TEXT,
+            pre_script TEXT,
+            post_script TEXT,
+            assertions_json TEXT,
+            extractors_json TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (task_id) REFERENCES test_tasks(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS test_executions (
+            id TEXT PRIMARY KEY,
+            task_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            total_steps INTEGER NOT NULL DEFAULT 0,
+            passed_steps INTEGER NOT NULL DEFAULT 0,
+            failed_steps INTEGER NOT NULL DEFAULT 0,
+            skipped_steps INTEGER NOT NULL DEFAULT 0,
+            total_duration_ms INTEGER NOT NULL DEFAULT 0,
+            environment_json TEXT,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            FOREIGN KEY (task_id) REFERENCES test_tasks(id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS test_step_results (
+            id TEXT PRIMARY KEY,
+            execution_id TEXT NOT NULL,
+            step_id TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL,
+            request_json TEXT,
+            response_json TEXT,
+            script_results_json TEXT,
+            variable_deltas_json TEXT,
+            duration_ms INTEGER NOT NULL DEFAULT 0,
+            error_message TEXT,
+            executed_at TEXT NOT NULL,
+            FOREIGN KEY (execution_id) REFERENCES test_executions(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_test_tasks_project ON test_tasks(project_id);
+        CREATE INDEX IF NOT EXISTS idx_test_steps_task ON test_steps(task_id, sort_order);
+        CREATE INDEX IF NOT EXISTS idx_test_executions_task ON test_executions(task_id, started_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_test_step_results_exec ON test_step_results(execution_id, sort_order);
+        ",
+    ).ok();
 }
 
 pub fn init_database(app_data_dir: &PathBuf) -> Db {

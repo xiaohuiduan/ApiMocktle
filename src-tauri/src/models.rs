@@ -293,6 +293,180 @@ pub struct ApiResult<T: Serialize> {
     pub error: Option<String>,
 }
 
+// Test Tasks
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TestTask {
+    pub id: String,
+    pub project_id: String,
+    pub name: String,
+    pub description: String,
+    pub environment_id: Option<String>,
+    pub environment_json: Option<serde_json::Value>,
+    pub status: String,
+    pub fail_fast: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateTestTaskPayload {
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(rename = "environmentId", default)]
+    pub environment_id: Option<String>,
+    #[serde(rename = "failFast", default = "default_true")]
+    pub fail_fast: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateTestTaskPayload {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(rename = "environmentId", default)]
+    pub environment_id: Option<String>,
+    #[serde(rename = "failFast", default)]
+    pub fail_fast: Option<bool>,
+}
+
+// Test Steps
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TestStep {
+    pub id: String,
+    pub task_id: String,
+    pub sort_order: i32,
+    pub name: String,
+    pub menu_item_id: String,
+    pub request_override_json: Option<serde_json::Value>,
+    pub pre_script: Option<String>,
+    pub post_script: Option<String>,
+    pub assertions_json: Option<serde_json::Value>,
+    pub extractors_json: Option<serde_json::Value>,
+    pub enabled: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateTestStepPayload {
+    #[serde(rename = "taskId")]
+    pub task_id: String,
+    #[serde(rename = "sortOrder", default)]
+    pub sort_order: Option<i32>,
+    #[serde(default)]
+    pub name: String,
+    #[serde(rename = "menuItemId")]
+    pub menu_item_id: String,
+    #[serde(rename = "requestOverride", default)]
+    pub request_override_json: Option<serde_json::Value>,
+    #[serde(rename = "preScript", default)]
+    pub pre_script: Option<String>,
+    #[serde(rename = "postScript", default)]
+    pub post_script: Option<String>,
+    #[serde(rename = "assertions", default)]
+    pub assertions_json: Option<serde_json::Value>,
+    #[serde(rename = "extractors", default)]
+    pub extractors_json: Option<serde_json::Value>,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateTestStepPayload {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(rename = "sortOrder", default)]
+    pub sort_order: Option<i32>,
+    #[serde(rename = "menuItemId", default)]
+    pub menu_item_id: Option<String>,
+    #[serde(rename = "requestOverride", default)]
+    pub request_override_json: Option<serde_json::Value>,
+    #[serde(rename = "preScript", default)]
+    pub pre_script: Option<String>,
+    #[serde(rename = "postScript", default)]
+    pub post_script: Option<String>,
+    #[serde(rename = "assertions", default)]
+    pub assertions_json: Option<serde_json::Value>,
+    #[serde(rename = "extractors", default)]
+    pub extractors_json: Option<serde_json::Value>,
+    #[serde(default)]
+    pub enabled: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ReorderStepsPayload {
+    #[serde(rename = "stepIds")]
+    pub step_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListTestExecutionsPayload {
+    #[serde(rename = "taskId")]
+    pub task_id: String,
+    #[serde(default = "default_limit")]
+    pub limit: i32,
+}
+
+fn default_limit() -> i32 {
+    20
+}
+
+// Test Executions
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TestExecution {
+    pub id: String,
+    pub task_id: String,
+    pub status: String,
+    pub total_steps: i32,
+    pub passed_steps: i32,
+    pub failed_steps: i32,
+    pub skipped_steps: i32,
+    pub total_duration_ms: i64,
+    pub environment_json: Option<serde_json::Value>,
+    pub started_at: String,
+    pub finished_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TestStepResult {
+    pub id: String,
+    pub execution_id: String,
+    pub step_id: String,
+    pub sort_order: i32,
+    pub status: String,
+    pub request_json: Option<serde_json::Value>,
+    pub response_json: Option<serde_json::Value>,
+    pub script_results_json: Option<serde_json::Value>,
+    pub variable_deltas_json: Option<serde_json::Value>,
+    pub duration_ms: i64,
+    pub error_message: Option<String>,
+    pub executed_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TestExecutionDetail {
+    pub execution: TestExecution,
+    pub step_results: Vec<TestStepResult>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TestTaskDetail {
+    pub task: TestTask,
+    pub steps: Vec<TestStep>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 impl<T: Serialize> ApiResult<T> {
     pub fn success(data: T) -> Self {
         ApiResult {

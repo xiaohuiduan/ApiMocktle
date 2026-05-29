@@ -5,3 +5,4 @@ pub mod menu_repo;
 pub mod recycle_repo;
 pub mod personal_token_repo;
 pub mod history_repo;
+pub mod test_repo;

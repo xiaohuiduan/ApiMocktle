@@ -298,3 +298,143 @@ export type AnyType = any
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type UnsafeAny = any
+
+// ==================== Test Automation Types ====================
+
+export interface TestTask {
+  id: string
+  projectId: string
+  name: string
+  description: string
+  environmentId?: string
+  environmentJson?: Record<string, unknown>
+  status: 'idle' | 'running' | 'passed' | 'failed' | 'aborted'
+  failFast: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateTestTaskPayload {
+  projectId: string
+  name: string
+  description?: string
+  environmentId?: string
+  failFast?: boolean
+}
+
+export interface UpdateTestTaskPayload {
+  name?: string
+  description?: string
+  environmentId?: string
+  failFast?: boolean
+}
+
+export interface TestStep {
+  id: string
+  taskId: string
+  sortOrder: number
+  name: string
+  menuItemId: string
+  requestOverrideJson?: Record<string, unknown>
+  preScript?: string
+  postScript?: string
+  assertionsJson?: Record<string, unknown>
+  extractorsJson?: TestExtractor[]
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TestExtractor {
+  type: 'json_path' | 'header' | 'regex' | 'status'
+  path?: string
+  name?: string
+  pattern?: string
+  variable: string
+}
+
+export interface TestAssertion {
+  type: 'status' | 'json_path' | 'header' | 'response_time' | 'body_contains'
+  path?: string
+  name?: string
+  operator: 'equals' | 'not_equals' | 'exists' | 'not_exists' | 'contains' | 'not_contains' | 'greater_than' | 'less_than'
+  expected?: unknown
+}
+
+export interface AssertionResult {
+  assertion: TestAssertion
+  passed: boolean
+  actual?: unknown
+  error?: string
+}
+
+export interface ExtractorResult {
+  extractor: TestExtractor
+  success: boolean
+  value?: string
+  error?: string
+}
+
+export interface CreateTestStepPayload {
+  taskId: string
+  sortOrder?: number
+  name?: string
+  menuItemId: string
+  requestOverride?: Record<string, unknown>
+  preScript?: string
+  postScript?: string
+  assertions?: Record<string, unknown>
+  extractors?: TestExtractor[]
+  enabled?: boolean
+}
+
+export interface UpdateTestStepPayload {
+  name?: string
+  sortOrder?: number
+  menuItemId?: string
+  requestOverride?: Record<string, unknown>
+  preScript?: string
+  postScript?: string
+  assertions?: Record<string, unknown>
+  extractors?: TestExtractor[]
+  enabled?: boolean
+}
+
+export interface TestExecution {
+  id: string
+  taskId: string
+  status: 'passed' | 'failed' | 'aborted' | 'error' | 'running'
+  totalSteps: number
+  passedSteps: number
+  failedSteps: number
+  skippedSteps: number
+  totalDurationMs: number
+  environmentJson?: Record<string, unknown>
+  startedAt: string
+  finishedAt?: string
+}
+
+export interface TestStepResult {
+  id: string
+  executionId: string
+  stepId: string
+  sortOrder: number
+  status: 'passed' | 'failed' | 'skipped' | 'error'
+  requestJson?: Record<string, unknown>
+  responseJson?: Record<string, unknown>
+  scriptResultsJson?: Record<string, unknown>
+  variableDeltasJson?: Record<string, string>
+  durationMs: number
+  errorMessage?: string
+  executedAt: string
+}
+
+export interface TestExecutionDetail {
+  execution: TestExecution
+  stepResults: TestStepResult[]
+}
+
+export interface TestTaskDetail {
+  task: TestTask
+  steps: TestStep[]
+}

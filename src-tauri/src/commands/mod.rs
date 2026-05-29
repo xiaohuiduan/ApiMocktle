@@ -9,3 +9,5 @@ pub mod exports;
 pub mod request_runner;
 pub mod history;
 pub mod app_info;
+pub mod test_tasks;
+pub mod mcp_server;
