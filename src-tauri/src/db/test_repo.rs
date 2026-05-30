@@ -30,14 +30,17 @@ pub fn update_task(db: &Db, task_id: &str, payload: &UpdateTestTaskPayload) -> R
     let description = payload.description.as_deref().unwrap_or(&task.description);
     let environment_id = payload.environment_id.as_deref().or(task.environment_id.as_deref());
     let fail_fast = payload.fail_fast.unwrap_or(task.fail_fast);
+    let variables_json = payload.variables_json.as_ref()
+        .map(|v| v.to_string())
+        .or(task.variables_json.map(|v| v.to_string()));
 
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let now = chrono::Utc::now().to_rfc3339();
 
     conn.execute(
-        "UPDATE test_tasks SET name = ?1, description = ?2, environment_id = ?3, fail_fast = ?4, updated_at = ?5
-         WHERE id = ?6",
-        params![name, description, environment_id, fail_fast, now, task_id],
+        "UPDATE test_tasks SET name = ?1, description = ?2, environment_id = ?3, variables_json = ?4, fail_fast = ?5, updated_at = ?6
+         WHERE id = ?7",
+        params![name, description, environment_id, variables_json, fail_fast, now, task_id],
     ).map_err(|e| AppError::Internal(e.to_string()))?;
 
     drop(conn);
@@ -54,13 +57,17 @@ pub fn delete_task(db: &Db, task_id: &str) -> Result<(), AppError> {
 pub fn get_task(db: &Db, task_id: &str) -> Result<Option<TestTask>, AppError> {
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let mut stmt = conn
-        .prepare("SELECT id, project_id, name, description, environment_id, environment_json, status, fail_fast, created_at, updated_at FROM test_tasks WHERE id = ?1")
+        .prepare("SELECT id, project_id, name, description, environment_id, environment_json, variables_json, status, fail_fast, created_at, updated_at FROM test_tasks WHERE id = ?1")
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut rows = stmt
         .query_map(params![task_id], |row| {
             let env_json_str: Option<String> = row.get(5)?;
             let env_json: Option<serde_json::Value> = env_json_str
+                .and_then(|s| serde_json::from_str(&s).ok());
+
+            let variables_json_str: Option<String> = row.get(6)?;
+            let variables_json: Option<serde_json::Value> = variables_json_str
                 .and_then(|s| serde_json::from_str(&s).ok());
 
             Ok(TestTask {
@@ -70,10 +77,11 @@ pub fn get_task(db: &Db, task_id: &str) -> Result<Option<TestTask>, AppError> {
                 description: row.get(3)?,
                 environment_id: row.get(4)?,
                 environment_json: env_json,
-                status: row.get(6)?,
-                fail_fast: row.get::<_, i32>(7)? != 0,
-                created_at: row.get(8)?,
-                updated_at: row.get(9)?,
+                variables_json,
+                status: row.get(7)?,
+                fail_fast: row.get::<_, i32>(8)? != 0,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
             })
         })
         .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -84,13 +92,17 @@ pub fn get_task(db: &Db, task_id: &str) -> Result<Option<TestTask>, AppError> {
 pub fn list_tasks(db: &Db, project_id: &str) -> Result<Vec<TestTask>, AppError> {
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let mut stmt = conn
-        .prepare("SELECT id, project_id, name, description, environment_id, environment_json, status, fail_fast, created_at, updated_at FROM test_tasks WHERE project_id = ?1 ORDER BY created_at DESC")
+        .prepare("SELECT id, project_id, name, description, environment_id, environment_json, variables_json, status, fail_fast, created_at, updated_at FROM test_tasks WHERE project_id = ?1 ORDER BY created_at DESC")
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let rows = stmt
         .query_map(params![project_id], |row| {
             let env_json_str: Option<String> = row.get(5)?;
             let env_json: Option<serde_json::Value> = env_json_str
+                .and_then(|s| serde_json::from_str(&s).ok());
+
+            let variables_json_str: Option<String> = row.get(6)?;
+            let variables_json: Option<serde_json::Value> = variables_json_str
                 .and_then(|s| serde_json::from_str(&s).ok());
 
             Ok(TestTask {
@@ -100,10 +112,11 @@ pub fn list_tasks(db: &Db, project_id: &str) -> Result<Vec<TestTask>, AppError> 
                 description: row.get(3)?,
                 environment_id: row.get(4)?,
                 environment_json: env_json,
-                status: row.get(6)?,
-                fail_fast: row.get::<_, i32>(7)? != 0,
-                created_at: row.get(8)?,
-                updated_at: row.get(9)?,
+                variables_json,
+                status: row.get(7)?,
+                fail_fast: row.get::<_, i32>(8)? != 0,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
             })
         })
         .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -113,6 +126,38 @@ pub fn list_tasks(db: &Db, project_id: &str) -> Result<Vec<TestTask>, AppError> 
         tasks.push(row.map_err(|e| AppError::Internal(e.to_string()))?);
     }
     Ok(tasks)
+}
+
+pub fn get_task_variables(db: &Db, task_id: &str) -> Result<Option<serde_json::Value>, AppError> {
+    let task = get_task(db, task_id)?;
+    Ok(task.and_then(|t| t.variables_json))
+}
+
+pub fn set_task_variables(db: &Db, task_id: &str, variables: &serde_json::Value) -> Result<serde_json::Value, AppError> {
+    let task = get_task(db, task_id)?.ok_or_else(|| AppError::NotFound("Task not found".to_string()))?;
+
+    let mut merged = match task.variables_json {
+        Some(serde_json::Value::Object(existing)) => existing,
+        _ => serde_json::Map::new(),
+    };
+
+    if let serde_json::Value::Object(new_vars) = variables {
+        for (key, value) in new_vars {
+            merged.insert(key.clone(), value.clone());
+        }
+    }
+
+    let merged_json = serde_json::Value::Object(merged);
+    let payload = UpdateTestTaskPayload {
+        name: None,
+        description: None,
+        environment_id: None,
+        variables_json: Some(merged_json.clone()),
+        fail_fast: None,
+    };
+
+    update_task(db, task_id, &payload)?;
+    Ok(merged_json)
 }
 
 // ==================== Test Steps ====================

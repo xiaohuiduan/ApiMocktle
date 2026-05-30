@@ -1,6 +1,9 @@
 use std::collections::HashMap;
+use std::time::Instant;
 use serde::{Deserialize, Serialize};
 
+use crate::db::{menu_repo, test_repo};
+use crate::db::client::Db;
 use crate::errors::AppError;
 use crate::models::*;
 
@@ -725,6 +728,444 @@ impl TestEngine {
             _ => Err(format!("Unknown operator: {}", operator)),
         }
     }
+}
+
+/// Send an HTTP request using reqwest and return { request, response } as JSON
+pub async fn send_http_request(payload: &RunRequestPayload) -> Result<serde_json::Value, String> {
+    let method = payload.method.to_uppercase();
+    let url = &payload.url;
+    let start = Instant::now();
+
+    // Validate URL before building the client
+    if url.is_empty() {
+        return Err(format!(
+            "请求 URL 为空。请检查接口是否设置了 path，以及是否选择了执行环境（环境提供 baseUrl）。\n\
+            当前请求详情：\n  Method: {}\n  Headers: {:?}\n  Body: {}",
+            method,
+            payload.headers.iter().map(|h| format!("{}={}", h.name, h.value)).collect::<Vec<_>>(),
+            if payload.body.is_empty() { "(空)".to_string() } else { payload.body.clone() },
+        ));
+    }
+
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(payload.insecure_skip_verify)
+        .build()
+        .map_err(|e| format!(
+            "HTTP 客户端构建失败: {}\n请求 URL: {}\nMethod: {}",
+            e, url, method
+        ))?;
+
+    let mut req = match method.as_str() {
+        "POST" => client.post(url),
+        "PUT" => client.put(url),
+        "PATCH" => client.patch(url),
+        "DELETE" => client.delete(url),
+        "OPTIONS" => client.request(reqwest::Method::OPTIONS, url),
+        "HEAD" => client.head(url),
+        _ => client.get(url),
+    };
+
+    for h in &payload.headers {
+        if !h.name.is_empty() {
+            req = req.header(&h.name, &h.value);
+        }
+    }
+
+    if let Some(ct) = &payload.content_type {
+        if !payload.headers.iter().any(|h| h.name.to_lowercase() == "content-type") {
+            req = req.header("Content-Type", ct.as_str());
+        }
+    }
+
+    if !payload.body.is_empty() && method != "GET" && method != "HEAD" {
+        req = req.body(payload.body.clone());
+    }
+
+    let response = req.send().await.map_err(|e| {
+        let detail = format!(
+            "\n请求详情：\n  URL: {}\n  Method: {}\n  Headers: {:?}\n  Body: {}",
+            url, method,
+            payload.headers.iter().map(|h| format!("{}: {}", h.name, h.value)).collect::<Vec<_>>(),
+            if payload.body.is_empty() { "(空)" } else { &payload.body },
+        );
+        if e.is_timeout() {
+            format!("请求超时，请检查网络连接或增加超时时间{}", detail)
+        } else if e.is_connect() {
+            format!("无法连接到服务器: {}{}", url, detail)
+        } else {
+            format!("请求发送失败: {}{}", e, detail)
+        }
+    })?;
+
+    let status_code = response.status().as_u16() as i32;
+    let duration_ms = start.elapsed().as_millis() as i64;
+
+    // Response headers as key-value map (for extractors/assertions which expect HashMap)
+    let response_headers: std::collections::HashMap<String, String> = response
+        .headers()
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+        .collect();
+
+    let response_body = response.text().await.unwrap_or_default();
+
+    // Build request JSON (headers as [{name, value}] for PmContext compatibility)
+    let request_headers: Vec<serde_json::Value> = payload.headers.iter()
+        .map(|h| serde_json::json!({ "name": h.name, "value": h.value }))
+        .collect();
+
+    Ok(serde_json::json!({
+        "request": {
+            "url": payload.url,
+            "method": payload.method,
+            "headers": request_headers,
+            "body": payload.body,
+        },
+        "response": {
+            "status": status_code,
+            "statusText": if status_code < 400 { "OK" } else { "Error" },
+            "headers": response_headers,
+            "body": response_body,
+            "responseTime": duration_ms,
+        },
+    }))
+}
+
+/// Orchestrate full test task execution: run all enabled steps sequentially,
+/// apply extractors and assertions, persist results, and return a summary.
+pub async fn execute_task_full(
+    db: &Db,
+    task_id: &str,
+    project_id: &str,
+    initial_variables: HashMap<String, String>,
+    base_url: Option<&str>,
+    fail_fast: bool,
+) -> Result<serde_json::Value, String> {
+    // 1. Get enabled test steps
+    let steps = test_repo::list_steps(db, task_id)
+        .map_err(|e| format!("Failed to list steps: {}", e))?;
+    let enabled_steps: Vec<_> = steps.into_iter().filter(|s| s.enabled).collect();
+
+    // 2. Create execution record
+    let execution = test_repo::create_execution(db, task_id, None)
+        .map_err(|e| format!("Failed to create execution: {}", e))?;
+    let execution_id = execution.id;
+    let start_time = Instant::now();
+
+    // 3. Get all menu items for the project
+    let menu_items = menu_repo::list_menu_items(db, project_id)
+        .map_err(|e| format!("Failed to list menu items: {}", e))?;
+
+    let mut variables = initial_variables;
+    let mut passed_count: i32 = 0;
+    let mut failed_count: i32 = 0;
+    let mut skipped_count: i32 = 0;
+
+    // 5. Loop through steps sequentially
+    for (index, step) in enabled_steps.iter().enumerate() {
+        let step_start = Instant::now();
+
+        // a. Find matching menu_item for the step
+        let menu_item = menu_items.iter().find(|item| item.id == step.menu_item_id);
+        let menu_item = match menu_item {
+            Some(item) => item,
+            None => {
+                let result = TestStepResult {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    execution_id: execution_id.clone(),
+                    step_id: step.id.clone(),
+                    sort_order: step.sort_order,
+                    status: "error".to_string(),
+                    request_json: None,
+                    response_json: None,
+                    script_results_json: None,
+                    variable_deltas_json: None,
+                    duration_ms: step_start.elapsed().as_millis() as i64,
+                    error_message: Some(format!("Menu item not found: {}", step.menu_item_id)),
+                    executed_at: chrono::Utc::now().to_rfc3339(),
+                };
+                let _ = test_repo::create_step_result(db, &result);
+                failed_count += 1;
+
+                // h. If fail_fast and step failed/errored: mark remaining steps as "skipped"
+                if fail_fast {
+                    for remaining in &enabled_steps[index + 1..] {
+                        let skip_result = TestStepResult {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            execution_id: execution_id.clone(),
+                            step_id: remaining.id.clone(),
+                            sort_order: remaining.sort_order,
+                            status: "skipped".to_string(),
+                            request_json: None,
+                            response_json: None,
+                            script_results_json: None,
+                            variable_deltas_json: None,
+                            duration_ms: 0,
+                            error_message: None,
+                            executed_at: chrono::Utc::now().to_rfc3339(),
+                        };
+                        let _ = test_repo::create_step_result(db, &skip_result);
+                        skipped_count += 1;
+                    }
+                    break;
+                }
+                continue;
+            }
+        };
+
+        // b. Build request payload
+        let request_payload = match TestEngine::build_request_payload(
+            menu_item,
+            step.request_override_json.as_ref(),
+            &variables,
+            base_url,
+        ) {
+            Ok(p) => p,
+            Err(e) => {
+                let result = TestStepResult {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    execution_id: execution_id.clone(),
+                    step_id: step.id.clone(),
+                    sort_order: step.sort_order,
+                    status: "error".to_string(),
+                    request_json: None,
+                    response_json: None,
+                    script_results_json: None,
+                    variable_deltas_json: None,
+                    duration_ms: step_start.elapsed().as_millis() as i64,
+                    error_message: Some(format!("Failed to build request: {}", e)),
+                    executed_at: chrono::Utc::now().to_rfc3339(),
+                };
+                let _ = test_repo::create_step_result(db, &result);
+                failed_count += 1;
+
+                if fail_fast {
+                    for remaining in &enabled_steps[index + 1..] {
+                        let skip_result = TestStepResult {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            execution_id: execution_id.clone(),
+                            step_id: remaining.id.clone(),
+                            sort_order: remaining.sort_order,
+                            status: "skipped".to_string(),
+                            request_json: None,
+                            response_json: None,
+                            script_results_json: None,
+                            variable_deltas_json: None,
+                            duration_ms: 0,
+                            error_message: None,
+                            executed_at: chrono::Utc::now().to_rfc3339(),
+                        };
+                        let _ = test_repo::create_step_result(db, &skip_result);
+                        skipped_count += 1;
+                    }
+                    break;
+                }
+                continue;
+            }
+        };
+
+        // c. Send HTTP request
+        let request_result = match send_http_request(&request_payload).await {
+            Ok(val) => val,
+            Err(e) => {
+                let result = TestStepResult {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    execution_id: execution_id.clone(),
+                    step_id: step.id.clone(),
+                    sort_order: step.sort_order,
+                    status: "error".to_string(),
+                    request_json: Some(serde_json::json!({
+                        "url": request_payload.url,
+                        "method": request_payload.method,
+                        "headers": request_payload.headers.iter().map(|h| {
+                            serde_json::json!({"name": h.name, "value": h.value})
+                        }).collect::<Vec<_>>(),
+                        "body": request_payload.body,
+                    })),
+                    response_json: None,
+                    script_results_json: None,
+                    variable_deltas_json: None,
+                    duration_ms: step_start.elapsed().as_millis() as i64,
+                    error_message: Some(e),
+                    executed_at: chrono::Utc::now().to_rfc3339(),
+                };
+                let _ = test_repo::create_step_result(db, &result);
+                failed_count += 1;
+
+                if fail_fast {
+                    for remaining in &enabled_steps[index + 1..] {
+                        let skip_result = TestStepResult {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            execution_id: execution_id.clone(),
+                            step_id: remaining.id.clone(),
+                            sort_order: remaining.sort_order,
+                            status: "skipped".to_string(),
+                            request_json: None,
+                            response_json: None,
+                            script_results_json: None,
+                            variable_deltas_json: None,
+                            duration_ms: 0,
+                            error_message: None,
+                            executed_at: chrono::Utc::now().to_rfc3339(),
+                        };
+                        let _ = test_repo::create_step_result(db, &skip_result);
+                        skipped_count += 1;
+                    }
+                    break;
+                }
+                continue;
+            }
+        };
+
+        let request_json = request_result.get("request").cloned();
+        let response_json = request_result.get("response").cloned();
+
+        let status_code = response_json.as_ref()
+            .and_then(|r| r.get("status"))
+            .and_then(|s| s.as_i64())
+            .unwrap_or(0) as i32;
+
+        let response_body = response_json.as_ref()
+            .and_then(|r| r.get("body"))
+            .and_then(|b| b.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let response_headers: HashMap<String, String> = response_json.as_ref()
+            .and_then(|r| r.get("headers"))
+            .and_then(|h| h.as_object())
+            .map(|obj| {
+                obj.iter()
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let duration_ms = response_json.as_ref()
+            .and_then(|r| r.get("responseTime"))
+            .and_then(|t| t.as_i64())
+            .unwrap_or_else(|| step_start.elapsed().as_millis() as i64);
+
+        // d. Extractors
+        let mut variable_deltas = HashMap::new();
+        if let Some(extractors_json) = &step.extractors_json {
+            if let Ok(extractors) = serde_json::from_value::<Vec<ExtractorDef>>(extractors_json.clone()) {
+                if !extractors.is_empty() {
+                    let (_results, extracted_vars) = TestEngine::extract_values(
+                        &extractors,
+                        &response_body,
+                        status_code,
+                        &response_headers,
+                    );
+                    for (k, v) in extracted_vars {
+                        variables.insert(k.clone(), v.clone());
+                        variable_deltas.insert(k, v);
+                    }
+                }
+            }
+        }
+
+        // e. Assertions
+        let mut all_assertions_passed = true;
+        if let Some(assertions_json) = &step.assertions_json {
+            if let Ok(assertions) = serde_json::from_value::<Vec<AssertionDef>>(assertions_json.clone()) {
+                if !assertions.is_empty() {
+                    let assertion_results = TestEngine::evaluate_assertions(
+                        &assertions,
+                        &response_body,
+                        status_code,
+                        &response_headers,
+                        duration_ms,
+                    );
+                    all_assertions_passed = assertion_results.iter().all(|r| r.passed);
+                }
+            }
+        }
+
+        // f. Determine step status
+        let step_status = if !all_assertions_passed {
+            "failed"
+        } else {
+            "passed"
+        };
+
+        if step_status == "passed" {
+            passed_count += 1;
+        } else {
+            failed_count += 1;
+        }
+
+        // g. Create step_result record
+        let variable_deltas_json = if variable_deltas.is_empty() {
+            None
+        } else {
+            Some(serde_json::to_value(&variable_deltas).unwrap_or(serde_json::json!({})))
+        };
+
+        let result = TestStepResult {
+            id: uuid::Uuid::new_v4().to_string(),
+            execution_id: execution_id.clone(),
+            step_id: step.id.clone(),
+            sort_order: step.sort_order,
+            status: step_status.to_string(),
+            request_json,
+            response_json,
+            script_results_json: None,
+            variable_deltas_json,
+            duration_ms,
+            error_message: None,
+            executed_at: chrono::Utc::now().to_rfc3339(),
+        };
+        let _ = test_repo::create_step_result(db, &result);
+
+        // h. If fail_fast and step failed: mark remaining as skipped
+        if step_status == "failed" && fail_fast {
+            for remaining in &enabled_steps[index + 1..] {
+                let skip_result = TestStepResult {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    execution_id: execution_id.clone(),
+                    step_id: remaining.id.clone(),
+                    sort_order: remaining.sort_order,
+                    status: "skipped".to_string(),
+                    request_json: None,
+                    response_json: None,
+                    script_results_json: None,
+                    variable_deltas_json: None,
+                    duration_ms: 0,
+                    error_message: None,
+                    executed_at: chrono::Utc::now().to_rfc3339(),
+                };
+                let _ = test_repo::create_step_result(db, &skip_result);
+                skipped_count += 1;
+            }
+            break;
+        }
+    }
+
+    // 6. Finish the execution record
+    let total_duration = start_time.elapsed().as_millis() as i64;
+    let final_status = if failed_count > 0 { "failed" } else { "passed" };
+
+    let _ = test_repo::finish_execution(
+        db,
+        &execution_id,
+        final_status,
+        passed_count,
+        failed_count,
+        skipped_count,
+        total_duration,
+    );
+
+    // 7. Return JSON summary
+    Ok(serde_json::json!({
+        "executionId": execution_id,
+        "status": final_status,
+        "totalSteps": enabled_steps.len(),
+        "passedSteps": passed_count,
+        "failedSteps": failed_count,
+        "skippedSteps": skipped_count,
+        "durationMs": total_duration,
+    }))
 }
 
 #[cfg(test)]

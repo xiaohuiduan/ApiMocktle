@@ -171,6 +171,17 @@ fn run_migrations(conn: &Connection) {
             .ok();
     }
 
+    // Add variables_json column to test_tasks if not exists
+    let has_variables_json: bool = conn
+        .prepare("SELECT 1 AS yes FROM pragma_table_info('test_tasks') WHERE name = 'variables_json'")
+        .and_then(|mut s| s.exists([]))
+        .unwrap_or(false);
+
+    if !has_variables_json {
+        conn.execute("ALTER TABLE test_tasks ADD COLUMN variables_json TEXT", [])
+            .ok();
+    }
+
     // Test automation tables
     conn.execute_batch(
         "

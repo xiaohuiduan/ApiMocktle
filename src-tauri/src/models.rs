@@ -303,6 +303,7 @@ pub struct TestTask {
     pub description: String,
     pub environment_id: Option<String>,
     pub environment_json: Option<serde_json::Value>,
+    pub variables_json: Option<serde_json::Value>,
     pub status: String,
     pub fail_fast: bool,
     pub created_at: String,
@@ -330,6 +331,8 @@ pub struct UpdateTestTaskPayload {
     pub description: Option<String>,
     #[serde(rename = "environmentId", default)]
     pub environment_id: Option<String>,
+    #[serde(rename = "variables", default)]
+    pub variables_json: Option<serde_json::Value>,
     #[serde(rename = "failFast", default)]
     pub fail_fast: Option<bool>,
 }

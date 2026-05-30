@@ -1,12 +1,12 @@
 use std::sync::Arc;
-use std::time::Instant;
+
 use tauri::State;
 
 use crate::db::client::Db;
 use crate::db::menu_repo;
 use crate::db::test_repo;
 use crate::models::*;
-use crate::services::test_engine::{TestEngine, ExtractorDef, AssertionDef};
+use crate::services::test_engine::{TestEngine, ExtractorDef, AssertionDef, send_http_request};
 
 #[tauri::command]
 pub fn list_test_tasks(
@@ -243,107 +243,6 @@ pub async fn execute_test_step_request(
     };
 
     Ok(ApiResult::success(request_result))
-}
-
-/// Send an HTTP request using reqwest and return { request, response } as JSON
-async fn send_http_request(payload: &RunRequestPayload) -> Result<serde_json::Value, String> {
-    let method = payload.method.to_uppercase();
-    let url = &payload.url;
-    let start = Instant::now();
-
-    // Validate URL before building the client
-    if url.is_empty() {
-        return Err(format!(
-            "请求 URL 为空。请检查接口是否设置了 path，以及是否选择了执行环境（环境提供 baseUrl）。\n\
-            当前请求详情：\n  Method: {}\n  Headers: {:?}\n  Body: {}",
-            method,
-            payload.headers.iter().map(|h| format!("{}={}", h.name, h.value)).collect::<Vec<_>>(),
-            if payload.body.is_empty() { "(空)".to_string() } else { payload.body.clone() },
-        ));
-    }
-
-    let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(payload.insecure_skip_verify)
-        .build()
-        .map_err(|e| format!(
-            "HTTP 客户端构建失败: {}\n请求 URL: {}\nMethod: {}",
-            e, url, method
-        ))?;
-
-    let mut req = match method.as_str() {
-        "POST" => client.post(url),
-        "PUT" => client.put(url),
-        "PATCH" => client.patch(url),
-        "DELETE" => client.delete(url),
-        "OPTIONS" => client.request(reqwest::Method::OPTIONS, url),
-        "HEAD" => client.head(url),
-        _ => client.get(url),
-    };
-
-    for h in &payload.headers {
-        if !h.name.is_empty() {
-            req = req.header(&h.name, &h.value);
-        }
-    }
-
-    if let Some(ct) = &payload.content_type {
-        if !payload.headers.iter().any(|h| h.name.to_lowercase() == "content-type") {
-            req = req.header("Content-Type", ct.as_str());
-        }
-    }
-
-    if !payload.body.is_empty() && method != "GET" && method != "HEAD" {
-        req = req.body(payload.body.clone());
-    }
-
-    let response = req.send().await.map_err(|e| {
-        let detail = format!(
-            "\n请求详情：\n  URL: {}\n  Method: {}\n  Headers: {:?}\n  Body: {}",
-            url, method,
-            payload.headers.iter().map(|h| format!("{}: {}", h.name, h.value)).collect::<Vec<_>>(),
-            if payload.body.is_empty() { "(空)" } else { &payload.body },
-        );
-        if e.is_timeout() {
-            format!("请求超时，请检查网络连接或增加超时时间{}", detail)
-        } else if e.is_connect() {
-            format!("无法连接到服务器: {}{}", url, detail)
-        } else {
-            format!("请求发送失败: {}{}", e, detail)
-        }
-    })?;
-
-    let status_code = response.status().as_u16() as i32;
-    let duration_ms = start.elapsed().as_millis() as i64;
-
-    // Response headers as key-value map (for extractors/assertions which expect HashMap)
-    let response_headers: std::collections::HashMap<String, String> = response
-        .headers()
-        .iter()
-        .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
-        .collect();
-
-    let response_body = response.text().await.unwrap_or_default();
-
-    // Build request JSON (headers as [{name, value}] for PmContext compatibility)
-    let request_headers: Vec<serde_json::Value> = payload.headers.iter()
-        .map(|h| serde_json::json!({ "name": h.name, "value": h.value }))
-        .collect();
-
-    Ok(serde_json::json!({
-        "request": {
-            "url": payload.url,
-            "method": payload.method,
-            "headers": request_headers,
-            "body": payload.body,
-        },
-        "response": {
-            "status": status_code,
-            "statusText": if status_code < 400 { "OK" } else { "Error" },
-            "headers": response_headers,
-            "body": response_body,
-            "responseTime": duration_ms,
-        },
-    }))
 }
 
 #[tauri::command(rename_all = "camelCase")]

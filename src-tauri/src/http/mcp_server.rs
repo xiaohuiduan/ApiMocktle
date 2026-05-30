@@ -12,6 +12,7 @@ use crate::db::test_repo;
 use crate::db::project_repo;
 use crate::db::menu_repo;
 use crate::models::*;
+use crate::services::test_engine::execute_task_full;
 
 // ==================== MCP Protocol Types ====================
 
@@ -187,6 +188,10 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                     "failFast": {
                         "type": "boolean",
                         "description": "Stop on first failure"
+                    },
+                    "environmentId": {
+                        "type": "string",
+                        "description": "Environment ID to use for test execution"
                     }
                 },
                 "required": ["projectId", "name"]
@@ -286,6 +291,19 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                                 "variable": { "type": "string" }
                             },
                             "required": ["type", "variable"]
+                        }
+                    },
+                    "requestOverride": {
+                        "type": "object",
+                        "description": "Request override configuration (headers, queryParams, pathParams, body)",
+                        "properties": {
+                            "headers": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "value": { "type": "string" } } } },
+                            "queryParams": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "value": { "type": "string" } } } },
+                            "pathParams": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "value": { "type": "string" } } } },
+                            "bodyType": { "type": "string", "enum": ["json", "form", "raw", "none"] },
+                            "bodyJson": { "type": "string" },
+                            "bodyForm": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "value": { "type": "string" } } } },
+                            "bodyRaw": { "type": "string" }
                         }
                     }
                 },
@@ -459,6 +477,10 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                         "type": "boolean",
                         "description": "Stop on first failure"
                     },
+                    "environmentId": {
+                        "type": "string",
+                        "description": "Environment ID to use for test execution"
+                    },
                     "steps": {
                         "type": "array",
                         "description": "Array of test steps",
@@ -506,12 +528,70 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["projectId", "name", "steps"]
             }),
         },
+        ToolDefinition {
+            name: "api-test.get_variables".to_string(),
+            description: "Get variables configured for a test task, including task-level variables and associated environment variables".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "taskId": {
+                        "type": "string",
+                        "description": "The test task ID"
+                    }
+                },
+                "required": ["taskId"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-test.set_variables".to_string(),
+            description: "Set or update variables for a test task".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "taskId": {
+                        "type": "string",
+                        "description": "The test task ID"
+                    },
+                    "variables": {
+                        "type": "object",
+                        "description": "Variables to set (key-value pairs)",
+                        "additionalProperties": { "type": "string" }
+                    }
+                },
+                "required": ["taskId", "variables"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-test.run_task".to_string(),
+            description: "Execute a test task synchronously and return execution results. Runs all enabled steps sequentially, applying extractors and assertions.".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "taskId": {
+                        "type": "string",
+                        "description": "The test task ID to execute"
+                    },
+                    "variables": {
+                        "type": "object",
+                        "description": "Additional variables (key-value pairs) to use during execution",
+                        "additionalProperties": {
+                            "type": "string"
+                        }
+                    },
+                    "environmentId": {
+                        "type": "string",
+                        "description": "Override the task's default environment ID"
+                    }
+                },
+                "required": ["taskId"]
+            }),
+        },
     ]
 }
 
 // ==================== Tool Execution ====================
 
-fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Result<ToolResult, JsonRpcError> {
+async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Result<ToolResult, JsonRpcError> {
     match name {
         "api-test.list_projects" => {
             // 直接查询所有不过滤 user_id
@@ -702,12 +782,13 @@ fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Result<To
             let fail_fast = arguments.get("failFast")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(true);
+            let environment_id = arguments.get("environmentId").and_then(|v| v.as_str()).map(|s| s.to_string());
 
             let payload = CreateTestTaskPayload {
                 project_id: project_id.to_string(),
                 name: name.to_string(),
                 description: description.to_string(),
-                environment_id: None,
+                environment_id,
                 fail_fast,
             };
 
@@ -741,6 +822,7 @@ fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Result<To
                 name: arguments.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()),
                 description: arguments.get("description").and_then(|v| v.as_str()).map(|s| s.to_string()),
                 environment_id: None,
+                variables_json: None,
                 fail_fast: arguments.get("failFast").and_then(|v| v.as_bool()),
             };
 
@@ -805,6 +887,7 @@ fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Result<To
 
             let assertions_json = arguments.get("assertions").map(|v| v.clone());
             let extractors_json = arguments.get("extractors").map(|v| v.clone());
+            let request_override_json = arguments.get("requestOverride").map(|v| v.clone());
 
             let payload = CreateTestStepPayload {
                 task_id: task_id.to_string(),
@@ -813,7 +896,7 @@ fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Result<To
                 sort_order: arguments.get("sortOrder").and_then(|v| v.as_i64()).map(|v| v as i32),
                 pre_script: arguments.get("preScript").and_then(|v| v.as_str()).map(|s| s.to_string()),
                 post_script: arguments.get("postScript").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                request_override_json: None,
+                request_override_json,
                 assertions_json,
                 extractors_json,
                 enabled: true,
@@ -1048,6 +1131,7 @@ fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Result<To
             let fail_fast = arguments.get("failFast")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(true);
+            let environment_id = arguments.get("environmentId").and_then(|v| v.as_str()).map(|s| s.to_string());
 
             let steps = arguments.get("steps")
                 .and_then(|v| v.as_array())
@@ -1062,7 +1146,7 @@ fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Result<To
                 project_id: project_id.to_string(),
                 name: name.to_string(),
                 description: description.to_string(),
-                environment_id: None,
+                environment_id,
                 fail_fast,
             };
 
@@ -1140,6 +1224,263 @@ fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Result<To
                 is_error: None,
             })
         }
+        "api-test.get_variables" => {
+            let task_id = arguments.get("taskId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing taskId".to_string(),
+                    data: None,
+                })?;
+
+            let task = match test_repo::get_task(db, task_id) {
+                Ok(Some(task)) => task,
+                Ok(None) => return Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: "Task not found".to_string(),
+                    }],
+                    is_error: Some(true),
+                }),
+                Err(e) => return Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: format!("Error: {}", e),
+                    }],
+                    is_error: Some(true),
+                }),
+            };
+
+            let task_variables = match &task.variables_json {
+                Some(serde_json::Value::Object(map)) => {
+                    let mut obj = serde_json::Map::new();
+                    for (k, v) in map {
+                        obj.insert(k.clone(), v.clone());
+                    }
+                    serde_json::Value::Object(obj)
+                }
+                _ => serde_json::json!({}),
+            };
+
+            let mut environment_variables = serde_json::json!({});
+            if let Some(ref env_id) = task.environment_id {
+                let conn = db.0.lock().map_err(|e| JsonRpcError {
+                    code: -32603,
+                    message: format!("Database error: {}", e),
+                    data: None,
+                })?;
+                let env_config_str: Option<String> = conn
+                    .query_row(
+                        "SELECT value FROM meta WHERE project_id = ?1 AND key = 'environmentConfig'",
+                        rusqlite::params![task.project_id],
+                        |row| row.get(0),
+                    )
+                    .ok();
+                drop(conn);
+
+                if let Some(config_str) = env_config_str {
+                    if let Ok(config) = serde_json::from_str::<ProjectEnvironmentConfig>(&config_str) {
+                        if let Some(env) = config.environments.iter().find(|e| {
+                            e.get("id").and_then(|v| v.as_str()) == Some(env_id)
+                        }) {
+                            if let Some(vars) = env.get("variables").and_then(|v| v.as_array()) {
+                                let mut obj = serde_json::Map::new();
+                                for var in vars {
+                                    if let Some(name) = var.get("name").and_then(|v| v.as_str()) {
+                                        let enabled = var.get("enable").and_then(|v| v.as_bool()).unwrap_or(true);
+                                        if enabled {
+                                            let value = var.get("value").cloned().unwrap_or(serde_json::Value::Null);
+                                            obj.insert(name.to_string(), value);
+                                        }
+                                    }
+                                }
+                                environment_variables = serde_json::Value::Object(obj);
+                            }
+                        }
+                    }
+                }
+            }
+
+            let mut merged = match &environment_variables {
+                serde_json::Value::Object(map) => map.clone(),
+                _ => serde_json::Map::new(),
+            };
+            if let serde_json::Value::Object(task_vars) = &task_variables {
+                for (k, v) in task_vars {
+                    merged.insert(k.clone(), v.clone());
+                }
+            }
+
+            let result = serde_json::json!({
+                "taskVariables": task_variables,
+                "environmentVariables": environment_variables,
+                "merged": serde_json::Value::Object(merged),
+            });
+
+            Ok(ToolResult {
+                content: vec![ToolResultContent {
+                    content_type: "text".to_string(),
+                    text: serde_json::to_string_pretty(&result).unwrap_or_default(),
+                }],
+                is_error: None,
+            })
+        }
+        "api-test.set_variables" => {
+            let task_id = arguments.get("taskId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing taskId".to_string(),
+                    data: None,
+                })?;
+            let variables = arguments.get("variables")
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing variables".to_string(),
+                    data: None,
+                })?;
+
+            match test_repo::set_task_variables(db, task_id, variables) {
+                Ok(updated) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: serde_json::to_string_pretty(&updated).unwrap_or_default(),
+                    }],
+                    is_error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: format!("Error: {}", e),
+                    }],
+                    is_error: Some(true),
+                }),
+            }
+        }
+        "api-test.run_task" => {
+            let task_id = arguments.get("taskId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing taskId".to_string(),
+                    data: None,
+                })?;
+
+            // 1. Get task
+            let task = match test_repo::get_task(db, task_id) {
+                Ok(Some(task)) => task,
+                Ok(None) => {
+                    return Ok(ToolResult {
+                        content: vec![ToolResultContent {
+                            content_type: "text".to_string(),
+                            text: "Task not found".to_string(),
+                        }],
+                        is_error: Some(true),
+                    });
+                }
+                Err(e) => {
+                    return Ok(ToolResult {
+                        content: vec![ToolResultContent {
+                            content_type: "text".to_string(),
+                            text: format!("Error: {}", e),
+                        }],
+                        is_error: Some(true),
+                    });
+                }
+            };
+
+            // 2. Parse provided variables
+            let mut merged_variables: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+            if let Some(vars_obj) = arguments.get("variables").and_then(|v| v.as_object()) {
+                for (k, v) in vars_obj {
+                    if let Some(s) = v.as_str() {
+                        merged_variables.insert(k.clone(), s.to_string());
+                    }
+                }
+            }
+
+            // 3. Determine environment_id
+            let environment_id = arguments.get("environmentId")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .or_else(|| task.environment_id.clone());
+
+            // 4. Resolve environment: baseUrl and env variables
+            let mut base_url: Option<String> = None;
+            if let Some(ref env_id) = environment_id {
+                let conn = db.0.lock().map_err(|e| JsonRpcError {
+                    code: -32603,
+                    message: format!("Database error: {}", e),
+                    data: None,
+                })?;
+                let env_config_str: Option<String> = conn
+                    .query_row(
+                        "SELECT value FROM meta WHERE project_id = ?1 AND key = 'environmentConfig'",
+                        rusqlite::params![task.project_id],
+                        |row| row.get(0),
+                    )
+                    .ok();
+                drop(conn);
+
+                if let Some(config_str) = env_config_str {
+                    if let Ok(config) = serde_json::from_str::<ProjectEnvironmentConfig>(&config_str) {
+                        if let Some(env) = config.environments.iter().find(|e| {
+                            e.get("id").and_then(|v| v.as_str()) == Some(env_id)
+                        }) {
+                            // Resolve baseUrl
+                            base_url = env.get("baseUrls")
+                                .and_then(|v| v.as_array())
+                                .and_then(|arr| {
+                                    arr.iter()
+                                        .find(|b| b.get("url").and_then(|u| u.as_str()).map(|s| !s.is_empty()).unwrap_or(false))
+                                        .and_then(|b| b.get("url").and_then(|u| u.as_str()))
+                                })
+                                .map(|s| s.to_string())
+                                .or_else(|| env.get("url").and_then(|v| v.as_str()).map(|s| s.to_string()));
+
+                            // Resolve environment variables
+                            if let Some(vars) = env.get("variables").and_then(|v| v.as_array()) {
+                                for var in vars {
+                                    if let Some(name) = var.get("name").and_then(|v| v.as_str()) {
+                                        let enabled = var.get("enable").and_then(|v| v.as_bool()).unwrap_or(true);
+                                        if enabled {
+                                            if let Some(value) = var.get("value").and_then(|v| v.as_str()) {
+                                                merged_variables.insert(name.to_string(), value.to_string());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 5. Call execute_task_full
+            match execute_task_full(
+                db,
+                task_id,
+                &task.project_id,
+                merged_variables,
+                base_url.as_deref(),
+                task.fail_fast,
+            ).await {
+                Ok(summary) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: serde_json::to_string_pretty(&summary).unwrap_or_default(),
+                    }],
+                    is_error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: format!("Execution failed: {}", e),
+                    }],
+                    is_error: Some(true),
+                }),
+            }
+        }
         _ => Err(JsonRpcError {
             code: -32601,
             message: format!("Unknown tool: {}", name),
@@ -1185,7 +1526,7 @@ async fn handle_mcp_request(
         "tools/call" => {
             match serde_json::from_value::<ToolCallParams>(request.params.clone()) {
                 Ok(params) => {
-                    match execute_tool(&params.name, &params.arguments, &state.db) {
+                    match execute_tool(&params.name, &params.arguments, &state.db).await {
                         Ok(result) => JsonRpcResponse {
                             jsonrpc: "2.0".to_string(),
                             id: request.id.clone(),
