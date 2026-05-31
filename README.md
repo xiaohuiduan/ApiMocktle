@@ -8,6 +8,21 @@
 
 ## 更新日志
 
+### v1.4.0 (2026-06-01)
+
+- 🎨 **可视化测试流程编辑器** — 全新的拖拽式流程画布，支持 9 种节点类型：开始、结束、HTTP 请求、条件判断、循环、等待、并行、变量赋值、断言
+- 🧠 **MCP 服务（AI Agent 集成）** — 新增 18 个 MCP 工具，AI Agent 可通过 `get_flow_context` 获取完整 API 参数信息，通过 `create_task_with_flow` 一键创建测试任务
+- 🔄 **流程执行引擎** — 前端流程图遍历引擎，支持环境选择、实时日志面板、节点状态高亮、快速失败模式
+- 📐 **ELK 自动布局** — 使用 ELK.js 分层布局算法替代 dagre，自动最小化边交叉，连线采用直角折线自动绕过节点
+- 🤖 **AI Prompt 生成** — 导入弹窗提供完整的 Prompt 模板，包含项目 API 参数详情（自动解析 `$ref` 引用）、节点类型文档、断言/提取器格式说明
+- 📝 **请求覆盖可视化** — Query/Header/Path 参数使用 KV 可视化编辑器，Body 使用 JSON 编辑器
+- 🔗 **连线增强** — 贝塞尔/折线切换、方向箭头、条件分支标注（符合/不符合）、循环体/出口标注、连线选中/删除/重连
+- 🖱️ **节点交互增强** — 节点选中高亮、右键菜单删除、节点上显示运行结果和耗时
+- 💾 **保存按钮** — 工具栏新增保存按钮 + Ctrl+S 快捷键
+- 🏷️ **条件节点优化** — 支持 expression/status_code/variable_check 三种模式，节点显示实际表达式，配置页面按类型动态显隐字段
+- 🔧 **断言修复** — 修复 status 类型断言数字/字符串类型不匹配问题，断言失败信息显示预期值和实际值
+- 📦 **依赖变更** — 新增 elkjs（自动布局），移除 dagre
+
 ### v1.3.4 (2026-05-28)
 
 - 🔀 **RunTab 数据分离** — 运行时信息（参数、Body、脚本等）与 API 定义分离存储，运行时修改不再覆盖文档定义
@@ -148,7 +163,8 @@
 | 前端 | React 18 + React Router v7 + Vite |
 | UI | Ant Design v5 + TailwindCSS + Lucide React |
 | 编辑器 | Monaco Editor（JSON 输入）+ ByteMD（Markdown） |
-| 后端 | Rust + Axum（YAPI HTTP 服务） |
+| 画布 | @xyflow/react（流程图）+ ELK.js（自动布局）|
+| 后端 | Rust + Axum（YAPI/MCP HTTP 服务） |
 | 数据库 | SQLite（rusqlite） |
 | 实时协作 | Yjs CRDT（在线文档） |
 
@@ -159,16 +175,35 @@ src/                   前端源码
   app/                 页面路由
   components/          UI 组件（ApiTab、JsonSchema、项目面板等）
   contexts/            React Context（auth、menu-helpers、global）
+  features/
+    test-flow/         测试流程编辑器
+      components/      画布、工具栏、节点面板、配置抽屉、导入弹窗、运行弹窗
+      nodes/           节点组件（BaseNode、ConditionNode、LoopNode 等）
+      store/           Zustand store（useFlowStore）
+      hooks/           执行引擎（useFlowExecution）、持久化（useFlowPersistence）
+      types/           流程类型定义
+      contexts/        FlowEditorContext、FlowInstanceContext
+  hooks/               全局 hooks（useApiMenu、useTestTask 等）
   utils/               工具函数（Markdown/HTML 导出）
 
 src-tauri/             Rust 后端
   src/
-    commands/          Tauri 命令（auth、projects、menu_items、environments、imports、exports、request_runner）
-    db/                SQLite 仓储（auth_repo、project_repo、menu_repo、personal_token_repo 等）
-    services/          业务逻辑（导入解析、密码加密、YApi 转换）
-    http/              YAPI 兼容 HTTP 服务
+    commands/          Tauri 命令（auth、projects、menu_items、test_tasks、test_flow、environments）
+    db/                SQLite 仓储（auth_repo、project_repo、menu_repo、test_repo、flow_repo）
+    services/          业务逻辑（导入解析、测试引擎 test_engine）
+    http/              YAPI 兼容 HTTP 服务 + MCP 服务（mcp_server）
   Cargo.toml
 ```
+
+### 自动化测试（v1.4.0 新增）
+
+| 功能 | 说明 |
+|---|---|
+| 流程编辑器 | 拖拽节点、连线编辑、自动布局、导入导出 JSON |
+| 节点类型 | start / end / httpRequest / condition / loop / wait / parallel / setVariable / assert |
+| 运行引擎 | 环境选择、变量传递、断言/提取器、快速失败、实时日志 |
+| AI 集成 | MCP 服务（18 个工具）、AI Prompt 生成、`$ref` Schema 解析 |
+| 项目结构 | 流程图存储在 `test_flow_graphs` 表，与 `test_tasks` 关联 |
 
 ## 快速开始
 
