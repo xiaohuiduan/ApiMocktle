@@ -253,6 +253,23 @@ fn run_migrations(conn: &Connection) {
         CREATE INDEX IF NOT EXISTS idx_test_step_results_exec ON test_step_results(execution_id, sort_order);
         ",
     ).ok();
+
+    // Flow graph persistence
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS test_flow_graphs (
+            id TEXT PRIMARY KEY,
+            task_id TEXT NOT NULL UNIQUE,
+            graph_json TEXT NOT NULL,
+            version INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (task_id) REFERENCES test_tasks(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_test_flow_graphs_task ON test_flow_graphs(task_id);
+        ",
+    ).ok();
 }
 
 pub fn init_database(app_data_dir: &PathBuf) -> Db {

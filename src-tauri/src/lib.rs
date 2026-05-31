@@ -114,6 +114,11 @@ pub fn run() {
             commands::test_tasks::create_test_step_result,
             commands::test_tasks::execute_extractors,
             commands::test_tasks::execute_assertions,
+            commands::test_tasks::execute_flow_node_request,
+            // Test Flow Graph
+            commands::test_flow::save_test_flow_graph,
+            commands::test_flow::load_test_flow_graph,
+            commands::test_flow::delete_test_flow_graph,
             // MCP Server
             commands::mcp_server::get_mcp_server_status,
             commands::mcp_server::start_mcp_server,

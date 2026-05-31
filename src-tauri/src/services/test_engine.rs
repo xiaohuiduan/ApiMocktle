@@ -677,14 +677,31 @@ impl TestEngine {
         match operator {
             "equals" => {
                 if let Some(expected) = expected {
-                    Ok(actual == expected)
+                    // 直接比较
+                    if actual == expected { return Ok(true) }
+                    // 类型不匹配时尝试数值比较（"200" == 200）
+                    if let (Some(a), Some(e)) = (actual.as_f64(), expected.as_f64()) {
+                        return Ok((a - e).abs() < f64::EPSILON)
+                    }
+                    // 字符串比较
+                    if let (Some(a), Some(e)) = (actual.as_str(), expected.as_str()) {
+                        return Ok(a == e)
+                    }
+                    Ok(false)
                 } else {
                     Err("Missing expected value".to_string())
                 }
             }
             "not_equals" => {
                 if let Some(expected) = expected {
-                    Ok(actual != expected)
+                    if actual == expected { return Ok(false) }
+                    if let (Some(a), Some(e)) = (actual.as_f64(), expected.as_f64()) {
+                        return Ok((a - e).abs() > f64::EPSILON)
+                    }
+                    if let (Some(a), Some(e)) = (actual.as_str(), expected.as_str()) {
+                        return Ok(a != e)
+                    }
+                    Ok(true)
                 } else {
                     Err("Missing expected value".to_string())
                 }

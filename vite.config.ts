@@ -3,6 +3,8 @@ import path from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
+/// <reference types="vitest/config" />
+
 const SRC_DIR = path.resolve(__dirname, 'src')
 const MONACO_VS_SRC = path.resolve(__dirname, 'node_modules/monaco-editor/min/vs')
 const MONACO_VS_DEST = path.resolve(__dirname, 'public/monaco-editor/vs')
@@ -38,4 +40,9 @@ export default defineConfig({
     target: 'esnext',
   },
   base: './',
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/features/test-flow/nodes/test-setup.ts'],
+  },
 })

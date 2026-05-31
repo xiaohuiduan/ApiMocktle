@@ -4,6 +4,7 @@
 /node_modules
 /.pnp
 .pnp.js
+package-lock.json
 
 # testing
 /coverage
@@ -28,6 +29,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # local env files
+.env
 .env.local
 .env.development.local
 .env.test.local
@@ -39,8 +41,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 .ace-tool/
-.claude
-.codebuddy
+
+# AI assistant configs
+.claude/
+.codebuddy/
+
 # local editor settings
 .vscode/
 .idea/
@@ -59,4 +64,12 @@ src-tauri/target/
 
 # Electron/Tauri release output
 /release/
+
+# Playwright test output
+/test-results/
+/playwright-report/
+/blob-report/
+
+# demo/test files at project root
+test-flow-demo.json
 test_server.py

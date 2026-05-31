@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { Table, Button, Space, Tag, Modal, Form, Input, Switch, message, Popconfirm, Empty } from 'antd'
+import { Table, Button, Space, Tag, Modal, Form, Input, message, Popconfirm, Empty } from 'antd'
 import { PlusOutlined, PlayCircleOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 
@@ -81,12 +81,6 @@ export default function TestTaskListPage() {
       dataIndex: 'status',
       key: 'status',
       render: (status: TestTask['status']) => getStatusTag(status),
-    },
-    {
-      title: '快速失败',
-      dataIndex: 'failFast',
-      key: 'failFast',
-      render: (failFast: boolean) => failFast ? '是' : '否',
     },
     {
       title: '创建时间',
@@ -184,13 +178,6 @@ export default function TestTaskListPage() {
             label="描述"
           >
             <Input.TextArea placeholder="请输入任务描述" rows={3} />
-          </Form.Item>
-          <Form.Item
-            name="failFast"
-            label="快速失败"
-            valuePropName="checked"
-          >
-            <Switch />
           </Form.Item>
         </Form>
       </Modal>

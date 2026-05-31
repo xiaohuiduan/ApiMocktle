@@ -322,3 +322,61 @@ pub fn execute_assertions(
 
     Ok(ApiResult::success(results))
 }
+
+/// 执行流程图节点的 HTTP 请求（不需要 step_id，直接传 menu_item_id 和 override）
+#[tauri::command]
+pub async fn execute_flow_node_request(
+    db: State<'_, Arc<Db>>,
+    project_id: String,
+    menu_item_id: String,
+    request_override: Option<serde_json::Value>,
+    variables: serde_json::Value,
+    base_url: Option<String>,
+) -> Result<ApiResult<serde_json::Value>, String> {
+    let menu_items = match menu_repo::list_menu_items(&db, &project_id) {
+        Ok(items) => items,
+        Err(e) => return Ok(ApiResult::from(e)),
+    };
+
+    let menu_item = match menu_items.iter().find(|item| item.id == menu_item_id) {
+        Some(item) => item.clone(),
+        None => {
+            return Ok(ApiResult {
+                ok: false,
+                data: None,
+                error: Some(format!("Menu item not found: {}", menu_item_id)),
+            });
+        }
+    };
+
+    let vars: std::collections::HashMap<String, String> = if let Some(obj) = variables.as_object() {
+        obj.iter()
+            .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+            .collect()
+    } else {
+        std::collections::HashMap::new()
+    };
+
+    let request_payload = match TestEngine::build_request_payload(
+        &menu_item,
+        request_override.as_ref(),
+        &vars,
+        base_url.as_deref(),
+    ) {
+        Ok(payload) => payload,
+        Err(e) => return Ok(ApiResult::from(e)),
+    };
+
+    let request_result: serde_json::Value = match send_http_request(&request_payload).await {
+        Ok(response_value) => response_value,
+        Err(e) => {
+            return Ok(ApiResult {
+                ok: false,
+                data: None,
+                error: Some(e),
+            });
+        }
+    };
+
+    Ok(ApiResult::success(request_result))
+}
