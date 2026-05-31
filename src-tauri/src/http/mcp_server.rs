@@ -11,6 +11,7 @@ use crate::db::client::Db;
 use crate::db::test_repo;
 use crate::db::project_repo;
 use crate::db::menu_repo;
+use crate::db::flow_repo;
 use crate::models::*;
 use crate::services::test_engine::execute_task_full;
 
@@ -155,7 +156,7 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "api-test.get_task".to_string(),
-            description: "Get a test task with its steps".to_string(),
+            description: "Get a test task with its flow graph".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -218,6 +219,10 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                     "failFast": {
                         "type": "boolean",
                         "description": "Stop on first failure"
+                    },
+                    "environmentId": {
+                        "type": "string",
+                        "description": "Environment ID to use for test execution"
                     }
                 },
                 "required": ["taskId"]
@@ -235,178 +240,6 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                     }
                 },
                 "required": ["taskId"]
-            }),
-        },
-        ToolDefinition {
-            name: "api-test.add_step".to_string(),
-            description: "Add a test step to a task".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "taskId": {
-                        "type": "string",
-                        "description": "The task ID"
-                    },
-                    "menuItemId": {
-                        "type": "string",
-                        "description": "The API menu item ID"
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Step name"
-                    },
-                    "preScript": {
-                        "type": "string",
-                        "description": "Pre-request script"
-                    },
-                    "postScript": {
-                        "type": "string",
-                        "description": "Post-response script"
-                    },
-                    "assertions": {
-                        "type": "array",
-                        "description": "Structured assertions",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "type": { "type": "string", "enum": ["status", "json_path", "header", "response_time", "body_contains"] },
-                                "path": { "type": "string" },
-                                "name": { "type": "string" },
-                                "operator": { "type": "string", "enum": ["equals", "not_equals", "exists", "not_exists", "contains", "not_contains", "greater_than", "less_than"] },
-                                "expected": {}
-                            },
-                            "required": ["type", "operator"]
-                        }
-                    },
-                    "extractors": {
-                        "type": "array",
-                        "description": "Response data extractors",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "type": { "type": "string", "enum": ["json_path", "header", "regex", "status"] },
-                                "path": { "type": "string" },
-                                "name": { "type": "string" },
-                                "pattern": { "type": "string" },
-                                "variable": { "type": "string" }
-                            },
-                            "required": ["type", "variable"]
-                        }
-                    },
-                    "requestOverride": {
-                        "type": "object",
-                        "description": "Request override configuration (headers, queryParams, pathParams, body)",
-                        "properties": {
-                            "headers": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "value": { "type": "string" } } } },
-                            "queryParams": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "value": { "type": "string" } } } },
-                            "pathParams": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "value": { "type": "string" } } } },
-                            "bodyType": { "type": "string", "enum": ["json", "form", "raw", "none"] },
-                            "bodyJson": { "type": "string" },
-                            "bodyForm": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "value": { "type": "string" } } } },
-                            "bodyRaw": { "type": "string" }
-                        }
-                    }
-                },
-                "required": ["taskId", "menuItemId"]
-            }),
-        },
-        ToolDefinition {
-            name: "api-test.update_step".to_string(),
-            description: "Update a test step".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "stepId": {
-                        "type": "string",
-                        "description": "The step ID"
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Step name"
-                    },
-                    "menuItemId": {
-                        "type": "string",
-                        "description": "The API menu item ID"
-                    },
-                    "preScript": {
-                        "type": "string",
-                        "description": "Pre-request script"
-                    },
-                    "postScript": {
-                        "type": "string",
-                        "description": "Post-response script"
-                    },
-                    "assertions": {
-                        "type": "array",
-                        "description": "Structured assertions",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "type": { "type": "string", "enum": ["status", "json_path", "header", "response_time", "body_contains"] },
-                                "path": { "type": "string" },
-                                "name": { "type": "string" },
-                                "operator": { "type": "string", "enum": ["equals", "not_equals", "exists", "not_exists", "contains", "not_contains", "greater_than", "less_than"] },
-                                "expected": {}
-                            },
-                            "required": ["type", "operator"]
-                        }
-                    },
-                    "extractors": {
-                        "type": "array",
-                        "description": "Response data extractors",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "type": { "type": "string", "enum": ["json_path", "header", "regex", "status"] },
-                                "path": { "type": "string" },
-                                "name": { "type": "string" },
-                                "pattern": { "type": "string" },
-                                "variable": { "type": "string" }
-                            },
-                            "required": ["type", "variable"]
-                        }
-                    },
-                    "enabled": {
-                        "type": "boolean",
-                        "description": "Enable/disable step"
-                    }
-                },
-                "required": ["stepId"]
-            }),
-        },
-        ToolDefinition {
-            name: "api-test.delete_step".to_string(),
-            description: "Delete a test step".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "stepId": {
-                        "type": "string",
-                        "description": "The step ID"
-                    }
-                },
-                "required": ["stepId"]
-            }),
-        },
-        ToolDefinition {
-            name: "api-test.reorder_steps".to_string(),
-            description: "Reorder test steps".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "taskId": {
-                        "type": "string",
-                        "description": "The task ID"
-                    },
-                    "stepIds": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": "Ordered list of step IDs"
-                    }
-                },
-                "required": ["taskId", "stepIds"]
             }),
         },
         ToolDefinition {
@@ -453,79 +286,6 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                     }
                 },
                 "required": ["executionId"]
-            }),
-        },
-        ToolDefinition {
-            name: "api-test.create_task_with_steps".to_string(),
-            description: "Create a test task with multiple steps in one call".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "projectId": {
-                        "type": "string",
-                        "description": "The project ID"
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Task name"
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Task description"
-                    },
-                    "failFast": {
-                        "type": "boolean",
-                        "description": "Stop on first failure"
-                    },
-                    "environmentId": {
-                        "type": "string",
-                        "description": "Environment ID to use for test execution"
-                    },
-                    "steps": {
-                        "type": "array",
-                        "description": "Array of test steps",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "name": { "type": "string" },
-                                "menuItemId": { "type": "string" },
-                                "preScript": { "type": "string" },
-                                "postScript": { "type": "string" },
-                                "requestOverride": { "type": "object" },
-                                "assertions": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "type": { "type": "string" },
-                                            "path": { "type": "string" },
-                                            "name": { "type": "string" },
-                                            "operator": { "type": "string" },
-                                            "expected": {}
-                                        },
-                                        "required": ["type", "operator"]
-                                    }
-                                },
-                                "extractors": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "type": { "type": "string" },
-                                            "path": { "type": "string" },
-                                            "name": { "type": "string" },
-                                            "pattern": { "type": "string" },
-                                            "variable": { "type": "string" }
-                                        },
-                                        "required": ["type", "variable"]
-                                    }
-                                }
-                            },
-                            "required": ["menuItemId"]
-                        }
-                    }
-                },
-                "required": ["projectId", "name", "steps"]
             }),
         },
         ToolDefinition {
@@ -584,6 +344,110 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                     }
                 },
                 "required": ["taskId"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-test.get_flow_context".to_string(),
+            description: "Get comprehensive context for AI agents to build test flow graphs: API list with full param details, node type definitions, handle conventions, and flow schema".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "projectId": {
+                        "type": "string",
+                        "description": "The project ID"
+                    }
+                },
+                "required": ["projectId"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-test.create_task_with_flow".to_string(),
+            description: "Create a test task and its flow graph in one atomic operation".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "projectId": {
+                        "type": "string",
+                        "description": "The project ID"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Task name"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Task description"
+                    },
+                    "graphJson": {
+                        "type": "object",
+                        "description": "The flow graph JSON with nodes and edges arrays"
+                    }
+                },
+                "required": ["projectId", "name", "graphJson"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-test.save_flow_graph".to_string(),
+            description: "Save or update a flow graph for an existing test task".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "taskId": {
+                        "type": "string",
+                        "description": "The task ID"
+                    },
+                    "graphJson": {
+                        "type": "object",
+                        "description": "The flow graph JSON with nodes and edges arrays"
+                    }
+                },
+                "required": ["taskId", "graphJson"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-test.load_flow_graph".to_string(),
+            description: "Load the flow graph for a test task".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "taskId": {
+                        "type": "string",
+                        "description": "The task ID"
+                    }
+                },
+                "required": ["taskId"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-test.delete_flow_graph".to_string(),
+            description: "Delete the flow graph for a test task".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "taskId": {
+                        "type": "string",
+                        "description": "The task ID"
+                    }
+                },
+                "required": ["taskId"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-test.validate_flow".to_string(),
+            description: "Validate a flow graph structure: checks nodes/edges arrays, start+end nodes, unique ids, edge references, and menuItemId validity".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "graphJson": {
+                        "type": "object",
+                        "description": "The flow graph JSON with nodes and edges arrays"
+                    },
+                    "projectId": {
+                        "type": "string",
+                        "description": "Optional project ID to validate menuItemIds exist"
+                    }
+                },
+                "required": ["graphJson"]
             }),
         },
     ]
@@ -722,28 +586,28 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
 
             match test_repo::get_task(db, task_id) {
                 Ok(Some(task)) => {
-                    match test_repo::list_steps(db, task_id) {
-                        Ok(steps) => {
-                            let detail = serde_json::json!({
-                                "task": task,
-                                "steps": steps
-                            });
-                            Ok(ToolResult {
-                                content: vec![ToolResultContent {
-                                    content_type: "text".to_string(),
-                                    text: serde_json::to_string_pretty(&detail).unwrap_or_default(),
-                                }],
-                                is_error: None,
-                            })
-                        }
-                        Err(e) => Ok(ToolResult {
+                    let flow_graph = match flow_repo::load_flow_graph(db, task_id) {
+                        Ok(graph) => graph,
+                        Err(e) => return Ok(ToolResult {
                             content: vec![ToolResultContent {
                                 content_type: "text".to_string(),
-                                text: format!("Error: {}", e),
+                                text: format!("Error loading flow graph: {}", e),
                             }],
                             is_error: Some(true),
                         }),
-                    }
+                    };
+
+                    let detail = serde_json::json!({
+                        "task": task,
+                        "flowGraph": flow_graph
+                    });
+                    Ok(ToolResult {
+                        content: vec![ToolResultContent {
+                            content_type: "text".to_string(),
+                            text: serde_json::to_string_pretty(&detail).unwrap_or_default(),
+                        }],
+                        is_error: None,
+                    })
                 }
                 Ok(None) => Ok(ToolResult {
                     content: vec![ToolResultContent {
@@ -821,7 +685,7 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
             let payload = UpdateTestTaskPayload {
                 name: arguments.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()),
                 description: arguments.get("description").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                environment_id: None,
+                environment_id: arguments.get("environmentId").and_then(|v| v.as_str()).map(|s| s.to_string()),
                 variables_json: None,
                 fail_fast: arguments.get("failFast").and_then(|v| v.as_bool()),
             };
@@ -853,159 +717,6 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                 })?;
 
             match test_repo::delete_task(db, task_id) {
-                Ok(_) => Ok(ToolResult {
-                    content: vec![ToolResultContent {
-                        content_type: "text".to_string(),
-                        text: serde_json::to_string(&serde_json::json!({"ok": true})).unwrap_or_default(),
-                    }],
-                    is_error: None,
-                }),
-                Err(e) => Ok(ToolResult {
-                    content: vec![ToolResultContent {
-                        content_type: "text".to_string(),
-                        text: format!("Error: {}", e),
-                    }],
-                    is_error: Some(true),
-                }),
-            }
-        }
-        "api-test.add_step" => {
-            let task_id = arguments.get("taskId")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| JsonRpcError {
-                    code: -32602,
-                    message: "Missing taskId".to_string(),
-                    data: None,
-                })?;
-            let menu_item_id = arguments.get("menuItemId")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| JsonRpcError {
-                    code: -32602,
-                    message: "Missing menuItemId".to_string(),
-                    data: None,
-                })?;
-
-            let assertions_json = arguments.get("assertions").map(|v| v.clone());
-            let extractors_json = arguments.get("extractors").map(|v| v.clone());
-            let request_override_json = arguments.get("requestOverride").map(|v| v.clone());
-
-            let payload = CreateTestStepPayload {
-                task_id: task_id.to_string(),
-                menu_item_id: menu_item_id.to_string(),
-                name: arguments.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                sort_order: arguments.get("sortOrder").and_then(|v| v.as_i64()).map(|v| v as i32),
-                pre_script: arguments.get("preScript").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                post_script: arguments.get("postScript").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                request_override_json,
-                assertions_json,
-                extractors_json,
-                enabled: true,
-            };
-
-            match test_repo::create_step(db, &payload) {
-                Ok(step) => Ok(ToolResult {
-                    content: vec![ToolResultContent {
-                        content_type: "text".to_string(),
-                        text: serde_json::to_string_pretty(&step).unwrap_or_default(),
-                    }],
-                    is_error: None,
-                }),
-                Err(e) => Ok(ToolResult {
-                    content: vec![ToolResultContent {
-                        content_type: "text".to_string(),
-                        text: format!("Error: {}", e),
-                    }],
-                    is_error: Some(true),
-                }),
-            }
-        }
-        "api-test.update_step" => {
-            let step_id = arguments.get("stepId")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| JsonRpcError {
-                    code: -32602,
-                    message: "Missing stepId".to_string(),
-                    data: None,
-                })?;
-
-            let assertions_json = arguments.get("assertions").map(|v| v.clone());
-            let extractors_json = arguments.get("extractors").map(|v| v.clone());
-
-            let payload = UpdateTestStepPayload {
-                name: arguments.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                sort_order: arguments.get("sortOrder").and_then(|v| v.as_i64()).map(|v| v as i32),
-                menu_item_id: arguments.get("menuItemId").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                pre_script: arguments.get("preScript").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                post_script: arguments.get("postScript").and_then(|v| v.as_str()).map(|s| s.to_string()),
-                request_override_json: None,
-                assertions_json,
-                extractors_json,
-                enabled: arguments.get("enabled").and_then(|v| v.as_bool()),
-            };
-
-            match test_repo::update_step(db, step_id, &payload) {
-                Ok(step) => Ok(ToolResult {
-                    content: vec![ToolResultContent {
-                        content_type: "text".to_string(),
-                        text: serde_json::to_string_pretty(&step).unwrap_or_default(),
-                    }],
-                    is_error: None,
-                }),
-                Err(e) => Ok(ToolResult {
-                    content: vec![ToolResultContent {
-                        content_type: "text".to_string(),
-                        text: format!("Error: {}", e),
-                    }],
-                    is_error: Some(true),
-                }),
-            }
-        }
-        "api-test.delete_step" => {
-            let step_id = arguments.get("stepId")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| JsonRpcError {
-                    code: -32602,
-                    message: "Missing stepId".to_string(),
-                    data: None,
-                })?;
-
-            match test_repo::delete_step(db, step_id) {
-                Ok(_) => Ok(ToolResult {
-                    content: vec![ToolResultContent {
-                        content_type: "text".to_string(),
-                        text: serde_json::to_string(&serde_json::json!({"ok": true})).unwrap_or_default(),
-                    }],
-                    is_error: None,
-                }),
-                Err(e) => Ok(ToolResult {
-                    content: vec![ToolResultContent {
-                        content_type: "text".to_string(),
-                        text: format!("Error: {}", e),
-                    }],
-                    is_error: Some(true),
-                }),
-            }
-        }
-        "api-test.reorder_steps" => {
-            let task_id = arguments.get("taskId")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| JsonRpcError {
-                    code: -32602,
-                    message: "Missing taskId".to_string(),
-                    data: None,
-                })?;
-            let step_ids = arguments.get("stepIds")
-                .and_then(|v| v.as_array())
-                .ok_or_else(|| JsonRpcError {
-                    code: -32602,
-                    message: "Missing stepIds".to_string(),
-                    data: None,
-                })?
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect::<Vec<_>>();
-
-            match test_repo::reorder_steps(db, task_id, &step_ids) {
                 Ok(_) => Ok(ToolResult {
                     content: vec![ToolResultContent {
                         content_type: "text".to_string(),
@@ -1109,120 +820,6 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                     is_error: Some(true),
                 }),
             }
-        }
-        "api-test.create_task_with_steps" => {
-            let project_id = arguments.get("projectId")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| JsonRpcError {
-                    code: -32602,
-                    message: "Missing projectId".to_string(),
-                    data: None,
-                })?;
-            let name = arguments.get("name")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| JsonRpcError {
-                    code: -32602,
-                    message: "Missing name".to_string(),
-                    data: None,
-                })?;
-            let description = arguments.get("description")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            let fail_fast = arguments.get("failFast")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(true);
-            let environment_id = arguments.get("environmentId").and_then(|v| v.as_str()).map(|s| s.to_string());
-
-            let steps = arguments.get("steps")
-                .and_then(|v| v.as_array())
-                .ok_or_else(|| JsonRpcError {
-                    code: -32602,
-                    message: "Missing steps".to_string(),
-                    data: None,
-                })?;
-
-            // Create the task first
-            let task_payload = CreateTestTaskPayload {
-                project_id: project_id.to_string(),
-                name: name.to_string(),
-                description: description.to_string(),
-                environment_id,
-                fail_fast,
-            };
-
-            let task = match test_repo::create_task(db, &task_payload) {
-                Ok(task) => task,
-                Err(e) => return Ok(ToolResult {
-                    content: vec![ToolResultContent {
-                        content_type: "text".to_string(),
-                        text: format!("Error creating task: {}", e),
-                    }],
-                    is_error: Some(true),
-                }),
-            };
-
-            // Create each step
-            let mut created_steps = Vec::new();
-            for (index, step_value) in steps.iter().enumerate() {
-                let menu_item_id = step_value.get("menuItemId")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-
-                let step_name = step_value.get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-
-                let pre_script = step_value.get("preScript")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-
-                let post_script = step_value.get("postScript")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-
-                let request_override_json = step_value.get("requestOverride").map(|v| v.clone());
-                let assertions_json = step_value.get("assertions").map(|v| v.clone());
-                let extractors_json = step_value.get("extractors").map(|v| v.clone());
-
-                let step_payload = CreateTestStepPayload {
-                    task_id: task.id.clone(),
-                    sort_order: Some(index as i32),
-                    name: step_name,
-                    menu_item_id,
-                    request_override_json,
-                    pre_script,
-                    post_script,
-                    assertions_json,
-                    extractors_json,
-                    enabled: true,
-                };
-
-                match test_repo::create_step(db, &step_payload) {
-                    Ok(step) => created_steps.push(step),
-                    Err(e) => return Ok(ToolResult {
-                        content: vec![ToolResultContent {
-                            content_type: "text".to_string(),
-                            text: format!("Error creating step {}: {}", index + 1, e),
-                        }],
-                        is_error: Some(true),
-                    }),
-                }
-            }
-
-            let result = serde_json::json!({
-                "task": task,
-                "steps": created_steps
-            });
-
-            Ok(ToolResult {
-                content: vec![ToolResultContent {
-                    content_type: "text".to_string(),
-                    text: serde_json::to_string_pretty(&result).unwrap_or_default(),
-                }],
-                is_error: None,
-            })
         }
         "api-test.get_variables" => {
             let task_id = arguments.get("taskId")
@@ -1480,6 +1077,535 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                     is_error: Some(true),
                 }),
             }
+        }
+        "api-test.get_flow_context" => {
+            let project_id = arguments.get("projectId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing projectId".to_string(),
+                    data: None,
+                })?;
+
+            match menu_repo::list_menu_items(db, project_id) {
+                Ok(items) => {
+                    let api_list: Vec<serde_json::Value> = items
+                        .iter()
+                        .filter(|item| item.menu_type == "apiDetail" || item.menu_type == "httpRequest")
+                        .map(|item| {
+                            let method = item.data_json
+                                .as_ref()
+                                .and_then(|d| d.get("method"))
+                                .and_then(|m| m.as_str())
+                                .unwrap_or("GET");
+                            let path = item.data_json
+                                .as_ref()
+                                .and_then(|d| d.get("path"))
+                                .and_then(|p| p.as_str())
+                                .unwrap_or("");
+                            let description = item.data_json
+                                .as_ref()
+                                .and_then(|d| d.get("description"))
+                                .and_then(|d| d.as_str())
+                                .unwrap_or("");
+                            let query_params = item.data_json
+                                .as_ref()
+                                .and_then(|d| d.get("queryParams"))
+                                .cloned();
+                            let request_body = item.data_json
+                                .as_ref()
+                                .and_then(|d| d.get("requestBody"))
+                                .and_then(|b| b.get("jsonSchema"))
+                                .cloned();
+                            let responses = item.data_json
+                                .as_ref()
+                                .and_then(|d| d.get("responses"))
+                                .cloned();
+                            serde_json::json!({
+                                "id": item.id,
+                                "name": item.name,
+                                "method": method,
+                                "path": path,
+                                "description": description,
+                                "queryParams": query_params,
+                                "requestBody": request_body,
+                                "responses": responses
+                            })
+                        })
+                        .collect();
+
+                    let node_types = serde_json::json!([
+                        {
+                            "type": "start",
+                            "label": "Start",
+                            "description": "Flow entry point",
+                            "inputHandles": [],
+                            "outputHandles": ["out"]
+                        },
+                        {
+                            "type": "end",
+                            "label": "End",
+                            "description": "Flow termination point",
+                            "inputHandles": ["in"],
+                            "outputHandles": []
+                        },
+                        {
+                            "type": "httpRequest",
+                            "label": "HTTP Request",
+                            "description": "Execute an HTTP API request",
+                            "inputHandles": ["in"],
+                            "outputHandles": ["out"],
+                            "dataKeys": ["menuItemId", "requestOverride", "preScript", "postScript", "assertions", "extractors"]
+                        },
+                        {
+                            "type": "condition",
+                            "label": "Condition",
+                            "description": "Branch based on expression or variable check",
+                            "inputHandles": ["in"],
+                            "outputHandles": ["true", "false"],
+                            "dataKeys": ["conditionType", "expression", "variableName", "operator", "compareValue", "conditions", "defaultLabel"]
+                        },
+                        {
+                            "type": "loop",
+                            "label": "Loop",
+                            "description": "Repeat execution (count, while, for_each)",
+                            "inputHandles": ["in"],
+                            "outputHandles": ["out", "loop"],
+                            "dataKeys": ["loopType", "count", "whileExpression", "collectionVariable", "iteratorVariable", "maxIterations"]
+                        },
+                        {
+                            "type": "parallel",
+                            "label": "Parallel",
+                            "description": "Execute multiple branches concurrently",
+                            "inputHandles": ["in"],
+                            "outputHandles": ["out"],
+                            "dataKeys": ["branchCount", "waitAll", "timeoutMs"]
+                        },
+                        {
+                            "type": "wait",
+                            "label": "Wait",
+                            "description": "Delay execution (fixed, variable, or condition-based)",
+                            "inputHandles": ["in"],
+                            "outputHandles": ["out"],
+                            "dataKeys": ["waitType", "durationMs", "durationVariable", "conditionExpression", "pollIntervalMs", "maxWaitMs"]
+                        },
+                        {
+                            "type": "subFlow",
+                            "label": "Sub Flow",
+                            "description": "Execute another test task as a sub-flow",
+                            "inputHandles": ["in"],
+                            "outputHandles": ["out"],
+                            "dataKeys": ["targetTaskId", "passVariables", "mergeVariables"]
+                        },
+                        {
+                            "type": "setVariable",
+                            "label": "Set Variable",
+                            "description": "Assign or modify variables",
+                            "inputHandles": ["in"],
+                            "outputHandles": ["out"],
+                            "dataKeys": ["assignments"]
+                        },
+                        {
+                            "type": "assert",
+                            "label": "Assert",
+                            "description": "Validate conditions with assertions",
+                            "inputHandles": ["in"],
+                            "outputHandles": ["out"],
+                            "dataKeys": ["assertions", "variableExpression", "script"]
+                        }
+                    ]);
+
+                    let flow_schema = serde_json::json!({
+                        "type": "object",
+                        "description": "A flow graph containing nodes and edges",
+                        "properties": {
+                            "nodes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "required": ["id", "type", "position", "data"],
+                                    "properties": {
+                                        "id": { "type": "string", "description": "Unique node identifier" },
+                                        "type": { "type": "string", "enum": ["start", "end", "httpRequest", "condition", "loop", "parallel", "wait", "subFlow", "setVariable", "assert"] },
+                                        "position": { "type": "object", "properties": { "x": { "type": "number" }, "y": { "type": "number" } } },
+                                        "data": { "type": "object", "description": "Node-specific data, see nodeTypes for dataKeys per type" }
+                                    }
+                                }
+                            },
+                            "edges": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "required": ["id", "source", "target"],
+                                    "properties": {
+                                        "id": { "type": "string", "description": "Unique edge identifier" },
+                                        "source": { "type": "string", "description": "Source node id" },
+                                        "target": { "type": "string", "description": "Target node id" },
+                                        "sourceHandle": { "type": "string", "description": "Source handle id (e.g. 'out', 'true', 'false', 'loop', 'default')" },
+                                        "targetHandle": { "type": "string", "description": "Target handle id (usually 'in')" }
+                                    }
+                                }
+                            }
+                        },
+                        "required": ["nodes", "edges"]
+                    });
+
+                    let result = serde_json::json!({
+                        "apiList": api_list,
+                        "nodeTypes": node_types,
+                        "flowSchema": flow_schema
+                    });
+
+                    Ok(ToolResult {
+                        content: vec![ToolResultContent {
+                            content_type: "text".to_string(),
+                            text: serde_json::to_string_pretty(&result).unwrap_or_default(),
+                        }],
+                        is_error: None,
+                    })
+                }
+                Err(e) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: format!("Error: {}", e),
+                    }],
+                    is_error: Some(true),
+                }),
+            }
+        }
+        "api-test.create_task_with_flow" => {
+            let project_id = arguments.get("projectId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing projectId".to_string(),
+                    data: None,
+                })?;
+            let name = arguments.get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing name".to_string(),
+                    data: None,
+                })?;
+            let description = arguments.get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let graph_json = arguments.get("graphJson")
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing graphJson".to_string(),
+                    data: None,
+                })?;
+
+            // Validate graphJson has nodes/edges arrays
+            let has_nodes = graph_json.get("nodes").and_then(|v| v.as_array()).is_some();
+            let has_edges = graph_json.get("edges").and_then(|v| v.as_array()).is_some();
+            if !has_nodes || !has_edges {
+                return Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: "graphJson must contain 'nodes' and 'edges' arrays".to_string(),
+                    }],
+                    is_error: Some(true),
+                });
+            }
+
+            let task_payload = CreateTestTaskPayload {
+                project_id: project_id.to_string(),
+                name: name.to_string(),
+                description: description.to_string(),
+                environment_id: None,
+                fail_fast: true,
+            };
+
+            let task = match test_repo::create_task(db, &task_payload) {
+                Ok(task) => task,
+                Err(e) => return Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: format!("Error creating task: {}", e),
+                    }],
+                    is_error: Some(true),
+                }),
+            };
+
+            match flow_repo::save_flow_graph(db, &task.id, graph_json) {
+                Ok(_) => {
+                    let result = serde_json::json!({
+                        "task": task,
+                        "flowGraph": graph_json
+                    });
+                    Ok(ToolResult {
+                        content: vec![ToolResultContent {
+                            content_type: "text".to_string(),
+                            text: serde_json::to_string_pretty(&result).unwrap_or_default(),
+                        }],
+                        is_error: None,
+                    })
+                }
+                Err(e) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: format!("Error saving flow graph: {}", e),
+                    }],
+                    is_error: Some(true),
+                }),
+            }
+        }
+        "api-test.save_flow_graph" => {
+            let task_id = arguments.get("taskId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing taskId".to_string(),
+                    data: None,
+                })?;
+            let graph_json = arguments.get("graphJson")
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing graphJson".to_string(),
+                    data: None,
+                })?;
+
+            match flow_repo::save_flow_graph(db, task_id, graph_json) {
+                Ok(_) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: serde_json::to_string(&serde_json::json!({"ok": true})).unwrap_or_default(),
+                    }],
+                    is_error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: format!("Error: {}", e),
+                    }],
+                    is_error: Some(true),
+                }),
+            }
+        }
+        "api-test.load_flow_graph" => {
+            let task_id = arguments.get("taskId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing taskId".to_string(),
+                    data: None,
+                })?;
+
+            match flow_repo::load_flow_graph(db, task_id) {
+                Ok(Some(graph)) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: serde_json::to_string_pretty(&graph).unwrap_or_default(),
+                    }],
+                    is_error: None,
+                }),
+                Ok(None) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: "No flow graph found for this task".to_string(),
+                    }],
+                    is_error: Some(true),
+                }),
+                Err(e) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: format!("Error: {}", e),
+                    }],
+                    is_error: Some(true),
+                }),
+            }
+        }
+        "api-test.delete_flow_graph" => {
+            let task_id = arguments.get("taskId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing taskId".to_string(),
+                    data: None,
+                })?;
+
+            match flow_repo::delete_flow_graph(db, task_id) {
+                Ok(_) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: serde_json::to_string(&serde_json::json!({"ok": true})).unwrap_or_default(),
+                    }],
+                    is_error: None,
+                }),
+                Err(e) => Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: format!("Error: {}", e),
+                    }],
+                    is_error: Some(true),
+                }),
+            }
+        }
+        "api-test.validate_flow" => {
+            let graph_json = arguments.get("graphJson")
+                .ok_or_else(|| JsonRpcError {
+                    code: -32602,
+                    message: "Missing graphJson".to_string(),
+                    data: None,
+                })?;
+            let project_id = arguments.get("projectId")
+                .and_then(|v| v.as_str());
+
+            let mut errors: Vec<String> = Vec::new();
+            let mut warnings: Vec<String> = Vec::new();
+
+            // Check nodes array exists
+            let nodes = match graph_json.get("nodes").and_then(|v| v.as_array()) {
+                Some(arr) => arr,
+                None => {
+                    errors.push("graphJson must contain a 'nodes' array".to_string());
+                    return Ok(ToolResult {
+                        content: vec![ToolResultContent {
+                            content_type: "text".to_string(),
+                            text: serde_json::to_string_pretty(&serde_json::json!({
+                                "valid": false,
+                                "errors": errors,
+                                "warnings": warnings,
+                                "nodeCount": 0,
+                                "edgeCount": 0
+                            })).unwrap_or_default(),
+                        }],
+                        is_error: None,
+                    });
+                }
+            };
+
+            // Check edges array exists
+            let edges = match graph_json.get("edges").and_then(|v| v.as_array()) {
+                Some(arr) => arr,
+                None => {
+                    errors.push("graphJson must contain an 'edges' array".to_string());
+                    return Ok(ToolResult {
+                        content: vec![ToolResultContent {
+                            content_type: "text".to_string(),
+                            text: serde_json::to_string_pretty(&serde_json::json!({
+                                "valid": false,
+                                "errors": errors,
+                                "warnings": warnings,
+                                "nodeCount": nodes.len(),
+                                "edgeCount": 0
+                            })).unwrap_or_default(),
+                        }],
+                        is_error: None,
+                    });
+                }
+            };
+
+            let node_count = nodes.len();
+            let edge_count = edges.len();
+
+            // Check has start and end nodes
+            let has_start = nodes.iter().any(|n| n.get("type").and_then(|t| t.as_str()) == Some("start"));
+            let has_end = nodes.iter().any(|n| n.get("type").and_then(|t| t.as_str()) == Some("end"));
+
+            if !has_start {
+                errors.push("Flow must have at least one 'start' node".to_string());
+            }
+            if !has_end {
+                errors.push("Flow must have at least one 'end' node".to_string());
+            }
+
+            // Check unique node ids
+            let mut node_ids: Vec<&str> = nodes
+                .iter()
+                .filter_map(|n| n.get("id").and_then(|v| v.as_str()))
+                .collect();
+            let original_len = node_ids.len();
+            node_ids.sort();
+            node_ids.dedup();
+            if node_ids.len() < original_len {
+                errors.push("Node ids must be unique".to_string());
+            }
+
+            // Build set of valid node ids for edge validation
+            let node_id_set: std::collections::HashSet<&str> = node_ids.iter().copied().collect();
+
+            // Validate edges reference valid nodes
+            for edge in edges {
+                let edge_id = edge.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+                let source = edge.get("source").and_then(|v| v.as_str());
+                let target = edge.get("target").and_then(|v| v.as_str());
+
+                if source.is_none() {
+                    errors.push(format!("Edge '{}' missing 'source'", edge_id));
+                } else if !node_id_set.contains(source.unwrap()) {
+                    errors.push(format!("Edge '{}' references invalid source node '{}'", edge_id, source.unwrap()));
+                }
+
+                if target.is_none() {
+                    errors.push(format!("Edge '{}' missing 'target'", edge_id));
+                } else if !node_id_set.contains(target.unwrap()) {
+                    errors.push(format!("Edge '{}' references invalid target node '{}'", edge_id, target.unwrap()));
+                }
+            }
+
+            // Validate httpRequest nodes have menuItemId
+            for node in nodes {
+                let node_type = node.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                let node_id = node.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+                if node_type == "httpRequest" {
+                    let has_menu_item = node.get("data")
+                        .and_then(|d| d.get("menuItemId"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| !s.is_empty())
+                        .unwrap_or(false);
+                    if !has_menu_item {
+                        errors.push(format!("httpRequest node '{}' must have a non-empty 'menuItemId' in data", node_id));
+                    }
+                }
+            }
+
+            // If projectId provided, validate menuItemIds exist in the project
+            if let Some(pid) = project_id {
+                match menu_repo::list_menu_items(db, pid) {
+                    Ok(items) => {
+                        let valid_ids: std::collections::HashSet<String> = items
+                            .iter()
+                            .map(|item| item.id.clone())
+                            .collect();
+
+                        for node in nodes {
+                            let node_type = node.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                            let node_id = node.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
+                            if node_type == "httpRequest" {
+                                if let Some(menu_id) = node.get("data").and_then(|d| d.get("menuItemId")).and_then(|v| v.as_str()) {
+                                    if !menu_id.is_empty() && !valid_ids.contains(menu_id) {
+                                        warnings.push(format!("httpRequest node '{}' references menuItemId '{}' which does not exist in project", node_id, menu_id));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warnings.push(format!("Could not validate menuItemIds against project: {}", e));
+                    }
+                }
+            }
+
+            let valid = errors.is_empty();
+            let result = serde_json::json!({
+                "valid": valid,
+                "errors": errors,
+                "warnings": warnings,
+                "nodeCount": node_count,
+                "edgeCount": edge_count
+            });
+
+            Ok(ToolResult {
+                content: vec![ToolResultContent {
+                    content_type: "text".to_string(),
+                    text: serde_json::to_string_pretty(&result).unwrap_or_default(),
+                }],
+                is_error: None,
+            })
         }
         _ => Err(JsonRpcError {
             code: -32601,

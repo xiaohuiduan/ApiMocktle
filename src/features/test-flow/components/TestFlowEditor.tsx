@@ -84,8 +84,8 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
     setIsRunning(false)
   }, [])
 
-  const handleAutoLayout = useCallback(() => {
-    autoLayout()
+  const handleAutoLayout = useCallback(async () => {
+    await autoLayout()
   }, [autoLayout])
 
   const handleUndo = useCallback(() => {

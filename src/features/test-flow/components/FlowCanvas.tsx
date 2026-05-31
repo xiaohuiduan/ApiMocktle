@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -40,14 +40,21 @@ function FlowCanvasInner() {
   const addNode = useFlowStore((s) => s.addNode)
   const selectNode = useFlowStore((s) => s.selectNode)
   const deleteEdge = useFlowStore((s) => s.deleteEdge)
+  const deleteNodes = useFlowStore((s) => s.deleteNodes)
   const selectedEdgeId = useFlowStore((s) => s.selectedEdgeId)
+  const selectedNodeId = useFlowStore((s) => s.selectedNodeId)
+
+  // 右键菜单状态
+  const [contextMenu, setContextMenu] = useState<{
+    x: number; y: number; type: 'node' | 'edge'; id: string
+  } | null>(null)
 
   // 节点类型映射，使用 useMemo 避免重渲染
   const nodeTypes = useMemo(() => getNodeTypes(), [])
 
-  // 边默认配置：贝塞尔曲线 + 方向箭头
+  // 边默认配置：平滑折线（自动绕过节点）+ 方向箭头
   const defaultEdgeOptions = useMemo(() => ({
-    type: 'default',
+    type: 'smoothstep',
     style: { strokeWidth: 2, stroke: '#94a3b8' },
     animated: false,
     markerEnd: { type: 'arrowclosed', color: '#94a3b8', width: 20, height: 20 },
@@ -99,6 +106,45 @@ function FlowCanvasInner() {
     [edges, selectedEdgeId, nodeHandleLabels],
   )
 
+  // 节点注入选中状态
+  const nodesWithSelection = useMemo(() =>
+    nodes.map((n) => ({ ...n, selected: n.id === selectedNodeId })),
+    [nodes, selectedNodeId],
+  )
+
+  // 右键菜单处理
+  const handleNodeContextMenu = useCallback(
+    (e: React.MouseEvent, node: Node) => {
+      e.preventDefault()
+      selectNode(node.id)
+      setContextMenu({ x: e.clientX, y: e.clientY, type: 'node', id: node.id })
+    },
+    [selectNode],
+  )
+
+  const handleEdgeContextMenu = useCallback(
+    (e: React.MouseEvent, edge: Edge) => {
+      e.preventDefault()
+      setContextMenu({ x: e.clientX, y: e.clientY, type: 'edge', id: edge.id })
+    },
+    [],
+  )
+
+  const handlePaneClick = useCallback(() => {
+    selectNode(null)
+    setContextMenu(null)
+  }, [selectNode])
+
+  const handleDeleteFromMenu = useCallback(() => {
+    if (!contextMenu) return
+    if (contextMenu.type === 'node') {
+      deleteNodes([contextMenu.id])
+    } else {
+      deleteEdge(contextMenu.id)
+    }
+    setContextMenu(null)
+  }, [contextMenu, deleteNodes, deleteEdge])
+
   // 连接校验：不允许自连接，源节点不能是 End，目标节点不能是 Start
   const isValidConnection: IsValidConnection<FlowEdge> = useCallback(
     (edge: Connection | FlowEdge) => {
@@ -123,11 +169,6 @@ function FlowCanvasInner() {
     },
     [selectNode],
   )
-
-  // 点击空白区域取消所有选择
-  const onPaneClick = useCallback(() => {
-    selectNode(null)
-  }, [selectNode])
 
   // 连线点击：选中连线
   const onEdgeClick = useCallback(
@@ -231,8 +272,15 @@ function FlowCanvasInner() {
       style={{ width: '100%', height: '100%' }}
       data-testid="flow-canvas"
     >
+      {/* 选中节点高亮样式 */}
+      <style>{`
+        .react-flow__node.selected {
+          box-shadow: 0 0 0 2px #3b82f6 !important;
+          border-radius: 8px;
+        }
+      `}</style>
       <ReactFlow
-        nodes={nodes}
+        nodes={nodesWithSelection}
         edges={edgesWithSelection}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
@@ -242,9 +290,11 @@ function FlowCanvasInner() {
         defaultEdgeOptions={defaultEdgeOptions}
         isValidConnection={isValidConnection}
         onNodeClick={onNodeClick}
-        onPaneClick={onPaneClick}
+        onPaneClick={handlePaneClick}
         onEdgeClick={onEdgeClick}
         onEdgeDoubleClick={onEdgeDoubleClick}
+        onNodeContextMenu={handleNodeContextMenu}
+        onEdgeContextMenu={handleEdgeContextMenu}
         edgesReconnectable
         fitView
       >
@@ -252,6 +302,41 @@ function FlowCanvasInner() {
         <MiniMap />
         <Controls />
       </ReactFlow>
+
+      {/* 右键菜单 */}
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            zIndex: 10000,
+            background: '#fff',
+            borderRadius: 6,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+            padding: '4px 0',
+            minWidth: 140,
+          }}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <div
+            style={{
+              padding: '6px 16px',
+              fontSize: 13,
+              cursor: 'pointer',
+              color: '#ef4444',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+            onClick={handleDeleteFromMenu}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#fef2f2')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            🗑 删除{contextMenu.type === 'node' ? '节点' : '连线'}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

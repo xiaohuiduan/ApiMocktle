@@ -74,6 +74,9 @@ importers:
       dayjs:
         specifier: ^1.11.13
         version: 1.11.13
+      elkjs:
+        specifier: ^0.11.1
+        version: 0.11.1
       foxact:
         specifier: ^0.2.38
         version: 0.2.45(react@18.3.1)
@@ -2383,6 +2386,9 @@ packages:
 
   electron-to-chromium@1.5.173:
     resolution: {integrity: sha512-2bFhXP2zqSfQHugjqJIDFVwa+qIxyNApenmXTp9EjaKtdPrES5Qcn9/aSFy/NaP2E+fWG/zxKu/LBvY36p5VNQ==}
+
+  elkjs@0.11.1:
+    resolution: {integrity: sha512-zxxR9k+rx5ktMwT/FwyLdPCrq7xN6e4VGGHH8hA01vVYKjTFik7nHOxBnAYtrgYUB1RpAiLvA1/U2YraWxyKKg==}
 
   emoji-regex@10.4.0:
     resolution: {integrity: sha512-EC+0oUMY1Rqm4O6LLrgjtYDvcVYTy7chDnM4Q7030tP4Kwj3u/pR6gP9ygnp2CJMK5Gq+9Q2oqmrFJAz01DXjw==}
@@ -7348,6 +7354,8 @@ snapshots:
   electron-to-chromium@1.5.137: {}
 
   electron-to-chromium@1.5.173: {}
+
+  elkjs@0.11.1: {}
 
   emoji-regex@10.4.0: {}
 

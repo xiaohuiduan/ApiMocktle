@@ -4,7 +4,7 @@ import {
   applyEdgeChanges,
   addEdge,
 } from '@xyflow/react'
-import dagre from 'dagre'
+import ELK from 'elkjs/lib/elk.bundled.js'
 import type {
   NodeChange,
   EdgeChange,
@@ -66,7 +66,7 @@ interface FlowState {
   reset: () => void
 
   // 自动布局
-  autoLayout: () => void
+  autoLayout: () => Promise<void>
 }
 
 // ==================== 常量 ====================
@@ -336,46 +336,58 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     })
   },
 
-  // 自动布局（使用 dagre 算法）
-  autoLayout: () => {
+  // 自动布局（使用 ELK 算法，最小化边交叉）
+  autoLayout: async () => {
     const { nodes, edges } = get()
     if (nodes.length === 0) return
 
     get().pushHistory()
 
-    const g = new dagre.graphlib.Graph()
-    g.setDefaultEdgeLabel(() => ({}))
-    g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 80, marginx: 40, marginy: 40 })
-
-    // dagre 使用宽高来计算布局
-    const NODE_WIDTH = 180
+    const NODE_WIDTH = 200
     const NODE_HEIGHT = 60
 
-    for (const node of nodes) {
-      g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
+    const elk = new ELK()
+
+    const graph = {
+      id: 'root',
+      layoutOptions: {
+        'elk.algorithm': 'layered',
+        'elk.direction': 'DOWN',
+        'elk.spacing.nodeNode': '60',
+        'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+        'elk.edgeRouting': 'ORTHOGONAL',
+        'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+        'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+        'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST',
+        'elk.padding': '[40, 40, 40, 40]',
+      },
+      children: nodes.map((node) => ({
+        id: node.id,
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+      })),
+      edges: edges.map((edge) => ({
+        id: edge.id,
+        sources: [edge.source],
+        targets: [edge.target],
+      })),
     }
 
-    for (const edge of edges) {
-      g.setEdge(edge.source, edge.target)
-    }
-
-    dagre.layout(g)
-
-    const layoutedNodes = nodes.map((node) => {
-      const dagreNode = g.node(node.id)
-      // dagre 返回的是节点中心点坐标，减去宽高一半得到左上角坐标
-      return {
-        ...node,
-        position: {
-          x: dagreNode.x - NODE_WIDTH / 2,
-          y: dagreNode.y - NODE_HEIGHT / 2,
-        },
+    try {
+      const layouted = await elk.layout(graph)
+      const posMap = new Map<string, { x: number; y: number }>()
+      for (const child of layouted.children || []) {
+        posMap.set(child.id, { x: child.x || 0, y: child.y || 0 })
       }
-    })
 
-    set({
-      nodes: layoutedNodes,
-      isDirty: true,
-    })
+      const layoutedNodes = nodes.map((node) => {
+        const pos = posMap.get(node.id)
+        return pos ? { ...node, position: pos } : node
+      })
+
+      set({ nodes: layoutedNodes, isDirty: true })
+    } catch (err) {
+      console.error('[autoLayout] ELK layout failed:', err)
+    }
   },
 }))
