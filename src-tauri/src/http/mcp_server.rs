@@ -1746,3 +1746,183 @@ pub async fn start_mcp_server(db: Arc<Db>, handle: Arc<McpServerHandle>, preferr
         *port_guard = 0;
     }
 }
+
+// ==================== Tests ====================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tool_definitions_count() {
+        let tools = get_tool_definitions();
+        assert_eq!(tools.len(), 19, "Expected 19 MCP tools, got {}", tools.len());
+    }
+
+    #[test]
+    fn test_no_step_tools() {
+        let tools = get_tool_definitions();
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+        assert!(!names.contains(&"api-test.add_step"), "add_step should be removed");
+        assert!(!names.contains(&"api-test.update_step"), "update_step should be removed");
+        assert!(!names.contains(&"api-test.delete_step"), "delete_step should be removed");
+        assert!(!names.contains(&"api-test.reorder_steps"), "reorder_steps should be removed");
+        assert!(!names.contains(&"api-test.create_task_with_steps"), "create_task_with_steps should be removed");
+    }
+
+    #[test]
+    fn test_new_flow_tools_exist() {
+        let tools = get_tool_definitions();
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+        assert!(names.contains(&"api-test.get_flow_context"), "get_flow_context missing");
+        assert!(names.contains(&"api-test.create_task_with_flow"), "create_task_with_flow missing");
+        assert!(names.contains(&"api-test.save_flow_graph"), "save_flow_graph missing");
+        assert!(names.contains(&"api-test.load_flow_graph"), "load_flow_graph missing");
+        assert!(names.contains(&"api-test.delete_flow_graph"), "delete_flow_graph missing");
+        assert!(names.contains(&"api-test.validate_flow"), "validate_flow missing");
+    }
+
+    #[test]
+    fn test_kept_tools_preserved() {
+        let tools = get_tool_definitions();
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+        let expected = [
+            "api-test.list_projects",
+            "api-test.list_api_menu_items",
+            "api-test.list_tasks",
+            "api-test.get_task",
+            "api-test.create_task",
+            "api-test.update_task",
+            "api-test.delete_task",
+            "api-test.list_executions",
+            "api-test.get_execution",
+            "api-test.delete_execution",
+            "api-test.get_variables",
+            "api-test.set_variables",
+            "api-test.run_task",
+        ];
+        for name in expected {
+            assert!(names.contains(&name), "Missing preserved tool: {}", name);
+        }
+    }
+
+    #[test]
+    fn test_tool_schemas_have_required_fields() {
+        let tools = get_tool_definitions();
+        for tool in &tools {
+            // Every tool must have a non-empty name and description
+            assert!(!tool.name.is_empty(), "Tool name is empty");
+            assert!(!tool.description.is_empty(), "Tool description is empty for {}", tool.name);
+            // input_schema must be a valid JSON object
+            assert!(tool.input_schema.is_object(), "input_schema is not an object for {}", tool.name);
+        }
+    }
+
+    #[test]
+    fn test_validate_flow_schema_requirements() {
+        let tools = get_tool_definitions();
+        let validate_tool = tools.iter().find(|t| t.name == "api-test.validate_flow").unwrap();
+        let required = validate_tool.input_schema.get("required").unwrap().as_array().unwrap();
+        let required_strs: Vec<&str> = required.iter().map(|v| v.as_str().unwrap()).collect();
+        assert!(required_strs.contains(&"graphJson"), "validate_flow should require graphJson");
+    }
+
+    #[test]
+    fn test_create_task_with_flow_schema_requirements() {
+        let tools = get_tool_definitions();
+        let tool = tools.iter().find(|t| t.name == "api-test.create_task_with_flow").unwrap();
+        let required = tool.input_schema.get("required").unwrap().as_array().unwrap();
+        let required_strs: Vec<&str> = required.iter().map(|v| v.as_str().unwrap()).collect();
+        assert!(required_strs.contains(&"projectId"));
+        assert!(required_strs.contains(&"name"));
+        assert!(required_strs.contains(&"graphJson"));
+    }
+
+    #[test]
+    fn test_flow_context_schema_requirements() {
+        let tools = get_tool_definitions();
+        let tool = tools.iter().find(|t| t.name == "api-test.get_flow_context").unwrap();
+        let required = tool.input_schema.get("required").unwrap().as_array().unwrap();
+        let required_strs: Vec<&str> = required.iter().map(|v| v.as_str().unwrap()).collect();
+        assert!(required_strs.contains(&"projectId"));
+    }
+
+    #[test]
+    fn test_update_task_has_environment_id_param() {
+        let tools = get_tool_definitions();
+        let tool = tools.iter().find(|t| t.name == "api-test.update_task").unwrap();
+        let props = tool.input_schema.get("properties").unwrap();
+        assert!(props.get("environmentId").is_some(), "update_task should have environmentId param");
+    }
+
+    #[test]
+    fn test_jsonrpc_response_structure() {
+        let resp = JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            id: Some(serde_json::json!(1)),
+            result: Some(serde_json::json!({"ok": true})),
+            error: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"jsonrpc\":\"2.0\""));
+        assert!(json.contains("\"result\""));
+        assert!(!json.contains("\"error\"")); // skip_serializing_if = None
+    }
+
+    #[test]
+    fn test_jsonrpc_error_response() {
+        let resp = JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            id: Some(serde_json::json!(1)),
+            result: None,
+            error: Some(JsonRpcError {
+                code: -32602,
+                message: "Missing param".to_string(),
+                data: None,
+            }),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"error\""));
+        assert!(json.contains("-32602"));
+        assert!(!json.contains("\"result\"")); // skip_serializing_if = None
+    }
+
+    #[test]
+    fn test_tool_result_structure() {
+        let result = ToolResult {
+            content: vec![ToolResultContent {
+                content_type: "text".to_string(),
+                text: "hello".to_string(),
+            }],
+            is_error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("\"type\":\"text\""));
+        assert!(json.contains("\"text\":\"hello\""));
+        assert!(!json.contains("isError")); // skip_serializing_if = None
+    }
+
+    #[test]
+    fn test_tool_result_error_structure() {
+        let result = ToolResult {
+            content: vec![ToolResultContent {
+                content_type: "text".to_string(),
+                text: "error message".to_string(),
+            }],
+            is_error: Some(true),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("\"isError\":true"));
+    }
+
+    #[test]
+    fn test_mcp_server_handle_initial_state() {
+        let handle = McpServerHandle::new();
+        // Use tokio runtime for async tests
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            assert!(!handle.is_running().await);
+            assert_eq!(handle.get_port().await, 0);
+        });
+    }
+}

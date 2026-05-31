@@ -1225,10 +1225,12 @@ mod tests {
             menu_type: "api".to_string(),
             data_json: Some(serde_json::json!({
                 "method": "GET",
-                "url": "https://api.example.com/users/{{userId}}",
-                "headerParams": [
-                    {"name": "Authorization", "value": "Bearer {{token}}"}
-                ]
+                "path": "/users/{{userId}}",
+                "parameters": {
+                    "header": [
+                        {"name": "Authorization", "value": "Bearer {{token}}"}
+                    ]
+                }
             })),
             run_tab_json: None,
             sort_order: 0,
@@ -1240,7 +1242,7 @@ mod tests {
         vars.insert("userId".to_string(), "123".to_string());
         vars.insert("token".to_string(), "mytoken".to_string());
 
-        let result = TestEngine::build_request_payload(&menu_item, None, &vars).unwrap();
+        let result = TestEngine::build_request_payload(&menu_item, None, &vars, Some("https://api.example.com")).unwrap();
         assert_eq!(result.url, "https://api.example.com/users/123");
         assert_eq!(result.method, "GET");
         assert_eq!(result.headers[0].value, "Bearer mytoken");
