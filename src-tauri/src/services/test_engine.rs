@@ -573,7 +573,11 @@ impl TestEngine {
                 }
                 "header" => {
                     if let Some(name) = &assertion.name {
-                        if let Some(actual_value) = response_headers.get(name) {
+                        // HTTP header 查找大小写不敏感
+                        let name_lower = name.to_lowercase();
+                        let actual_value = response_headers.get(&name_lower)
+                            .or_else(|| response_headers.get(name));
+                        if let Some(actual_value) = actual_value {
                             let actual = serde_json::json!(actual_value);
                             let actual_clone = actual.clone();
                             Self::compare_values(&actual, &assertion.operator, assertion.expected.as_ref())

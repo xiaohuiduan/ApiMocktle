@@ -37,7 +37,7 @@ const PALETTE_NODES: PaletteNodeItem[] = [
   { type: FlowNodeType.Parallel, label: '并行', description: '同时执行', icon: Split, color: '#14b8a6' },
   { type: FlowNodeType.Wait, label: '等待', description: '延迟执行', icon: Timer, color: '#eab308' },
   { type: FlowNodeType.SetVariable, label: '变量赋值', description: '设置变量', icon: Variable, color: '#22c55e' },
-  { type: FlowNodeType.Assert, label: '断言', description: '验证条件', icon: ShieldCheck, color: '#ef4444' },
+  { type: FlowNodeType.Assert, label: '断言', description: '验证变量', icon: ShieldCheck, color: '#ef4444' },
 ]
 
 // ==================== 样式 ====================

@@ -1208,10 +1208,10 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                         {
                             "type": "assert",
                             "label": "Assert",
-                            "description": "Validate conditions with assertions",
+                            "description": "Validate variables with assertion rules or script. assertions[] uses {variable, operator, expected} format. script uses pm.test()/pm.expect() with access to variables object.",
                             "inputHandles": ["in"],
                             "outputHandles": ["out"],
-                            "dataKeys": ["assertions", "variableExpression", "script"]
+                            "dataKeys": ["assertions", "script"]
                         }
                     ]);
 

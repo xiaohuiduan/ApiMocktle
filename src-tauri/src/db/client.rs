@@ -171,17 +171,6 @@ fn run_migrations(conn: &Connection) {
             .ok();
     }
 
-    // Add variables_json column to test_tasks if not exists
-    let has_variables_json: bool = conn
-        .prepare("SELECT 1 AS yes FROM pragma_table_info('test_tasks') WHERE name = 'variables_json'")
-        .and_then(|mut s| s.exists([]))
-        .unwrap_or(false);
-
-    if !has_variables_json {
-        conn.execute("ALTER TABLE test_tasks ADD COLUMN variables_json TEXT", [])
-            .ok();
-    }
-
     // Test automation tables
     conn.execute_batch(
         "
@@ -192,6 +181,7 @@ fn run_migrations(conn: &Connection) {
             description TEXT NOT NULL DEFAULT '',
             environment_id TEXT,
             environment_json TEXT,
+            variables_json TEXT,
             status TEXT NOT NULL DEFAULT 'idle',
             fail_fast INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL,
@@ -270,6 +260,12 @@ fn run_migrations(conn: &Connection) {
         CREATE INDEX IF NOT EXISTS idx_test_flow_graphs_task ON test_flow_graphs(task_id);
         ",
     ).ok();
+
+    // v1.4.0 迁移：为已存在的 test_tasks 表补充 variables_json 列
+    conn.execute(
+        "ALTER TABLE test_tasks ADD COLUMN variables_json TEXT",
+        [],
+    ).ok(); // 已存在则静默忽略
 }
 
 pub fn init_database(app_data_dir: &PathBuf) -> Db {

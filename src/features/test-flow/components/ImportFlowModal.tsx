@@ -162,17 +162,18 @@ conditionType 三种模式：
 | enabled | boolean | 是 | 是否启用 |
 | assignments | array | 是 | 赋值列表，每项包含 variable（变量名）、operator（"="赋值 / "+="累加 / "-="累减）、value（值，可用 {{变量}} 表达式） |
 
-## 8. assert — 断言
+## 8. assert — 变量断言
 
-作用：验证条件是否满足，失败时标记流程为失败。用于独立的验证步骤。
+作用：验证变量值是否符合预期，失败时标记流程为失败。用于在一系列请求之后检查变量状态。
 输入：in | 输出：out
+注意：此节点检查的是**变量**（由 setVariable 节点或 httpRequest 的 postScript/extractors 产生的），不是 HTTP 响应。HTTP 响应断言请使用 httpRequest 节点内置的 assertions。
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | label | string | 是 | 节点名称 |
 | enabled | boolean | 是 | 是否启用 |
-| assertions | array | 是 | 断言列表（见下方格式） |
-| script | string | 否 | JavaScript 断言脚本，可用 pm.test('描述', () => { pm.expect(...) }) |
+| assertions | array | 是 | 变量断言列表（见下方变量断言格式） |
+| script | string | 否 | 高级脚本断言，可用 pm.test/pm.expect，variables 对象可直接访问 |
 
 ## 9. parallel — 并行
 
@@ -202,17 +203,40 @@ conditionType 三种模式：
 
 ---
 
-# 三、断言格式（assertions 数组中的每一项）
+# 三、httpRequest 内置断言格式（httpRequest 节点的 assertions 数组）
+
+用于验证 HTTP 响应是否符合预期，每项包含：
 
 | 字段 | 说明 |
 |------|------|
 | type | 断言类型：'status'（状态码）/ 'json_path'（JSON 路径）/ 'header'（响应头）/ 'response_time'（响应时间）/ 'body_contains'（响应体包含） |
 | path | 当 type 为 json_path 时必填，如 "data.user.name" |
-| name | 当 type 为 header 时必填，如 "Content-Type" |
+| name | 当 type 为 header 时必填，如 "Content-Type"（大小写不敏感） |
 | operator | 比较方式：'equals' / 'not_equals' / 'exists' / 'not_exists' / 'contains' / 'not_contains' / 'greater_than' / 'less_than' |
 | expected | 期望值，如 200、"application/json"、true |
 
-# 四、提取器格式（extractors 数组中的每一项）
+# 四、assert 节点变量断言格式（assert 节点的 assertions 数组）
+
+用于验证流程变量是否符合预期，每项包含：
+
+| 字段 | 说明 |
+|------|------|
+| variable | 变量名，如 "token"、"server_ip"、"last_status" |
+| operator | 比较方式：'equals' / 'not_equals' / 'exists' / 'not_exists' / 'contains' / 'not_contains' / 'greater_than' / 'less_than' |
+| expected | 期望值（exists/not_exists 时不需要） |
+
+示例：
+\`\`\`json
+{
+  "assertions": [
+    { "variable": "token", "operator": "exists" },
+    { "variable": "last_status", "operator": "equals", "expected": "200" },
+    { "variable": "origin", "operator": "contains", "expected": "http" }
+  ]
+}
+\`\`\`
+
+# 五、提取器格式（extractors 数组中的每一项）
 
 | 字段 | 说明 |
 |------|------|
@@ -224,7 +248,7 @@ conditionType 三种模式：
 
 ---
 
-# 五、edges（连线）
+# 六、edges（连线）
 
 每条连线表示从一个节点到另一个节点的流向：
 - id: 唯一字符串
@@ -235,7 +259,7 @@ conditionType 三种模式：
 
 ---
 
-# 六、完整示例
+# 七、完整示例
 
 需求：调用登录接口获取 token，检查状态码，成功则用 token 获取用户信息并验证返回的用户名。
 
@@ -243,25 +267,25 @@ conditionType 三种模式：
 {
   "nodes": [
     { "id": "start-1", "type": "start", "position": {"x":0,"y":0}, "data": { "label": "开始", "enabled": true } },
-    { "id": "http-login", "type": "httpRequest", "position": {"x":0,"y":0}, "data": { "label": "用户登录", "enabled": true, "menuItemId": "login-api-id", "postScript": "if (pm.response.status === 200) { pm.variables.set('token', pm.response.json().data.token); }", "assertions": [{ "type": "status", "operator": "equals", "expected": 200 }] } },
-    { "id": "cond-1", "type": "condition", "position": {"x":0,"y":0}, "data": { "label": "登录是否成功", "enabled": true, "conditionType": "expression", "expression": "variables.token !== undefined" } },
+    { "id": "http-login", "type": "httpRequest", "position": {"x":0,"y":0}, "data": { "label": "用户登录", "enabled": true, "menuItemId": "login-api-id", "postScript": "var resp = pm.response.json(); if (resp.token) { pm.variables.set('token', resp.token); }", "assertions": [{ "type": "status", "operator": "equals", "expected": 200 }] } },
+    { "id": "assert-token", "type": "assert", "position": {"x":0,"y":0}, "data": { "label": "验证 token 已获取", "enabled": true, "assertions": [{ "variable": "token", "operator": "exists" }], "script": "pm.test('token 非空', function() { pm.expect(variables.token).toBeTruthy(); });" } },
     { "id": "http-user", "type": "httpRequest", "position": {"x":0,"y":0}, "data": { "label": "获取用户信息", "enabled": true, "menuItemId": "user-info-api-id", "requestOverride": { "headers": [{"name": "Authorization", "value": "Bearer {{token}}"}] }, "assertions": [{ "type": "json_path", "path": "data.username", "operator": "exists" }] } },
     { "id": "end-ok", "type": "end", "position": {"x":0,"y":0}, "data": { "label": "测试通过", "enabled": true } },
     { "id": "end-fail", "type": "end", "position": {"x":0,"y":0}, "data": { "label": "登录失败", "enabled": true } }
   ],
   "edges": [
     { "id": "e-1", "source": "start-1", "target": "http-login", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e-2", "source": "http-login", "target": "cond-1", "sourceHandle": "out", "targetHandle": "in" },
-    { "id": "e-3", "source": "cond-1", "target": "http-user", "sourceHandle": "true", "targetHandle": "in" },
-    { "id": "e-4", "source": "cond-1", "target": "end-fail", "sourceHandle": "false", "targetHandle": "in" },
-    { "id": "e-5", "source": "http-user", "target": "end-ok", "sourceHandle": "out", "targetHandle": "in" }
+    { "id": "e-2", "source": "http-login", "target": "assert-token", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e-3", "source": "assert-token", "target": "http-user", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e-4", "source": "http-user", "target": "end-ok", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e-5", "source": "http-login", "target": "end-fail", "sourceHandle": "out", "targetHandle": "in" }
   ]
 }
 \`\`\`
 
 ---
 
-# 七、用户需求
+# 八、用户需求
 
 请根据以下需求生成测试流程 JSON（只输出 JSON，不要其他内容）：
 `

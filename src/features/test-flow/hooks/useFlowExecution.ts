@@ -405,14 +405,28 @@ export function useFlowExecution() {
             if (!allAssertsPassed) {
               const failedAsserts = assertionResults.filter((a) => !a.passed)
               const details = failedAsserts.map((a) => {
-                const expected = a.assertion?.expected
+                const atn = a.assertion as Record<string, unknown> | undefined
+                const atype = (atn?.type as string) || '未知'
+                const path = atn?.path as string | undefined
+                const name = atn?.name as string | undefined
+                const op = (atn?.operator as string) || '?'
+                const expected = atn?.expected
                 const actual = a.actual
-                if (expected !== undefined && expected !== null) {
-                  return `预期: ${JSON.stringify(expected)}, 实际: ${JSON.stringify(actual)}`
+
+                // 构建标识：json_path:data.username / header:Content-Type / status
+                let target = atype
+                if (atype === 'json_path' && path) target = `json_path:${path}`
+                else if (atype === 'header' && name) target = `header:${name}`
+
+                // 构建详情
+                const expStr = expected !== undefined && expected !== null ? JSON.stringify(expected) : undefined
+                const actStr = actual !== undefined ? JSON.stringify(actual) : 'undefined'
+                if (expStr) {
+                  return `${target} ${op} 失败: 期望 ${expStr}, 实际 ${actStr}`
                 }
-                return a.error || `实际值: ${JSON.stringify(actual)}`
-              }).join('; ')
-              nodeErrors[nodeId] = `断言失败: ${details}`
+                return `${target} ${op} 失败: ${a.error || `实际 ${actStr}`}`
+              }).join('\n')
+              nodeErrors[nodeId] = details
             } else {
               delete nodeErrors[nodeId]
             }
@@ -495,11 +509,85 @@ export function useFlowExecution() {
           }
 
           case NT.Assert: {
-            // 独立断言节点 - 使用 __last_status__ 和 __last_response__
             const dur = Date.now() - startMs
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', '断言通过', { durationMs: dur })
-            nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
-            return { handleId: 'out' }
+            const script = nodeData.script as string | undefined
+            const failures: string[] = []
+
+            // 1. 执行变量断言规则
+            const varAssertions = nodeData.assertions as Array<{ variable?: string; operator?: string; expected?: string }> | undefined
+            if (varAssertions && varAssertions.length > 0) {
+              for (const rule of varAssertions) {
+                if (!rule.variable || !rule.operator) continue
+                const actual = variables[rule.variable]
+                const expected = rule.expected
+                const label = `${rule.variable} ${rule.operator}${expected ? ` ${expected}` : ''}`
+
+                switch (rule.operator) {
+                  case 'exists':
+                    if (actual === undefined) failures.push(`${label}: 变量不存在`)
+                    break
+                  case 'not_exists':
+                    if (actual !== undefined) failures.push(`${label}: 变量不应存在`)
+                    break
+                  case 'equals':
+                    if (actual !== expected) failures.push(`${label}: 实际值 "${actual}"`)
+                    break
+                  case 'not_equals':
+                    if (actual === expected) failures.push(`${label}: 不应等于`)
+                    break
+                  case 'contains':
+                    if (!actual || !String(actual).includes(expected || '')) failures.push(`${label}: 不包含`)
+                    break
+                  case 'not_contains':
+                    if (actual && String(actual).includes(expected || '')) failures.push(`${label}: 不应包含`)
+                    break
+                  case 'greater_than':
+                    if (actual === undefined || Number(actual) <= Number(expected)) failures.push(`${label}: 实际值 ${actual}`)
+                    break
+                  case 'less_than':
+                    if (actual === undefined || Number(actual) >= Number(expected)) failures.push(`${label}: 实际值 ${actual}`)
+                    break
+                }
+              }
+            }
+
+            // 2. 执行脚本断言
+            if (script && script.trim()) {
+              try {
+                const pm = {
+                  test: (name: string, fn: () => void) => {
+                    try { fn() } catch { failures.push(name) }
+                  },
+                  expect: (actual: unknown) => ({
+                    toBe: (expected: unknown) => { if (actual !== expected) throw new Error(`expected ${expected}, got ${actual}`) },
+                    toEqual: (expected: unknown) => { if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`not equal`) },
+                    toBeTruthy: () => { if (!actual) throw new Error(`expected truthy, got ${actual}`) },
+                    toBeDefined: () => { if (actual === undefined) throw new Error('expected defined') },
+                    toContain: (substr: string) => { if (typeof actual === 'string' && !actual.includes(substr)) throw new Error(`not contain ${substr}`) },
+                    toBeGreaterThan: (n: number) => { if (typeof actual === 'number' && actual <= n) throw new Error(`${actual} <= ${n}`) },
+                    toBeLessThan: (n: number) => { if (typeof actual === 'number' && actual >= n) throw new Error(`${actual} >= ${n}`) },
+                  }),
+                  variables: {
+                    get: (k: string) => variables[k],
+                    all: () => ({ ...variables }),
+                  },
+                }
+                const fn = new Function('pm', 'variables', script)
+                fn(pm, { ...variables })
+              } catch (err) {
+                failures.push(`脚本执行异常: ${err}`)
+              }
+            }
+
+            const allPassed = failures.length === 0
+            const status: NodeExecStatus = allPassed ? 'passed' : 'failed'
+            const msg = allPassed ? '断言通过' : `断言失败: ${failures.join('; ')}`
+
+            if (!allPassed) nodeErrors[nodeId] = msg
+            nodeDurations[nodeId] = dur
+            logs = addLog(logs, nodeId, nodeName, nodeType, status, msg, { durationMs: dur, variables: { ...variables } })
+            nodeStatuses = setNodeStatus(nodeStatuses, nodeId, status)
+            return allPassed ? { handleId: 'out' } : { error: true }
           }
 
           case NT.Parallel: {
