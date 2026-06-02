@@ -94,3 +94,16 @@ pub fn batch_delete_menu_items(db: State<Arc<Db>>, session_id: String, project_i
         Err(e) => e.into(),
     }
 }
+
+#[tauri::command]
+pub fn get_flow_prompt(db: State<Arc<Db>>, session_id: String, project_id: String) -> ApiResult<serde_json::Value> {
+    let _user = match check_project_access(&db, &session_id, &project_id) {
+        Ok(u) => u,
+        Err(e) => return e.into(),
+    };
+
+    match crate::services::prompt_builder::generate_flow_prompt(&db, &project_id) {
+        Ok(prompt) => ApiResult::success(serde_json::json!({ "prompt": prompt })),
+        Err(e) => crate::errors::AppError::Internal(e).into(),
+    }
+}

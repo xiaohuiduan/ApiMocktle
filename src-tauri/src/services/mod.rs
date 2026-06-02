@@ -4,3 +4,4 @@ pub mod auth_service;
 pub mod import_service;
 pub mod yapi_service;
 pub mod test_engine;
+pub mod prompt_builder;

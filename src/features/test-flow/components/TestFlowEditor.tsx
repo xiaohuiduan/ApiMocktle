@@ -237,7 +237,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
                   key: 'variables',
                   label: <span style={{ fontSize: 12 }}><Database size={12} style={{ marginRight: 4 }} />变量</span>,
                   children: (
-                    <div style={{ overflow: 'auto', flex: 1 }}>
+                    <div style={{ height: 'calc(100vh - 140px)', overflowY: 'auto' }}>
                       <VariablesPanel sources={variableSources} />
                     </div>
                   ),

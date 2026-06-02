@@ -71,6 +71,7 @@ pub fn run() {
             commands::menu_items::delete_menu_item,
             commands::menu_items::move_menu_items,
             commands::menu_items::batch_delete_menu_items,
+            commands::menu_items::get_flow_prompt,
             // Recycle
             commands::recycle::list_recycle_items,
             commands::recycle::restore_recycle_item,

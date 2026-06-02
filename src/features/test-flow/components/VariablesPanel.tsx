@@ -39,7 +39,7 @@ export default function VariablesPanel({ sources }: VariablesPanelProps) {
   }
 
   return (
-    <div style={{ padding: '4px 0' }}>
+    <div style={{ padding: '4px 0', overflowY: 'auto', maxHeight: '100%' }}>
       {entries.map(([key, src]) => (
         <div
           key={key}
