@@ -43,11 +43,10 @@ const PALETTE_NODES: PaletteNodeItem[] = [
 // ==================== 样式 ====================
 
 const panelClass = css`
-  width: 200px;
+  width: 100%;
   height: 100%;
   overflow-y: auto;
-  border-right: 1px solid #f0f0f0;
-  background: #fafafa;
+  background: transparent;
   padding: 8px;
 `
 

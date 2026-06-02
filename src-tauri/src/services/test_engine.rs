@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 use serde::{Deserialize, Serialize};
+use regex::Regex;
 
 use crate::db::{menu_repo, test_repo};
 use crate::db::client::Db;
@@ -492,16 +493,32 @@ impl TestEngine {
         Some(current.clone())
     }
 
-    /// Simple pattern extraction (supports basic capture groups)
+    /// Regex extraction — supports real regex patterns with capture groups.
+    /// If the pattern has a capture group, returns the first group match.
+    /// Otherwise returns the full match. Falls back to literal search if
+    /// the pattern is not valid regex.
     fn extract_with_pattern(text: &str, pattern: &str) -> Option<String> {
-        // For simplicity, just check if the pattern exists and return the matched part
-        // In a real implementation, we'd use a regex crate
-        if let Some(start) = text.find(pattern) {
-            Some(text[start..start + pattern.len()].to_string())
-        } else {
-            // Try to handle simple capture patterns like "token=(.+?)"
-            // For now, just return None for complex patterns
-            None
+        match Regex::new(pattern) {
+            Ok(re) => {
+                if let Some(caps) = re.captures(text) {
+                    // Prefer the first capture group if it exists
+                    if caps.len() > 1 {
+                        caps.get(1).map(|m| m.as_str().to_string())
+                    } else {
+                        caps.get(0).map(|m| m.as_str().to_string())
+                    }
+                } else {
+                    None
+                }
+            }
+            Err(_) => {
+                // Not valid regex — fall back to literal substring search
+                if let Some(start) = text.find(pattern) {
+                    Some(text[start..start + pattern.len()].to_string())
+                } else {
+                    None
+                }
+            }
         }
     }
 

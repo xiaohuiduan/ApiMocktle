@@ -56,7 +56,7 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
 
   // 判断是否需要显示 path 字段
   const shouldShowPath = (type: string) => {
-    return type === 'json_path' || type === 'regex'
+    return type === 'json_path'
   }
 
   // 判断是否需要显示 pattern 字段
@@ -106,11 +106,7 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
                     value={extractor.path || ''}
                     onChange={(e) => handleUpdate(index, 'path', e.target.value)}
                     size="small"
-                    placeholder={
-                      extractor.type === 'json_path'
-                        ? '$.data.token'
-                        : '正则表达式'
-                    }
+                    placeholder="data.token"
                     style={{ width: '65%' }}
                   />
                 )}

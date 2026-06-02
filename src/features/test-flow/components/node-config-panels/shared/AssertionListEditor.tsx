@@ -70,7 +70,12 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
 
   // 判断是否需要显示 path 字段
   const shouldShowPath = (type: string) => {
-    return type === 'json_path' || type === 'header'
+    return type === 'json_path'
+  }
+
+  // 判断是否需要显示 name 字段
+  const shouldShowName = (type: string) => {
+    return type === 'header'
   }
 
   // 判断是否需要显示 expected 字段
@@ -120,11 +125,16 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
                     value={assertion.path || ''}
                     onChange={(e) => handleUpdate(index, 'path', e.target.value)}
                     size="small"
-                    placeholder={
-                      assertion.type === 'json_path'
-                        ? '$.data.token'
-                        : 'Content-Type'
-                    }
+                    placeholder="data.token"
+                    style={{ width: '60%' }}
+                  />
+                )}
+                {shouldShowName(assertion.type) && (
+                  <Input
+                    value={assertion.name || ''}
+                    onChange={(e) => handleUpdate(index, 'name', e.target.value)}
+                    size="small"
+                    placeholder="Content-Type"
                     style={{ width: '60%' }}
                   />
                 )}

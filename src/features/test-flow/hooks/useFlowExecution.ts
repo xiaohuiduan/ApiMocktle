@@ -18,6 +18,15 @@ export interface FlowExecLog {
   variables?: Record<string, string>
 }
 
+export interface VariableSource {
+  value: string
+  source: string
+  sourceType: 'init' | 'setVariable' | 'postScript' | 'extractor' | 'loop' | 'system'
+  nodeId?: string
+  nodeName?: string
+  timestamp: number
+}
+
 export interface FlowExecState {
   status: 'idle' | 'running' | 'passed' | 'failed' | 'aborted'
   nodeStatuses: Record<string, NodeExecStatus>
@@ -27,6 +36,7 @@ export interface FlowExecState {
   nodeResponses: Record<string, Record<string, unknown>>
   logs: FlowExecLog[]
   variables: Record<string, string>
+  variableSources: Record<string, VariableSource>
   currentNodeId: string | null
   startTime?: number
   endTime?: number
@@ -54,6 +64,7 @@ export function useFlowExecution() {
     nodeResponses: {},
     logs: [],
     variables: {},
+    variableSources: {},
     currentNodeId: null,
   })
   const abortRef = useRef(false)
@@ -97,6 +108,7 @@ export function useFlowExecution() {
   ) => {
     abortRef.current = false
     const variables: Record<string, string> = { ...(initialVariables || {}) }
+    const variableSources: Record<string, VariableSource> = {}
     let nodeStatuses: Record<string, NodeExecStatus> = {}
     let nodeErrors: Record<string, string> = {}
     let nodeDurations: Record<string, number> = {}
@@ -104,6 +116,19 @@ export function useFlowExecution() {
     let nodeResponses: Record<string, Record<string, unknown>> = {}
     let logs: FlowExecLog[] = []
     const startTime = Date.now()
+
+    // 记录初始变量来源
+    if (initialVariables) {
+      for (const [k, v] of Object.entries(initialVariables)) {
+        variableSources[k] = { value: v, source: '环境变量', sourceType: 'init', timestamp: Date.now() }
+      }
+    }
+
+    // 记录变量来源的辅助函数
+    const recordVar = (key: string, value: string, source: string, sourceType: VariableSource['sourceType'], nodeId?: string, nodeName?: string) => {
+      variables[key] = value
+      variableSources[key] = { value, source, sourceType, nodeId, nodeName, timestamp: Date.now() }
+    }
 
     // 初始化所有节点为 idle
     for (const node of nodes) {
@@ -120,6 +145,7 @@ export function useFlowExecution() {
         nodeResponses: { ...nodeResponses },
         logs: [...logs],
         variables: { ...variables },
+        variableSources: { ...variableSources },
         currentNodeId: null,
         startTime,
         ...partial,
@@ -136,8 +162,13 @@ export function useFlowExecution() {
       const finalState: FlowExecState = {
         status: 'failed',
         nodeStatuses,
+        nodeErrors,
+        nodeDurations,
+        nodeRequests,
+        nodeResponses,
         logs: addLog(logs, '', '', NT.Start, 'error', '未找到 Start 节点'),
         variables,
+        variableSources,
         currentNodeId: null,
         startTime,
         endTime: Date.now(),
@@ -208,9 +239,12 @@ export function useFlowExecution() {
             const assignments = nodeData.assignments as Array<{ variable: string; operator: string; value: string }> || []
             for (const a of assignments) {
               const val = interpolate(a.value)
-              if (a.operator === '=') variables[a.variable] = val
-              else if (a.operator === '+=') variables[a.variable] = (variables[a.variable] || '') + val
-              else if (a.operator === '-=') variables[a.variable] = (variables[a.variable] || '').replace(val, '')
+              let newVal: string
+              if (a.operator === '=') newVal = val
+              else if (a.operator === '+=') newVal = (variables[a.variable] || '') + val
+              else if (a.operator === '-=') newVal = (variables[a.variable] || '').replace(val, '')
+              else continue
+              recordVar(a.variable, newVal, `赋值: ${a.operator} ${a.value}`, 'setVariable', nodeId, nodeName)
             }
             const dur = Date.now() - startMs
             logs = addLog(logs, nodeId, nodeName, nodeType, 'passed',
@@ -284,15 +318,15 @@ export function useFlowExecution() {
               nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
               nodeErrors[nodeId] = errMsg
               nodeDurations[nodeId] = dur
-              variables['__last_status__'] = '0'
-              variables['__last_error__'] = result.error || '未知错误'
+              recordVar('__last_status__', '0', '请求失败', 'system', nodeId, nodeName)
+              recordVar('__last_error__', result.error || '未知错误', '请求失败', 'system', nodeId, nodeName)
               return { handleId: 'out' }
             }
 
             const resp = result.data.response
             const status = resp.status
-            variables['__last_status__'] = String(status)
-            variables['__last_duration__'] = String(resp.responseTime)
+            recordVar('__last_status__', String(status), `HTTP ${status}`, 'system', nodeId, nodeName)
+            recordVar('__last_duration__', String(resp.responseTime), `响应时间`, 'system', nodeId, nodeName)
 
             // 存储请求/响应用于节点详情展示
             nodeRequests[nodeId] = result.data.request as Record<string, unknown>
@@ -315,7 +349,9 @@ export function useFlowExecution() {
                     body: resp.body,
                   },
                   variables: {
-                    set: (k: string, v: string) => { variables[k] = String(v) },
+                    set: (k: string, v: string) => {
+                      recordVar(k, String(v), `postScript`, 'postScript', nodeId, nodeName)
+                    },
                     get: (k: string) => variables[k],
                   },
                 }
@@ -347,7 +383,18 @@ export function useFlowExecution() {
                   },
                 )
                 if (extResult.ok && extResult.data) {
-                  Object.assign(variables, extResult.data.variables)
+                  const extractedVars = extResult.data.variables
+                  // 记录所有提取器的结果（包括未匹配的）
+                  for (const ext of extractors) {
+                    const varName = ext.variable as string
+                    const extType = (ext.type as string) || 'unknown'
+                    if (extractedVars[varName] !== undefined) {
+                      recordVar(varName, extractedVars[varName], `提取器 (${extType})`, 'extractor', nodeId, nodeName)
+                    } else {
+                      // 提取失败，记录空值
+                      recordVar(varName, '', `提取器 (${extType}) - 未匹配`, 'extractor', nodeId, nodeName)
+                    }
+                  }
                 }
               } catch { /* ignore extractor errors */ }
             }
@@ -467,6 +514,8 @@ export function useFlowExecution() {
               else if (op === 'equals') result = val === cv
               else if (op === 'not_equals') result = val !== cv
               else if (op === 'contains') result = (val || '').includes(cv || '')
+              else if (op === 'greater_than') result = val !== undefined && Number(val) > Number(cv)
+              else if (op === 'less_than') result = val !== undefined && Number(val) < Number(cv)
             }
 
             const handleId = result ? 'true' : 'false'
@@ -491,6 +540,7 @@ export function useFlowExecution() {
             for (let i = 0; i < actualCount; i++) {
               if (abortRef.current) break
               variables['__loop_index__'] = String(i)
+              variableSources['__loop_index__'] = { value: String(i), source: `循环索引 #${i}`, sourceType: 'loop', nodeId, nodeName, timestamp: Date.now() }
               logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `循环 #${i + 1}/${actualCount}`)
               updateState({})
 
@@ -597,10 +647,31 @@ export function useFlowExecution() {
 
             const branchPromises: Promise<void>[] = []
             for (let i = 0; i < branchCount; i++) {
-              const branchNodes = getNextNodes(nodeId, `branch-${i}`)
+              const branchIdx = i
+              const firstNodes = getNextNodes(nodeId, `branch-${i}`)
               branchPromises.push((async () => {
-                for (const bNode of branchNodes) {
-                  await executeNode(bNode)
+                // 从分支入口开始，沿 out 逐个执行整条链
+                let current = firstNodes[0]
+                while (current) {
+                  const branchResult = await executeNode(current)
+                  if (branchResult.error) {
+                    // 标记后续节点为 skipped
+                    const nextNodes = getNextNodes(current.id, branchResult.handleId || 'out')
+                    const failedName = (current.data as Record<string, unknown>)?.label as string || current.id
+                    const failedErr = nodeErrors[current.id] || '未知原因'
+                    const reason = `分支${branchIdx + 1}内「${failedName}」失败，后续跳过（${failedErr.substring(0, 60)}）`
+                    for (const nn of nextNodes) {
+                      if (nodeStatuses[nn.id] === 'idle') {
+                        nodeStatuses = setNodeStatus(nodeStatuses, nn.id, 'skipped')
+                        nodeErrors[nn.id] = reason
+                        logs = addLog(logs, nn.id, (nn.data as Record<string, unknown>)?.label as string || nn.id, nn.type as FlowNodeType, 'skipped', reason)
+                      }
+                    }
+                    break
+                  }
+                  // 查找分支内的下一个节点
+                  const next = getNextNodes(current.id, branchResult.handleId)
+                  current = next[0]
                 }
               })())
             }
@@ -644,10 +715,15 @@ export function useFlowExecution() {
       if (result.error || !result.handleId) {
         // 快速失败：标记后续所有未执行节点为 skipped
         if (failFast && result.error) {
+          const failedId = currentNode.id
+          const failedName = (currentNode.data as Record<string, unknown>)?.label as string || failedId
+          const failedErr = nodeErrors[failedId] || '未知原因'
+          const reason = `因「${failedName}」失败而跳过（${failedErr.substring(0, 80)}）`
           for (const n of nodes) {
             if (nodeStatuses[n.id] === 'idle') {
               nodeStatuses = setNodeStatus(nodeStatuses, n.id, 'skipped')
-              logs = addLog(logs, n.id, (n.data as Record<string, unknown>)?.label as string || n.id, n.type as FlowNodeType, 'skipped', '因前置节点失败而跳过')
+              nodeErrors[n.id] = reason
+              logs = addLog(logs, n.id, (n.data as Record<string, unknown>)?.label as string || n.id, n.type as FlowNodeType, 'skipped', reason)
             }
           }
         }
@@ -672,6 +748,7 @@ export function useFlowExecution() {
       nodeResponses,
       logs,
       variables: { ...variables },
+      variableSources: { ...variableSources },
       currentNodeId: null,
       startTime,
       endTime,
@@ -695,6 +772,7 @@ export function useFlowExecution() {
       nodeResponses: {},
       logs: [],
       variables: {},
+      variableSources: {},
       currentNodeId: null,
     })
   }, [])

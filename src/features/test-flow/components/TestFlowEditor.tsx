@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Modal, message } from 'antd'
+import { Modal, message, Tabs } from 'antd'
 import { invoke } from '@tauri-apps/api/core'
+import { Layers, Database } from 'lucide-react'
 import { useFlowStore } from '../store/useFlowStore'
 import { useFlowPersistence } from '../hooks/useFlowPersistence'
 import { FlowEditorContext } from '../contexts/FlowEditorContext'
 import { useAuth } from '@/contexts/auth'
 import type { FlowGraph, NodeExecStatus } from '../types/flow.types'
+import type { VariableSource } from '../hooks/useFlowExecution'
 import FlowToolbar from './FlowToolbar'
 import NodePalette from './NodePalette'
+import VariablesPanel from './VariablesPanel'
 import FlowCanvas from './FlowCanvas'
 import NodeConfigDrawer from './NodeConfigDrawer'
 import ImportFlowModal from './ImportFlowModal'
@@ -50,6 +53,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [runModalOpen, setRunModalOpen] = useState(false)
   const [environments, setEnvironments] = useState<Environment[]>([])
+  const [variableSources, setVariableSources] = useState<Record<string, VariableSource>>({})
 
   // 计算撤销/重做可用状态
   const canUndo = historyIndex >= 0
@@ -185,6 +189,11 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
     }))
   }, [])
 
+  // 运行完成后保存变量来源
+  const handleRunComplete = useCallback((sources: Record<string, VariableSource>) => {
+    setVariableSources(sources)
+  }, [])
+
   // 初始加载
   useEffect(() => {
     loadFlow()
@@ -211,8 +220,31 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
         />
 
         <div className="flex flex-1 overflow-hidden">
-          {/* 左侧节点面板 */}
-          <NodePalette />
+          {/* 左侧面板：节点 + 变量 Tab */}
+          <div style={{ width: 200, height: '100%', borderRight: '1px solid #f0f0f0', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
+            <Tabs
+              size="small"
+              defaultActiveKey="nodes"
+              style={{ flex: 1, overflow: 'hidden' }}
+              tabBarStyle={{ margin: 0, paddingLeft: 8, minHeight: 32 }}
+              items={[
+                {
+                  key: 'nodes',
+                  label: <span style={{ fontSize: 12 }}><Layers size={12} style={{ marginRight: 4 }} />节点</span>,
+                  children: <NodePalette />,
+                },
+                {
+                  key: 'variables',
+                  label: <span style={{ fontSize: 12 }}><Database size={12} style={{ marginRight: 4 }} />变量</span>,
+                  children: (
+                    <div style={{ overflow: 'auto', flex: 1 }}>
+                      <VariablesPanel sources={variableSources} />
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          </div>
 
           {/* 中间画布 */}
           <div className="flex-1 h-full min-h-0">
@@ -236,6 +268,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
         projectId={projectId}
         environments={environments}
         onNodeStatusChange={handleNodeStatusChange}
+        onRunComplete={handleRunComplete}
       />
 
       {/* 导入弹窗 */}

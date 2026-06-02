@@ -223,20 +223,23 @@ function BaseNodeInner({
           </span>
         )}
         {/* 执行结果摘要 */}
-        {execStatus && execStatus !== 'idle' && execStatus !== 'running' && (
+        {execStatus && execStatus !== 'idle' && (
           <span
             style={{
               fontSize: 10,
-              color: (execStatus === 'passed') ? '#16a34a' : '#dc2626',
+              color: execStatus === 'passed' ? '#16a34a' : execStatus === 'skipped' ? '#9ca3af' : '#dc2626',
               lineHeight: 1.3,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}
+            title={execError || execStatus}
           >
             {execStatus === 'passed' && execDurationMs !== undefined && `${execDurationMs}ms`}
             {execStatus === 'passed' && !execDurationMs && execError}
             {(execStatus === 'failed' || execStatus === 'error') && (execError || '执行失败')}
+            {execStatus === 'skipped' && (execError || '已跳过（无详细原因）')}
+            {execStatus === 'running' && '执行中...'}
           </span>
         )}
       </div>

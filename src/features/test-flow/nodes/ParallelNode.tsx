@@ -7,10 +7,13 @@ function ParallelNodeInner({ id, data, type }: NodeProps<FlowNode>) {
   const branchCount = ((data as Record<string, unknown>).branchCount as number) ?? 2
 
   const outputHandles = useMemo((): HandleSpec[] => {
-    return Array.from({ length: branchCount }, (_, i) => ({
-      id: `branch-${i}`,
-      label: `#${i + 1}`,
-    }))
+    return [
+      ...Array.from({ length: branchCount }, (_, i) => ({
+        id: `branch-${i}`,
+        label: `#${i + 1}`,
+      })),
+      { id: 'out', label: '续' },
+    ]
   }, [branchCount])
 
   const summary = `${branchCount} 并行分支`

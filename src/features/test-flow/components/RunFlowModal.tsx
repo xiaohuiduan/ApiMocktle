@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Modal, Select, Button, Space, Typography, Tag, Divider, Switch, Collapse } from 'antd'
+import { Modal, Select, Button, Space, Typography, Tag, Divider, Switch } from 'antd'
 import { Play, Square, CheckCircle, XCircle, Clock, AlertTriangle, SkipForward } from 'lucide-react'
 import { css } from '@emotion/css'
 import type { FlowNode, FlowEdge, FlowNodeType, NodeExecStatus } from '../types/flow.types'
 import { FlowNodeType as NT } from '../types/flow.types'
-import { useFlowExecution, type FlowExecLog, type FlowExecState } from '../hooks/useFlowExecution'
+import { useFlowExecution, type FlowExecLog, type FlowExecState, type VariableSource } from '../hooks/useFlowExecution'
+
+export type { VariableSource }
 
 const { Text } = Typography
 
@@ -76,6 +78,7 @@ interface RunFlowModalProps {
     execRequest?: Record<string, unknown>
     execResponse?: Record<string, unknown>
   }) => void
+  onRunComplete?: (variableSources: Record<string, VariableSource>) => void
 }
 
 export default function RunFlowModal({
@@ -86,6 +89,7 @@ export default function RunFlowModal({
   projectId,
   environments = [],
   onNodeStatusChange,
+  onRunComplete,
 }: RunFlowModalProps) {
   const [selectedEnv, setSelectedEnv] = useState<string>('')
   const [failFast, setFailFast] = useState(true)
@@ -132,7 +136,12 @@ export default function RunFlowModal({
         })
       }
     }
-  }, [nodes, edges, projectId, selectedEnv, environments, executeFlow, onNodeStatusChange])
+
+    // 传出变量来源数据
+    if (onRunComplete && result) {
+      onRunComplete(result.variableSources)
+    }
+  }, [nodes, edges, projectId, selectedEnv, environments, executeFlow, onNodeStatusChange, onRunComplete])
 
   const handleClose = useCallback(() => {
     if (state.status === 'running') {

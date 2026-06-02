@@ -14,7 +14,7 @@ export function getOutputHandleIds(type: FlowNodeType, data: FlowNodeData): stri
     }
     case FlowNodeType.Parallel: {
       const count = (data as any).branchCount ?? 2
-      return Array.from({ length: count }, (_, i) => `branch-${i}`)
+      return [...Array.from({ length: count }, (_, i) => `branch-${i}`), 'out']
     }
     case FlowNodeType.Loop:
       return ['out', 'loop']
