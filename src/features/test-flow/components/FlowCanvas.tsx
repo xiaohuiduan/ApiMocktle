@@ -17,7 +17,7 @@ import '@xyflow/react/dist/style.css'
 import { useFlowStore } from '../store/useFlowStore'
 import { getNodeTypes, getDefaultNodeData } from '../nodes/nodeRegistry'
 import { FlowNodeType, type FlowNode, type FlowEdge } from '../types/flow.types'
-import { FlowInstanceContext } from '../contexts/FlowInstanceContext'
+import { FlowInstanceContext, globalFlowInstanceRef } from '../contexts/FlowInstanceContext'
 
 // ==================== 内层画布组件 ====================
 // 使用 useReactFlow() 的组件必须在 ReactFlowProvider 内部
@@ -30,7 +30,8 @@ function FlowCanvasInner() {
   // 暴露 ReactFlow 实例给外部
   useEffect(() => {
     flowInstanceRef.current = reactFlow
-    return () => { flowInstanceRef.current = null }
+    globalFlowInstanceRef.current = reactFlow
+    return () => { flowInstanceRef.current = null; globalFlowInstanceRef.current = null }
   }, [reactFlow, flowInstanceRef])
   const nodes = useFlowStore((s) => s.nodes)
   const edges = useFlowStore((s) => s.edges)
@@ -272,10 +273,27 @@ function FlowCanvasInner() {
       style={{ width: '100%', height: '100%' }}
       data-testid="flow-canvas"
     >
-      {/* 选中节点高亮样式 */}
+      {/* 节点高亮样式 */}
       <style>{`
         .react-flow__node.selected {
           box-shadow: 0 0 0 2px #3b82f6 !important;
+          border-radius: 8px;
+        }
+        @keyframes node-running-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+          50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+        }
+        .react-flow__node[data-exec-status="running"] {
+          animation: node-running-pulse 1.5s ease-in-out infinite;
+          border-radius: 8px;
+        }
+        .react-flow__node[data-exec-status="passed"] {
+          box-shadow: 0 0 0 2px #22c55e !important;
+          border-radius: 8px;
+        }
+        .react-flow__node[data-exec-status="failed"],
+        .react-flow__node[data-exec-status="error"] {
+          box-shadow: 0 0 0 2px #ef4444 !important;
           border-radius: 8px;
         }
       `}</style>

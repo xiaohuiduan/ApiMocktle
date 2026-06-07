@@ -21,7 +21,7 @@ export interface FlowExecLog {
 export interface VariableSource {
   value: string
   source: string
-  sourceType: 'init' | 'setVariable' | 'postScript' | 'extractor' | 'loop' | 'system'
+  sourceType: 'init' | 'setVariable' | 'preScript' | 'postScript' | 'extractor' | 'loop' | 'system'
   nodeId?: string
   nodeName?: string
   timestamp: number
@@ -177,8 +177,8 @@ export function useFlowExecution() {
       return finalState
     }
 
-    // 获取节点的后继节点
-    const getNextNodes = (nodeId: string, handleId?: string): FlowNode[] => {
+    // 获取节点的后继节点（executeGraph 会临时替换为子流程的版本）
+    let getNextNodes = (nodeId: string, handleId?: string): FlowNode[] => {
       return edges
         .filter((e) => e.source === nodeId && (!handleId || e.sourceHandle === handleId))
         .map((e) => nodes.find((n) => n.id === e.target))
@@ -256,6 +256,69 @@ export function useFlowExecution() {
 
           case NT.Wait: {
             const waitType = nodeData.waitType as string
+            if (waitType === 'condition') {
+              const conditionExpr = nodeData.conditionExpression as string
+              const pollInterval = (nodeData.pollIntervalMs as number) || 1000
+              const maxWait = (nodeData.maxWaitMs as number) || 30000
+              const waitStart = Date.now()
+
+              if (!conditionExpr) {
+                const errMsg = '条件等待缺少表达式'
+                logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
+                nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+                nodeErrors[nodeId] = errMsg
+                return { error: true }
+              }
+
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `条件等待: 轮询 ${pollInterval}ms, 超时 ${maxWait}ms`)
+              updateState({})
+
+              let conditionMet = false
+              while (!conditionMet && !abortRef.current) {
+                const elapsed = Date.now() - waitStart
+                if (elapsed >= maxWait) {
+                  const errMsg = `条件等待超时 (${maxWait}ms)`
+                  const dur = Date.now() - startMs
+                  logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg, { durationMs: dur })
+                  nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+                  nodeErrors[nodeId] = errMsg
+                  nodeDurations[nodeId] = dur
+                  return { error: true }
+                }
+
+                try {
+                  const fn = new Function('variables', `return !!(${conditionExpr})`)
+                  conditionMet = fn(variables)
+                } catch (err) {
+                  const errMsg = `条件表达式求值失败: ${err}`
+                  const dur = Date.now() - startMs
+                  logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg, { durationMs: dur })
+                  nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+                  nodeErrors[nodeId] = errMsg
+                  nodeDurations[nodeId] = dur
+                  return { error: true }
+                }
+
+                if (!conditionMet) {
+                  await new Promise((r) => setTimeout(r, pollInterval))
+                }
+              }
+
+              if (!conditionMet) {
+                // 被中止（abortRef）
+                const dur = Date.now() - startMs
+                logs = addLog(logs, nodeId, nodeName, nodeType, 'skipped', `条件等待被中止`, { durationMs: dur })
+                nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'skipped')
+                nodeDurations[nodeId] = dur
+                return { error: true }
+              }
+
+              const dur = Date.now() - startMs
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', `条件满足 (${dur}ms)`, { durationMs: dur })
+              nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
+              return { handleId: 'out' }
+            }
+
             let waitMs = 1000
             if (waitType === 'fixed') waitMs = (nodeData.durationMs as number) || 1000
             else if (waitType === 'variable') {
@@ -284,6 +347,33 @@ export function useFlowExecution() {
             // 处理 requestOverride 中的变量替换
             let override = nodeData.requestOverride as Record<string, unknown> | undefined
             if (override) override = interpolateObj(override)
+
+            // 运行 preScript（请求发送前）
+            const preScript = nodeData.preScript as string | undefined
+            if (preScript) {
+              try {
+                // preScript 可以直接修改 override（生效于后续请求），也可以通过 variables.set 写变量
+                const requestProxy = override || {}
+                const prePmContext = {
+                  request: requestProxy,
+                  variables: {
+                    set: (k: string, v: string) => {
+                      recordVar(k, String(v), 'preScript', 'preScript', nodeId, nodeName)
+                    },
+                    get: (k: string) => variables[k],
+                  },
+                }
+                const fn = new Function('pm', preScript)
+                fn(prePmContext)
+                // 将 preScript 修改后的 requestProxy 赋回 override
+                if (!override && Object.keys(requestProxy).length > 0) {
+                  override = requestProxy
+                }
+              } catch (err) {
+                logs = addLog(logs, nodeId, nodeName, nodeType, 'error',
+                  `preScript 执行失败: ${err}`)
+              }
+            }
 
             // 检查是否有 base_url（相对路径需要）
             if (!baseUrl) {
@@ -527,33 +617,123 @@ export function useFlowExecution() {
           }
 
           case NT.Loop: {
-            // 简单实现：根据 loopType 确定循环次数
             const loopType = nodeData.loopType as string
-            const count = loopType === 'count' ? (Number(nodeData.count) || 3) : 3
             const maxIter = (nodeData.maxIterations as number) || 100
-            const actualCount = Math.min(count, maxIter)
 
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `循环 ${actualCount} 次`)
+            // 根据循环类型确定迭代
+            let iterations: unknown[] = []
+            if (loopType === 'while') {
+              const whileExpr = nodeData.whileExpression as string
+              if (!whileExpr) {
+                const errMsg = 'while 循环缺少条件表达式'
+                logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
+                nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+                nodeErrors[nodeId] = errMsg
+                return { error: true }
+              }
+              // while 循环的迭代次数在运行时确定，用占位数组
+              iterations = new Array(maxIter).fill(null)
+            } else if (loopType === 'for_each') {
+              const collVar = nodeData.collectionVariable as string
+              if (!collVar || variables[collVar] === undefined) {
+                const errMsg = `for_each 循环: 变量 ${collVar || '(未设置)'} 不存在`
+                logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
+                nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+                nodeErrors[nodeId] = errMsg
+                return { error: true }
+              }
+              try {
+                const parsed = JSON.parse(variables[collVar])
+                if (!Array.isArray(parsed)) throw new Error('变量值不是数组')
+                iterations = parsed.slice(0, maxIter)
+              } catch (err) {
+                const errMsg = `for_each 循环: 解析变量 ${collVar} 失败 - ${err}`
+                logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
+                nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+                nodeErrors[nodeId] = errMsg
+                return { error: true }
+              }
+            } else {
+              // count 类型：支持 {{variable}} 插值
+              let countVal = nodeData.count as number | string | undefined
+              if (typeof countVal === 'string') countVal = Number(interpolate(countVal))
+              const count = Number(countVal) || 3
+              iterations = new Array(Math.min(count, maxIter)).fill(null)
+            }
+
+            const totalIter = iterations.length
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `循环 ${loopType === 'while' ? '(while)' : totalIter} 次`)
             updateState({})
 
-            // 执行循环体
-            for (let i = 0; i < actualCount; i++) {
+            let loopBroken = false
+            const breakOnFailure = nodeData.breakOnFailure !== false // 默认 true
+            for (let i = 0; i < iterations.length; i++) {
               if (abortRef.current) break
+
+              // while 循环：每次迭代前检查条件
+              if (loopType === 'while') {
+                try {
+                  const fn = new Function('variables', `return !!(${nodeData.whileExpression})`)
+                  if (!fn(variables)) {
+                    logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `while 条件不满足，在第 ${i} 次迭代后退出`)
+                    break
+                  }
+                } catch (err) {
+                  const errMsg = `while 条件求值失败: ${err}`
+                  logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
+                  nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+                  nodeErrors[nodeId] = errMsg
+                  loopBroken = true
+                  break
+                }
+              }
+
               variables['__loop_index__'] = String(i)
               variableSources['__loop_index__'] = { value: String(i), source: `循环索引 #${i}`, sourceType: 'loop', nodeId, nodeName, timestamp: Date.now() }
-              logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `循环 #${i + 1}/${actualCount}`)
+
+              // for_each: 设置迭代变量
+              if (loopType === 'for_each') {
+                const iterVar = nodeData.iteratorVariable as string
+                if (!iterVar) {
+                  const errMsg = 'for_each 循环缺少迭代变量名 (iteratorVariable)'
+                  logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
+                  nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+                  nodeErrors[nodeId] = errMsg
+                  return { error: true }
+                }
+                const item = iterations[i]
+                const itemStr = typeof item === 'string' ? item : JSON.stringify(item)
+                recordVar(iterVar, itemStr, `forEach #${i}`, 'loop', nodeId, nodeName)
+              }
+
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `循环 #${i + 1}${loopType === 'while' ? '' : '/' + totalIter}`)
               updateState({})
 
-              // 执行循环体节点
               const loopBodyNodes = getNextNodes(nodeId, 'loop')
               for (const bodyNode of loopBodyNodes) {
                 const bodyResult = await executeNode(bodyNode)
-                if (bodyResult.error) break
+                if (bodyResult.error) {
+                  if (breakOnFailure) {
+                    loopBroken = true
+                    break
+                  }
+                  // 不中断：记录错误日志但继续下一次迭代
+                  logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `迭代 #${i + 1} 中有节点失败，继续执行`)
+                }
               }
+              if (loopBroken) break
             }
 
             const dur = Date.now() - startMs
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', `循环完成 (${actualCount} 次)`, { durationMs: dur })
+            if (loopBroken) {
+              // 循环因失败中断：如果还没有设置 error 状态（如循环体失败而非 while 条件失败），设置之
+              if (nodeStatuses[nodeId] !== 'error') {
+                logs = addLog(logs, nodeId, nodeName, nodeType, 'error', `循环因执行失败而中断`, { durationMs: dur })
+                nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+              }
+              return { error: true }
+            }
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', `循环完成 (${loopType})`, { durationMs: dur })
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
             return { handleId: 'out' }
           }
@@ -689,6 +869,79 @@ export function useFlowExecution() {
             return { handleId: 'out' }
           }
 
+          case NT.SubFlow: {
+            const targetTaskId = nodeData.targetTaskId as string
+            if (!targetTaskId) {
+              const errMsg = '子流程节点缺少目标任务 ID'
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
+              nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+              nodeErrors[nodeId] = errMsg
+              return { error: true }
+            }
+
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `加载子流程 (${targetTaskId})...`)
+            updateState({})
+
+            // 加载子流程图
+            let subFlowGraph: { nodes: FlowNode[]; edges: FlowEdge[] }
+            try {
+              const res = await invoke<{ ok: boolean; data?: string }>('load_test_flow_graph', { taskId: targetTaskId })
+              if (!res.ok || !res.data) throw new Error('加载失败')
+              subFlowGraph = JSON.parse(res.data)
+            } catch (err) {
+              const errMsg = `加载子流程失败: ${err}`
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
+              nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+              nodeErrors[nodeId] = errMsg
+              return { error: true }
+            }
+
+            // 准备子流程变量
+            const passVars = nodeData.passVariables !== false
+            const mergeVars = nodeData.mergeVariables !== false
+            const preVarKeys = new Set(Object.keys(variables))
+
+            const subResult = await executeGraph(
+              subFlowGraph.nodes, subFlowGraph.edges,
+              passVars ? { ...variables } : {},
+            )
+
+            // 恢复当前作用域的节点状态（executeGraph 内部 mutate 了闭包变量）
+            for (const n of subFlowGraph.nodes) {
+              delete nodeStatuses[n.id]
+              delete nodeErrors[n.id]
+              delete nodeDurations[n.id]
+            }
+
+            // 检查子流程失败
+            const subFailed = Object.entries(subResult.nodeStatuses)
+              .find(([, s]) => s === 'failed' || s === 'error')
+            if (subFailed) {
+              const [failId, failStatus] = subFailed
+              const failErr = subResult.nodeErrors[failId] || '未知原因'
+              const failNodeName = subResult.variables.__subflow_fail_name || failId
+              const errMsg = `子流程失败: ${failNodeName} (${failStatus}) - ${failErr.substring(0, 100)}`
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
+              nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
+              nodeErrors[nodeId] = errMsg
+              return { error: true }
+            }
+
+            // 合并子流程变量
+            if (mergeVars) {
+              for (const [k, v] of Object.entries(subResult.variables)) {
+                if (!preVarKeys.has(k) || variables[k] !== v) {
+                  recordVar(k, v, '子流程', 'setVariable', nodeId, nodeName)
+                }
+              }
+            }
+
+            const dur = Date.now() - startMs
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', `子流程完成`, { durationMs: dur })
+            nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
+            return { handleId: 'out' }
+          }
+
           default: {
             logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', `跳过 (${nodeType})`)
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
@@ -703,6 +956,95 @@ export function useFlowExecution() {
         nodeErrors[nodeId] = errMsg
         nodeDurations[nodeId] = dur
         return { error: true }
+      }
+    }
+
+    // 子流程执行辅助（复用 executeNode 闭包，独立变量作用域）
+    interface ExecGraphResult {
+      nodeStatuses: Record<string, NodeExecStatus>
+      nodeErrors: Record<string, string>
+      nodeDurations: Record<string, number>
+      logs: FlowExecLog[]
+      variables: Record<string, string>
+      variableSources: Record<string, VariableSource>
+    }
+
+    const executeGraph = async (
+      graphNodes: FlowNode[],
+      graphEdges: FlowEdge[],
+      initVars: Record<string, string>,
+    ): Promise<ExecGraphResult> => {
+      // 快照父作用域
+      const savedVars = { ...variables }
+      const savedSources = { ...variableSources }
+      const savedStatuses = { ...nodeStatuses }
+      const savedErrors = { ...nodeErrors }
+      const savedDurations = { ...nodeDurations }
+      const savedLogs = [...logs]
+
+      // 初始化子流程变量
+      Object.keys(variables).forEach(k => delete variables[k])
+      Object.assign(variables, initVars)
+      Object.keys(variableSources).forEach(k => delete variableSources[k])
+      for (const n of graphNodes) nodeStatuses[n.id] = 'idle'
+      logs = []
+
+      // 子流程的后继节点查找
+      const getSubNext = (nid: string, hid?: string): FlowNode[] =>
+        graphEdges.filter((e) => e.source === nid && (!hid || e.sourceHandle === hid))
+          .map((e) => graphNodes.find((n) => n.id === e.target))
+          .filter((n): n is FlowNode => n !== undefined)
+
+      // 临时替换 getNextNodes 为子流程版本
+      const origGetNextNodes = getNextNodes
+      getNextNodes = getSubNext
+
+      // 遍历执行
+      const subStart = graphNodes.find((n) => n.type === NT.Start)
+      let subCurrent: FlowNode | undefined = subStart
+      while (subCurrent && !abortRef.current) {
+        const subResult = await executeNode(subCurrent)
+        if (subResult.error || !subResult.handleId) break
+        const nextNodes = getSubNext(subCurrent.id, subResult.handleId)
+        subCurrent = nextNodes[0]
+      }
+
+      // 恢复 getNextNodes
+      getNextNodes = origGetNextNodes
+
+      // 收集子流程结果
+      const resultStatuses: Record<string, NodeExecStatus> = {}
+      const resultErrors: Record<string, string> = {}
+      const resultDurations: Record<string, number> = {}
+      for (const n of graphNodes) {
+        resultStatuses[n.id] = nodeStatuses[n.id] || 'idle'
+        if (nodeErrors[n.id]) resultErrors[n.id] = nodeErrors[n.id]
+        if (nodeDurations[n.id]) resultDurations[n.id] = nodeDurations[n.id]
+      }
+      const resultVars = { ...variables }
+      const resultSources = { ...variableSources }
+      const resultLogs = [...logs]
+
+      // 恢复父作用域
+      Object.keys(variables).forEach(k => delete variables[k])
+      Object.assign(variables, savedVars)
+      Object.keys(variableSources).forEach(k => delete variableSources[k])
+      Object.assign(variableSources, savedSources)
+      Object.keys(nodeStatuses).forEach(k => delete nodeStatuses[k])
+      Object.assign(nodeStatuses, savedStatuses)
+      Object.keys(nodeErrors).forEach(k => delete nodeErrors[k])
+      Object.assign(nodeErrors, savedErrors)
+      Object.keys(nodeDurations).forEach(k => delete nodeDurations[k])
+      Object.assign(nodeDurations, savedDurations)
+      logs = savedLogs
+
+      return {
+        nodeStatuses: resultStatuses,
+        nodeErrors: resultErrors,
+        nodeDurations: resultDurations,
+        logs: resultLogs,
+        variables: resultVars,
+        variableSources: resultSources,
       }
     }
 

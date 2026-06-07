@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { Radio, InputNumber, Input, Typography } from 'antd'
+import { Radio, InputNumber, Input, Typography, Switch } from 'antd'
 import type { PanelProps } from './shared/panelRegistry'
 import type { LoopNodeData } from '../../types/flow.types'
 
@@ -60,6 +60,14 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
   const handleMaxIterationsChange = useCallback(
     (value: number | null) => {
       onChange({ maxIterations: value || 100 })
+    },
+    [onChange],
+  )
+
+  // 更新失败中断策略
+  const handleBreakOnFailureChange = useCallback(
+    (checked: boolean) => {
+      onChange({ breakOnFailure: checked })
     },
     [onChange],
   )
@@ -170,6 +178,19 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
           size="small"
           style={{ width: '100%' }}
           data-testid="loop-max-iterations"
+        />
+      </div>
+
+      {/* 失败策略 */}
+      <div className="flex items-center justify-between">
+        <Text type="secondary" className="text-xs">
+          循环体失败时中断
+        </Text>
+        <Switch
+          size="small"
+          checked={data.breakOnFailure !== false}
+          onChange={handleBreakOnFailureChange}
+          data-testid="loop-break-on-failure"
         />
       </div>
     </div>

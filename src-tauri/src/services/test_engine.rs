@@ -207,8 +207,8 @@ impl TestEngine {
                         h.get("name").and_then(|v: &serde_json::Value| v.as_str()),
                         h.get("value").and_then(|v: &serde_json::Value| v.as_str()),
                     ) {
-                        // Replace if exists, otherwise push
-                        if let Some(existing) = headers.iter_mut().find(|x| x.name == name) {
+                        // Replace if exists, otherwise push（大小写不敏感）
+                        if let Some(existing) = headers.iter_mut().find(|x| x.name.to_lowercase() == name.to_lowercase()) {
                             existing.value = value.to_string();
                         } else {
                             headers.push(RunRequestHeader {
@@ -390,7 +390,7 @@ impl TestEngine {
                 }
                 "header" => {
                     if let Some(name) = &extractor.name {
-                        if let Some(value) = response_headers.get(name) {
+                        if let Some(value) = response_headers.get(&name.to_lowercase()) {
                             extracted_vars.insert(extractor.variable.clone(), value.clone());
                             ExtractorResult {
                                 extractor: extractor.clone(),
@@ -590,11 +590,7 @@ impl TestEngine {
                 }
                 "header" => {
                     if let Some(name) = &assertion.name {
-                        // HTTP header 查找大小写不敏感
-                        let name_lower = name.to_lowercase();
-                        let actual_value = response_headers.get(&name_lower)
-                            .or_else(|| response_headers.get(name));
-                        if let Some(actual_value) = actual_value {
+                        if let Some(actual_value) = response_headers.get(&name.to_lowercase()) {
                             let actual = serde_json::json!(actual_value);
                             let actual_clone = actual.clone();
                             Self::compare_values(&actual, &assertion.operator, assertion.expected.as_ref())
@@ -838,11 +834,11 @@ pub async fn send_http_request(payload: &RunRequestPayload) -> Result<serde_json
     let status_code = response.status().as_u16() as i32;
     let duration_ms = start.elapsed().as_millis() as i64;
 
-    // Response headers as key-value map (for extractors/assertions which expect HashMap)
+    // Response headers as key-value map（key 统一小写，HTTP headers 大小写不敏感）
     let response_headers: std::collections::HashMap<String, String> = response
         .headers()
         .iter()
-        .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+        .map(|(k, v)| (k.to_string().to_lowercase(), v.to_str().unwrap_or("").to_string()))
         .collect();
 
     let response_body = response.text().await.unwrap_or_default();
@@ -1074,7 +1070,7 @@ pub async fn execute_task_full(
             .and_then(|h| h.as_object())
             .map(|obj| {
                 obj.iter()
-                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .filter_map(|(k, v)| v.as_str().map(|s| (k.to_lowercase(), s.to_string())))
                     .collect()
             })
             .unwrap_or_default();

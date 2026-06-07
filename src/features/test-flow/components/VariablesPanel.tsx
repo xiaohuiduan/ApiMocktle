@@ -6,6 +6,7 @@ import type { VariableSource } from '../hooks/useFlowExecution'
 const SOURCE_TYPE_LABELS: Record<VariableSource['sourceType'], string> = {
   init: '环境',
   setVariable: '赋值节点',
+  preScript: '前置脚本',
   postScript: '后置脚本',
   extractor: '提取器',
   loop: '循环',
@@ -15,6 +16,7 @@ const SOURCE_TYPE_LABELS: Record<VariableSource['sourceType'], string> = {
 const SOURCE_TYPE_COLORS: Record<VariableSource['sourceType'], string> = {
   init: '#8b5cf6',
   setVariable: '#3b82f6',
+  preScript: '#ec4899',
   postScript: '#f59e0b',
   extractor: '#10b981',
   loop: '#6366f1',

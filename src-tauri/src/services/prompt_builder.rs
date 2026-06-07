@@ -406,6 +406,7 @@ const PROMPT_TEMPLATE: &str = r#"你是一个测试流程设计专家。你的�
 | enabled | boolean | 是 | 是否启用 |
 | menuItemId | string | 是 | 引用上方 API 列表中的接口 id |
 | requestOverride | object | 否 | 覆盖请求参数，各字段均可选，值中可用 `{{变量名}}` |
+| preScript | string | 否 | 请求发送**前**执行的 JS 脚本，可修改请求参数、设置变量 |
 | postScript | string | 否 | 请求完成后执行的 JS 脚本，可读取响应、设置变量 |
 | assertions | array | 否 | 断言列表，验证响应是否符合预期 |
 | extractors | array | 否 | 提取器列表，从响应中提取数据到变量 |
@@ -428,7 +429,12 @@ postScript 中可用的 API：
 - `pm.variables.set('变量名', 值)` — 保存变量，后续节点用 `{{变量名}}` 引用
 - `pm.variables.get('变量名')` — 读取变量
 
-执行顺序：发送请求 → postScript → extractors → assertions
+preScript 中可用的 API：
+- `pm.request` — 请求参数对象（可直接修改 headers、body 等字段，修改会生效于实际请求）
+- `pm.variables.set('变量名', 值)` — 保存变量
+- `pm.variables.get('变量名')` — 读取变量
+
+执行顺序：preScript → 发送请求 → postScript → extractors → assertions
 
 ## 4. condition — 条件判断
 
@@ -460,15 +466,25 @@ variable_check 支持的 operator：
 
 ## 5. loop — 循环
 
-作用：重复执行一组节点，支持固定次数循环。
+作用：重复执行一组节点，支持固定次数、while 条件、for_each 遍历三种模式。
 输入：in | 输出：out（循环结束后走这里）, loop（循环体，连接要重复执行的节点）
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | label | string | 是 | 节点名称 |
 | enabled | boolean | 是 | 是否启用 |
-| count | number | 是 | 循环次数，如 3、10 |
+| loopType | string | 是 | 循环类型：`count` / `while` / `for_each` |
+| count | number/string | count 时必填 | 循环次数，支持 `{{变量名}}` 插值 |
+| whileExpression | string | while 时必填 | JS 表达式，每次迭代前求值，为 false 时退出循环 |
+| collectionVariable | string | for_each 时必填 | 存放 JSON 数组的变量名 |
+| iteratorVariable | string | for_each 时必填 | 当前迭代元素的变量名（如 "item"） |
 | maxIterations | number | 否 | 安全限制，防止死循环，默认 100 |
+| breakOnFailure | boolean | 否 | 循环体中节点失败时是否中断循环，默认 true |
+
+三种循环模式：
+- **count**：固定次数，如 `count: 3` 循环 3 次
+- **while**：条件循环，每次迭代前求值 `whileExpression`，如 `"variables.counter < 10"`
+- **for_each**：遍历数组变量，如 `collectionVariable: "items"` 遍历 `items` 变量中的数组，当前元素存入 `iteratorVariable` 指定的变量
 
 每次循环时，系统自动设置内置变量 `__loop_index__` 为当前循环索引（从 0 开始）。
 
@@ -476,16 +492,19 @@ variable_check 支持的 operator：
 
 ## 6. wait — 等待
 
-作用：暂停流程执行。
+作用：暂停流程执行，支持固定时长、变量时长、条件轮询三种模式。
 输入：in | 输出：out
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | label | string | 是 | 节点名称 |
 | enabled | boolean | 是 | 是否启用 |
-| waitType | string | 是 | 'fixed'（固定时长）/ 'variable'（变量时长）|
+| waitType | string | 是 | 'fixed'（固定时长）/ 'variable'（变量时长）/ 'condition'（条件轮询）|
 | durationMs | number | fixed 时必填 | 等待毫秒数 |
 | durationVariable | string | variable 时必填 | 存放等待时长的变量名 |
+| conditionExpression | string | condition 时必填 | JS 表达式，轮询直到为 true，可访问 variables 对象 |
+| pollIntervalMs | number | condition 时可选 | 轮询间隔毫秒数，默认 1000 |
+| maxWaitMs | number | condition 时可选 | 超时毫秒数，默认 30000 |
 
 ## 7. setVariable — 变量赋值
 
@@ -530,6 +549,19 @@ script API: pm.test(name, fn) / pm.expect(x).toBe/.toEqual/.toBeTruthy/.toBeDefi
 | enabled | boolean | 是 | 是否启用 |
 | branchCount | number | 是 | 并行分支数（2-6） |
 | waitAll | boolean | 是 | true=等待所有，false=任一完成即继续 |
+
+## 10. subFlow — 子流程
+
+作用：调用另一个测试任务作为子流程执行，实现测试复用。
+输入：in | 输出：out
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| label | string | 是 | 节点名称 |
+| enabled | boolean | 是 | 是否启用 |
+| targetTaskId | string | 是 | 要调用的测试任务 ID |
+| passVariables | boolean | 否 | 是否将当前变量传递给子流程，默认 true |
+| mergeVariables | boolean | 否 | 是否将子流程产生的变量合并回当前流程，默认 true |
 
 ---
 

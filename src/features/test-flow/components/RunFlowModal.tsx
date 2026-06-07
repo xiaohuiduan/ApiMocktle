@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Modal, Select, Button, Space, Typography, Tag, Divider, Switch } from 'antd'
 import { Play, Square, CheckCircle, XCircle, Clock, AlertTriangle, SkipForward } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
 import { css } from '@emotion/css'
 import type { FlowNode, FlowEdge, FlowNodeType, NodeExecStatus } from '../types/flow.types'
 import { FlowNodeType as NT } from '../types/flow.types'
@@ -85,6 +86,7 @@ interface Environment {
 interface RunFlowModalProps {
   open: boolean
   onClose: () => void
+  taskId: string
   nodes: FlowNode[]
   edges: FlowEdge[]
   projectId: string
@@ -101,6 +103,7 @@ interface RunFlowModalProps {
 export default function RunFlowModal({
   open,
   onClose,
+  taskId,
   nodes,
   edges,
   projectId,
@@ -181,7 +184,58 @@ export default function RunFlowModal({
     if (onRunComplete && result) {
       onRunComplete(result.variableSources)
     }
-  }, [nodes, edges, projectId, selectedEnv, environments, executeFlow, onNodeStatusChange, onRunComplete])
+
+    // 持久化执行记录
+    if (result) {
+      try {
+        const execRes = await invoke<{ ok: boolean; data?: { id: string } }>(
+          'create_test_execution',
+          { taskId, envJson: selectedEnv ? { name: selectedEnv } : null },
+        )
+        console.log('[RunFlowModal] create_test_execution:', execRes)
+        if (execRes.ok && execRes.data) {
+          const executionId = execRes.data.id
+          let sortOrder = 0
+          for (const [nodeId, status] of Object.entries(result.nodeStatuses)) {
+            if (status === 'idle') continue
+            const stepData = {
+              id: crypto.randomUUID(),
+              executionId,
+              stepId: nodeId,
+              sortOrder: sortOrder++,
+              status,
+              requestJson: result.nodeRequests[nodeId] || null,
+              responseJson: result.nodeResponses[nodeId] || null,
+              scriptResultsJson: null,
+              variableDeltasJson: null,
+              durationMs: result.nodeDurations[nodeId] || 0,
+              errorMessage: result.nodeErrors[nodeId] || null,
+              executedAt: new Date().toISOString(),
+            }
+            try {
+              await invoke('create_test_step_result', { result: stepData })
+            } catch (stepErr) {
+              console.error(`[RunFlowModal] 保存步骤 ${nodeId} 失败:`, stepErr)
+            }
+          }
+          const passed = Object.values(result.nodeStatuses).filter((s) => s === 'passed').length
+          const failed = Object.values(result.nodeStatuses).filter((s) => s === 'failed' || s === 'error').length
+          const skipped = Object.values(result.nodeStatuses).filter((s) => s === 'skipped').length
+          const duration = result.endTime && result.startTime ? result.endTime - result.startTime : 0
+          await invoke('finish_test_execution', {
+            execId: executionId,
+            status: result.status,
+            passed,
+            failed,
+            skipped,
+            duration,
+          })
+        }
+      } catch (err) {
+        console.error('[RunFlowModal] 保存执行记录失败:', err)
+      }
+    }
+  }, [nodes, edges, projectId, taskId, selectedEnv, environments, executeFlow, onNodeStatusChange, onRunComplete])
 
   const handleClose = useCallback(() => {
     if (state.status === 'running') {

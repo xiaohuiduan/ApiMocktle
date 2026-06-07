@@ -131,7 +131,7 @@ pub fn reorder_test_steps(
     }
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub fn list_test_executions(
     db: State<'_, Arc<Db>>,
     task_id: String,
@@ -143,7 +143,7 @@ pub fn list_test_executions(
     }
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub fn get_test_execution_detail(
     db: State<'_, Arc<Db>>,
     execution_id: String,
@@ -273,7 +273,7 @@ pub fn finish_test_execution(
     }
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub fn create_test_step_result(
     db: State<'_, Arc<Db>>,
     result: TestStepResult,

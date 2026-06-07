@@ -201,7 +201,7 @@ function BaseNodeInner({
   const Icon = NODE_ICONS[type] ?? Globe
 
   return (
-    <div className={nodeClass} style={minWidth ? { minWidth } : undefined} data-testid={`node-${type}`}>
+    <div className={nodeClass} style={minWidth ? { minWidth } : undefined} data-testid={`node-${type}`} data-exec-status={execStatus || 'idle'}>
       {/* 左侧彩色边框 */}
       <div
         className={borderClass}

@@ -10,6 +10,7 @@ import {
   Download,
   Upload,
   Trash2,
+  ShieldCheck,
 } from 'lucide-react'
 
 // ==================== Props ====================
@@ -23,6 +24,7 @@ export interface FlowToolbarProps {
   onSave: () => void
   onExport: () => void
   onImport: () => void
+  onValidate: () => void
   onClear: () => void
   canUndo: boolean
   canRedo: boolean
@@ -59,6 +61,7 @@ export default function FlowToolbar({
   onSave,
   onExport,
   onImport,
+  onValidate,
   onClear,
   canUndo,
   canRedo,
@@ -151,6 +154,14 @@ export default function FlowToolbar({
             icon={<Upload size={14} />}
             onClick={onImport}
             data-testid="toolbar-import"
+          />
+        </Tooltip>
+        <Tooltip title="校验流程">
+          <Button
+            size="small"
+            icon={<ShieldCheck size={14} />}
+            onClick={onValidate}
+            data-testid="toolbar-validate"
           />
         </Tooltip>
         <Tooltip title="清空">

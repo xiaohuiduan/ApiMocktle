@@ -77,6 +77,7 @@ export interface LoopNodeData extends BaseNodeData {
   collectionVariable?: string // variable name holding array for for_each
   iteratorVariable?: string // loop variable name (e.g., "i", "item")
   maxIterations?: number // safety limit, default 100
+  breakOnFailure?: boolean // true = 循环体失败时中断循环（默认 true）
 }
 
 export interface ParallelNodeData extends BaseNodeData {

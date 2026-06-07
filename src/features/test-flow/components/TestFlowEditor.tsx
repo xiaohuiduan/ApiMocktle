@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Modal, message, Tabs } from 'antd'
 import { invoke } from '@tauri-apps/api/core'
-import { Layers, Database } from 'lucide-react'
+import { Layers, Database, ListTree, History } from 'lucide-react'
 import { useFlowStore } from '../store/useFlowStore'
 import { useFlowPersistence } from '../hooks/useFlowPersistence'
 import { FlowEditorContext } from '../contexts/FlowEditorContext'
 import { useAuth } from '@/contexts/auth'
-import type { FlowGraph, NodeExecStatus } from '../types/flow.types'
+import { FlowNodeType as NT, type FlowGraph, type NodeExecStatus } from '../types/flow.types'
 import type { VariableSource } from '../hooks/useFlowExecution'
 import FlowToolbar from './FlowToolbar'
 import NodePalette from './NodePalette'
 import VariablesPanel from './VariablesPanel'
+import NodeOutlinePanel from './NodeOutlinePanel'
+import ExecutionHistoryPanel from './ExecutionHistoryPanel'
 import FlowCanvas from './FlowCanvas'
 import NodeConfigDrawer from './NodeConfigDrawer'
 import ImportFlowModal from './ImportFlowModal'
@@ -77,6 +79,90 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
     }
     fetchEnvs()
   }, [projectId, sessionId])
+
+  // ==================== 校验逻辑 ====================
+
+  const handleValidate = useCallback(() => {
+    const currentNodes = useFlowStore.getState().nodes
+    const currentEdges = useFlowStore.getState().edges
+    const errors: string[] = []
+    const warnings: string[] = []
+
+    // 1. 检查起止节点
+    const startNodes = currentNodes.filter((n) => n.type === NT.Start)
+    const endNodes = currentNodes.filter((n) => n.type === NT.End)
+    if (startNodes.length === 0) errors.push('缺少 Start 节点')
+    if (startNodes.length > 1) errors.push(`有 ${startNodes.length} 个 Start 节点（应只有 1 个）`)
+    if (endNodes.length === 0) errors.push('缺少 End 节点')
+    if (endNodes.length > 1) warnings.push(`有 ${endNodes.length} 个 End 节点`)
+
+    // 2. 边引用有效性
+    const nodeIds = new Set(currentNodes.map((n) => n.id))
+    for (const edge of currentEdges) {
+      if (!nodeIds.has(edge.source)) errors.push(`边引用了不存在的源节点: ${edge.source}`)
+      if (!nodeIds.has(edge.target)) errors.push(`边引用了不存在的目标节点: ${edge.target}`)
+    }
+
+    // 3. 孤立节点检查
+    const hasIncoming = new Set(currentEdges.map((e) => e.target))
+    const hasOutgoing = new Set(currentEdges.map((e) => e.source))
+    for (const node of currentNodes) {
+      if (node.type === NT.Start && !hasOutgoing.has(node.id)) {
+        warnings.push(`Start 节点「${(node.data?.label as string) || node.id}」没有出边`)
+      }
+      if (node.type === NT.End && !hasIncoming.has(node.id)) {
+        warnings.push(`End 节点「${(node.data?.label as string) || node.id}」没有入边`)
+      }
+      if (node.type !== NT.Start && node.type !== NT.End) {
+        if (!hasIncoming.has(node.id)) {
+          warnings.push(`节点「${(node.data?.label as string) || node.id}」没有入边`)
+        }
+        if (!hasOutgoing.has(node.id)) {
+          warnings.push(`节点「${(node.data?.label as string) || node.id}」没有出边`)
+        }
+      }
+    }
+
+    // 4. httpRequest 节点的 menuItemId
+    for (const node of currentNodes) {
+      if (node.type === NT.HttpRequest && !(node.data?.menuItemId as string)) {
+        errors.push(`HTTP 请求节点「${(node.data?.label as string) || node.id}」未选择 API`)
+      }
+    }
+
+    // 5. 定位到第一个有问题的节点
+    const firstProblemNode = currentNodes.find((n) => {
+      if (n.type === NT.HttpRequest && !(n.data?.menuItemId as string)) return true
+      return false
+    })
+
+    // 结果展示
+    if (errors.length === 0 && warnings.length === 0) {
+      message.success('流程校验通过 ✓')
+    } else if (errors.length > 0) {
+      Modal.error({
+        title: `流程校验失败 (${errors.length} 个错误)`,
+        content: (
+          <div>
+            {errors.map((e, i) => <div key={i} style={{ color: '#ef4444' }}>✗ {e}</div>)}
+            {warnings.map((w, i) => <div key={`w${i}`} style={{ color: '#f59e0b' }}>⚠ {w}</div>)}
+          </div>
+        ),
+      })
+      if (firstProblemNode) {
+        useFlowStore.getState().selectNode(firstProblemNode.id)
+      }
+    } else {
+      Modal.warning({
+        title: `校验通过，但有 ${warnings.length} 个警告`,
+        content: (
+          <div>
+            {warnings.map((w, i) => <div key={i} style={{ color: '#f59e0b' }}>⚠ {w}</div>)}
+          </div>
+        ),
+      })
+    }
+  }, [])
 
   // ==================== 工具栏回调 ====================
 
@@ -212,6 +298,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
           onSave={handleSave}
           onExport={handleExport}
           onImport={handleImport}
+          onValidate={handleValidate}
           onClear={handleClear}
           canUndo={canUndo}
           canRedo={canRedo}
@@ -234,6 +321,11 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
                   children: <NodePalette />,
                 },
                 {
+                  key: 'outline',
+                  label: <span style={{ fontSize: 12 }}><ListTree size={12} style={{ marginRight: 4 }} />大纲</span>,
+                  children: <NodeOutlinePanel />,
+                },
+                {
                   key: 'variables',
                   label: <span style={{ fontSize: 12 }}><Database size={12} style={{ marginRight: 4 }} />变量</span>,
                   children: (
@@ -241,6 +333,11 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
                       <VariablesPanel sources={variableSources} />
                     </div>
                   ),
+                },
+                {
+                  key: 'history',
+                  label: <span style={{ fontSize: 12 }}><History size={12} style={{ marginRight: 4 }} />历史</span>,
+                  children: <ExecutionHistoryPanel taskId={taskId} />,
                 },
               ]}
             />
@@ -263,6 +360,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
           setRunModalOpen(false)
           setIsRunning(false)
         }}
+        taskId={taskId}
         nodes={nodes}
         edges={edges}
         projectId={projectId}
