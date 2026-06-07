@@ -92,7 +92,7 @@ export function NavMenu() {
               />
             </svg>
           )}
-          name="自动化测试"
+          name="自测"
         />
       </Link>
 
