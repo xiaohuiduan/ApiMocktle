@@ -16,12 +16,29 @@ const logClass = css`
   font-family: 'Cascadia Code', 'Fira Code', monospace;
   font-size: 12px;
   line-height: 1.8;
-  max-height: 400px;
   overflow-y: auto;
   padding: 8px;
   background: #1e1e1e;
   border-radius: 6px;
   color: #d4d4d4;
+  position: relative;
+`
+
+const resizeHandleClass = css`
+  height: 6px;
+  cursor: ns-resize;
+  background: transparent;
+  position: relative;
+  &:hover::after, &:active::after {
+    content: '';
+    position: absolute;
+    left: 30%;
+    right: 30%;
+    top: 2px;
+    height: 2px;
+    background: #6b7280;
+    border-radius: 1px;
+  }
 `
 
 const logLineClass = css`
@@ -93,13 +110,36 @@ export default function RunFlowModal({
 }: RunFlowModalProps) {
   const [selectedEnv, setSelectedEnv] = useState<string>('')
   const [failFast, setFailFast] = useState(true)
+  const [logHeight, setLogHeight] = useState(400)
   const { state, executeFlow, abort, reset } = useFlowExecution()
   const logEndRef = useRef<HTMLDivElement>(null)
+  const resizingRef = useRef(false)
 
-  // 自动滚动到底部
+  // 自动滚动到底部（仅在未手动调整大小时）
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (!resizingRef.current) {
+      logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [state.logs.length])
+
+  // 拖拽调整日志面板高度
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    resizingRef.current = true
+    const startY = e.clientY
+    const startHeight = logHeight
+    const onMouseMove = (ev: MouseEvent) => {
+      const newHeight = Math.max(150, startHeight + (ev.clientY - startY))
+      setLogHeight(newHeight)
+    }
+    const onMouseUp = () => {
+      resizingRef.current = false
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+  }, [logHeight])
 
   // 弹窗打开时重置
   useEffect(() => {
@@ -235,12 +275,13 @@ export default function RunFlowModal({
       {state.logs.length > 0 && (
         <>
           <Divider style={{ margin: '8px 0' }} />
-          <div className={logClass}>
+          <div className={logClass} style={{ height: logHeight }}>
             {state.logs.map((log, i) => (
               <LogLine key={i} log={log} />
             ))}
             <div ref={logEndRef} />
           </div>
+          <div className={resizeHandleClass} onMouseDown={handleResizeStart} />
         </>
       )}
 

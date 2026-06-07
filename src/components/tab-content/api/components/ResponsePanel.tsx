@@ -1,8 +1,8 @@
 'use client'
 
-import { ReactNode, useEffect, useRef } from 'react'
+import { ReactNode } from 'react'
 
-import { ImperativePanelGroupHandle, Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 
 import { Typography, theme } from 'antd'
 
@@ -19,16 +19,6 @@ interface ResponsePanelProps {
 
 export function ResponsePanel({ paramsArea, resultArea, hasResult, autoSaveId }: ResponsePanelProps) {
   const { token } = theme.useToken()
-  const panelGroupRef = useRef<ImperativePanelGroupHandle>(null)
-  const prevHasResult = useRef(hasResult)
-
-  // Auto-reset layout when result appears (false → true transition)
-  useEffect(() => {
-    if (hasResult && !prevHasResult.current) {
-      panelGroupRef.current?.setLayout([60, 40])
-    }
-    prevHasResult.current = hasResult
-  }, [hasResult])
 
   const { styles } = useStyles(({ token }) => ({
     resizeHandle: css({
@@ -44,7 +34,6 @@ export function ResponsePanel({ paramsArea, resultArea, hasResult, autoSaveId }:
 
   return (
     <PanelGroup
-      ref={panelGroupRef}
       direction="vertical"
       autoSaveId={autoSaveId}
       className="flex-1 min-w-0 overflow-hidden"
