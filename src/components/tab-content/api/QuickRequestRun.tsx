@@ -24,7 +24,7 @@ import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useSessionVariablesContext } from '@/contexts/session-variables'
-import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
+import { useMenuTabContext, useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { BodyType, MenuItemType } from '@/enums'
 import type { ApiDetails, RunTabInfo } from '@/types'
@@ -99,6 +99,7 @@ export function QuickRequestRun() {
   const { messageApi } = useGlobalContext()
   const { menuRawList, addMenuItem, updateMenuItem } = useMenuHelpersContext()
   const { addTabItem } = useMenuTabHelpers()
+  const { activeTabKey } = useMenuTabContext()
   const { sessionVars, setSessionVars } = useSessionVariablesContext()
 
   const isCreating = tabData.data?.tabStatus === PageTabStatus.Create
@@ -329,6 +330,7 @@ export function QuickRequestRun() {
         await updateMenuItem({
           id: tabData.key,
           name: menuName,
+          data: { ...workCopy, name: menuName },
           runTabInfo,
         })
         messageApi.success('保存成功')
@@ -340,7 +342,7 @@ export function QuickRequestRun() {
     }
   }
 
-  useCtrlSave(handleSave)
+  useCtrlSave(handleSave, activeTabKey === tabData.key)
 
   const handleFillBody = () => {
     const text = buildBodyFillText(workCopy, menuRawList)
