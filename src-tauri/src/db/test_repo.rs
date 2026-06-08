@@ -5,6 +5,117 @@ use crate::db::client::Db;
 use crate::errors::AppError;
 use crate::models::*;
 
+// ==================== Test Folders ====================
+
+pub fn create_folder(db: &Db, payload: &CreateTestFolderPayload) -> Result<TestFolder, AppError> {
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    let max_order: i32 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) FROM test_folders WHERE project_id = ?1",
+            params![payload.project_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(-1);
+
+    conn.execute(
+        "INSERT INTO test_folders (id, project_id, name, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![id, payload.project_id, payload.name, max_order + 1, now, now],
+    ).map_err(|e| AppError::Internal(e.to_string()))?;
+
+    drop(conn);
+    get_folder(db, &id)?.ok_or_else(|| AppError::Internal("Failed to create folder".to_string()))
+}
+
+pub fn get_folder(db: &Db, folder_id: &str) -> Result<Option<TestFolder>, AppError> {
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let mut stmt = conn
+        .prepare("SELECT id, project_id, name, sort_order, created_at, updated_at FROM test_folders WHERE id = ?1")
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    let mut rows = stmt
+        .query_map(params![folder_id], |row| {
+            Ok(TestFolder {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                name: row.get(2)?,
+                sort_order: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+            })
+        })
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    rows.next().transpose().map_err(|e| AppError::Internal(e.to_string()))
+}
+
+pub fn list_folders(db: &Db, project_id: &str) -> Result<Vec<TestFolder>, AppError> {
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let mut stmt = conn
+        .prepare("SELECT id, project_id, name, sort_order, created_at, updated_at FROM test_folders WHERE project_id = ?1 ORDER BY sort_order ASC")
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    let rows = stmt
+        .query_map(params![project_id], |row| {
+            Ok(TestFolder {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                name: row.get(2)?,
+                sort_order: row.get(3)?,
+                created_at: row.get(4)?,
+                updated_at: row.get(5)?,
+            })
+        })
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    let mut folders = Vec::new();
+    for row in rows {
+        folders.push(row.map_err(|e| AppError::Internal(e.to_string()))?);
+    }
+    Ok(folders)
+}
+
+pub fn update_folder(db: &Db, folder_id: &str, payload: &UpdateTestFolderPayload) -> Result<TestFolder, AppError> {
+    let folder = get_folder(db, folder_id)?.ok_or_else(|| AppError::NotFound("Folder not found".to_string()))?;
+    let name = payload.name.as_deref().unwrap_or(&folder.name);
+
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE test_folders SET name = ?1, updated_at = ?2 WHERE id = ?3",
+        params![name, now, folder_id],
+    ).map_err(|e| AppError::Internal(e.to_string()))?;
+
+    drop(conn);
+    get_folder(db, folder_id)?.ok_or_else(|| AppError::Internal("Failed to update folder".to_string()))
+}
+
+pub fn delete_folder(db: &Db, folder_id: &str) -> Result<(), AppError> {
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    // 将该文件夹下的任务 folder_id 置空（回到默认）
+    conn.execute(
+        "UPDATE test_tasks SET folder_id = NULL, updated_at = ?1 WHERE folder_id = ?2",
+        params![chrono::Utc::now().to_rfc3339(), folder_id],
+    ).map_err(|e| AppError::Internal(e.to_string()))?;
+    conn.execute("DELETE FROM test_folders WHERE id = ?1", params![folder_id])
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(())
+}
+
+pub fn move_task_to_folder(db: &Db, task_id: &str, folder_id: Option<&str>) -> Result<TestTask, AppError> {
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE test_tasks SET folder_id = ?1, updated_at = ?2 WHERE id = ?3",
+        params![folder_id, now, task_id],
+    ).map_err(|e| AppError::Internal(e.to_string()))?;
+    drop(conn);
+    get_task(db, task_id)?.ok_or_else(|| AppError::Internal("Task not found".to_string()))
+}
+
 // ==================== Test Tasks ====================
 
 pub fn create_task(db: &Db, payload: &CreateTestTaskPayload) -> Result<TestTask, AppError> {
@@ -13,9 +124,9 @@ pub fn create_task(db: &Db, payload: &CreateTestTaskPayload) -> Result<TestTask,
     let now = chrono::Utc::now().to_rfc3339();
 
     conn.execute(
-        "INSERT INTO test_tasks (id, project_id, name, description, environment_id, status, fail_fast, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, 'idle', ?6, ?7, ?8)",
-        params![id, payload.project_id, payload.name, payload.description, payload.environment_id, payload.fail_fast, now, now],
+        "INSERT INTO test_tasks (id, project_id, name, description, folder_id, environment_id, status, fail_fast, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'idle', ?7, ?8, ?9)",
+        params![id, payload.project_id, payload.name, payload.description, payload.folder_id, payload.environment_id, payload.fail_fast, now, now],
     ).map_err(|e| AppError::Internal(e.to_string()))?;
 
     drop(conn);
@@ -33,14 +144,19 @@ pub fn update_task(db: &Db, task_id: &str, payload: &UpdateTestTaskPayload) -> R
     let variables_json = payload.variables_json.as_ref()
         .map(|v| v.to_string())
         .or(task.variables_json.map(|v| v.to_string()));
+    let folder_id = match &payload.folder_id {
+        Some(Some(fid)) => Some(fid.as_str()),
+        Some(None) => None, // 显式设为 null → 移回默认
+        None => task.folder_id.as_deref(),
+    };
 
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let now = chrono::Utc::now().to_rfc3339();
 
     conn.execute(
-        "UPDATE test_tasks SET name = ?1, description = ?2, environment_id = ?3, variables_json = ?4, fail_fast = ?5, updated_at = ?6
-         WHERE id = ?7",
-        params![name, description, environment_id, variables_json, fail_fast, now, task_id],
+        "UPDATE test_tasks SET name = ?1, description = ?2, folder_id = ?3, environment_id = ?4, variables_json = ?5, fail_fast = ?6, updated_at = ?7
+         WHERE id = ?8",
+        params![name, description, folder_id, environment_id, variables_json, fail_fast, now, task_id],
     ).map_err(|e| AppError::Internal(e.to_string()))?;
 
     drop(conn);
@@ -57,16 +173,16 @@ pub fn delete_task(db: &Db, task_id: &str) -> Result<(), AppError> {
 pub fn get_task(db: &Db, task_id: &str) -> Result<Option<TestTask>, AppError> {
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let mut stmt = conn
-        .prepare("SELECT id, project_id, name, description, environment_id, environment_json, variables_json, status, fail_fast, created_at, updated_at FROM test_tasks WHERE id = ?1")
+        .prepare("SELECT id, project_id, name, description, folder_id, environment_id, environment_json, variables_json, status, fail_fast, created_at, updated_at FROM test_tasks WHERE id = ?1")
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut rows = stmt
         .query_map(params![task_id], |row| {
-            let env_json_str: Option<String> = row.get(5)?;
+            let env_json_str: Option<String> = row.get(6)?;
             let env_json: Option<serde_json::Value> = env_json_str
                 .and_then(|s| serde_json::from_str(&s).ok());
 
-            let variables_json_str: Option<String> = row.get(6)?;
+            let variables_json_str: Option<String> = row.get(7)?;
             let variables_json: Option<serde_json::Value> = variables_json_str
                 .and_then(|s| serde_json::from_str(&s).ok());
 
@@ -75,13 +191,14 @@ pub fn get_task(db: &Db, task_id: &str) -> Result<Option<TestTask>, AppError> {
                 project_id: row.get(1)?,
                 name: row.get(2)?,
                 description: row.get(3)?,
-                environment_id: row.get(4)?,
+                folder_id: row.get(4)?,
+                environment_id: row.get(5)?,
                 environment_json: env_json,
                 variables_json,
-                status: row.get(7)?,
-                fail_fast: row.get::<_, i32>(8)? != 0,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
+                status: row.get(8)?,
+                fail_fast: row.get::<_, i32>(9)? != 0,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
             })
         })
         .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -92,16 +209,16 @@ pub fn get_task(db: &Db, task_id: &str) -> Result<Option<TestTask>, AppError> {
 pub fn list_tasks(db: &Db, project_id: &str) -> Result<Vec<TestTask>, AppError> {
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
     let mut stmt = conn
-        .prepare("SELECT id, project_id, name, description, environment_id, environment_json, variables_json, status, fail_fast, created_at, updated_at FROM test_tasks WHERE project_id = ?1 ORDER BY created_at DESC")
+        .prepare("SELECT id, project_id, name, description, folder_id, environment_id, environment_json, variables_json, status, fail_fast, created_at, updated_at FROM test_tasks WHERE project_id = ?1 ORDER BY created_at DESC")
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let rows = stmt
         .query_map(params![project_id], |row| {
-            let env_json_str: Option<String> = row.get(5)?;
+            let env_json_str: Option<String> = row.get(6)?;
             let env_json: Option<serde_json::Value> = env_json_str
                 .and_then(|s| serde_json::from_str(&s).ok());
 
-            let variables_json_str: Option<String> = row.get(6)?;
+            let variables_json_str: Option<String> = row.get(7)?;
             let variables_json: Option<serde_json::Value> = variables_json_str
                 .and_then(|s| serde_json::from_str(&s).ok());
 
@@ -110,13 +227,14 @@ pub fn list_tasks(db: &Db, project_id: &str) -> Result<Vec<TestTask>, AppError> 
                 project_id: row.get(1)?,
                 name: row.get(2)?,
                 description: row.get(3)?,
-                environment_id: row.get(4)?,
+                folder_id: row.get(4)?,
+                environment_id: row.get(5)?,
                 environment_json: env_json,
                 variables_json,
-                status: row.get(7)?,
-                fail_fast: row.get::<_, i32>(8)? != 0,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
+                status: row.get(8)?,
+                fail_fast: row.get::<_, i32>(9)? != 0,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
             })
         })
         .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -151,6 +269,7 @@ pub fn set_task_variables(db: &Db, task_id: &str, variables: &serde_json::Value)
     let payload = UpdateTestTaskPayload {
         name: None,
         description: None,
+        folder_id: None,
         environment_id: None,
         variables_json: Some(merged_json.clone()),
         fail_fast: None,

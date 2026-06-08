@@ -432,6 +432,8 @@ export function ProjectsClient() {
                       <span>模型 {project.schemaCount}</span>
                       <span className="text-gray-300">|</span>
                       <span>快捷请求 {project.requestCount}</span>
+                      <span className="text-gray-300">|</span>
+                      <span>自测 {project.testCount}</span>
                     </div>
                   </div>
                 </div>

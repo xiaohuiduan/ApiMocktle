@@ -10,6 +10,7 @@ export interface ProjectItem {
   apiCount: number
   schemaCount: number
   requestCount: number
+  testCount: number
 }
 
 export class ApiRequestError extends Error {

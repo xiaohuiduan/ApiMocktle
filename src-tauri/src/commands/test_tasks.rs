@@ -8,6 +8,67 @@ use crate::db::test_repo;
 use crate::models::*;
 use crate::services::test_engine::{TestEngine, ExtractorDef, AssertionDef, send_http_request};
 
+// ==================== Test Folders ====================
+
+#[tauri::command]
+pub fn list_test_folders(
+    db: State<'_, Arc<Db>>,
+    project_id: String,
+) -> Result<ApiResult<Vec<TestFolder>>, String> {
+    match test_repo::list_folders(&db, &project_id) {
+        Ok(folders) => Ok(ApiResult::success(folders)),
+        Err(e) => Ok(ApiResult::from(e)),
+    }
+}
+
+#[tauri::command]
+pub fn create_test_folder(
+    db: State<'_, Arc<Db>>,
+    payload: CreateTestFolderPayload,
+) -> Result<ApiResult<TestFolder>, String> {
+    match test_repo::create_folder(&db, &payload) {
+        Ok(folder) => Ok(ApiResult::success(folder)),
+        Err(e) => Ok(ApiResult::from(e)),
+    }
+}
+
+#[tauri::command]
+pub fn update_test_folder(
+    db: State<'_, Arc<Db>>,
+    folder_id: String,
+    payload: UpdateTestFolderPayload,
+) -> Result<ApiResult<TestFolder>, String> {
+    match test_repo::update_folder(&db, &folder_id, &payload) {
+        Ok(folder) => Ok(ApiResult::success(folder)),
+        Err(e) => Ok(ApiResult::from(e)),
+    }
+}
+
+#[tauri::command]
+pub fn delete_test_folder(
+    db: State<'_, Arc<Db>>,
+    folder_id: String,
+) -> Result<ApiResult<()>, String> {
+    match test_repo::delete_folder(&db, &folder_id) {
+        Ok(_) => Ok(ApiResult::success(())),
+        Err(e) => Ok(ApiResult::from(e)),
+    }
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub fn move_test_task_to_folder(
+    db: State<'_, Arc<Db>>,
+    task_id: String,
+    folder_id: Option<String>,
+) -> Result<ApiResult<TestTask>, String> {
+    match test_repo::move_task_to_folder(&db, &task_id, folder_id.as_deref()) {
+        Ok(task) => Ok(ApiResult::success(task)),
+        Err(e) => Ok(ApiResult::from(e)),
+    }
+}
+
+// ==================== Test Tasks ====================
+
 #[tauri::command]
 pub fn list_test_tasks(
     db: State<'_, Arc<Db>>,

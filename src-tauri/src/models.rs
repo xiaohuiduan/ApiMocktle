@@ -53,6 +53,8 @@ pub struct ProjectItem {
     pub schema_count: i32,
     #[serde(rename = "requestCount")]
     pub request_count: i32,
+    #[serde(rename = "testCount")]
+    pub test_count: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -293,6 +295,31 @@ pub struct ApiResult<T: Serialize> {
     pub error: Option<String>,
 }
 
+// Test Folders
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TestFolder {
+    pub id: String,
+    pub project_id: String,
+    pub name: String,
+    pub sort_order: i32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateTestFolderPayload {
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateTestFolderPayload {
+    #[serde(default)]
+    pub name: Option<String>,
+}
+
 // Test Tasks
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -301,6 +328,7 @@ pub struct TestTask {
     pub project_id: String,
     pub name: String,
     pub description: String,
+    pub folder_id: Option<String>,
     pub environment_id: Option<String>,
     pub environment_json: Option<serde_json::Value>,
     pub variables_json: Option<serde_json::Value>,
@@ -317,6 +345,8 @@ pub struct CreateTestTaskPayload {
     pub name: String,
     #[serde(default)]
     pub description: String,
+    #[serde(rename = "folderId", default)]
+    pub folder_id: Option<String>,
     #[serde(rename = "environmentId", default)]
     pub environment_id: Option<String>,
     #[serde(rename = "failFast", default = "default_true")]
@@ -329,6 +359,8 @@ pub struct UpdateTestTaskPayload {
     pub name: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
+    #[serde(rename = "folderId", default)]
+    pub folder_id: Option<Option<String>>,
     #[serde(rename = "environmentId", default)]
     pub environment_id: Option<String>,
     #[serde(rename = "variables", default)]

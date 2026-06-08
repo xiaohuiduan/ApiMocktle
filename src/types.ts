@@ -301,11 +301,30 @@ export type UnsafeAny = any
 
 // ==================== Test Automation Types ====================
 
+export interface TestFolder {
+  id: string
+  projectId: string
+  name: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateTestFolderPayload {
+  projectId: string
+  name: string
+}
+
+export interface UpdateTestFolderPayload {
+  name?: string
+}
+
 export interface TestTask {
   id: string
   projectId: string
   name: string
   description: string
+  folderId?: string | null
   environmentId?: string
   environmentJson?: Record<string, unknown>
   status: 'idle' | 'running' | 'passed' | 'failed' | 'aborted'
@@ -318,6 +337,7 @@ export interface CreateTestTaskPayload {
   projectId: string
   name: string
   description?: string
+  folderId?: string | null
   environmentId?: string
   failFast?: boolean
 }
@@ -325,6 +345,7 @@ export interface CreateTestTaskPayload {
 export interface UpdateTestTaskPayload {
   name?: string
   description?: string
+  folderId?: string | null
   environmentId?: string
   failFast?: boolean
 }

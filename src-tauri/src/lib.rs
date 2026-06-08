@@ -95,6 +95,12 @@ pub fn run() {
             commands::app_config_cmd::set_app_config,
             // App info
             commands::app_info::get_app_version,
+            // Test Folders
+            commands::test_tasks::list_test_folders,
+            commands::test_tasks::create_test_folder,
+            commands::test_tasks::update_test_folder,
+            commands::test_tasks::delete_test_folder,
+            commands::test_tasks::move_test_task_to_folder,
             // Test Tasks
             commands::test_tasks::list_test_tasks,
             commands::test_tasks::get_test_task,

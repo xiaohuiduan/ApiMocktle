@@ -114,6 +114,48 @@ impl McpServerHandle {
     }
 }
 
+// ==================== Helpers ====================
+
+/// 根据 folderId 或 folderName 解析最终的 folder_id。
+/// 优先级：folderName > folderId > None。
+/// folderName 匹配不到时自动创建。
+fn resolve_folder_id(
+    db: &crate::db::client::Db,
+    project_id: &str,
+    folder_id: Option<&str>,
+    folder_name: Option<&str>,
+) -> Result<Option<String>, String> {
+    // 优先用 folderName
+    if let Some(name) = folder_name {
+        let name = name.trim();
+        if !name.is_empty() {
+            // 查找同名文件夹
+            let folders = test_repo::list_folders(db, project_id)
+                .map_err(|e| format!("Error listing folders: {}", e))?;
+            if let Some(existing) = folders.iter().find(|f| f.name == name) {
+                return Ok(Some(existing.id.clone()));
+            }
+            // 不存在则自动创建
+            let new_folder = test_repo::create_folder(
+                db,
+                &CreateTestFolderPayload {
+                    project_id: project_id.to_string(),
+                    name: name.to_string(),
+                },
+            )
+            .map_err(|e| format!("Error creating folder: {}", e))?;
+            return Ok(Some(new_folder.id));
+        }
+    }
+    // 其次用 folderId
+    if let Some(fid) = folder_id {
+        if !fid.is_empty() {
+            return Ok(Some(fid.to_string()));
+        }
+    }
+    Ok(None)
+}
+
 // ==================== Tool Definitions ====================
 
 fn get_tool_definitions() -> Vec<ToolDefinition> {
@@ -170,7 +212,7 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "api-test.create_task".to_string(),
-            description: "Create a new test task".to_string(),
+            description: "Create a new test task. Optionally assign to a folder by folderId or folderName (auto-creates if not exists).".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -193,6 +235,14 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                     "environmentId": {
                         "type": "string",
                         "description": "Environment ID to use for test execution"
+                    },
+                    "folderId": {
+                        "type": "string",
+                        "description": "Assign to an existing folder by ID"
+                    },
+                    "folderName": {
+                        "type": "string",
+                        "description": "Assign to a folder by name. If the folder does not exist, it will be created automatically. Takes priority over folderId."
                     }
                 },
                 "required": ["projectId", "name"]
@@ -348,7 +398,7 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "api-test.create_task_with_flow".to_string(),
-            description: "Create a test task and its flow graph in one atomic operation".to_string(),
+            description: "Create a test task and its flow graph in one atomic operation. Optionally assign to a folder by folderId or folderName (auto-creates if not exists).".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -367,6 +417,14 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                     "graphJson": {
                         "type": "object",
                         "description": "The flow graph JSON with nodes and edges arrays"
+                    },
+                    "folderId": {
+                        "type": "string",
+                        "description": "Assign to an existing folder by ID"
+                    },
+                    "folderName": {
+                        "type": "string",
+                        "description": "Assign to a folder by name. If the folder does not exist, it will be created automatically. Takes priority over folderId."
                     }
                 },
                 "required": ["projectId", "name", "graphJson"]
@@ -516,13 +574,33 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                 })?;
 
             match test_repo::list_tasks(db, project_id) {
-                Ok(tasks) => Ok(ToolResult {
-                    content: vec![ToolResultContent {
-                        content_type: "text".to_string(),
-                        text: serde_json::to_string_pretty(&tasks).unwrap_or_default(),
-                    }],
-                    is_error: None,
-                }),
+                Ok(tasks) => {
+                    // 加载文件夹映射，给每个任务附上 folderName
+                    let folders = test_repo::list_folders(db, project_id).unwrap_or_default();
+                    let folder_map: std::collections::HashMap<&str, &str> = folders
+                        .iter()
+                        .map(|f| (f.id.as_str(), f.name.as_str()))
+                        .collect();
+
+                    let enriched: Vec<serde_json::Value> = tasks.iter().map(|t| {
+                        let mut val = serde_json::to_value(t).unwrap_or_default();
+                        if let Some(obj) = val.as_object_mut() {
+                            let fname = t.folder_id.as_deref()
+                                .and_then(|fid| folder_map.get(fid).map(|n| n.to_string()));
+                            obj.insert("folderName".to_string(),
+                                fname.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null));
+                        }
+                        val
+                    }).collect();
+
+                    Ok(ToolResult {
+                        content: vec![ToolResultContent {
+                            content_type: "text".to_string(),
+                            text: serde_json::to_string_pretty(&enriched).unwrap_or_default(),
+                        }],
+                        is_error: None,
+                    })
+                }
                 Err(e) => Ok(ToolResult {
                     content: vec![ToolResultContent {
                         content_type: "text".to_string(),
@@ -604,11 +682,25 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                 .and_then(|v| v.as_bool())
                 .unwrap_or(true);
             let environment_id = arguments.get("environmentId").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let folder_id_arg = arguments.get("folderId").and_then(|v| v.as_str());
+            let folder_name_arg = arguments.get("folderName").and_then(|v| v.as_str());
+
+            let resolved_folder_id = match resolve_folder_id(db, project_id, folder_id_arg, folder_name_arg) {
+                Ok(id) => id,
+                Err(e) => return Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: format!("Error resolving folder: {}", e),
+                    }],
+                    is_error: Some(true),
+                }),
+            };
 
             let payload = CreateTestTaskPayload {
                 project_id: project_id.to_string(),
                 name: name.to_string(),
                 description: description.to_string(),
+                folder_id: resolved_folder_id,
                 environment_id,
                 fail_fast,
             };
@@ -642,6 +734,7 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
             let payload = UpdateTestTaskPayload {
                 name: arguments.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()),
                 description: arguments.get("description").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                folder_id: None,
                 environment_id: arguments.get("environmentId").and_then(|v| v.as_str()).map(|s| s.to_string()),
                 variables_json: None,
                 fail_fast: arguments.get("failFast").and_then(|v| v.as_bool()),
@@ -1059,6 +1152,8 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                     message: "Missing graphJson".to_string(),
                     data: None,
                 })?;
+            let folder_id_arg = arguments.get("folderId").and_then(|v| v.as_str());
+            let folder_name_arg = arguments.get("folderName").and_then(|v| v.as_str());
 
             // Validate graphJson has nodes/edges arrays
             let has_nodes = graph_json.get("nodes").and_then(|v| v.as_array()).is_some();
@@ -1073,10 +1168,22 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                 });
             }
 
+            let resolved_folder_id = match resolve_folder_id(db, project_id, folder_id_arg, folder_name_arg) {
+                Ok(id) => id,
+                Err(e) => return Ok(ToolResult {
+                    content: vec![ToolResultContent {
+                        content_type: "text".to_string(),
+                        text: format!("Error resolving folder: {}", e),
+                    }],
+                    is_error: Some(true),
+                }),
+            };
+
             let task_payload = CreateTestTaskPayload {
                 project_id: project_id.to_string(),
                 name: name.to_string(),
                 description: description.to_string(),
+                folder_id: resolved_folder_id,
                 environment_id: None,
                 fail_fast: true,
             };

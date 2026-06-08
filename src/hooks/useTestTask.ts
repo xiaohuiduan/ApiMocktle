@@ -4,8 +4,11 @@ import type {
   TestTask,
   TestTaskDetail,
   TestStep,
+  TestFolder,
   CreateTestTaskPayload,
   UpdateTestTaskPayload,
+  CreateTestFolderPayload,
+  UpdateTestFolderPayload,
   CreateTestStepPayload,
   UpdateTestStepPayload,
   TestExecution,
@@ -97,6 +100,25 @@ export function useTestTask(projectId: string) {
     }
   }, [])
 
+  const moveTaskToFolder = useCallback(async (taskId: string, folderId: string | null): Promise<TestTask | null> => {
+    try {
+      const result = await invoke<ApiResult<TestTask>>('move_test_task_to_folder', {
+        taskId,
+        folderId,
+      })
+      if (result.ok && result.data) {
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? result.data! : t)))
+        return result.data
+      } else {
+        setError(result.error || 'Failed to move task')
+        return null
+      }
+    } catch (err) {
+      setError(String(err))
+      return null
+    }
+  }, [])
+
   return {
     tasks,
     loading,
@@ -105,6 +127,87 @@ export function useTestTask(projectId: string) {
     createTask,
     updateTask,
     deleteTask,
+    moveTaskToFolder,
+    setTasks,
+  }
+}
+
+export function useTestFolders(projectId: string) {
+  const [folders, setFolders] = useState<TestFolder[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const fetchFolders = useCallback(async () => {
+    setLoading(true)
+    try {
+      const result = await invoke<ApiResult<TestFolder[]>>('list_test_folders', {
+        projectId,
+      })
+      if (result.ok && result.data) {
+        setFolders(result.data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch folders:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [projectId])
+
+  const createFolder = useCallback(async (name: string): Promise<TestFolder | null> => {
+    try {
+      const result = await invoke<ApiResult<TestFolder>>('create_test_folder', {
+        payload: { projectId, name },
+      })
+      if (result.ok && result.data) {
+        setFolders((prev) => [...prev, result.data!])
+        return result.data
+      }
+      return null
+    } catch (err) {
+      console.error('Failed to create folder:', err)
+      return null
+    }
+  }, [projectId])
+
+  const renameFolder = useCallback(async (folderId: string, name: string): Promise<TestFolder | null> => {
+    try {
+      const result = await invoke<ApiResult<TestFolder>>('update_test_folder', {
+        folderId,
+        payload: { name },
+      })
+      if (result.ok && result.data) {
+        setFolders((prev) => prev.map((f) => (f.id === folderId ? result.data! : f)))
+        return result.data
+      }
+      return null
+    } catch (err) {
+      console.error('Failed to rename folder:', err)
+      return null
+    }
+  }, [])
+
+  const deleteFolder = useCallback(async (folderId: string): Promise<boolean> => {
+    try {
+      const result = await invoke<ApiResult<null>>('delete_test_folder', {
+        folderId,
+      })
+      if (result.ok) {
+        setFolders((prev) => prev.filter((f) => f.id !== folderId))
+        return true
+      }
+      return false
+    } catch (err) {
+      console.error('Failed to delete folder:', err)
+      return false
+    }
+  }, [])
+
+  return {
+    folders,
+    loading,
+    fetchFolders,
+    createFolder,
+    renameFolder,
+    deleteFolder,
   }
 }
 

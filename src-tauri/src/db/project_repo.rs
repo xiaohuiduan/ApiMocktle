@@ -12,7 +12,8 @@ pub fn list_projects(db: &Db, user_id: &str) -> Result<Vec<ProjectItem>, crate::
                 (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count,
                 (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'apiDetail') as api_count,
                 (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'apiSchema') as schema_count,
-                (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'httpRequest') as request_count
+                (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'httpRequest') as request_count,
+                (SELECT COUNT(*) FROM test_tasks WHERE project_id = p.id) as test_count
          FROM projects p
          JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?1
          ORDER BY p.created_at DESC",
@@ -30,6 +31,7 @@ pub fn list_projects(db: &Db, user_id: &str) -> Result<Vec<ProjectItem>, crate::
             api_count: row.get(7)?,
             schema_count: row.get(8)?,
             request_count: row.get(9)?,
+            test_count: row.get(10)?,
         })
     })?;
 
@@ -67,6 +69,7 @@ pub fn create_project(
         api_count: 0,
         schema_count: 0,
         request_count: 0,
+        test_count: 0,
     })
 }
 
@@ -81,7 +84,8 @@ pub fn get_project(
                 (SELECT COUNT(*) FROM project_members WHERE project_id = p.id) as member_count,
                 (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'apiDetail') as api_count,
                 (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'apiSchema') as schema_count,
-                (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'httpRequest') as request_count
+                (SELECT COUNT(*) FROM menu_items WHERE project_id = p.id AND type = 'httpRequest') as request_count,
+                (SELECT COUNT(*) FROM test_tasks WHERE project_id = p.id) as test_count
          FROM projects p
          JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?2
          WHERE p.id = ?1",
@@ -98,6 +102,7 @@ pub fn get_project(
                 api_count: row.get(7)?,
                 schema_count: row.get(8)?,
                 request_count: row.get(9)?,
+                test_count: row.get(10)?,
             })
         },
     );
