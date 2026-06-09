@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { Modal, message, Tabs } from 'antd'
 import { invoke } from '@tauri-apps/api/core'
 import { Layers, Database, ListTree, History } from 'lucide-react'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { useFlowStore } from '../store/useFlowStore'
 import { useFlowPersistence } from '../hooks/useFlowPersistence'
 import { FlowEditorContext } from '../contexts/FlowEditorContext'
 import { useAuth } from '@/contexts/auth'
+import { useTestTaskDetail } from '@/hooks/useTestTask'
 import { FlowNodeType as NT, type FlowGraph, type NodeExecStatus } from '../types/flow.types'
 import type { VariableSource } from '../hooks/useFlowExecution'
 import FlowToolbar from './FlowToolbar'
@@ -37,6 +39,7 @@ interface Environment {
 export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
   const { loadFlow, forceSave, isSaving } = useFlowPersistence(taskId)
   const { sessionId } = useAuth()
+  const { taskDetail, fetchTaskDetail } = useTestTaskDetail(taskId)
 
   // Store 状态
   const nodes = useFlowStore((s) => s.nodes)
@@ -283,13 +286,15 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
   // 初始加载
   useEffect(() => {
     loadFlow()
-  }, [loadFlow])
+    fetchTaskDetail()
+  }, [loadFlow, fetchTaskDetail])
 
   return (
     <FlowEditorContext.Provider value={{ projectId, taskId }}>
       <div className="flex h-full flex-col" data-testid="test-flow-editor">
         {/* 顶部工具栏 */}
         <FlowToolbar
+          taskName={taskDetail?.task?.name}
           onRun={handleRun}
           onAbort={handleAbort}
           onAutoLayout={handleAutoLayout}
@@ -307,46 +312,54 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
         />
 
         <div className="flex flex-1 overflow-hidden">
-          {/* 左侧面板：节点 + 变量 Tab */}
-          <div style={{ width: 200, height: '100%', borderRight: '1px solid #f0f0f0', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
-            <Tabs
-              size="small"
-              defaultActiveKey="nodes"
-              style={{ flex: 1, overflow: 'hidden' }}
-              tabBarStyle={{ margin: 0, paddingLeft: 8, minHeight: 32 }}
-              items={[
-                {
-                  key: 'nodes',
-                  label: <span style={{ fontSize: 12 }}><Layers size={12} style={{ marginRight: 4 }} />节点</span>,
-                  children: <NodePalette />,
-                },
-                {
-                  key: 'outline',
-                  label: <span style={{ fontSize: 12 }}><ListTree size={12} style={{ marginRight: 4 }} />大纲</span>,
-                  children: <NodeOutlinePanel />,
-                },
-                {
-                  key: 'variables',
-                  label: <span style={{ fontSize: 12 }}><Database size={12} style={{ marginRight: 4 }} />变量</span>,
-                  children: (
-                    <div style={{ height: 'calc(100vh - 140px)', overflowY: 'auto' }}>
-                      <VariablesPanel sources={variableSources} />
-                    </div>
-                  ),
-                },
-                {
-                  key: 'history',
-                  label: <span style={{ fontSize: 12 }}><History size={12} style={{ marginRight: 4 }} />历史</span>,
-                  children: <ExecutionHistoryPanel taskId={taskId} />,
-                },
-              ]}
-            />
-          </div>
+          <PanelGroup direction="horizontal" autoSaveId="test-flow-left-panel">
+            {/* 左侧面板：节点 + 变量 Tab */}
+            <Panel defaultSize={8} minSize={8} maxSize={40}>
+              <div style={{ height: '100%', borderRight: '1px solid #f0f0f0', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
+                <Tabs
+                  size="small"
+                  defaultActiveKey="nodes"
+                  style={{ flex: 1, overflow: 'hidden' }}
+                  tabBarStyle={{ margin: 0, paddingLeft: 8, minHeight: 32 }}
+                  items={[
+                    {
+                      key: 'nodes',
+                      label: <span style={{ fontSize: 12 }}><Layers size={12} style={{ marginRight: 4 }} />节点</span>,
+                      children: <NodePalette />,
+                    },
+                    {
+                      key: 'outline',
+                      label: <span style={{ fontSize: 12 }}><ListTree size={12} style={{ marginRight: 4 }} />大纲</span>,
+                      children: <NodeOutlinePanel />,
+                    },
+                    {
+                      key: 'variables',
+                      label: <span style={{ fontSize: 12 }}><Database size={12} style={{ marginRight: 4 }} />变量</span>,
+                      children: (
+                        <div style={{ height: 'calc(100vh - 140px)', overflowY: 'auto' }}>
+                          <VariablesPanel sources={variableSources} />
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'history',
+                      label: <span style={{ fontSize: 12 }}><History size={12} style={{ marginRight: 4 }} />历史</span>,
+                      children: <ExecutionHistoryPanel taskId={taskId} />,
+                    },
+                  ]}
+                />
+              </div>
+            </Panel>
 
-          {/* 中间画布 */}
-          <div className="flex-1 h-full min-h-0">
-            <FlowCanvas />
-          </div>
+            <PanelResizeHandle className="w-px bg-gray-200 hover:bg-blue-400 transition-colors" />
+
+            {/* 中间画布 */}
+            <Panel>
+              <div className="h-full min-h-0">
+                <FlowCanvas />
+              </div>
+            </Panel>
+          </PanelGroup>
 
           {/* 右侧配置抽屉 */}
           <NodeConfigDrawer />

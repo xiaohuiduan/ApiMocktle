@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { Select, Collapse, Typography, Spin, Tabs } from 'antd'
 import type { PanelProps } from './shared/panelRegistry'
 import type { HttpRequestNodeData } from '../../types/flow.types'
@@ -7,7 +7,8 @@ import { useApiMenu } from '@/hooks/useApiMenu'
 import AssertionListEditor from './shared/AssertionListEditor'
 import ExtractorListEditor from './shared/ExtractorListEditor'
 import KVEditor, { type KVPair } from './shared/KVEditor'
-import { MonacoEditor } from '@/components/MonacoEditor/MonacoEditor'
+import { MonacoEditor, type MonacoEditorRef } from '@/components/MonacoEditor/MonacoEditor'
+import { serialize } from '@/utils'
 
 const { Text } = Typography
 
@@ -32,6 +33,23 @@ function getOverride(override: unknown): RequestOverride {
 export default function HttpRequestNodePanel({ data, onChange, projectId }: PanelProps<HttpRequestNodeData>) {
   const { items: apiMenuItems, loading: loadingMenu } = useApiMenu(projectId)
   const override = getOverride(data.requestOverride)
+  const bodyEditorRef = useRef<MonacoEditorRef>(null)
+  const lastBodyRef = useRef<unknown>(undefined)
+
+  // Sync body editor when external value changes (e.g. different API selected)
+  useEffect(() => {
+    const currentBody = override.body?.json
+    if (lastBodyRef.current !== currentBody) {
+      lastBodyRef.current = currentBody
+      const editor = bodyEditorRef.current?.editor
+      if (editor) {
+        const newVal = currentBody != null ? serialize(currentBody, 2) : ''
+        if (editor.getValue() !== newVal) {
+          editor.setValue(newVal)
+        }
+      }
+    }
+  })
 
   // 更新 menuItemId
   const handleMenuItemChange = useCallback(
@@ -172,7 +190,10 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
                     JSON 请求体（支持 {'{{变量}}'} 占位符）
                   </Text>
                   <MonacoEditor
-                    value={override.body?.json || {}}
+                    ref={bodyEditorRef}
+                    defaultValue={override.body?.json || ''}
+                    useDefaultValue
+                    deserializeOnChange={false}
                     onChange={handleBodyChange}
                     language="json"
                     height="180px"

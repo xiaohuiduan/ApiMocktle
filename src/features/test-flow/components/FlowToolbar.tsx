@@ -16,6 +16,7 @@ import {
 // ==================== Props ====================
 
 export interface FlowToolbarProps {
+  taskName?: string
   onRun: () => void
   onAbort: () => void
   onAutoLayout: () => void
@@ -53,6 +54,7 @@ const dividerClass = css`
 // ==================== 组件 ====================
 
 export default function FlowToolbar({
+  taskName,
   onRun,
   onAbort,
   onAutoLayout,
@@ -70,6 +72,26 @@ export default function FlowToolbar({
 }: FlowToolbarProps) {
   return (
     <div className={toolbarClass} data-testid="flow-toolbar">
+      {taskName && (
+        <Tooltip title={taskName}>
+          <span
+            style={{
+              maxWidth: 200,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontWeight: 600,
+              fontSize: 14,
+              color: '#1f2937',
+              marginRight: 4,
+              flexShrink: 0,
+            }}
+          >
+            {taskName}
+          </span>
+        </Tooltip>
+      )}
+      <div className={dividerClass} />
       <Space size={4}>
         {/* 执行组 */}
         <Tooltip title="运行">

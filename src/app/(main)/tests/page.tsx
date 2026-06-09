@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { Table, Button, Space, Tag, Modal, Form, Input, Switch, message, Popconfirm, Empty, Menu, Dropdown } from 'antd'
+import { Table, Button, Space, Tag, Modal, Form, Input, Switch, message, Popconfirm, Empty, Menu, Dropdown, Tooltip } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined,
   FolderOutlined, FolderAddOutlined, MoreOutlined,
 } from '@ant-design/icons'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import type { ColumnsType } from 'antd/es/table'
 
 import { useTestTask, useTestFolders } from '@/hooks/useTestTask'
@@ -272,82 +273,98 @@ export default function TestTaskListPage() {
     ],
   })
 
+  // Compute dynamic title based on selected folder
+  const pageTitle = useMemo(() => {
+    if (selectedFolderKey === ALL_KEY) return '自动化测试'
+    if (selectedFolderKey === DEFAULT_KEY) return '默认'
+    const folder = folders.find((f) => f.id === selectedFolderKey)
+    return folder?.name || '自动化测试'
+  }, [selectedFolderKey, folders])
+
   return (
     <div className="flex h-full">
-      {/* Left: Folder sidebar */}
-      <div className="w-48 shrink-0 border-r border-gray-200 bg-gray-50/50 flex flex-col">
-        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
-          <span className="text-xs font-medium text-gray-500">文件夹</span>
-          <Button
-            type="text"
-            size="small"
-            icon={<FolderAddOutlined />}
-            onClick={handleAddFolder}
-          />
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {menuItems.map((item) => {
-            const isFolder = item.key !== ALL_KEY && item.key !== DEFAULT_KEY
-            const isEditing = editingFolderId === item.key
-            return (
-              <div
-                key={item.key}
-                className={`group flex items-center justify-between px-3 py-1.5 cursor-pointer text-sm transition-colors ${
-                  selectedFolderKey === item.key
-                    ? 'bg-blue-50 text-blue-600 font-medium'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-                onClick={() => {
-                  if (!isEditing) setSelectedFolderKey(item.key)
-                }}
-              >
-                <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  {isFolder ? (
-                    <FolderOutlined className="text-yellow-500 text-xs shrink-0" />
-                  ) : item.key === ALL_KEY ? (
-                    <span className="text-xs shrink-0">📋</span>
-                  ) : (
-                    <FolderOutlined className="text-gray-400 text-xs shrink-0" />
-                  )}
-                  {isEditing ? (
-                    <Input
-                      size="small"
-                      value={editingFolderName}
-                      onChange={(e) => setEditingFolderName(e.target.value)}
-                      onPressEnter={() => handleRenameFolder(item.key)}
-                      onBlur={() => handleRenameFolder(item.key)}
-                      onClick={(e) => e.stopPropagation()}
-                      autoFocus
-                      className="text-xs"
-                    />
-                  ) : (
-                    <span className="truncate">{item.label}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-gray-400">{item.count}</span>
-                  {isFolder && !isEditing && (
-                    <Dropdown menu={getFolderMenuItems(folders.find((f) => f.id === item.key)!)} trigger={['click']}>
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<MoreOutlined />}
-                        className="opacity-0 group-hover:opacity-100 !w-4 !h-4 !text-[10px]"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </Dropdown>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <PanelGroup direction="horizontal" autoSaveId="tests-folder-sidebar">
+        {/* Left: Folder sidebar */}
+        <Panel defaultSize={20} minSize={15} maxSize={35}>
+          <div className="h-full border-r border-gray-200 bg-gray-50/50 flex flex-col">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
+              <span className="text-xs font-medium text-gray-500">文件夹</span>
+              <Button
+                type="text"
+                size="small"
+                icon={<FolderAddOutlined />}
+                onClick={handleAddFolder}
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {menuItems.map((item) => {
+                const isFolder = item.key !== ALL_KEY && item.key !== DEFAULT_KEY
+                const isEditing = editingFolderId === item.key
+                return (
+                  <div
+                    key={item.key}
+                    className={`group flex items-center justify-between px-3 py-1.5 cursor-pointer text-sm transition-colors ${
+                      selectedFolderKey === item.key
+                        ? 'bg-blue-50 text-blue-600 font-medium'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    onClick={() => {
+                      if (!isEditing) setSelectedFolderKey(item.key)
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      {isFolder ? (
+                        <FolderOutlined className="text-yellow-500 text-xs shrink-0" />
+                      ) : item.key === ALL_KEY ? (
+                        <span className="text-xs shrink-0">📋</span>
+                      ) : (
+                        <FolderOutlined className="text-gray-400 text-xs shrink-0" />
+                      )}
+                      {isEditing ? (
+                        <Input
+                          size="small"
+                          value={editingFolderName}
+                          onChange={(e) => setEditingFolderName(e.target.value)}
+                          onPressEnter={() => handleRenameFolder(item.key)}
+                          onBlur={() => handleRenameFolder(item.key)}
+                          onClick={(e) => e.stopPropagation()}
+                          autoFocus
+                          className="text-xs"
+                        />
+                      ) : (
+                        <Tooltip title={item.label} placement="right" mouseEnterDelay={0.5}>
+                          <span className="truncate">{item.label}</span>
+                        </Tooltip>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-gray-400">{item.count}</span>
+                      {isFolder && !isEditing && (
+                        <Dropdown menu={getFolderMenuItems(folders.find((f) => f.id === item.key)!)} trigger={['click']}>
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<MoreOutlined />}
+                            className="opacity-0 group-hover:opacity-100 !w-4 !h-4 !text-[10px]"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </Dropdown>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </Panel>
 
-      {/* Right: Task table */}
-      <div className="flex-1 p-6 overflow-auto">
+        <PanelResizeHandle className="w-px bg-gray-200 hover:bg-blue-400 transition-colors" />
+
+        {/* Right: Task table */}
+        <Panel>
+          <div className="h-full p-6 overflow-auto">
         <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">自动化测试</h1>
+          <h1 className="text-2xl font-bold">{pageTitle}</h1>
           <Space>
             <Button
               icon={<FolderAddOutlined />}
@@ -386,7 +403,9 @@ export default function TestTaskListPage() {
             loading={tasksLoading}
           />
         )}
-      </div>
+          </div>
+        </Panel>
+      </PanelGroup>
 
       {/* Create Modal */}
       <Modal
