@@ -2,6 +2,8 @@ import { useState, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { FlowNode, FlowEdge, FlowNodeType, NodeExecStatus } from '../types/flow.types'
 import { FlowNodeType as NT } from '../types/flow.types'
+import type { MockRule, MockCallLog } from '../types/mock.types'
+import { buildAgentPushPayload } from '../utils/mock-rule-utils'
 
 // ==================== 类型 ====================
 
@@ -105,6 +107,7 @@ export function useFlowExecution() {
     initialVariables?: Record<string, string>,
     failFast?: boolean,
     onStateChange?: (state: FlowExecState) => void,
+    agentUrl?: string,
   ) => {
     abortRef.current = false
     const variables: Record<string, string> = { ...(initialVariables || {}) }
@@ -387,6 +390,22 @@ export function useFlowExecution() {
             logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `发送请求...`)
             updateState({})
 
+            // 推送 Mock 规则到 Agent（仅节点级别规则）
+            const nodeMockRules = nodeData.mockRules as MockRule[] | undefined
+            if (agentUrl && nodeMockRules && nodeMockRules.length > 0) {
+              try {
+                const payload = buildAgentPushPayload(nodeMockRules, variables)
+                if (payload.length > 0) {
+                  await invoke('push_mock_rules', { agentUrl, rules: payload })
+                  logs = addLog(logs, nodeId, nodeName, nodeType, 'running',
+                    `推送 ${payload.length} 条 Mock 规则到 Agent`)
+                }
+              } catch (err) {
+                logs = addLog(logs, nodeId, nodeName, nodeType, 'running',
+                  `Mock 规则推送失败（不影响请求）: ${err}`)
+              }
+            }
+
             const result = await invoke<{ ok: boolean; data?: RunFlowNodeRequestResult; error?: string }>(
               'execute_flow_node_request',
               {
@@ -423,8 +442,25 @@ export function useFlowExecution() {
             nodeResponses[nodeId] = {
               status,
               headers: resp.headers,
-              body: resp.body.substring(0, 5000),
+              body: resp.body,
               duration_ms: resp.responseTime,
+            }
+
+            // 拉取 Mock 调用日志
+            let mockCallLogs: MockCallLog[] = []
+            if (agentUrl) {
+              try {
+                const logsResult = await invoke<{ ok: boolean; data?: MockCallLog[] }>(
+                  'get_mock_call_logs', { agentUrl }
+                )
+                if (logsResult.ok && logsResult.data) {
+                  mockCallLogs = logsResult.data
+                  if (mockCallLogs.length > 0) {
+                    logs = addLog(logs, nodeId, nodeName, nodeType, 'running',
+                      `捕获 ${mockCallLogs.length} 次 Mock 调用: ${mockCallLogs.map(l => `${l.className.split('.').pop()}.${l.methodName}`).join(', ')}`)
+                  }
+                }
+              } catch { /* ignore */ }
             }
 
             // 运行 postScript
@@ -1080,6 +1116,13 @@ export function useFlowExecution() {
     const endTime = Date.now()
     const hasFailed = Object.values(nodeStatuses).some((s) => s === 'failed' || s === 'error')
     const finalStatus = abortRef.current ? 'aborted' : hasFailed ? 'failed' : 'passed'
+
+    // 清除 Agent 上的 Mock 规则
+    if (agentUrl) {
+      try {
+        await invoke('clear_mock_rules', { agentUrl })
+      } catch { /* ignore */ }
+    }
 
     const finalState: FlowExecState = {
       status: finalStatus,

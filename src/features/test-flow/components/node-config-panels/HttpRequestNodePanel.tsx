@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Select, Collapse, Typography, Spin, Tabs } from 'antd'
+import { invoke } from '@tauri-apps/api/core'
 import type { PanelProps } from './shared/panelRegistry'
 import type { HttpRequestNodeData } from '../../types/flow.types'
 import type { TestAssertion, TestExtractor } from '@/types'
+import type { MockRule } from '../../types/mock.types'
+import { useAuth } from '@/contexts/auth'
 import { useApiMenu } from '@/hooks/useApiMenu'
 import AssertionListEditor from './shared/AssertionListEditor'
 import ExtractorListEditor from './shared/ExtractorListEditor'
 import KVEditor, { type KVPair } from './shared/KVEditor'
+import MockRuleEditor from './shared/MockRuleEditor'
 import { MonacoEditor, type MonacoEditorRef } from '@/components/MonacoEditor/MonacoEditor'
 import { serialize } from '@/utils'
 
@@ -31,10 +35,29 @@ function getOverride(override: unknown): RequestOverride {
 // ==================== 组件 ====================
 
 export default function HttpRequestNodePanel({ data, onChange, projectId }: PanelProps<HttpRequestNodeData>) {
+  const { sessionId } = useAuth()
   const { items: apiMenuItems, loading: loadingMenu } = useApiMenu(projectId)
   const override = getOverride(data.requestOverride)
   const bodyEditorRef = useRef<MonacoEditorRef>(null)
   const lastBodyRef = useRef<unknown>(undefined)
+
+  // 加载项目环境（用于 Mock Agent 发现）
+  const [environments, setEnvironments] = useState<Array<{ name: string; agentUrl?: string }>>([])
+  useEffect(() => {
+    if (!sessionId || !projectId) return
+    const fetchEnvs = async () => {
+      try {
+        const result = await invoke<{ ok: boolean; data?: { environments: Array<{ name: string; agentUrl?: string }> } }>(
+          'get_project_environments',
+          { sessionId, projectId },
+        )
+        if (result.ok && result.data) {
+          setEnvironments(result.data.environments || [])
+        }
+      } catch { /* ignore */ }
+    }
+    fetchEnvs()
+  }, [sessionId, projectId])
 
   // Sync body editor when external value changes (e.g. different API selected)
   useEffect(() => {
@@ -119,6 +142,11 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
 
   const handleExtractorsChange = useCallback(
     (extractors: TestExtractor[]) => { onChange({ extractors }) },
+    [onChange],
+  )
+
+  const handleMockRulesChange = useCallback(
+    (rules: MockRule[]) => { onChange({ mockRules: rules }) },
     [onChange],
   )
 
@@ -260,6 +288,22 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
           extractors={data.extractors || []}
           onChange={handleExtractorsChange}
         />
+      ),
+    },
+    {
+      key: 'mockRules',
+      label: `Mock 依赖（可选）${data.mockRules?.length ? ` · ${data.mockRules.length} 条` : ''}`,
+      children: (
+        <div>
+          <Text type="secondary" className="block text-xs mb-2">
+            拦截此请求触发的 Feign/Mapper 调用，返回模拟数据
+          </Text>
+          <MockRuleEditor
+            rules={data.mockRules || []}
+            onChange={handleMockRulesChange}
+            environments={environments}
+          />
+        </div>
       ),
     },
   ]

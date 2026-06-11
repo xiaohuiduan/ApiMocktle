@@ -100,6 +100,7 @@ export interface ApiEnvironment {
   baseUrls?: ApiEnvironmentBaseUrl[]
   variables?: ApiEnvironmentValue[]
   parameters?: ApiEnvironmentGlobalParameters
+  agentUrl?: string
 }
 
 export interface ProjectEnvironmentConfig {

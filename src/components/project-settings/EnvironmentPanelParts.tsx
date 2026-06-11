@@ -150,6 +150,17 @@ export function EnvironmentEditor(props: {
         </Button>
       </div>
 
+      <Input
+            disabled={!editable}
+            placeholder="Mock Agent URL（如 http://localhost:19876）"
+            value={environment.agentUrl || ''}
+            onChange={(event) => {
+              onChange({ ...environment, agentUrl: event.target.value || undefined })
+            }}
+            addonBefore="Mock Agent"
+            allowClear
+          />
+
       <FieldGrid
         description="每个环境都可以维护多个模块的前置 URL，当前运行默认使用第一项。"
         editable={editable}

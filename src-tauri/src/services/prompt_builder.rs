@@ -410,6 +410,7 @@ const PROMPT_TEMPLATE: &str = r#"你是一个测试流程设计专家。你的�
 | postScript | string | 否 | 请求完成后执行的 JS 脚本，可读取响应、设置变量 |
 | assertions | array | 否 | 断言列表，验证响应是否符合预期 |
 | extractors | array | 否 | 提取器列表，从响应中提取数据到变量 |
+| mockRules | array | 否 | Mock 依赖规则列表，在请求发送前推送到 Mock Agent 拦截 Feign/Mapper 调用 |
 
 requestOverride 格式：
 ```json
@@ -434,7 +435,45 @@ preScript 中可用的 API：
 - `pm.variables.set('变量名', 值)` — 保存变量
 - `pm.variables.get('变量名')` — 读取变量
 
-执行顺序：preScript → 发送请求 → postScript → extractors → assertions
+执行顺序：preScript → 推送 Mock 规则 → 发送请求 → 拉取 Mock 日志 → postScript → extractors → assertions
+
+mockRules 格式（Mock 依赖拦截）：
+
+当被测接口内部依赖其他服务（如 Feign Client、MyBatis Mapper），可通过 mockRules 在请求发送前拦截这些依赖调用，返回预设的模拟数据，实现单服务隔离测试。
+
+```json
+"mockRules": [
+  {
+    "id": "rule-1",
+    "enabled": true,
+    "targetType": "feign",
+    "className": "com.example.feign.UserClient",
+    "methodName": "getUser",
+    "paramTypes": ["java.lang.Long"],
+    "responseTemplate": {"code": 200, "message": "success", "data": {"id": 1, "username": "张三", "role": "VIP"}},
+    "responseClassName": "com.example.dto.ApiResult",
+    "responseDelay": 0,
+    "maxTimes": 10
+  }
+]
+```
+
+mockRules 字段说明：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | string | 是 | 规则唯一标识 |
+| enabled | boolean | 是 | 是否启用 |
+| targetType | string | 是 | 目标类型：`feign`（Feign Client）/ `mapper`（MyBatis Mapper）/ `custom`（自定义方法） |
+| className | string | 是 | 目标类全限定名，如 `com.example.feign.OrderClient` |
+| methodName | string | 是 | 目标方法名，如 `createOrder` |
+| paramTypes | string[] | 否 | 方法参数类型全限定名，用于区分重载方法 |
+| responseTemplate | any | 是 | 返回的模拟数据（JSON 对象/数组/字符串），支持 `{{变量名}}` 插值 |
+| responseClassName | string | 否 | 返回值目标类型全限定名，帮助 Agent 精确反序列化 |
+| responseDelay | number | 否 | 模拟响应延迟（毫秒） |
+| maxTimes | number | 否 | 最多拦截次数，之后放行真实调用 |
+
+> **前提条件：** 使用 mockRules 需要在运行环境的「Mock Agent」字段配置 Agent 地址（如 `http://localhost:19876`）。Agent 会在请求发送前接收规则，拦截对应的依赖调用。
 
 ## 4. condition — 条件判断
 
@@ -614,7 +653,7 @@ script API: pm.test(name, fn) / pm.expect(x).toBe/.toEqual/.toBeTruthy/.toBeDefi
     { "id": "start-1", "type": "start", "position": {"x":0,"y":0}, "data": { "label": "开始", "enabled": true } },
     { "id": "http-login", "type": "httpRequest", "position": {"x":0,"y":0}, "data": { "label": "用户登录", "enabled": true, "menuItemId": "login-api-id", "postScript": "var resp = pm.response.json(); pm.variables.set('token', resp.token);", "assertions": [{ "type": "status", "operator": "equals", "expected": 200 }] } },
     { "id": "cond-token", "type": "condition", "position": {"x":0,"y":0}, "data": { "label": "检查登录", "enabled": true, "conditionType": "variable_check", "variableName": "token", "operator": "exists" } },
-    { "id": "http-user", "type": "httpRequest", "position": {"x":0,"y":0}, "data": { "label": "获取用户", "enabled": true, "menuItemId": "user-info-api-id", "requestOverride": { "headers": [{"name": "Authorization", "value": "Bearer {{token}}"}] } } },
+    { "id": "http-user", "type": "httpRequest", "position": {"x":0,"y":0}, "data": { "label": "获取用户", "enabled": true, "menuItemId": "user-info-api-id", "requestOverride": { "headers": [{"name": "Authorization", "value": "Bearer {{token}}"}] }, "mockRules": [{ "id": "mock-user", "enabled": true, "targetType": "feign", "className": "com.example.feign.UserClient", "methodName": "getUser", "responseTemplate": {"code": 200, "data": {"username": "测试用户"}}, "responseClassName": "com.example.dto.ApiResult" }] } },
     { "id": "end-ok", "type": "end", "position": {"x":0,"y":0}, "data": { "label": "通过", "enabled": true } },
     { "id": "end-fail", "type": "end", "position": {"x":0,"y":0}, "data": { "label": "失败", "enabled": true } }
   ],

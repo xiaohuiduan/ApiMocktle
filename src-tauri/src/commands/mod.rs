@@ -12,3 +12,4 @@ pub mod app_info;
 pub mod test_tasks;
 pub mod test_flow;
 pub mod mcp_server;
+pub mod mock_agent;

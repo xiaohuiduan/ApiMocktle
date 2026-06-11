@@ -166,7 +166,7 @@ export default function RunFlowModal({
       }
     }
 
-    const result = await executeFlow(nodes, edges, projectId, baseUrl, initialVars, failFast)
+    const result = await executeFlow(nodes, edges, projectId, baseUrl, initialVars, failFast, undefined, env?.agentUrl)
 
     // 回调节点状态变化
     if (onNodeStatusChange && result) {

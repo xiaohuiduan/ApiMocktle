@@ -132,6 +132,12 @@ pub fn run() {
             commands::mcp_server::stop_mcp_server,
             commands::mcp_server::get_mcp_server_config,
             commands::mcp_server::save_mcp_server_config,
+            // Mock Agent
+            commands::mock_agent::push_mock_rules,
+            commands::mock_agent::clear_mock_rules,
+            commands::mock_agent::get_mock_call_logs,
+            commands::mock_agent::discover_mock_targets,
+            commands::mock_agent::check_mock_agent_status,
             // Tokens
         ])
         .run(tauri::generate_context!())

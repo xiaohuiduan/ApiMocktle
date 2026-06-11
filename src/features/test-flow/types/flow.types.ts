@@ -1,5 +1,6 @@
 import type { Node, Edge, Connection } from '@xyflow/react'
 import type { TestAssertion, TestExtractor } from '@/types'
+import type { MockRule, MockCallLog } from './mock.types'
 
 // ==================== 节点类型枚举 ====================
 
@@ -57,6 +58,7 @@ export interface HttpRequestNodeData extends BaseNodeData {
   postScript?: string
   assertions?: TestAssertion[]
   extractors?: TestExtractor[]
+  mockRules?: MockRule[]
 }
 
 export interface ConditionNodeData extends BaseNodeData {
@@ -193,6 +195,7 @@ export interface NodeResult {
     error?: string
   }>
   variableDeltas?: Record<string, string>
+  mockCallLogs?: MockCallLog[]
   durationMs: number
   error?: string
 }
