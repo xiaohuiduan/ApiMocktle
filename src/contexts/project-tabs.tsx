@@ -38,6 +38,8 @@ export interface ProjectTabState {
   tabItems: ApiTabItem[]
   activeTabKey?: ApiTabItem['key']
   lastActiveTabKey?: ApiTabItem['key']
+  /** 最近一次子页面路徑，如 "/home" "/tests" "/settings" */
+  lastSubPath: string
 }
 
 /* ------------------------------------------------------------------ */
@@ -156,6 +158,7 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
       tabItems: [],
       activeTabKey: undefined,
       lastActiveTabKey: undefined,
+      lastSubPath: '/home',
     }))
   })
 
@@ -171,23 +174,39 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
     (id: string | null) => {
       setActiveProjectIdState(id)
       if (id) {
-        navigate(`/projects/${id}/home`, { replace: true })
+        const tab = openTabs.find((t) => t.info.projectId === id)
+        const subPath = tab?.lastSubPath || '/home'
+        navigate(`/projects/${id}${subPath}`, { replace: true })
       } else {
         navigate('/projects', { replace: true })
       }
     },
-    [navigate],
+    [navigate, openTabs],
   )
 
-  // 监听外部 URL 变化（如浏览器后退 / 直接输入 URL）
+  // 监听 URL 变化：跟踪子页面路由 + 同步 activeProjectId
   useEffect(() => {
     const prevPath = prevPathRef.current
     prevPathRef.current = pathname
 
-    if (pathname === prevPath) return
-
     const parts = pathname.split('/').filter(Boolean)
     const urlProjectId = parts[0] === 'projects' ? parts[1] : null
+    const urlSubPath = parts[0] === 'projects' && parts.length >= 3
+      ? '/' + parts.slice(2).join('/')
+      : null
+
+    // 跟踪当前项目的子页面路径
+    if (urlProjectId && urlSubPath) {
+      setOpenTabs((prev) =>
+        prev.map((tab) =>
+          tab.info.projectId === urlProjectId
+            ? { ...tab, lastSubPath: urlSubPath }
+            : tab,
+        ),
+      )
+    }
+
+    if (pathname === prevPath) return
 
     if (urlProjectId !== activeProjectId) {
       setActiveProjectIdState(urlProjectId)
@@ -257,6 +276,7 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
             tabItems: createDefaultTabItems(),
             activeTabKey: CatalogType.Overview,
             lastActiveTabKey: undefined,
+            lastSubPath: '/home',
           },
         ]
       })

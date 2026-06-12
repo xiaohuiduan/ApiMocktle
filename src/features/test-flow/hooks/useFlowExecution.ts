@@ -829,9 +829,20 @@ export function useFlowExecution() {
                     toEqual: (expected: unknown) => { if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`not equal`) },
                     toBeTruthy: () => { if (!actual) throw new Error(`expected truthy, got ${actual}`) },
                     toBeDefined: () => { if (actual === undefined) throw new Error('expected defined') },
-                    toContain: (substr: string) => { if (typeof actual === 'string' && !actual.includes(substr)) throw new Error(`not contain ${substr}`) },
-                    toBeGreaterThan: (n: number) => { if (typeof actual === 'number' && actual <= n) throw new Error(`${actual} <= ${n}`) },
-                    toBeLessThan: (n: number) => { if (typeof actual === 'number' && actual >= n) throw new Error(`${actual} >= ${n}`) },
+                    toContain: (substr: string) => {
+                      const actualStr = typeof actual === 'string' ? actual : String(actual ?? '')
+                      if (!actualStr.includes(substr)) throw new Error(`not contain ${substr}`)
+                    },
+                    toBeGreaterThan: (n: number) => {
+                      const num = typeof actual === 'number' ? actual : Number(actual)
+                      if (isNaN(num)) throw new Error(`expected number, got ${typeof actual} (${actual})`)
+                      if (num <= n) throw new Error(`${num} <= ${n}`)
+                    },
+                    toBeLessThan: (n: number) => {
+                      const num = typeof actual === 'number' ? actual : Number(actual)
+                      if (isNaN(num)) throw new Error(`expected number, got ${typeof actual} (${actual})`)
+                      if (num >= n) throw new Error(`${num} >= ${n}`)
+                    },
                   }),
                   variables: {
                     get: (k: string) => variables[k],

@@ -1,4 +1,4 @@
-import { Button, Tooltip, Space } from 'antd'
+import { Button, Tooltip, Space, Select, Input } from 'antd'
 import { css } from '@emotion/css'
 import {
   Play,
@@ -31,6 +31,11 @@ export interface FlowToolbarProps {
   canRedo: boolean
   isRunning: boolean
   isDirty: boolean
+  // Mock Agent 地址
+  agentUrl: string
+  onAgentUrlChange: (url: string) => void
+  // 可选的环境列表（用户从系统环境配置中手动粘贴 Agent URL，不依赖环境选择）
+  environments?: Array<{ name: string; agentUrl?: string }>
 }
 
 // ==================== 样式 ====================
@@ -69,7 +74,18 @@ export default function FlowToolbar({
   canRedo,
   isRunning,
   isDirty,
+  agentUrl,
+  onAgentUrlChange,
+  environments = [],
 }: FlowToolbarProps) {
+  // 从环境列表提取有 agentUrl 的地址，供快速选择
+  const agentUrlOptions = environments
+    .filter(e => e.agentUrl)
+    .map(e => ({
+      value: e.agentUrl!,
+      label: `${e.name} (${e.agentUrl})`,
+    }))
+
   return (
     <div className={toolbarClass} data-testid="flow-toolbar">
       {taskName && (
@@ -196,6 +212,18 @@ export default function FlowToolbar({
           />
         </Tooltip>
       </Space>
+
+      {/* 右侧：Mock Agent 地址 */}
+      <div style={{ flex: 1 }} />
+      <Select
+        size="small"
+        value={agentUrl || undefined}
+        onChange={onAgentUrlChange}
+        placeholder="Mock Agent 地址"
+        allowClear
+        style={{ minWidth: 240 }}
+        options={agentUrlOptions}
+      />
     </div>
   )
 }

@@ -67,11 +67,23 @@ interface FlowState {
 
   // 自动布局
   autoLayout: () => Promise<void>
+
+  // Agent 地址（Mock 依赖发现用）
+  agentUrl: string
+  setAgentUrl: (url: string) => void
 }
 
 // ==================== 常量 ====================
 
 const MAX_HISTORY = 50
+
+// ==================== Agent 地址持久化 ====================
+
+const AGENT_URL_LS_KEY = 'flow-agent-url'
+
+function tryLoadAgentUrl(): string {
+  try { return localStorage.getItem(AGENT_URL_LS_KEY) || '' } catch { return '' }
+}
 
 // ==================== Store 实现 ====================
 
@@ -86,6 +98,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   lastSavedGraph: null,
   history: [],
   historyIndex: -1,
+  agentUrl: tryLoadAgentUrl(),
 
   // 节点变更处理
   onNodesChange: (changes) => {
@@ -215,6 +228,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
   },
 
+  // Agent 地址
+  setAgentUrl: (url) => {
+    set({ agentUrl: url })
+    try { localStorage.setItem(AGENT_URL_LS_KEY, url) } catch { /* ignore */ }
+  },
+
   // 加载图
   loadGraph: (graph) => {
     // 应用迁移逻辑，确保向后兼容
@@ -334,6 +353,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       history: [],
       historyIndex: -1,
     })
+    // 重置不清理 agentEnvName，这是用户偏好
   },
 
   // 自动布局（使用 ELK 算法，最小化边交叉）

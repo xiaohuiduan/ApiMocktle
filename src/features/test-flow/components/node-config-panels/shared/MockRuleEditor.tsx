@@ -4,62 +4,56 @@ import { PlusOutlined, DeleteOutlined, ThunderboltOutlined, ApiOutlined } from '
 import { invoke } from '@tauri-apps/api/core'
 import { nanoid } from 'nanoid'
 import { MonacoEditor } from '@/components/MonacoEditor/MonacoEditor'
+import { useFlowStore } from '../../../store/useFlowStore'
 import type { MockRule, AgentDiscoverResult, AgentClassInfo } from '../../../types/mock.types'
 
 const { Text } = Typography
-
-// ==================== 环境类型 ====================
-
-interface EnvironmentOption {
-  name: string
-  agentUrl?: string
-}
-
-// ==================== localStorage 工具 ====================
-
-const LS_KEY = 'mock-editor-selected-env'
-
-function loadSavedEnvName(): string {
-  try { return localStorage.getItem(LS_KEY) || '' } catch { return '' }
-}
-
-function saveSavedEnvName(name: string) {
-  try { localStorage.setItem(LS_KEY, name) } catch { /* ignore */ }
-}
 
 // ==================== Props ====================
 
 interface MockRuleEditorProps {
   rules: MockRule[]
   onChange: (rules: MockRule[]) => void
-  environments?: EnvironmentOption[]
 }
 
 // ==================== 组件 ====================
 
-export default function MockRuleEditor({ rules, onChange, environments = [] }: MockRuleEditorProps) {
+export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps) {
   const [discoverResult, setDiscoverResult] = useState<AgentDiscoverResult | null>(null)
   const [agentConnected, setAgentConnected] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [selectedEnvName, setSelectedEnvName] = useState<string>(() => {
-    const saved = loadSavedEnvName()
-    // 验证保存的环境名仍然存在
-    if (saved && environments.some(e => e.name === saved)) return saved
-    // 默认选第一个有 agentUrl 的环境
-    const first = environments.find(e => e.agentUrl)
-    return first?.name || ''
-  })
 
-  const agentUrl = environments.find(e => e.name === selectedEnvName)?.agentUrl || ''
+  // 从全局 store 读取 Agent 地址
+  const agentUrl = useFlowStore((s) => s.agentUrl)
 
-  // 保存选择到 localStorage
-  const handleEnvChange = useCallback((name: string) => {
-    setSelectedEnvName(name)
-    saveSavedEnvName(name)
-    // 清除旧的发现结果
-    setDiscoverResult(null)
-    setAgentConnected(false)
-  }, [])
+  // 检查 Agent 连接状态并加载发现结果
+  useEffect(() => {
+    if (!agentUrl) {
+      setAgentConnected(false)
+      setDiscoverResult(null)
+      return
+    }
+    const check = async () => {
+      try {
+        const statusResult = await invoke<{ ok: boolean; data?: { connected: boolean } }>(
+          'check_mock_agent_status', { agentUrl }
+        )
+        setAgentConnected(statusResult.data?.connected ?? false)
+
+        if (statusResult.data?.connected) {
+          const result = await invoke<{ ok: boolean; data?: AgentDiscoverResult }>(
+            'discover_mock_targets', { agentUrl }
+          )
+          if (result.data) {
+            setDiscoverResult(result.data)
+          }
+        }
+      } catch {
+        setAgentConnected(false)
+      }
+    }
+    check()
+  }, [agentUrl])
 
   // 检查 Agent 连接状态并加载发现结果
   useEffect(() => {
@@ -129,30 +123,10 @@ export default function MockRuleEditor({ rules, onChange, environments = [] }: M
 
   return (
     <div className="space-y-3">
-      {/* 环境选择（用于 Agent 发现） */}
-      {environments.length > 0 && (
-        <div>
-          <Text type="secondary" className="block text-xs mb-1">关联环境（用于 Agent 发现）</Text>
-          <Select
-            size="small"
-            value={selectedEnvName || undefined}
-            onChange={handleEnvChange}
-            placeholder="选择环境"
-            allowClear
-            style={{ width: '100%' }}
-            options={environments.map(e => ({
-              value: e.name,
-              label: `${e.name}${e.agentUrl ? ` (${e.agentUrl})` : ''}`,
-              disabled: !e.agentUrl,
-            }))}
-          />
-        </div>
-      )}
-
       {/* Agent 连接状态 */}
       <div className="flex items-center gap-2">
         <Tag color={agentConnected ? 'success' : 'default'} icon={<ApiOutlined />}>
-          {agentConnected ? 'Agent 已连接' : agentUrl ? 'Agent 未连接' : '未配置 Agent URL'}
+          {agentConnected ? 'Agent 已连接' : agentUrl ? 'Agent 未连接' : '添加规则后可在顶部工具栏选择 Agent 环境'}
         </Tag>
       </div>
 

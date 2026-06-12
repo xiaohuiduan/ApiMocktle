@@ -254,9 +254,23 @@ export default function NodeConfigDrawer() {
 
     setSingleRunLoading(true)
     try {
-      // 从环境获取 baseUrl
+      // 从环境获取 baseUrl 和 agentUrl
       const env = environments.find(e => e.name === envName)
       const baseUrl = env?.baseUrls?.[0]?.url || undefined
+      const agentUrl = (env as Record<string, unknown>)?.agentUrl as string | undefined
+
+      // 推送 Mock 规则（如果节点配置了）
+      const nodeMockRules = nodeData.mockRules as Array<Record<string, unknown>> | undefined
+      if (agentUrl && nodeMockRules && nodeMockRules.length > 0) {
+        try {
+          const payload = buildSingleNodeMockPayload(nodeMockRules, variables)
+          if (payload.length > 0) {
+            await invoke('push_mock_rules', { agentUrl, rules: payload })
+          }
+        } catch {
+          // Mock 推送失败不影响请求
+        }
+      }
 
       // 构建 requestOverride 并替换变量
       let override = nodeData.requestOverride as Record<string, unknown> | undefined
@@ -274,6 +288,11 @@ export default function NodeConfigDrawer() {
           baseUrl: baseUrl || null,
         },
       )
+
+      // 清除 Mock 规则
+      if (agentUrl) {
+        try { await invoke('clear_mock_rules', { agentUrl }) } catch { /* ignore */ }
+      }
 
       if (!result.ok || !result.data) {
         const errMsg = result.error || '请求失败'
@@ -475,6 +494,30 @@ function interpolateOverride(obj: unknown, variables: Record<string, string>): u
   return obj
 }
 
+// ==================== Mock 规则推送辅助 ====================
+
+/** 将 HttpRequest 节点中的 mockRules 转为 Agent payload 格式并插值变量 */
+function buildSingleNodeMockPayload(rules: Array<Record<string, unknown>>, variables: Record<string, string>): Array<Record<string, unknown>> {
+  return rules
+    .filter(r => r.enabled !== false)
+    .map(r => {
+      const template = r.responseTemplate
+      const interpolated = variables && Object.keys(variables).length > 0
+        ? interpolateOverride(template, variables)
+        : template
+      return {
+        id: r.id,
+        className: r.className,
+        methodName: r.methodName,
+        paramTypes: r.paramTypes || undefined,
+        responseTemplate: typeof interpolated === 'string' ? interpolated : JSON.stringify(interpolated),
+        responseDelay: r.responseDelay || undefined,
+        maxTimes: r.maxTimes || undefined,
+        returnType: r.responseClassName || undefined,
+      }
+    })
+}
+
 // ==================== 运行结果组件 ====================
 
 interface ExecResultProps {
@@ -548,9 +591,19 @@ function formatRequest(req: Record<string, unknown>): string {
   parts.push('')
   if (req.headers && typeof req.headers === 'object') {
     parts.push('── Headers ──')
-    const headers = req.headers as Record<string, string>
-    for (const [k, v] of Object.entries(headers)) {
-      parts.push(`  ${k}: ${v}`)
+    const headers = req.headers
+    if (Array.isArray(headers)) {
+      // 后端返回的请求头是 [{name, value}, ...] 格式
+      for (const h of headers) {
+        const name = (h as Record<string, unknown>)?.name ?? ''
+        const value = (h as Record<string, unknown>)?.value ?? ''
+        parts.push(`  ${name}: ${value}`)
+      }
+    } else {
+      // 响应头是 key: value 对象格式
+      for (const [k, v] of Object.entries(headers as Record<string, string>)) {
+        parts.push(`  ${k}: ${v}`)
+      }
     }
   }
   if (req.body && req.body !== '(empty)' && req.body !== '') {

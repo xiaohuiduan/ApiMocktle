@@ -53,6 +53,8 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
   const getGraph = useFlowStore((s) => s.getGraph)
   const loadGraph = useFlowStore((s) => s.loadGraph)
   const autoLayout = useFlowStore((s) => s.autoLayout)
+  const agentUrl = useFlowStore((s) => s.agentUrl)
+  const setAgentUrl = useFlowStore((s) => s.setAgentUrl)
 
   // 运行状态
   const [isRunning, setIsRunning] = useState(false)
@@ -309,6 +311,9 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
           canRedo={canRedo}
           isRunning={isRunning}
           isDirty={isDirty}
+          environments={environments}
+          agentUrl={agentUrl}
+          onAgentUrlChange={setAgentUrl}
         />
 
         <div className="flex flex-1 overflow-hidden">

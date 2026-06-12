@@ -696,8 +696,17 @@ impl TestEngine {
                 if let Some(expected) = expected {
                     // 直接比较
                     if actual == expected { return Ok(true) }
-                    // 类型不匹配时尝试数值比较（"200" == 200）
+                    // 类型不匹配时尝试数值比较（200 == 200.0）
                     if let (Some(a), Some(e)) = (actual.as_f64(), expected.as_f64()) {
+                        return Ok((a - e).abs() < f64::EPSILON)
+                    }
+                    // 字符串 vs 数字交叉比较（"200" == 200 或 200 == "200"）
+                    let actual_str = actual.as_str().and_then(|s| s.parse::<f64>().ok());
+                    let expected_str = expected.as_str().and_then(|s| s.parse::<f64>().ok());
+                    if let (Some(a), Some(e)) = (actual.as_f64(), expected_str) {
+                        return Ok((a - e).abs() < f64::EPSILON)
+                    }
+                    if let (Some(a), Some(e)) = (actual_str, expected.as_f64()) {
                         return Ok((a - e).abs() < f64::EPSILON)
                     }
                     // 字符串比较
@@ -715,6 +724,15 @@ impl TestEngine {
                     if let (Some(a), Some(e)) = (actual.as_f64(), expected.as_f64()) {
                         return Ok((a - e).abs() > f64::EPSILON)
                     }
+                    // 字符串 vs 数字交叉比较
+                    let actual_str = actual.as_str().and_then(|s| s.parse::<f64>().ok());
+                    let expected_str = expected.as_str().and_then(|s| s.parse::<f64>().ok());
+                    if let (Some(a), Some(e)) = (actual.as_f64(), expected_str) {
+                        return Ok((a - e).abs() > f64::EPSILON)
+                    }
+                    if let (Some(a), Some(e)) = (actual_str, expected.as_f64()) {
+                        return Ok((a - e).abs() > f64::EPSILON)
+                    }
                     if let (Some(a), Some(e)) = (actual.as_str(), expected.as_str()) {
                         return Ok(a != e)
                     }
@@ -726,22 +744,32 @@ impl TestEngine {
             "exists" => Ok(true),
             "not_exists" => Ok(false),
             "contains" => {
-                if let (Some(actual_str), Some(expected_str)) = (actual.as_str(), expected.and_then(|e| e.as_str())) {
-                    Ok(actual_str.contains(expected_str))
+                if let Some(expected) = expected {
+                    let actual_str = Self::value_as_display_string(actual);
+                    let expected_str = Self::value_as_display_string(expected);
+                    Ok(actual_str.contains(&expected_str))
                 } else {
-                    Err("Both actual and expected must be strings for contains".to_string())
+                    Err("Missing expected value".to_string())
                 }
             }
             "not_contains" => {
-                if let (Some(actual_str), Some(expected_str)) = (actual.as_str(), expected.and_then(|e| e.as_str())) {
-                    Ok(!actual_str.contains(expected_str))
+                if let Some(expected) = expected {
+                    let actual_str = Self::value_as_display_string(actual);
+                    let expected_str = Self::value_as_display_string(expected);
+                    Ok(!actual_str.contains(&expected_str))
                 } else {
-                    Err("Both actual and expected must be strings for not_contains".to_string())
+                    Err("Missing expected value".to_string())
                 }
             }
             "greater_than" => {
                 if let Some(expected) = expected {
-                    match (actual.as_f64(), expected.as_f64()) {
+                    let actual_f64 = actual.as_f64().or_else(|| {
+                        actual.as_str().and_then(|s| s.parse::<f64>().ok())
+                    });
+                    let expected_f64 = expected.as_f64().or_else(|| {
+                        expected.as_str().and_then(|s| s.parse::<f64>().ok())
+                    });
+                    match (actual_f64, expected_f64) {
                         (Some(a), Some(e)) => Ok(a > e),
                         _ => Err("Values must be numbers for greater_than".to_string()),
                     }
@@ -751,7 +779,13 @@ impl TestEngine {
             }
             "less_than" => {
                 if let Some(expected) = expected {
-                    match (actual.as_f64(), expected.as_f64()) {
+                    let actual_f64 = actual.as_f64().or_else(|| {
+                        actual.as_str().and_then(|s| s.parse::<f64>().ok())
+                    });
+                    let expected_f64 = expected.as_f64().or_else(|| {
+                        expected.as_str().and_then(|s| s.parse::<f64>().ok())
+                    });
+                    match (actual_f64, expected_f64) {
                         (Some(a), Some(e)) => Ok(a < e),
                         _ => Err("Values must be numbers for less_than".to_string()),
                     }
@@ -761,6 +795,15 @@ impl TestEngine {
             }
             _ => Err(format!("Unknown operator: {}", operator)),
         }
+    }
+
+    /// Convert any serde_json::Value to a display string for contains/not_contains
+    fn value_as_display_string(v: &serde_json::Value) -> String {
+        if v.is_string() { return v.as_str().unwrap().to_string() }
+        if v.is_number() { return v.as_f64().unwrap().to_string() }
+        if v.is_boolean() { return v.as_bool().unwrap().to_string() }
+        if v.is_null() { return "null".to_string() }
+        String::new()
     }
 }
 
