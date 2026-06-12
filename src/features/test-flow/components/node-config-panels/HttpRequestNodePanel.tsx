@@ -16,6 +16,16 @@ import { serialize } from '@/utils'
 
 const { Text } = Typography
 
+/** 标签后有数据时显示绿色 * */
+function LabelWithBadge({ label, hasData }: { label: string; hasData: boolean }) {
+  return (
+    <span>
+      {label}
+      {hasData && <span style={{ color: '#22c55e', marginLeft: 3, fontSize: 14, lineHeight: 1 }}>*</span>}
+    </span>
+  )
+}
+
 // ==================== requestOverride 结构 ====================
 // 后端期望的格式:
 // { headers: [{name, value}], queryParams: [{name, value}], pathParams: [{name, value}], body: {type, json} }
@@ -66,7 +76,10 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
       lastBodyRef.current = currentBody
       const editor = bodyEditorRef.current?.editor
       if (editor) {
-        const newVal = currentBody != null ? serialize(currentBody, 2) : ''
+        // 字符串类型直接显示原文，避免 serialize 再包装成 JSON 字符串
+        const newVal = currentBody != null
+          ? (typeof currentBody === 'string' ? currentBody : serialize(currentBody, 2))
+          : ''
         if (editor.getValue() !== newVal) {
           editor.setValue(newVal)
         }
@@ -159,10 +172,12 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
 
   // ====== 折叠面板配置 ======
 
+  const hasOverride = !!(override.headers?.length || override.queryParams?.length || override.pathParams?.length || override.body)
+
   const collapseItems = [
     {
       key: 'requestOverride',
-      label: '请求覆盖（可选）',
+      label: <LabelWithBadge label="请求覆盖（可选）" hasData={hasOverride} />,
       children: (
         <Tabs
           size="small"
@@ -170,7 +185,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
           items={[
             {
               key: 'query',
-              label: 'Query',
+              label: <LabelWithBadge label="Query" hasData={(override.queryParams?.length ?? 0) > 0} />,
               children: (
                 <KVEditor
                   value={override.queryParams || []}
@@ -182,7 +197,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
             },
             {
               key: 'header',
-              label: 'Header',
+              label: <LabelWithBadge label="Header" hasData={(override.headers?.length ?? 0) > 0} />,
               children: (
                 <KVEditor
                   value={override.headers || []}
@@ -194,7 +209,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
             },
             {
               key: 'path',
-              label: 'Path',
+              label: <LabelWithBadge label="Path" hasData={(override.pathParams?.length ?? 0) > 0} />,
               children: (
                 <div>
                   <Text type="secondary" style={{ display: 'block', fontSize: 11, marginBottom: 8 }}>
@@ -211,7 +226,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
             },
             {
               key: 'body',
-              label: 'Body',
+              label: <LabelWithBadge label="Body" hasData={!!override.body} />,
               children: (
                 <div>
                   <Text type="secondary" style={{ display: 'block', fontSize: 11, marginBottom: 4 }}>
@@ -236,7 +251,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
     },
     {
       key: 'preScript',
-      label: '前置脚本（可选）',
+      label: <LabelWithBadge label="前置脚本（可选）" hasData={!!data.preScript} />,
       children: (
         <div>
           <Text type="secondary" className="block text-xs mb-2">
@@ -254,7 +269,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
     },
     {
       key: 'postScript',
-      label: '后置脚本（可选）',
+      label: <LabelWithBadge label="后置脚本（可选）" hasData={!!data.postScript} />,
       children: (
         <div>
           <Text type="secondary" className="block text-xs mb-2">
@@ -272,7 +287,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
     },
     {
       key: 'assertions',
-      label: '断言（可选）',
+      label: <LabelWithBadge label="断言（可选）" hasData={(data.assertions?.length ?? 0) > 0} />,
       children: (
         <AssertionListEditor
           assertions={data.assertions || []}
@@ -282,7 +297,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
     },
     {
       key: 'extractors',
-      label: '提取器（可选）',
+      label: <LabelWithBadge label="提取器（可选）" hasData={(data.extractors?.length ?? 0) > 0} />,
       children: (
         <ExtractorListEditor
           extractors={data.extractors || []}
@@ -292,7 +307,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
     },
     {
       key: 'mockRules',
-      label: `Mock 依赖（可选）${data.mockRules?.length ? ` · ${data.mockRules.length} 条` : ''}`,
+      label: <LabelWithBadge label={`Mock 依赖（可选）${data.mockRules?.length ? ` · ${data.mockRules.length} 条` : ''}`} hasData={(data.mockRules?.length ?? 0) > 0} />,
       children: (
         <div>
           <Text type="secondary" className="block text-xs mb-2">
@@ -301,7 +316,6 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
           <MockRuleEditor
             rules={data.mockRules || []}
             onChange={handleMockRulesChange}
-            environments={environments}
           />
         </div>
       ),
