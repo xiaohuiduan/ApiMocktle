@@ -14,8 +14,11 @@ import {
   Typography,
   theme,
 } from 'antd'
-import { ClockIcon, PlayIcon, RotateCcwIcon, SaveIcon } from 'lucide-react'
+import { ClockIcon, PlayIcon, RotateCcwIcon } from 'lucide-react'
 
+import { useParams } from 'react-router'
+import { api } from '@/api-client'
+import { useAuth } from '@/contexts/auth'
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { useApiSubTabContext } from './Api'
 import { buildSchemaExample } from '@/components/JsonSchema/schema-normalizer'
@@ -24,10 +27,9 @@ import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useSessionVariablesContext } from '@/contexts/session-variables'
-import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { BodyType } from '@/enums'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
-import type { ApiDetails, ApiRequestBody, RunTabInfo } from '@/types'
+import type { ApiDetails, ApiRequestBody, ApiRunResult, RunTabInfo } from '@/types'
 
 import { ParamsEditableTable } from './components/ParamsEditableTable'
 import { ParamsTab } from './params/ParamsTab'
@@ -169,10 +171,11 @@ export function RunTab() {
     projectEnvironments,
     currentProjectEnvironmentId,
     projectEnvironmentConfig,
-    updateMenuItem,
   } = useMenuHelpersContext()
 
   const { sessionVars, setSessionVars } = useSessionVariablesContext()
+  const { projectId } = useParams()
+  const { sessionId } = useAuth()
 
   const { menuApiItem, docValue, savedRunTabInfo } = useMemo(() => {
     const item = menuRawList?.find(({ id }) => id === tabData.key)
@@ -185,7 +188,7 @@ export function RunTab() {
 
   const storageKey = docValue ? `${STORAGE_PREFIX}${docValue.id}` : ''
 
-  const { run, running, result, error, resetResult } = useApiRequestRunner()
+  const { run, running, result, error, resetResult, setResult } = useApiRequestRunner()
 
   const { proxyConfig } = useProxyConfig()
   const proxyInfo = proxyConfig && proxyConfig.proxyType !== 'none'
@@ -213,7 +216,6 @@ export function RunTab() {
   const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [resetCounter, setResetCounter] = useState(0)
 
   // 脚本相关状态
@@ -370,72 +372,66 @@ export function RunTab() {
     setResetCounter(c => c + 1)
   }
 
-  // 保存到数据库（只保存运行时信息）
-  const handleSave = useCallback(async () => {
-    if (!workCopy) return
-    setSaving(true)
-    try {
-      // 只保存与文档定义不同的部分
-      const original = originalDocRef.current
-      const runTabInfo: RunTabInfo = {}
+  // 从数据库加载最近一次运行结果和请求参数
+  const prevLoadedKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!tabData.key || !projectId || !sessionId) return
+    // 防止重复请求（同一个 tabData.key 只加载一次）
+    if (prevLoadedKeyRef.current === tabData.key) return
+    prevLoadedKeyRef.current = tabData.key
 
-      // 环境选择
-      if (workCopy.serverId && workCopy.serverId !== original?.serverId) {
-        runTabInfo.serverId = workCopy.serverId
-      }
+    const loadLastResult = async () => {
+      try {
+        const list = await api<Array<{ requestJson: { url: string; method: string; headers: Array<{ name: string; value: string }>; body: string; contentType?: string }; responseJson: ApiRunResult }>>('list_request_history', { sessionId, projectId, menuItemId: tabData.key })
+        if (list.length > 0) {
+          const last = list[0]
+          // 恢复结果展示
+          setResult(last.responseJson)
 
-      // 参数（只保存有修改的）
-      if (workCopy.parameters) {
-        const changedParams: typeof workCopy.parameters = {}
-        for (const section of ['header', 'query', 'cookie', 'path'] as const) {
-          const current = workCopy.parameters[section]
-          const orig = original?.parameters?.[section]
-          if (current && JSON.stringify(current) !== JSON.stringify(orig)) {
-            changedParams[section] = current
+          // 恢复请求参数到 workCopy
+          if (workCopy && last.requestJson) {
+            const next = { ...workCopy }
+            // 恢复请求头、Query 参数、Cookie
+            if (next.parameters) {
+              // Query 参数从 URL 解析（responseJson.requestQuery 可能为空）
+              let queryParams: Array<{ name: string; example: string; enable: boolean }> = []
+              try {
+                const u = new URL(last.requestJson.url || '')
+                u.searchParams.forEach((value, name) => {
+                  queryParams.push({ name, example: value, enable: true })
+                })
+              } catch { /* ignore */ }
+              // Cookie 从 Cookie header 解析
+              const cookieHeader = last.requestJson.headers.find(h => h.name.toLowerCase() === 'cookie')
+              let cookiePairs: Array<{ name: string; example: string; enable: boolean }> = []
+              if (cookieHeader?.value) {
+                cookiePairs = cookieHeader.value.split(';').filter(Boolean).map(p => {
+                  const eqIdx = p.indexOf('=')
+                  if (eqIdx > 0) return { name: p.substring(0, eqIdx).trim(), example: decodeURIComponent(p.substring(eqIdx + 1).trim()), enable: true }
+                  return { name: p.trim(), example: '', enable: true }
+                })
+              }
+              next.parameters = {
+                ...next.parameters,
+                header: last.requestJson.headers.filter(h => h.name && h.name.toLowerCase() !== 'cookie').map(h => ({ name: h.name, example: h.value, enable: true }) as any),
+                query: queryParams as any,
+                cookie: cookiePairs as any,
+              }
+            }
+            // 恢复 Body
+            if (last.requestJson.body) {
+              setBodyRawText(last.requestJson.body)
+              if (next.requestBody && last.requestJson.contentType === 'application/json') {
+                next.requestBody = { ...next.requestBody, type: BodyType.Json }
+              }
+            }
+            setWorkCopy(next)
           }
         }
-        if (Object.keys(changedParams).length > 0) {
-          runTabInfo.parameters = changedParams
-        }
-      }
-
-      // Body
-      const currentBodyRawText = bodyRawText || workCopy.requestBody?.rawText
-      const origBodyRawText = original?.requestBody?.rawText
-      if (currentBodyRawText && currentBodyRawText !== origBodyRawText) {
-        runTabInfo.bodyType = workCopy.requestBody?.type
-        runTabInfo.bodyRawText = currentBodyRawText
-      }
-      if (workCopy.requestBody?.parameters) {
-        const origBodyParams = original?.requestBody?.parameters
-        if (JSON.stringify(workCopy.requestBody.parameters) !== JSON.stringify(origBodyParams)) {
-          runTabInfo.bodyType = workCopy.requestBody?.type
-          runTabInfo.bodyParameters = workCopy.requestBody.parameters
-        }
-      }
-
-      // 脚本
-      if (workCopy.preScript && workCopy.preScript !== original?.preScript) {
-        runTabInfo.preScript = workCopy.preScript
-      }
-      if (workCopy.postScript && workCopy.postScript !== original?.postScript) {
-        runTabInfo.postScript = workCopy.postScript
-      }
-
-      await updateMenuItem({
-        id: tabData.key,
-        runTabInfo,
-      })
-      try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
-      messageApi.success('保存成功')
-    } catch {
-      messageApi.error('保存失败')
-    } finally {
-      setSaving(false)
+      } catch { /* ignore */ }
     }
-  }, [workCopy, bodyRawText, tabData.key, storageKey, updateMenuItem, messageApi])
-
-  useCtrlSave(handleSave, subTabKey === 'run')
+    void loadLastResult()
+  }, [tabData.key, projectId, sessionId, setResult])
 
   // 运行
   const handleRun = async () => {
@@ -764,7 +760,6 @@ export function RunTab() {
 
         <Space className="shrink-0" style={{ marginLeft: 'auto' }}>
           <Button icon={<ClockIcon size={14} />} title="历史记录" onClick={() => setHistoryOpen(true)} />
-          <Button icon={<SaveIcon size={14} />} title="保存 (Ctrl+S)" loading={saving} onClick={() => void handleSave()} />
           <Button
             loading={running}
             type="primary"
