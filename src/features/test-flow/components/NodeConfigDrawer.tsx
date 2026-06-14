@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { css } from '@emotion/css'
 import { useFlowStore } from '../store/useFlowStore'
 import { FlowEditorContext } from '../contexts/FlowEditorContext'
+import { usePathHighlightContext } from '../contexts/PathHighlightContext'
 import { useAuth } from '@/contexts/auth'
 import { FlowNodeType } from '../types/flow.types'
 import type { FlowNodeData, NodeExecStatus } from '../types/flow.types'
@@ -129,8 +130,10 @@ export default function NodeConfigDrawer() {
   const drawerOpen = useFlowStore((s) => s.drawerOpen)
   const setDrawerOpen = useFlowStore((s) => s.setDrawerOpen)
   const updateNodeData = useFlowStore((s) => s.updateNodeData)
+  const selectNode = useFlowStore((s) => s.selectNode)
 
   const flowContext = useContext(FlowEditorContext)
+  const pathHighlight = usePathHighlightContext()
   const projectId = flowContext?.projectId || ''
   const { sessionId } = useAuth()
 
@@ -353,6 +356,15 @@ export default function NodeConfigDrawer() {
         <div className={resizeHandleClass} onMouseDown={handleResizeStart} />
         {selectedNode && (
           <div className="space-y-4">
+            {/* 路径面包屑 */}
+            {pathHighlight?.breadcrumbs && pathHighlight.breadcrumbs.length > 1 && (
+              <PathBreadcrumb
+                items={pathHighlight.breadcrumbs}
+                currentId={selectedNodeId!}
+                onSelect={selectNode}
+              />
+            )}
+
             {/* 节点类型头部 + 运行按钮 */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <TypeHeader
@@ -646,4 +658,94 @@ function formatResponse(resp: Record<string, unknown>): string {
     }
   }
   return parts.join('\n') || '(无详情)'
+}
+
+// ==================== 路径面包屑组件 ====================
+
+const COLLAPSE_THRESHOLD = 6 // 超过 6 个节点时折叠中间部分
+
+interface PathBreadcrumbProps {
+  items: { id: string; label: string }[]
+  currentId: string
+  onSelect: (id: string) => void
+}
+
+function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
+  const [expanded, setExpanded] = useState(false)
+
+  if (items.length <= 1) return null
+
+  const shouldCollapse = items.length > COLLAPSE_THRESHOLD && !expanded
+  const currentIdx = items.findIndex((item) => item.id === currentId)
+
+  let displayItems: Array<{ id: string; label: string; isEllipsis?: boolean }> = items
+
+  if (shouldCollapse) {
+    // 显示首尾各 2 个 + 中间折叠
+    const head = items.slice(0, 2)
+    const tail = items.slice(-2)
+    displayItems = [
+      ...head,
+      { id: '__ellipsis__', label: '⋯', isEllipsis: true },
+      ...tail,
+    ]
+  }
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 2,
+      fontSize: 12,
+      color: '#6b7280',
+      padding: '6px 0',
+    }}>
+      {displayItems.map((item, i) => {
+        const isCurrent = item.id === currentId
+        const isFirst = i === 0
+        const isLast = i === displayItems.length - 1
+
+        return (
+          <span key={item.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+            {/* 分隔符 */}
+            {!isFirst && (
+              <span style={{ margin: '0 4px', color: '#d1d5db' }}>→</span>
+            )}
+
+            {item.isEllipsis ? (
+              <span
+                style={{
+                  cursor: 'pointer',
+                  color: '#9ca3af',
+                  padding: '0 2px',
+                }}
+                onClick={() => setExpanded(true)}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#3b82f6' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = '#9ca3af' }}
+              >
+                ⋯
+              </span>
+            ) : (
+              <span
+                style={{
+                  fontWeight: isCurrent ? 600 : 400,
+                  color: isCurrent ? '#3b82f6' : '#6b7280',
+                  cursor: isCurrent ? 'default' : 'pointer',
+                  padding: '0 2px',
+                  borderRadius: 2,
+                  transition: 'color 0.15s',
+                }}
+                onClick={() => !isCurrent && onSelect(item.id)}
+                onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.color = '#3b82f6' }}
+                onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.color = '#6b7280' }}
+              >
+                {isCurrent ? `[${item.label}]` : item.label}
+              </span>
+            )}
+          </span>
+        )
+      })}
+    </div>
+  )
 }

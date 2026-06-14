@@ -6,6 +6,8 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { useFlowStore } from '../store/useFlowStore'
 import { useFlowPersistence } from '../hooks/useFlowPersistence'
 import { FlowEditorContext } from '../contexts/FlowEditorContext'
+import { PathHighlightContext } from '../contexts/PathHighlightContext'
+import { usePathHighlight } from '../hooks/usePathHighlight'
 import { useAuth } from '@/contexts/auth'
 import { useTestTaskDetail } from '@/hooks/useTestTask'
 import { FlowNodeType as NT, type FlowGraph, type NodeExecStatus } from '../types/flow.types'
@@ -39,6 +41,7 @@ interface Environment {
 export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
   const { loadFlow, forceSave, isSaving } = useFlowPersistence(taskId)
   const { sessionId } = useAuth()
+  const pathHighlight = usePathHighlight()
   const { taskDetail, fetchTaskDetail } = useTestTaskDetail(taskId)
 
   // Store 状态
@@ -293,6 +296,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
 
   return (
     <FlowEditorContext.Provider value={{ projectId, taskId }}>
+    <PathHighlightContext.Provider value={pathHighlight}>
       <div className="flex h-full flex-col" data-testid="test-flow-editor">
         {/* 顶部工具栏 */}
         <FlowToolbar
@@ -394,6 +398,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
         onClose={() => setImportModalOpen(false)}
         onImport={handleImportConfirm}
       />
+    </PathHighlightContext.Provider>
     </FlowEditorContext.Provider>
   )
 }

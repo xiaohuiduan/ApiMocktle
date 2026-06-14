@@ -73,3 +73,4 @@ src-tauri/target/
 # demo/test files at project root
 test-flow-demo.json
 test_server.py
+plans/**
