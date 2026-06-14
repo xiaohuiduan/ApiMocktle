@@ -246,6 +246,7 @@ pub fn list_tasks(db: &Db, project_id: &str) -> Result<Vec<TestTask>, AppError> 
     Ok(tasks)
 }
 
+#[allow(dead_code)]
 pub fn get_task_variables(db: &Db, task_id: &str) -> Result<Option<serde_json::Value>, AppError> {
     let task = get_task(db, task_id)?;
     Ok(task.and_then(|t| t.variables_json))

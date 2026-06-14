@@ -14,6 +14,7 @@ fn api_err<T: Serialize>(msg: &str) -> ApiResult<T> {
 // ==================== 数据结构 ====================
 
 /// 推送到 Agent 的单条 Mock 规则
+#[allow(non_snake_case)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MockRulePayload {
     pub id: String,
@@ -31,6 +32,7 @@ pub struct MockRulePayload {
 }
 
 /// Mock 调用日志条目
+#[allow(non_snake_case)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MockCallLogEntry {
     pub className: String,

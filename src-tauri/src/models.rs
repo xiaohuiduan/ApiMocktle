@@ -440,6 +440,7 @@ pub struct ReorderStepsPayload {
     pub step_ids: Vec<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ListTestExecutionsPayload {
     #[serde(rename = "taskId")]
@@ -448,6 +449,7 @@ pub struct ListTestExecutionsPayload {
     pub limit: i32,
 }
 
+#[allow(dead_code)]
 fn default_limit() -> i32 {
     20
 }

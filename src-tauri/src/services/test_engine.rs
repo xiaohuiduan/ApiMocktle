@@ -8,6 +8,7 @@ use crate::db::client::Db;
 use crate::errors::AppError;
 use crate::models::*;
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StepRequestResult {
     pub request: serde_json::Value,
@@ -76,6 +77,7 @@ impl TestEngine {
     }
 
     /// Interpolate a JSON value recursively
+    #[allow(dead_code)]
     pub fn interpolate_json(value: &serde_json::Value, variables: &HashMap<String, String>) -> serde_json::Value {
         match value {
             serde_json::Value::String(s) => {
@@ -311,6 +313,7 @@ impl TestEngine {
     }
 
     /// Build step request result from response
+    #[allow(dead_code)]
     pub fn build_step_result(
         request: &RunRequestPayload,
         response_body: &str,

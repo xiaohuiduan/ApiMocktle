@@ -9,7 +9,6 @@ use tokio::sync::{Mutex, oneshot};
 
 use crate::db::client::Db;
 use crate::db::test_repo;
-use crate::db::project_repo;
 use crate::db::menu_repo;
 use crate::db::flow_repo;
 use crate::models::*;

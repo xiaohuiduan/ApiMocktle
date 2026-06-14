@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use serde_json::Value as JsonValue;
 
-use crate::db::{menu_repo, project_repo};
+use crate::db::menu_repo;
 use crate::db::client::Db;
 
 /// 为指定项目生成完整的 AI Prompt（markdown 格式）
@@ -169,7 +169,7 @@ fn schema_to_example(schema: &JsonValue, schema_map: &HashMap<String, JsonValue>
         Some(p) => p,
         None => return serde_json::json!({}),
     };
-    let required_set: std::collections::HashSet<String> = resolved.get("required")
+    let _required_set: std::collections::HashSet<String> = resolved.get("required")
         .and_then(|v| v.as_array())
         .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
         .unwrap_or_default();
