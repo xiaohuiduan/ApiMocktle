@@ -27,9 +27,10 @@ import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useSessionVariablesContext } from '@/contexts/session-variables'
-import { BodyType } from '@/enums'
+import { BodyType, ParamType } from '@/enums'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
-import type { ApiDetails, ApiRequestBody, ApiRunResult, RunTabInfo } from '@/types'
+import type { ApiDetails, ApiRequestBody, ApiRunResult, RunTabInfo, SavedRequestConfig, Parameter } from '@/types'
+import { nanoid } from 'nanoid'
 
 import { ParamsEditableTable } from './components/ParamsEditableTable'
 import { ParamsTab } from './params/ParamsTab'
@@ -41,6 +42,63 @@ import { ScriptTab, executeScript } from './scripts'
 import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
 
 const STORAGE_PREFIX = 'run_tab_'
+
+/** 从 URL 中解析 query 参数 */
+function parseQueryFromUrl(url: string): Parameter[] {
+  try {
+    const parsed = new URL(url)
+    const params: Parameter[] = []
+    parsed.searchParams.forEach((value, name) => {
+      params.push({
+        id: nanoid(6),
+        name,
+        example: value,
+        enable: true,
+        type: ParamType.String,
+      } as Parameter)
+    })
+    return params
+  } catch {
+    return []
+  }
+}
+
+/** 从 requestJson 的 headers 和 url 中解析出 query/header/cookie 参数 */
+function parseHistoryParams(
+  headers: Array<{ name: string; value: string }>,
+  url: string,
+): { query: Parameter[], header: Parameter[], cookie: Parameter[] } {
+  const query = parseQueryFromUrl(url)
+  const header: Parameter[] = []
+  const cookie: Parameter[] = []
+
+  for (const h of headers) {
+    if (h.name.toLowerCase() === 'cookie') {
+      h.value.split(';').forEach(pair => {
+        const eqIdx = pair.indexOf('=')
+        if (eqIdx > 0) {
+          cookie.push({
+            id: nanoid(6),
+            name: pair.slice(0, eqIdx).trim(),
+            example: pair.slice(eqIdx + 1).trim(),
+            enable: true,
+            type: ParamType.String,
+          } as Parameter)
+        }
+      })
+    } else {
+      header.push({
+        id: nanoid(6),
+        name: h.name,
+        example: h.value,
+        enable: true,
+        type: ParamType.String,
+      } as Parameter)
+    }
+  }
+
+  return { query, header, cookie }
+}
 
 function cloneApiDetails(source: ApiDetails): ApiDetails {
   return JSON.parse(JSON.stringify(source)) as ApiDetails
@@ -204,6 +262,9 @@ export function RunTab() {
     originalDocRef.current = cloneApiDetails(docValue)
   }
 
+  // 缓存待解析的历史数据
+  const pendingHistoryRef = useRef<{ requestJson: SavedRequestConfig; responseJson: ApiRunResult } | null>(null)
+
   const [workCopy, setWorkCopy] = useState<ApiDetails | undefined>(() => {
     if (!docValue) return undefined
     try {
@@ -217,6 +278,7 @@ export function RunTab() {
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [resetCounter, setResetCounter] = useState(0)
+  const [historyLoaded, setHistoryLoaded] = useState(0)
 
   // 脚本相关状态
   const [preScriptConsole, setPreScriptConsole] = useState<ScriptConsoleEntry[]>([])
@@ -225,30 +287,6 @@ export function RunTab() {
   const [postScriptTests, setPostScriptTests] = useState<ScriptTestResult[]>([])
   const [preScriptRunning, setPreScriptRunning] = useState(false)
   const [postScriptRunning, setPostScriptRunning] = useState(false)
-
-  const [disabledInheritedParams, setDisabledInheritedParams] = useState<{
-    query: Set<string>
-    header: Set<string>
-    cookie: Set<string>
-    body: Set<string>
-  }>({
-    query: new Set(),
-    header: new Set(),
-    cookie: new Set(),
-    body: new Set(),
-  })
-
-  const handleToggleInheritedParam = useCallback(
-    (section: 'query' | 'header' | 'cookie', name: string, enabled: boolean) => {
-      setDisabledInheritedParams((prev) => {
-        const next = new Set(prev[section])
-        if (enabled) next.delete(name)
-        else next.add(name)
-        return { ...prev, [section]: next }
-      })
-    },
-    [],
-  )
 
   // 用数据库表列的 updatedAt 追踪文档版本（data_json 内部 updatedAt 不会随保存变化）
   const docVersionRef = useRef((menuApiItem as { updatedAt?: string } | undefined)?.updatedAt)
@@ -362,12 +400,7 @@ export function RunTab() {
 
     setBodyRawText(undefined)
     resetResult()
-    setDisabledInheritedParams({
-      query: new Set(),
-      header: new Set(),
-      cookie: new Set(),
-      body: new Set(),
-    })
+    pendingHistoryRef.current = null
     try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
     setResetCounter(c => c + 1)
   }
@@ -382,56 +415,55 @@ export function RunTab() {
 
     const loadLastResult = async () => {
       try {
-        const list = await api<Array<{ requestJson: { url: string; method: string; headers: Array<{ name: string; value: string }>; body: string; contentType?: string }; responseJson: ApiRunResult }>>('list_request_history', { sessionId, projectId, menuItemId: tabData.key })
+        const list = await api<Array<{ requestJson: SavedRequestConfig; responseJson: ApiRunResult }>>('list_request_history', { sessionId, projectId, menuItemId: tabData.key })
         if (list.length > 0) {
           const last = list[0]
           // 恢复结果展示
           setResult(last.responseJson)
 
-          // 恢复请求参数到 workCopy
-          if (workCopy && last.requestJson) {
-            const next = { ...workCopy }
-            // 恢复请求头、Query 参数、Cookie
-            if (next.parameters) {
-              // Query 参数从 URL 解析（responseJson.requestQuery 可能为空）
-              let queryParams: Array<{ name: string; example: string; enable: boolean }> = []
-              try {
-                const u = new URL(last.requestJson.url || '')
-                u.searchParams.forEach((value, name) => {
-                  queryParams.push({ name, example: value, enable: true })
-                })
-              } catch { /* ignore */ }
-              // Cookie 从 Cookie header 解析
-              const cookieHeader = last.requestJson.headers.find(h => h.name.toLowerCase() === 'cookie')
-              let cookiePairs: Array<{ name: string; example: string; enable: boolean }> = []
-              if (cookieHeader?.value) {
-                cookiePairs = cookieHeader.value.split(';').filter(Boolean).map(p => {
-                  const eqIdx = p.indexOf('=')
-                  if (eqIdx > 0) return { name: p.substring(0, eqIdx).trim(), example: decodeURIComponent(p.substring(eqIdx + 1).trim()), enable: true }
-                  return { name: p.trim(), example: '', enable: true }
-                })
-              }
-              next.parameters = {
-                ...next.parameters,
-                header: last.requestJson.headers.filter(h => h.name && h.name.toLowerCase() !== 'cookie').map(h => ({ name: h.name, example: h.value, enable: true }) as any),
-                query: queryParams as any,
-                cookie: cookiePairs as any,
-              }
-            }
-            // 恢复 Body
-            if (last.requestJson.body) {
-              setBodyRawText(last.requestJson.body)
-              if (next.requestBody && last.requestJson.contentType === 'application/json') {
-                next.requestBody = { ...next.requestBody, type: BodyType.Json }
-              }
-            }
-            setWorkCopy(next)
+          // 缓存历史数据，等待 workCopy 可用后解析参数
+          pendingHistoryRef.current = last
+          setHistoryLoaded(c => c + 1)
+
+          // 恢复 Body（不依赖 workCopy）
+          if (last.requestJson.body) {
+            setBodyRawText(last.requestJson.body)
           }
         }
       } catch { /* ignore */ }
     }
     void loadLastResult()
   }, [tabData.key, projectId, sessionId, setResult])
+
+  // 当 workCopy 可用时，恢复历史参数（直接写入 workCopy）
+  useEffect(() => {
+    if (!workCopy || !pendingHistoryRef.current) return
+
+    const last = pendingHistoryRef.current
+    const parsed = parseHistoryParams(
+      last.requestJson.headers ?? [],
+      last.requestJson.url ?? '',
+    )
+
+    const next = {
+      ...workCopy,
+      parameters: {
+        ...workCopy.parameters,
+        query: parsed.query,
+        header: parsed.header,
+        cookie: parsed.cookie,
+      },
+    }
+
+    // Body type 恢复
+    if (last.requestJson.body && workCopy.requestBody && last.requestJson.contentType === 'application/json') {
+      next.requestBody = { ...next.requestBody!, type: BodyType.Json }
+    }
+
+    setWorkCopy(next)
+    persist(next)
+    pendingHistoryRef.current = null
+  }, [workCopy, historyLoaded])
 
   // 运行
   const handleRun = async () => {
@@ -519,7 +551,6 @@ export function RunTab() {
       (projectEnvironmentConfig?.globalParameters?.query ?? []).filter(p => p.enable !== false),
       envParams.query.filter(p => p.enable !== false),
       workCopy.parameters?.query ?? [],
-      disabledInheritedParams.query,
     )
     const queryParams = mergedQuery
       .filter(p => p.name && p.enable !== false)
@@ -532,7 +563,6 @@ export function RunTab() {
       (projectEnvironmentConfig?.globalParameters?.header ?? []).filter(p => p.enable !== false),
       envParams.header.filter(p => p.enable !== false),
       workCopy.parameters?.header ?? [],
-      disabledInheritedParams.header,
     )
     const headers = mergedHeader
       .filter(h => h.name && h.enable !== false)
@@ -543,7 +573,6 @@ export function RunTab() {
       (projectEnvironmentConfig?.globalParameters?.cookie ?? []).filter(p => p.enable !== false),
       envParams.cookie.filter(p => p.enable !== false),
       workCopy.parameters?.cookie ?? [],
-      disabledInheritedParams.cookie,
     )
     const cookiePairs = mergedCookie
       .filter(c => c.name && c.enable !== false)
@@ -798,8 +827,6 @@ export function RunTab() {
                         globalParameters={projectEnvironmentConfig?.globalParameters}
                         envParameters={currentEnv?.parameters}
                         varMap={varMap}
-                        disabledInheritedNames={disabledInheritedParams}
-                        onToggleInheritedParam={handleToggleInheritedParam}
                         onChange={(parameters) => {
                           const next = { ...workCopy, parameters }
                           setWorkCopy(next)

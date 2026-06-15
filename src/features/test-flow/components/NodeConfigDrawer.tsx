@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Drawer, Divider, Tag, Typography, Collapse, Button, Modal, Input, Select, Space, Spin, message } from 'antd'
-import { CheckCircle, XCircle, Clock, AlertTriangle, Play } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, AlertTriangle, Play, CopyIcon } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { css } from '@emotion/css'
 import { useFlowStore } from '../store/useFlowStore'
@@ -549,6 +549,19 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
     collapseItems.push({
       key: 'request',
       label: '请求详情',
+      extra: (
+        <Button
+          type="text"
+          size="small"
+          icon={<CopyIcon size={12} />}
+          onClick={(e) => {
+            e.stopPropagation()
+            void navigator.clipboard.writeText(formatRequest(request)).then(() => {
+              message.success('已复制')
+            })
+          }}
+        />
+      ),
       children: (
         <div className={codeBlockClass}>
           {formatRequest(request)}
@@ -562,6 +575,19 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
       key: 'response',
       label: '响应详情',
       defaultActiveKey: true,
+      extra: (
+        <Button
+          type="text"
+          size="small"
+          icon={<CopyIcon size={12} />}
+          onClick={(e) => {
+            e.stopPropagation()
+            void navigator.clipboard.writeText(formatResponse(response)).then(() => {
+              message.success('已复制')
+            })
+          }}
+        />
+      ),
       children: (
         <div className={codeBlockClass}>
           {formatResponse(response)}

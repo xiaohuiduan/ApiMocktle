@@ -118,6 +118,30 @@ export interface RequestErrorInfo {
   suggestion: string
 }
 
+export interface RuntimeParamsState {
+  // 覆盖值（key 为参数 name）
+  overrides: Record<string, Parameter>
+  // 禁用的文档参数 name 列表
+  disabled: string[]
+  // 用户自定义添加的参数
+  custom: Parameter[]
+}
+
+export interface RuntimeRequestConfig {
+  query: RuntimeParamsState
+  header: RuntimeParamsState
+  cookie: RuntimeParamsState
+}
+
+export interface SavedRequestConfig {
+  url: string
+  method: string
+  headers: Array<{ name: string, value: string }>
+  body: string
+  contentType?: string
+  runtimeParamsState?: RuntimeRequestConfig
+}
+
 export interface ApiRunResult {
   url: string
   method: HttpMethod

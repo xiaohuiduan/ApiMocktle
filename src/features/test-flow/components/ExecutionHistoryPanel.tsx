@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { Tag, Button, Popconfirm, Spin, Empty, Modal, Collapse, Typography } from 'antd'
-import { RefreshCw, Trash2, Clock, ChevronRight, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { Tag, Button, Popconfirm, Spin, Empty, Modal, Collapse, Typography, message } from 'antd'
+import { RefreshCw, Trash2, Clock, ChevronRight, CheckCircle, XCircle, AlertTriangle, CopyIcon } from 'lucide-react'
 import { css } from '@emotion/css'
 import { useTestExecutions } from '@/hooks/useTestTask'
 import { useFlowStore } from '../store/useFlowStore'
@@ -125,6 +125,22 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
   const hasRequest = req && Object.keys(req).length > 0
   const hasResponse = resp && Object.keys(resp).length > 0
 
+  const handleCopyRequest = () => {
+    if (req) {
+      void navigator.clipboard.writeText(formatRequestText(req)).then(() => {
+        message.success('已复制')
+      })
+    }
+  }
+
+  const handleCopyResponse = () => {
+    if (resp) {
+      void navigator.clipboard.writeText(formatResponseText(resp)).then(() => {
+        message.success('已复制')
+      })
+    }
+  }
+
   return (
     <Modal
       title={
@@ -163,11 +179,33 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
             ...(hasRequest ? [{
               key: 'request',
               label: <span style={{ fontSize: 12 }}>请求详情</span>,
+              extra: (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CopyIcon size={12} />}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleCopyRequest()
+                  }}
+                />
+              ),
               children: <div className={codeBlockClass}>{formatRequestText(req!)}</div>,
             }] : []),
             ...(hasResponse ? [{
               key: 'response',
               label: <span style={{ fontSize: 12 }}>响应详情</span>,
+              extra: (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CopyIcon size={12} />}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleCopyResponse()
+                  }}
+                />
+              ),
               children: <div className={codeBlockClass}>{formatResponseText(resp!)}</div>,
             }] : []),
           ]}

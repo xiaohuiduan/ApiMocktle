@@ -3,6 +3,7 @@ import { Button, Input, Select, Switch, theme, Tooltip } from 'antd'
 import { PlusCircleIcon, XCircleIcon } from 'lucide-react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { nanoid } from 'nanoid'
+import { useEffect, useMemo } from 'react'
 
 import { DoubleCheckRemoveBtn } from '@/components/DoubleCheckRemoveBtn'
 import { EditableTable, type EditableTableProps } from '@/components/EditableTable'
@@ -46,10 +47,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     exampleColumnTitle = '请求值',
   } = props
 
-  const newRowRecordId = nanoid(6)
-
-  const testIsNewRow = (target: Parameter | undefined) =>
-    !target?.id || target.id === newRowRecordId
+  const testIsNewRow = (target: Parameter | undefined) => !target?.id
 
   const { styles } = useStyles(({ token }) => {
     const exampleRow = css({
@@ -92,32 +90,26 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
 
   const handleChange = (rowIdx: number, v: Record<string, any>) => {
     const target = value?.at(rowIdx)
-
     const isNewRow = testIsNewRow(target)
 
     if (isNewRow) {
-      const isDuplicate = value?.some((it, i) => it.name === v.name && i < rowIdx)
+      const newParam: Parameter = {
+        id: nanoid(6),
+        name: target?.name || v.name,
+        description: target?.description || v.description,
+        enable: target?.enable !== undefined ? target.enable : true,
+        required: target?.required,
+        type: v.type || ParamType.String,
+        example: v.example !== undefined ? v.example : (target?.type === ParamType.Array ? [''] : ''),
+      } as Parameter
 
-      if (isDuplicate) {
-        handleDuplicate(rowIdx, v)
-      }
-      else {
-        onChange?.([
-          ...(value ?? []),
-          {
-            id: newRowRecordId,
-            ...target,
-            ...v,
-            type: ParamType.String,
-          },
-        ])
-      }
+      onChange?.([...(value ?? []), newParam])
     }
     else {
       onChange?.(
         value?.map((it, i) => {
           if (i === rowIdx) {
-            return { ...it, ...v }
+            return { ...it, ...v } as Parameter
           }
 
           return it
@@ -395,7 +387,6 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
       columns={columns}
       dataSource={value}
       newRowRecord={{
-        id: newRowRecordId,
         type: ParamType.String,
       }}
     />
