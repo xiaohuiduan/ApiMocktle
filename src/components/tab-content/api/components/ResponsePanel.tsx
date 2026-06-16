@@ -22,7 +22,7 @@ export function ResponsePanel({ paramsArea, resultArea, hasResult, autoSaveId }:
 
   const { styles } = useStyles(({ token }) => ({
     resizeHandle: css({
-      height: 3,
+      height: 2,
       backgroundColor: token.colorBorderSecondary,
       cursor: 'row-resize',
       transition: 'background-color 0.2s',
@@ -39,7 +39,7 @@ export function ResponsePanel({ paramsArea, resultArea, hasResult, autoSaveId }:
       className="flex-1 min-w-0 overflow-hidden"
     >
       <Panel
-        defaultSize={hasResult ? 60 : 85}
+        defaultSize={hasResult ? 50 : 85}
         minSize={15}
         maxSize={85}
         className="flex flex-col overflow-hidden min-w-0"
@@ -52,11 +52,11 @@ export function ResponsePanel({ paramsArea, resultArea, hasResult, autoSaveId }:
       <PanelResizeHandle className={styles.resizeHandle} />
 
       <Panel
-        defaultSize={hasResult ? 40 : 0}
+        defaultSize={hasResult ? 50 : 0}
         minSize={15}
         className="flex flex-col overflow-hidden min-w-0"
       >
-        <div className="flex flex-col flex-1 overflow-hidden px-3 py-3">
+        <div className="flex flex-col flex-1 overflow-hidden px-2 py-1.5">
           {hasResult ? (
             resultArea
           ) : (

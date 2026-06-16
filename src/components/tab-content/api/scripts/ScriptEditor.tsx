@@ -389,7 +389,7 @@ export function ScriptEditor(props: ScriptEditorProps) {
 
   return (
     <div className="flex flex-col min-h-0">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between">
         <div />
         <Button
           type="link"
@@ -420,7 +420,7 @@ export function ScriptEditor(props: ScriptEditorProps) {
       </div>
 
       {hasOutput && (
-        <div className="mt-2 rounded border overflow-hidden" style={{ borderColor: token.colorBorderSecondary }}>
+        <div className="mt-1.5 rounded border overflow-hidden" style={{ borderColor: token.colorBorderSecondary }}>
           <Tabs
             animated={false}
             size="small"

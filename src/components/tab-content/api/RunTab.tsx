@@ -34,6 +34,11 @@ import { nanoid } from 'nanoid'
 
 import { ParamsEditableTable } from './components/ParamsEditableTable'
 import { ParamsTab } from './params/ParamsTab'
+import { QueryParamsPanel } from './params/QueryParamsPanel'
+import { HeadersParamsPanel } from './params/HeadersParamsPanel'
+import { CookieParamsPanel } from './params/CookieParamsPanel'
+import { BodyPanel } from './params/BodyPanel'
+import { ScriptsPanel } from './params/ScriptsPanel'
 import { useApiRequestRunner } from './useApiRequestRunner'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
@@ -274,11 +279,28 @@ export function RunTab() {
     return cloneApiDetails(docValue)
   })
 
-  const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [resetCounter, setResetCounter] = useState(0)
   const [historyLoaded, setHistoryLoaded] = useState(0)
+
+  // 智能默认 tab：根据 HTTP 方法选择
+  const getDefaultActiveTab = useCallback(() => {
+    const method = workCopy?.method?.toUpperCase()
+    if (['POST', 'PUT', 'PATCH'].includes(method ?? '')) {
+      return 'body'
+    }
+    return 'params'
+  }, [workCopy?.method])
+
+  const [activeParamsTab, setActiveParamsTab] = useState(getDefaultActiveTab())
+
+  // 当 workCopy.method 变化时，更新默认 tab（仅在切换 API 时）
+  useEffect(() => {
+    if (workCopy?.id) {
+      setActiveParamsTab(getDefaultActiveTab())
+    }
+  }, [workCopy?.id, getDefaultActiveTab])
 
   // 脚本相关状态
   const [preScriptConsole, setPreScriptConsole] = useState<ScriptConsoleEntry[]>([])
@@ -300,7 +322,6 @@ export function RunTab() {
       originalDocRef.current = cloneApiDetails(docValue)
       const merged = savedRunTabInfo ? mergeRunTabInfo(docValue, savedRunTabInfo) : cloneApiDetails(docValue)
       setWorkCopy(merged)
-      setBodyRawText(undefined)
       resetResult()
       return
     }
@@ -398,7 +419,6 @@ export function RunTab() {
       messageApi.success('已复原为文档原始值')
     }
 
-    setBodyRawText(undefined)
     resetResult()
     pendingHistoryRef.current = null
     try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
@@ -425,10 +445,7 @@ export function RunTab() {
           pendingHistoryRef.current = last
           setHistoryLoaded(c => c + 1)
 
-          // 恢复 Body（不依赖 workCopy）
-          if (last.requestJson.body) {
-            setBodyRawText(last.requestJson.body)
-          }
+          // Body 会在下面的 useEffect 中通过 pendingHistoryRef 恢复
         }
       } catch { /* ignore */ }
     }
@@ -455,9 +472,13 @@ export function RunTab() {
       },
     }
 
-    // Body type 恢复
-    if (last.requestJson.body && workCopy.requestBody && last.requestJson.contentType === 'application/json') {
-      next.requestBody = { ...next.requestBody!, type: BodyType.Json }
+    // Body type 和 rawText 恢复
+    if (last.requestJson.body && workCopy.requestBody) {
+      next.requestBody = {
+        ...next.requestBody!,
+        type: last.requestJson.contentType === 'application/json' ? BodyType.Json : BodyType.Raw,
+        rawText: last.requestJson.body,
+      }
     }
 
     setWorkCopy(next)
@@ -513,7 +534,7 @@ export function RunTab() {
             headers: (workCopy.parameters?.header ?? [])
               .filter(h => h.name && h.enable !== false)
               .map(h => ({ name: h.name!, value: String(h.example ?? '') })),
-            body: bodyRawText ?? '',
+            body: workCopy.requestBody?.rawText ?? '',
           },
         })
 
@@ -589,7 +610,7 @@ export function RunTab() {
 
     if (body && body.type !== BodyType.None) {
       if (body.type === BodyType.Json || body.type === BodyType.Xml || body.type === BodyType.Raw) {
-        const raw = bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)
+        const raw = body.rawText ?? buildBodyExample(workCopy, menuRawList)
         bodyText = resolveVars(raw)
         contentType = body.type === BodyType.Xml ? 'application/xml'
           : body.type === BodyType.Raw ? 'text/plain'
@@ -669,7 +690,12 @@ export function RunTab() {
   const handleFillBody = () => {
     if (!workCopy) return
     const text = buildBodyFillText(workCopy, menuRawList)
-    setBodyRawText(text)
+    const next = {
+      ...workCopy,
+      requestBody: { ...workCopy.requestBody!, rawText: text },
+    }
+    setWorkCopy(next)
+    persist(next)
   }
 
 
@@ -677,7 +703,51 @@ export function RunTab() {
   const showBodyEditor = workCopy?.requestBody
     && (workCopy.requestBody.type === BodyType.Json
       || workCopy.requestBody.type === BodyType.Xml
-      || workCopy.requestBody.type === BodyType.Raw)
+      || workCopy.requestBody.type === BodyType.Raw
+      || workCopy.requestBody.type === BodyType.Binary)
+
+  // 判断各 tab 是否有内容（用于显示绿色 * 标识）
+  const hasParamsContent = useMemo(() => {
+    return (workCopy?.parameters?.query ?? []).some(p => p.name && p.enable !== false)
+  }, [workCopy?.parameters?.query])
+
+  const hasHeadersContent = useMemo(() => {
+    return (workCopy?.parameters?.header ?? []).some(p => p.name && p.enable !== false)
+  }, [workCopy?.parameters?.header])
+
+  const hasCookieContent = useMemo(() => {
+    return (workCopy?.parameters?.cookie ?? []).some(p => p.name && p.enable !== false)
+  }, [workCopy?.parameters?.cookie])
+
+  const hasBodyContent = useMemo(() => {
+    const body = workCopy?.requestBody
+    if (!body || body.type === BodyType.None) return false
+
+    if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
+      return (body.parameters ?? []).some(p => p.name && p.enable !== false)
+    }
+    if (body.type === BodyType.Json || body.type === BodyType.Xml) {
+      return !!((body.jsonSchema as { properties?: unknown[] })?.properties?.length)
+    }
+    if (body.type === BodyType.Raw || body.type === BodyType.Binary) {
+      return !!(body.rawText?.trim())
+    }
+    return false
+  }, [workCopy?.requestBody])
+
+  const hasScriptsContent = useMemo(() => {
+    return !!(workCopy?.preScript?.trim() || workCopy?.postScript?.trim())
+  }, [workCopy?.preScript, workCopy?.postScript])
+
+  // Tab Label 组件（带绿色 * 标识）
+  const TabLabel = ({ children, hasContent }: { children: React.ReactNode; hasContent: boolean }) => {
+    return (
+      <span>
+        {children}
+        {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 4 }}>*</span>}
+      </span>
+    )
+  }
 
   // cURL
   const curlCommands = useMemo(() => {
@@ -699,7 +769,7 @@ export function RunTab() {
   return (
     <div className="flex h-full flex-col overflow-hidden" style={{ minWidth: 0, maxWidth: '100%' }}>
       {/* 环境选择器 + URL 行 */}
-      <div className="flex items-center gap-2 px-3 py-2 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+      <div className="flex items-center gap-2 px-2 py-1 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
         <Typography.Text type="secondary" className="text-xs shrink-0">环境：</Typography.Text>
         <Select
           size="small"
@@ -812,150 +882,130 @@ export function RunTab() {
             key={`run-tabs-${resetCounter}`}
             animated={false}
             className="min-w-0 h-full"
-            tabBarStyle={{ paddingLeft: 12, marginBottom: 0 }}
+            tabBarStyle={{ paddingLeft: 8, marginBottom: 0 }}
+            activeKey={activeParamsTab}
+            onChange={setActiveParamsTab}
             items={[
               {
                 key: 'params',
-                label: 'Params & Body',
+                label: <TabLabel hasContent={hasParamsContent}>Params</TabLabel>,
                 children: (
-                  <>
-                    {/* 参数编辑区 */}
-                    <div className="px-3 min-w-0 overflow-hidden">
-                      <ParamsTab
-                        key={`params-tab-${resetCounter}`}
-                        value={workCopy.parameters}
-                        globalParameters={projectEnvironmentConfig?.globalParameters}
-                        envParameters={currentEnv?.parameters}
-                        varMap={varMap}
-                        onChange={(parameters) => {
-                          const next = { ...workCopy, parameters }
-                          setWorkCopy(next)
-                          persist(next)
-                        }}
-                      />
-                    </div>
-
-                    {/* Body 编辑区 */}
-                    <div className="px-3 pb-3">
-                      <div className="mb-2 flex items-center justify-between">
-                        <Typography.Text strong className="text-sm">Body</Typography.Text>
-                        {showBodyEditor && (
-                          <Button size="small" onClick={handleFillBody}>一键填充</Button>
-                        )}
-                      </div>
-                      {workCopy.requestBody
-                        ? (
-                            <div>
-                              <div className="mb-2 flex flex-wrap items-center gap-1">
-                                {bodyTypeOptions.map(({ n, t }) => {
-                                  const b = workCopy.requestBody
-                                  const hasContent = b
-                                    ? t === BodyType.FormData || t === BodyType.UrlEncoded
-                                      ? (b.parameters ?? []).some(p => p.name && p.enable !== false)
-                                      : t === BodyType.Json || t === BodyType.Xml
-                                        ? !!((b.jsonSchema as { properties?: unknown[] })?.properties?.length)
-                                        : t === BodyType.Raw || t === BodyType.Binary
-                                          ? !!(b.rawText?.trim())
-                                          : false
-                                    : false
-                                  return (
-                                    <Tag.CheckableTag
-                                      key={t}
-                                      checked={workCopy.requestBody!.type === t}
-                                      onChange={(checked) => {
-                                        if (checked) {
-                                          const next = {
-                                            ...workCopy,
-                                            requestBody: { ...workCopy.requestBody!, type: t },
-                                          }
-                                          setWorkCopy(next)
-                                          persist(next)
-                                        }
-                                      }}
-                                    >
-                                      {n}
-                                      {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
-                                    </Tag.CheckableTag>
-                                  )
-                                })}
-                              </div>
-
-                              {showBodyEditor && (
-                                <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: token.colorBorderSecondary }}>
-                                  <MonacoEditor
-                                    height="200px"
-                                    language={
-                                      workCopy.requestBody!.type === BodyType.Xml ? 'xml'
-                                        : workCopy.requestBody!.type === BodyType.Raw ? 'plaintext'
-                                        : 'json'
-                                    }
-                                    deserializeOnChange={false}
-                                    value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
-                                    onChange={(val) => {
-                                      setBodyRawText(typeof val === 'string' ? val : '')
-                                    }}
-                                    options={{ readOnly: false }}
-                                    onMount={(editor, monaco) => {
-                                      monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                                      monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                                    }}
-                                  />
-                                </div>
-                              )}
-
-                              {(workCopy.requestBody.type === BodyType.FormData
-                                || workCopy.requestBody.type === BodyType.UrlEncoded) && (
-                                <div>
-                                  <Typography.Text type="secondary" className="mb-2 block text-xs">
-                                    {workCopy.requestBody.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
-                                  </Typography.Text>
-                                  <ParamsEditableTable
-                                    value={workCopy.requestBody.parameters}
-                                    onChange={(parameters) => {
-                                      const next = {
-                                        ...workCopy,
-                                        requestBody: { ...workCopy.requestBody!, parameters },
-                                      }
-                                      setWorkCopy(next)
-                                      persist(next)
-                                    }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          )
-                        : (
-                            <Typography.Text type="secondary">无</Typography.Text>
-                          )}
-                    </div>
-                  </>
+                  <div className="px-2 min-w-0 overflow-hidden">
+                    <QueryParamsPanel
+                      key={`params-tab-${resetCounter}`}
+                      value={workCopy.parameters}
+                      globalParameters={projectEnvironmentConfig?.globalParameters}
+                      envParameters={currentEnv?.parameters}
+                      varMap={varMap}
+                      onChange={(parameters) => {
+                        const next = { ...workCopy, parameters }
+                        setWorkCopy(next)
+                        persist(next)
+                      }}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'headers',
+                label: <TabLabel hasContent={hasHeadersContent}>Headers</TabLabel>,
+                children: (
+                  <div className="px-2 min-w-0 overflow-hidden">
+                    <HeadersParamsPanel
+                      key={`headers-tab-${resetCounter}`}
+                      value={workCopy.parameters}
+                      globalParameters={projectEnvironmentConfig?.globalParameters}
+                      envParameters={currentEnv?.parameters}
+                      varMap={varMap}
+                      onChange={(parameters) => {
+                        const next = { ...workCopy, parameters }
+                        setWorkCopy(next)
+                        persist(next)
+                      }}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'cookie',
+                label: <TabLabel hasContent={hasCookieContent}>Cookie</TabLabel>,
+                children: (
+                  <div className="px-2 min-w-0 overflow-hidden">
+                    <CookieParamsPanel
+                      key={`cookie-tab-${resetCounter}`}
+                      value={workCopy.parameters}
+                      globalParameters={projectEnvironmentConfig?.globalParameters}
+                      envParameters={currentEnv?.parameters}
+                      varMap={varMap}
+                      onChange={(parameters) => {
+                        const next = { ...workCopy, parameters }
+                        setWorkCopy(next)
+                        persist(next)
+                      }}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'body',
+                label: <TabLabel hasContent={hasBodyContent}>Body</TabLabel>,
+                children: (
+                  <BodyPanel
+                    key={`body-tab-${resetCounter}`}
+                    requestBody={workCopy.requestBody}
+                    bodyRawText={workCopy.requestBody?.rawText}
+                    onBodyTypeChange={(type) => {
+                      const next = {
+                        ...workCopy,
+                        requestBody: { ...workCopy.requestBody!, type },
+                      }
+                      setWorkCopy(next)
+                      persist(next)
+                    }}
+                    onBodyRawTextChange={(text) => {
+                      const next = {
+                        ...workCopy,
+                        requestBody: { ...workCopy.requestBody!, rawText: text },
+                      }
+                      setWorkCopy(next)
+                      persist(next)
+                    }}
+                    onBodyParametersChange={(parameters) => {
+                      const next = {
+                        ...workCopy,
+                        requestBody: { ...workCopy.requestBody!, parameters },
+                      }
+                      setWorkCopy(next)
+                      persist(next)
+                    }}
+                    onFillBody={handleFillBody}
+                    buildBodyExample={() => buildBodyExample(workCopy, menuRawList)}
+                  />
                 ),
               },
               {
                 key: 'scripts',
-                label: 'Scripts',
+                label: <TabLabel hasContent={hasScriptsContent}>Scripts</TabLabel>,
                 children: (
-                  <div className="px-3 pb-3">
-                    <ScriptTab
-                      key={`script-tab-${resetCounter}`}
-                      preScript={workCopy.preScript}
-                      postScript={workCopy.postScript}
-                      onPreScriptChange={(value) => {
-                        const next = { ...workCopy, preScript: value }
-                        setWorkCopy(next)
-                        persist(next)
-                      }}
-                      onPostScriptChange={(value) => {
-                        const next = { ...workCopy, postScript: value }
-                        setWorkCopy(next)
-                        persist(next)
-                      }}
-                      preScriptConsole={preScriptConsole}
-                      preScriptTests={preScriptTests}
-                      postScriptConsole={postScriptConsole}
-                      postScriptTests={postScriptTests}
-                    />
-                  </div>
+                  <ScriptsPanel
+                    key={`scripts-tab-${resetCounter}`}
+                    preScript={workCopy.preScript}
+                    postScript={workCopy.postScript}
+                    onPreScriptChange={(value) => {
+                      const next = { ...workCopy, preScript: value }
+                      setWorkCopy(next)
+                      persist(next)
+                    }}
+                    onPostScriptChange={(value) => {
+                      const next = { ...workCopy, postScript: value }
+                      setWorkCopy(next)
+                      persist(next)
+                    }}
+                    preScriptConsole={preScriptConsole}
+                    preScriptTests={preScriptTests}
+                    postScriptConsole={postScriptConsole}
+                    postScriptTests={postScriptTests}
+                  />
                 ),
               },
             ]}

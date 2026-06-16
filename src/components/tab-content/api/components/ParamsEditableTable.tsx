@@ -244,10 +244,10 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
                       />
                     </ParamsEditableCell>
 
-                    <div className="flex items-center px-2">
+                    <div className="flex items-center px-1">
                       <PlusCircleIcon
                         className="cursor-pointer"
-                        size={15}
+                        size={13}
                         onClick={() => {
                           const newExample = example.toSpliced(vIdx + 1, 0, '')
                           handleChange(ridx, { example: newExample })
@@ -256,14 +256,14 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
                     </div>
 
                     <div
-                      className={`flex items-center pr-2 ${canRemove ? '' : 'pointer-events-auto invisible opacity-0'}`}
+                      className={`flex items-center pr-1 ${canRemove ? '' : 'pointer-events-auto invisible opacity-0'}`}
                       onClick={() => {
                         if (canRemove) {
                           handleChange(ridx, { example: example.filter((_, i) => i !== vIdx) })
                         }
                       }}
                     >
-                      <XCircleIcon className="cursor-pointer" size={15} />
+                      <XCircleIcon className="cursor-pointer" size={13} />
                     </div>
                   </div>
                 )

@@ -72,12 +72,12 @@ export function EditableTable<RecordType = AnyType>(props: EditableTableProps<Re
       boxSizing: 'border-box',
 
       '.ant-input': {
-        minHeight: '32px',
+        minHeight: '28px',
         padding: '0 5px',
       },
 
       'textarea.ant-input': {
-        padding: '5px',
+        padding: '4px',
       },
     })
 

@@ -14,7 +14,7 @@ export function ParamsEditableCell(props: ParamsEditableCelllProps) {
   const { styles } = useStyles(({ token }) => {
     const editableCell = css({
       height: '100%',
-      minHeight: '32px',
+      minHeight: '28px',
       outline: '1px solid',
       outlineColor: validateError ? token.colorErrorText : 'transparent',
 

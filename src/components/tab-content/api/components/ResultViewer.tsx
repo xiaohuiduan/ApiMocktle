@@ -1,8 +1,9 @@
 'use client'
 
-import { ReactNode, useMemo } from 'react'
+import { ReactNode, useMemo, useState } from 'react'
 
 import {
+  Button,
   Table,
   Tabs,
   Tag,
@@ -10,7 +11,7 @@ import {
   Typography,
   theme,
 } from 'antd'
-import { TerminalIcon } from 'lucide-react'
+import { MinusIcon, PlusIcon, TerminalIcon } from 'lucide-react'
 
 import { useProxyConfig } from '@/contexts/proxy-config'
 import { MonacoEditor } from '@/components/MonacoEditor'
@@ -36,6 +37,14 @@ export function ResultViewer({ result, error, curlContent, onRetry }: ResultView
   const proxyTooltip = proxyConfig && proxyConfig.proxyType !== 'none'
     ? `${proxyConfig.host}:${proxyConfig.port}`
     : null
+
+  // 格式化按钮状态
+  const isJson = result?.contentType?.toLowerCase().includes('json')
+  const FORMAT_SIZE_LIMIT = 200 * 1024
+  const bodySize = result?.body ? new Blob([result.body]).size : 0
+  const isLarge = bodySize > FORMAT_SIZE_LIMIT
+  const [showFormatted, setShowFormatted] = useState(isJson && !isLarge)
+  const [activeTab, setActiveTab] = useState(result?.body ? 'resContent' : 'reqContent')
 
   const monacoOptions = useMemo(() => ({
     readOnly: true,
@@ -90,16 +99,45 @@ export function ResultViewer({ result, error, curlContent, onRetry }: ResultView
 
   const tabsItems = [
     {
+      key: 'resContent',
+      label: '响应内容',
+      children: result.body != null
+        ? (
+            <ResponseBodyViewer
+              body={result.body}
+              contentType={result.contentType}
+              showFormatted={showFormatted}
+              onToggleFormat={() => setShowFormatted(v => !v)}
+            />
+          )
+        : <Typography.Text type="secondary" className="text-xs">无响应体</Typography.Text>,
+    },
+    {
+      key: 'resHeaders',
+      label: `响应头${result.headers?.length ? ` (${result.headers.length})` : ''}`,
+      children: result.headers && result.headers.length > 0
+        ? (
+            <Table
+              size="small"
+              dataSource={result.headers}
+              columns={headerTableColumns}
+              pagination={false}
+              rowKey="name"
+            />
+          )
+        : <Typography.Text type="secondary" className="text-xs">无响应头</Typography.Text>,
+    },
+    {
       key: 'reqContent',
       label: '请求内容',
       children: (
         <div className="flex flex-col h-full min-h-0">
-          <div className="rounded p-2 text-xs flex-shrink-0" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace' }}>
+          <div className="rounded p-1 text-xs flex-shrink-0" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace' }}>
             <span className="font-medium opacity-60">URL: </span>
             <span className="break-all">{result.url ?? '-'}</span>
           </div>
           {result.requestBodyText && (
-            <div className="flex-1 min-h-0 mt-2">
+            <div className="flex-1 min-h-0 mt-1">
               <MonacoEditor
                 height="100%"
                 language={detectLanguage(result.contentType)}
@@ -109,7 +147,7 @@ export function ResultViewer({ result, error, curlContent, onRetry }: ResultView
             </div>
           )}
           {result.requestBodyParameters && result.requestBodyParameters.length > 0 && (
-            <div className="flex-shrink-0 mt-2">
+            <div className="flex-shrink-0 mt-1">
               <Table
                 size="small"
                 dataSource={result.requestBodyParameters}
@@ -141,33 +179,6 @@ export function ResultViewer({ result, error, curlContent, onRetry }: ResultView
         : <Typography.Text type="secondary" className="text-xs">无请求头</Typography.Text>,
     },
     {
-      key: 'resContent',
-      label: '响应内容',
-      children: result.body != null
-        ? (
-            <ResponseBodyViewer
-              body={result.body}
-              contentType={result.contentType}
-            />
-          )
-        : <Typography.Text type="secondary" className="text-xs">无响应体</Typography.Text>,
-    },
-    {
-      key: 'resHeaders',
-      label: `响应头${result.headers?.length ? ` (${result.headers.length})` : ''}`,
-      children: result.headers && result.headers.length > 0
-        ? (
-            <Table
-              size="small"
-              dataSource={result.headers}
-              columns={headerTableColumns}
-              pagination={false}
-              rowKey="name"
-            />
-          )
-        : <Typography.Text type="secondary" className="text-xs">无响应头</Typography.Text>,
-    },
-    {
       key: 'curl',
       label: (
         <span className="flex items-center gap-1">
@@ -181,20 +192,44 @@ export function ResultViewer({ result, error, curlContent, onRetry }: ResultView
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="mb-2 flex flex-wrap items-center gap-3 flex-shrink-0">
-        <Tag color={getStatusColor(result.status)}>{result.status > 0 ? `${result.status} ${result.statusText}` : result.statusText}</Tag>
-        {result.proxyType && result.proxyType !== 'none' && (
-          <Tooltip title={proxyTooltip ? `代理: ${proxyTooltip}` : undefined}>
-            <Tag color="blue">{result.proxyType === 'socks5' ? 'SOCKS5' : 'HTTP'} 代理</Tag>
-          </Tooltip>
-        )}
-        <span className="text-xs opacity-50">
-          {result.method?.toUpperCase()} | {result.durationMs}ms
-          {result.body ? ` | ${calcBodySize(result.body)}` : ''}
-        </span>
-      </div>
-
-      <Tabs size="small" className={styles.resultContent} defaultActiveKey={result.body ? 'resContent' : 'reqContent'} items={tabsItems} />
+      <Tabs
+        size="small"
+        className={styles.resultContent}
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={tabsItems}
+        tabBarExtraContent={{
+          right: (
+            <div className="flex items-center gap-3 text-sm max-w-full overflow-hidden">
+              {/* 格式化按钮：仅在"响应内容" tab 且是 JSON 时显示 */}
+              {activeTab === 'resContent' && isJson && (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={showFormatted ? <MinusIcon size={12} /> : <PlusIcon size={12} />}
+                  onClick={() => setShowFormatted(v => !v)}
+                  style={{ marginRight: 8 }}
+                >
+                  {showFormatted ? '原始' : '格式化'}
+                </Button>
+              )}
+              <Tag className="flex-shrink-0" color={getStatusColor(result.status)}>
+                {result.status > 0 ? `${result.status} ${result.statusText}` : result.statusText}
+              </Tag>
+              <span className="text-xs opacity-50 truncate">
+                {result.method?.toUpperCase()}
+                {result.proxyType && result.proxyType !== 'none' && (
+                  <Tooltip title={proxyTooltip ? `代理: ${proxyTooltip}` : undefined}>
+                    <span> | {result.proxyType === 'socks5' ? 'SOCKS5' : 'HTTP'} 代理</span>
+                  </Tooltip>
+                )}
+                {' | '}{result.durationMs}ms
+                {result.body ? ` | ${calcBodySize(result.body)}` : ''}
+              </span>
+            </div>
+          )
+        }}
+      />
     </div>
   )
 }

@@ -11,6 +11,8 @@ import { css } from '@emotion/css'
 interface ResponseBodyViewerProps {
   body: string
   contentType?: string
+  showFormatted?: boolean
+  onToggleFormat?: () => void
 }
 
 const FORMAT_SIZE_LIMIT = 200 * 1024
@@ -40,7 +42,7 @@ function tryFormatJson(body: string): string | null {
   }
 }
 
-export function ResponseBodyViewer({ body, contentType }: ResponseBodyViewerProps) {
+export function ResponseBodyViewer({ body, contentType, showFormatted: externalShowFormatted, onToggleFormat }: ResponseBodyViewerProps) {
   const { token } = theme.useToken()
   const isJson = contentType?.toLowerCase().includes('json')
   const bodySize = useMemo(() => new Blob([body]).size, [body])
@@ -60,29 +62,27 @@ export function ResponseBodyViewer({ body, contentType }: ResponseBodyViewerProp
   }, [body, isJson])
 
   const isLarge = bodySize > FORMAT_SIZE_LIMIT
-  const [showFormatted, setShowFormatted] = useState(isJson && !isLarge)
+  const [internalShowFormatted, setInternalShowFormatted] = useState(isJson && !isLarge)
+
+  // 如果提供了外部控制，使用外部状态；否则使用内部状态
+  const showFormatted = externalShowFormatted !== undefined ? externalShowFormatted : internalShowFormatted
+  const handleToggle = onToggleFormat || (() => setInternalShowFormatted(v => !v))
 
   const displayBody = showFormatted && formatted ? formatted : body
   const language = detectLanguage(contentType)
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {isJson && (
+      {/* 按钮行已移到 ResultViewer 的 tabBarExtraContent，这里只保留提示信息 */}
+      {isJson && isLarge && (
         <div className="mb-1 flex items-center gap-2 flex-shrink-0">
-          <Button
-            size="small"
-            icon={showFormatted ? <MinusIcon size={12} /> : <PlusIcon size={12} />}
-            onClick={() => setShowFormatted((v) => !v)}
-          >
-            {showFormatted ? '原始' : '格式化'}
-          </Button>
-          {isLarge && !showFormatted && formatted && (
+          {!showFormatted && formatted && (
             <Typography.Text style={{ fontSize: token.fontSizeSM, color: token.colorTextTertiary }}>
               响应体 {calcBodySize(body)}，已显示原始数据，
-              <a onClick={() => setShowFormatted(true)}>强制格式化</a>
+              <a onClick={handleToggle}>强制格式化</a>
             </Typography.Text>
           )}
-          {isLarge && showFormatted && (
+          {showFormatted && (
             <Typography.Text style={{ fontSize: token.fontSizeSM, color: token.colorTextTertiary }}>
               已强制格式化 {calcBodySize(body)} 的响应体，可能影响性能
             </Typography.Text>
