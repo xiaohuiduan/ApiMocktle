@@ -74,3 +74,8 @@ src-tauri/target/
 test-flow-demo.json
 test_server.py
 plans/**
+
+# AI 计划/报告文档
+/IMPLEMENTATION_REPORT.md
+/UI_OPTIMIZATION_REPORT.md
+/BODY_EDITOR_BUG_FIX.md

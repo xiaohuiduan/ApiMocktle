@@ -3,7 +3,7 @@ import { Button, Input, Select, Switch, theme, Tooltip } from 'antd'
 import { PlusCircleIcon, XCircleIcon } from 'lucide-react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { nanoid } from 'nanoid'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { DoubleCheckRemoveBtn } from '@/components/DoubleCheckRemoveBtn'
 import { EditableTable, type EditableTableProps } from '@/components/EditableTable'
@@ -49,6 +49,10 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
 
   const testIsNewRow = (target: Parameter | undefined) => !target?.id
 
+  // 追踪待提交的新行数据（ref 避免 key 变化导致焦点丢失）
+  const pendingNewRowRef = useRef<Partial<Parameter> | null>(null)
+  const [pendingVersion, setPendingVersion] = useState(0)
+
   const { styles } = useStyles(({ token }) => {
     const exampleRow = css({
       color: token.colorTextTertiary,
@@ -93,17 +97,13 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     const isNewRow = testIsNewRow(target)
 
     if (isNewRow) {
-      const newParam: Parameter = {
-        id: nanoid(6),
+      // 新增行：暂存到 ref 中，不触发 onChange，保持 key 稳定避免焦点丢失
+      pendingNewRowRef.current = {
+        ...pendingNewRowRef.current,
+        ...v,
         name: target?.name || v.name,
-        description: target?.description || v.description,
-        enable: target?.enable !== undefined ? target.enable : true,
-        required: target?.required,
-        type: v.type || ParamType.String,
-        example: v.example !== undefined ? v.example : (target?.type === ParamType.Array ? [''] : ''),
-      } as Parameter
-
-      onChange?.([...(value ?? []), newParam])
+      }
+      setPendingVersion(prev => prev + 1)
     }
     else {
       onChange?.(
@@ -117,6 +117,33 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
       )
     }
   }
+
+  // 提交待新增的行（失焦时调用）
+  const commitPendingNewRow = () => {
+    const pending = pendingNewRowRef.current
+    if (pending && pending.name) {
+      const newParam: Parameter = {
+        id: nanoid(6),
+        name: pending.name,
+        description: pending.description || '',
+        enable: true,
+        type: pending.type || ParamType.String,
+        example: pending.example || '',
+      } as Parameter
+      onChange?.([...(value ?? []), newParam])
+    }
+    pendingNewRowRef.current = null
+    setPendingVersion(prev => prev + 1)
+  }
+
+  // 合并待新增行到 dataSource（渲染用），避免 EditableTable 的 autoNewRow 被干扰
+  const mergedValue = useMemo(() => {
+    const base = value ?? []
+    if (pendingNewRowRef.current) {
+      return [...base, pendingNewRowRef.current as Parameter]
+    }
+    return base
+  }, [value, pendingVersion])
 
   const columns: EditableTableProps<Parameter>['columns'] = [
     {
@@ -155,6 +182,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
                     if (isDuplicate) {
                       handleDuplicate(ridx, { name: text })
                     }
+                    commitPendingNewRow()
                   }}
                   onChange={(ev) => {
                     handleChange(ridx, { name: ev.target.value })
@@ -385,7 +413,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     <EditableTable<Parameter>
       autoNewRow={autoNewRow}
       columns={columns}
-      dataSource={value}
+      dataSource={mergedValue}
       newRowRecord={{
         type: ParamType.String,
       }}

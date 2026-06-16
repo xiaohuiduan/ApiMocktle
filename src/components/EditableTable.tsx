@@ -132,12 +132,12 @@ export function EditableTable<RecordType = AnyType>(props: EditableTableProps<Re
           <SortableContext
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-expect-error
-            items={internalDataSource.map((r, ridx) => `${ridx}_${String(r[rowKey])}`)}
+            items={internalDataSource.map((r, ridx) => r[rowKey] == null ? `__new_${ridx}` : `${ridx}_${String(r[rowKey])}`)}
           >
             {internalDataSource.map((record, ridx) => (
               // eslint-disable-next-line @typescript-eslint/ban-ts-comment
               // @ts-expect-error
-              <DraggableTabNode key={`${ridx}_${String(record[rowKey])}`} className="h-fit">
+              <DraggableTabNode key={record[rowKey] == null ? `__new_${ridx}` : `${ridx}_${String(record[rowKey])}`} className="h-fit">
                 <tr className="h-fit">
                   {columns?.map((col, cidx) => {
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
