@@ -21,6 +21,11 @@ import { FlowNodeType, type FlowNode, type FlowEdge } from '../types/flow.types'
 import { FlowInstanceContext, globalFlowInstanceRef } from '../contexts/FlowInstanceContext'
 import { usePathHighlightContext } from '../contexts/PathHighlightContext'
 
+/** 读取 html 元素上的 CSS 变量值 */
+function getCssVar(name: string, fallback: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+}
+
 // ==================== 内层画布组件 ====================
 // 使用 useReactFlow() 的组件必须在 ReactFlowProvider 内部
 
@@ -68,35 +73,43 @@ function FlowCanvasInner() {
   const nodeTypes = useMemo(() => getNodeTypes(), [])
 
   // 边默认配置：平滑折线（自动绕过节点）+ 方向箭头
-  const defaultEdgeOptions = useMemo(() => ({
-    type: 'smoothstep',
-    style: { strokeWidth: 2, stroke: '#94a3b8' },
-    animated: false,
-    markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8', width: 20, height: 20 },
-  }), [])
+  const defaultEdgeOptions = useMemo(() => {
+    const edgeColor = getCssVar('--ds-edge-color', '#94a3b8')
+    return {
+      type: 'smoothstep' as const,
+      style: { strokeWidth: 2, stroke: edgeColor },
+      animated: false,
+      markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor, width: 20, height: 20 },
+    }
+  }, [])
 
   // 节点的 handle 标签映射（用于连线标注）
   const nodeHandleLabels: Record<string, Record<string, { label: string; color: string }>> = useMemo(() => {
     const map: Record<string, Record<string, { label: string; color: string }>> = {}
+    const primaryColor = getCssVar('--ds-primary-color', '#3b82f6')
+    const mutedColor = getCssVar('--ds-node-text-muted', '#9ca3af')
+    const successColor = getCssVar('--ds-success-color', '#22c55e')
+    const errorColor = getCssVar('--ds-error-color', '#ef4444')
+    const loopColor = '#a855f7'
     for (const node of nodes) {
       const d = node.data as Record<string, unknown>
       if (node.type === 'condition') {
         const conditions = d.conditions as Array<{ id: string; label: string }> | undefined
         if (conditions && conditions.length > 0) {
           const handles: Record<string, { label: string; color: string }> = {}
-          for (const c of conditions) handles[c.id] = { label: c.label, color: '#3b82f6' }
-          handles['default'] = { label: (d.defaultLabel as string) || '默认', color: '#9ca3af' }
+          for (const c of conditions) handles[c.id] = { label: c.label, color: primaryColor }
+          handles['default'] = { label: (d.defaultLabel as string) || '默认', color: mutedColor }
           map[node.id] = handles
         } else {
           map[node.id] = {
-            'true': { label: '符合', color: '#22c55e' },
-            'false': { label: '不符合', color: '#ef4444' },
+            'true': { label: '符合', color: successColor },
+            'false': { label: '不符合', color: errorColor },
           }
         }
       } else if (node.type === 'loop') {
         map[node.id] = {
-          'out': { label: '出口', color: '#6b7280' },
-          'loop': { label: '循环体', color: '#a855f7' },
+          'out': { label: '出口', color: mutedColor },
+          'loop': { label: '循环体', color: loopColor },
         }
       }
     }
@@ -104,35 +117,37 @@ function FlowCanvasInner() {
   }, [nodes])
 
   // 为边注入选中状态样式 + 连线标签 + 路径高亮
-  const edgesWithSelection = useMemo(() =>
-    edges.map((e) => {
+  const edgesWithSelection = useMemo(() => {
+    const defaultEdge = getCssVar('--ds-edge-color', '#94a3b8')
+    const selectedColor = getCssVar('--ds-highlight-selected', '#3b82f6')
+    const upstreamColor = getCssVar('--ds-highlight-upstream', '#f59e0b')
+    const downstreamColor = getCssVar('--ds-highlight-downstream', '#10b981')
+
+    return edges.map((e) => {
       const isSelected = e.id === selectedEdgeId
       const isUpstream = activeNodeId && upstreamEdgeIds.has(e.id)
       const isDownstream = activeNodeId && downstreamEdgeIds.has(e.id)
 
-      // 路径高亮颜色优先于默认，选中蓝色优先于路径色
       let edgeColor: string
       let edgeWidth = 2
       let edgeAnimated = false
       let edgeOpacity: string | undefined
 
       if (isUpstream) {
-        edgeColor = isSelected ? '#3b82f6' : '#f59e0b'
+        edgeColor = isSelected ? selectedColor : upstreamColor
         edgeWidth = isSelected ? 3 : 2.5
         edgeAnimated = isLocked
       } else if (isDownstream) {
-        edgeColor = isSelected ? '#3b82f6' : '#10b981'
+        edgeColor = isSelected ? selectedColor : downstreamColor
         edgeWidth = isSelected ? 3 : 2.5
         edgeAnimated = isLocked
       } else if (activeNodeId) {
-        // 不相关边
         const handleInfo = nodeHandleLabels[e.source]?.[e.sourceHandle || '']
-        edgeColor = handleInfo?.color || '#94a3b8'
+        edgeColor = handleInfo?.color || defaultEdge
         edgeOpacity = '0.15'
       } else {
-        // 无高亮时的默认逻辑
         const handleInfo = nodeHandleLabels[e.source]?.[e.sourceHandle || '']
-        edgeColor = isSelected ? '#3b82f6' : handleInfo?.color || '#94a3b8'
+        edgeColor = isSelected ? selectedColor : handleInfo?.color || defaultEdge
         edgeWidth = isSelected ? 3 : 2
       }
 
@@ -142,12 +157,14 @@ function FlowCanvasInner() {
         style: {
           strokeWidth: edgeWidth,
           stroke: edgeColor,
+          transition: 'stroke 0.3s ease, stroke-width 0.3s ease',
           ...(edgeOpacity ? { opacity: edgeOpacity } : {}),
         },
         animated: edgeAnimated,
         markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor, width: 20, height: 20 },
       }
-    }),
+    })
+  },
     [edges, selectedEdgeId, nodeHandleLabels, activeNodeId, upstreamEdgeIds, downstreamEdgeIds, isLocked],
   )
 
@@ -351,7 +368,7 @@ function FlowCanvasInner() {
       {/* 节点高亮样式 */}
       <style>{`
         .react-flow__node.selected {
-          box-shadow: 0 0 0 2px #3b82f6 !important;
+          box-shadow: 0 0 0 2px var(--ds-highlight-selected, #3b82f6) !important;
           border-radius: 8px;
         }
         @keyframes node-running-pulse {
@@ -363,12 +380,12 @@ function FlowCanvasInner() {
           border-radius: 8px;
         }
         .react-flow__node[data-exec-status="passed"] {
-          box-shadow: 0 0 0 2px #22c55e !important;
+          box-shadow: 0 0 0 2px var(--ds-success-color, #22c55e) !important;
           border-radius: 8px;
         }
         .react-flow__node[data-exec-status="failed"],
         .react-flow__node[data-exec-status="error"] {
-          box-shadow: 0 0 0 2px #ef4444 !important;
+          box-shadow: 0 0 0 2px var(--ds-error-color, #ef4444) !important;
           border-radius: 8px;
         }
         /* 路径高亮 */
@@ -385,7 +402,7 @@ function FlowCanvasInner() {
           transition: opacity 0.2s ease;
         }
         .react-flow__node.path-highlight-current {
-          box-shadow: 0 0 0 3px #3b82f6, 0 0 12px rgba(59, 130, 246, 0.4) !important;
+          box-shadow: 0 0 0 3px var(--ds-highlight-selected, #3b82f6), 0 0 12px color-mix(in srgb, var(--ds-highlight-selected, #3b82f6) 40%, transparent) !important;
           border-radius: 8px;
           opacity: 1;
         }
@@ -395,7 +412,7 @@ function FlowCanvasInner() {
         }
         .react-flow__node.path-preview.path-highlight-current {
           opacity: 0.6;
-          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4) !important;
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--ds-highlight-selected, #3b82f6) 40%, transparent) !important;
         }
         .react-flow__edge.path-dimmed {
           opacity: 0.15 !important;
@@ -426,11 +443,11 @@ function FlowCanvasInner() {
         <Background gap={16} size={1} />
         <MiniMap
           nodeColor={(node) => {
-            if (!activeNodeId) return '#ddd'
-            if (node.id === activeNodeId) return '#3b82f6'
-            if (upstreamNodeIds.has(node.id)) return '#f59e0b'
-            if (downstreamNodeIds.has(node.id)) return '#10b981'
-            return '#ddd'
+            if (!activeNodeId) return getCssVar('--ds-node-border-color', '#ddd')
+            if (node.id === activeNodeId) return getCssVar('--ds-highlight-selected', '#3b82f6')
+            if (upstreamNodeIds.has(node.id)) return getCssVar('--ds-highlight-upstream', '#f59e0b')
+            if (downstreamNodeIds.has(node.id)) return getCssVar('--ds-highlight-downstream', '#10b981')
+            return getCssVar('--ds-node-border-color', '#ddd')
           }}
         />
         <Controls />
@@ -444,9 +461,10 @@ function FlowCanvasInner() {
             left: contextMenu.x,
             top: contextMenu.y,
             zIndex: 10000,
-            background: '#fff',
+            background: 'var(--ds-node-bg, #fff)',
             borderRadius: 6,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+            boxShadow: 'var(--ds-shadow-md, 0 2px 12px rgba(0,0,0,0.15))',
+            border: 'var(--ds-border, none)',
             padding: '4px 0',
             minWidth: 140,
           }}
@@ -457,13 +475,13 @@ function FlowCanvasInner() {
               padding: '6px 16px',
               fontSize: 13,
               cursor: 'pointer',
-              color: '#ef4444',
+              color: 'var(--ds-error-color, #ef4444)',
               display: 'flex',
               alignItems: 'center',
               gap: 6,
             }}
             onClick={handleDeleteFromMenu}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#fef2f2')}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ds-bg-elevated, #fef2f2)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             🗑 删除{contextMenu.type === 'node' ? '节点' : '连线'}

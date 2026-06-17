@@ -11,8 +11,8 @@ const { Text } = Typography
 // ==================== 样式 ====================
 
 const codeBlockClass = css`
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: var(--ds-code-bg, #1e1e1e);
+  color: var(--ds-code-color, #d4d4d4);
   border-radius: 4px;
   padding: 8px 10px;
   font-family: 'Cascadia Code', 'Fira Code', monospace;
@@ -26,8 +26,8 @@ const codeBlockClass = css`
 `
 
 const resultBlockClass = css`
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--ds-node-bg-elevated, #f8fafc);
+  border: 1px solid var(--ds-node-border-color, #e2e8f0);
   border-radius: 6px;
   padding: 12px;
   font-size: 12px;
@@ -41,11 +41,11 @@ const STEP_STATUS_CONFIG: Record<string, { color: string; icon: React.ReactNode;
 }
 
 const EXEC_STATUS_COLORS: Record<string, string> = {
-  passed: '#22c55e',
-  failed: '#ef4444',
-  aborted: '#f59e0b',
-  error: '#ef4444',
-  running: '#3b82f6',
+  passed: 'var(--ds-success-color, #22c55e)',
+  failed: 'var(--ds-error-color, #ef4444)',
+  aborted: 'var(--ds-warning-color, #f59e0b)',
+  error: 'var(--ds-error-color, #ef4444)',
+  running: 'var(--ds-highlight-selected, #3b82f6)',
 }
 
 const EXEC_STATUS_LABELS: Record<string, string> = {
@@ -150,7 +150,7 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
             {config.label}
           </Tag>
           {step.durationMs > 0 && (
-            <span style={{ color: '#9ca3af', fontSize: 12, fontWeight: 'normal' }}>{step.durationMs}ms</span>
+            <span style={{ color: 'var(--ds-node-text-muted, #9ca3af)', fontSize: 12, fontWeight: 'normal' }}>{step.durationMs}ms</span>
           )}
         </span>
       }
@@ -164,7 +164,7 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
       {step.errorMessage && (
         <div
           className={resultBlockClass}
-          style={{ marginBottom: 12, borderColor: '#fca5a5', background: '#fef2f2' }}
+          style={{ marginBottom: 12, borderColor: 'var(--ds-error-color, #fca5a5)', background: 'rgba(239, 68, 68, 0.08)' }}
         >
           <Text type="danger" style={{ fontSize: 12 }}>{step.errorMessage}</Text>
         </div>
@@ -260,9 +260,9 @@ function ExecutionDetail({ executionId, taskId }: { executionId: string; taskId:
   }, [executionId, getExecutionDetail])
 
   if (loading) return <Spin size="small" style={{ display: 'block', margin: '8px auto' }} />
-  if (error) return <div style={{ padding: 8, color: '#ef4444', fontSize: 11, textAlign: 'center' }}>{error}</div>
+  if (error) return <div style={{ padding: 8, color: 'var(--ds-error-color, #ef4444)', fontSize: 11, textAlign: 'center' }}>{error}</div>
   if (!steps.length) {
-    return <div style={{ padding: 8, color: '#9ca3af', fontSize: 11, textAlign: 'center' }}>无步骤详情</div>
+    return <div style={{ padding: 8, color: 'var(--ds-node-text-muted, #9ca3af)', fontSize: 11, textAlign: 'center' }}>无步骤详情</div>
   }
 
   const sorted = [...steps].sort((a, b) => a.sortOrder - b.sortOrder)
@@ -287,7 +287,7 @@ function ExecutionDetail({ executionId, taskId }: { executionId: string; taskId:
                 borderRadius: 4,
                 transition: 'background 0.15s',
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#f5f5f5' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--ds-bg-elevated, #f5f5f5)' }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
             >
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
@@ -295,14 +295,14 @@ function ExecutionDetail({ executionId, taskId }: { executionId: string; taskId:
                 {getLabel(step.stepId)}
               </span>
               {step.errorMessage && (
-                <span style={{ color: '#ef4444', fontSize: 10, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={step.errorMessage}>
+                <span style={{ color: 'var(--ds-error-color, #ef4444)', fontSize: 10, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={step.errorMessage}>
                   ✗
                 </span>
               )}
               {hasDetail && (
-                <ChevronRight size={10} color="#9ca3af" style={{ flexShrink: 0 }} />
+                <ChevronRight size={10} color="var(--ds-node-text-muted, #9ca3af)" style={{ flexShrink: 0 }} />
               )}
-              <span style={{ color: '#9ca3af', flexShrink: 0 }}>{formatDuration(step.durationMs)}</span>
+              <span style={{ color: 'var(--ds-node-text-muted, #9ca3af)', flexShrink: 0 }}>{formatDuration(step.durationMs)}</span>
             </div>
           )
         })}
@@ -367,7 +367,7 @@ export default function ExecutionHistoryPanel({ taskId }: { taskId: string }) {
                 key={exec.id}
                 style={{
                   marginBottom: 6,
-                  border: '1px solid #f0f0f0',
+                  border: '1px solid var(--ds-divider-color, #f0f0f0)',
                   borderRadius: 6,
                   overflow: 'hidden',
                 }}
@@ -380,7 +380,7 @@ export default function ExecutionHistoryPanel({ taskId }: { taskId: string }) {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 3,
-                    background: isExpanded ? '#fafafa' : '#fff',
+                    background: isExpanded ? 'var(--ds-bg-elevated, #fafafa)' : 'var(--ds-node-bg, #fff)',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -411,21 +411,21 @@ export default function ExecutionHistoryPanel({ taskId }: { taskId: string }) {
                       />
                     </Popconfirm>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#6b7280' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--ds-node-text-secondary, #6b7280)' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                       <Clock size={10} />
                       {formatDuration(exec.totalDurationMs)}
                     </span>
-                    <span style={{ color: '#22c55e' }}>✓{exec.passedSteps}</span>
-                    {exec.failedSteps > 0 && <span style={{ color: '#ef4444' }}>✗{exec.failedSteps}</span>}
-                    {exec.skippedSteps > 0 && <span style={{ color: '#9ca3af' }}>-{exec.skippedSteps}</span>}
+                    <span style={{ color: 'var(--ds-success-color, #22c55e)' }}>✓{exec.passedSteps}</span>
+                    {exec.failedSteps > 0 && <span style={{ color: 'var(--ds-error-color, #ef4444)' }}>✗{exec.failedSteps}</span>}
+                    {exec.skippedSteps > 0 && <span style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }}>-{exec.skippedSteps}</span>}
                     <span style={{ flex: 1 }} />
                     <span style={{ fontSize: 10 }}>{formatRelativeTime(exec.startedAt)}</span>
                   </div>
                 </div>
 
                 {isExpanded && (
-                  <div style={{ borderTop: '1px solid #f0f0f0', padding: '4px 8px' }}>
+                  <div style={{ borderTop: '1px solid var(--ds-divider-color, #f0f0f0)', padding: '4px 8px' }}>
                     <ExecutionDetail executionId={exec.id} taskId={taskId} />
                   </div>
                 )}

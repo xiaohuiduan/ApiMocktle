@@ -7,28 +7,158 @@
  */
 
 /* ============================================================
+ * 默认 (default)
+ * 标准扁平界面，干净简洁
+ * ============================================================ */
+
+[data-design-style='default'] {
+  /* 基础表面 */
+  --ds-bg-surface: var(--color-bg-panel);
+  --ds-bg-elevated: #ffffff;
+  --ds-bg-overlay: rgba(0, 0, 0, 0.45);
+  --ds-border: 1px solid var(--color-border);
+  --ds-border-top: 1px solid var(--color-border);
+  --ds-border-subtle: 1px solid var(--color-border);
+  --ds-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --ds-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --ds-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
+  --ds-blur: 0px;
+  --ds-saturate: 100%;
+  --ds-brightness: 100%;
+  --ds-backdrop-opacity: 1;
+  --ds-inner-shadow: none;
+  --ds-gradient: none;
+  --ds-glow: none;
+  --ds-texture: none;
+
+  /* 流程图节点 */
+  --ds-node-bg: #ffffff;
+  --ds-node-bg-elevated: #f9fafb;
+  --ds-node-border-color: #e5e7eb;
+  --ds-node-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --ds-node-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --ds-node-shadow-selected: 0 0 0 2px #3b82f6;
+  --ds-node-text-primary: var(--color-text-primary);
+  --ds-node-text-secondary: var(--color-text-secondary);
+  --ds-node-text-muted: #9ca3af;
+
+  /* 连线 */
+  --ds-edge-color: #94a3b8;
+
+  /* 画布 */
+  --ds-canvas-bg: var(--color-bg-panel);
+  --ds-canvas-dot: rgba(0, 0, 0, 0.08);
+
+  /* 面板 & 工具栏 */
+  --ds-panel-bg: var(--color-bg-panel);
+  --ds-panel-border: 1px solid var(--color-border);
+  --ds-divider-color: var(--color-border);
+  --ds-toolbar-bg: var(--color-bg-panel);
+  --ds-toolbar-border: 1px solid var(--color-border);
+
+  /* 代码块 */
+  --ds-code-bg: #1e1e1e;
+  --ds-code-color: #d4d4d4;
+
+  /* 高亮色（功能色，跨风格一致） */
+  --ds-highlight-selected: #3b82f6;
+  --ds-highlight-upstream: #f59e0b;
+  --ds-highlight-downstream: #10b981;
+
+  /* 状态色 */
+  --ds-success-color: #22c55e;
+  --ds-error-color: #ef4444;
+  --ds-warning-color: #f59e0b;
+}
+
+:root[theme='darkDefault'][data-design-style='default'] {
+  --ds-bg-elevated: #273548;
+  --ds-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --ds-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --ds-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  --ds-node-bg: #1e293b;
+  --ds-node-bg-elevated: #273548;
+  --ds-node-border-color: #334155;
+  --ds-node-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --ds-node-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --ds-node-text-primary: #ecedee;
+  --ds-node-text-secondary: #9ba1b0;
+  --ds-node-text-muted: #64748b;
+
+  --ds-canvas-bg: #0f172a;
+  --ds-canvas-dot: rgba(255, 255, 255, 0.06);
+
+  --ds-panel-bg: #1a2332;
+  --ds-panel-border: 1px solid #2a3444;
+  --ds-divider-color: #2a3444;
+  --ds-toolbar-bg: #1a2332;
+  --ds-toolbar-border: 1px solid #2a3444;
+}
+
+/* ============================================================
  * 毛玻璃 (glassmorphism)
  * 半透明模糊、细腻边界光感、清晰层次叠加
  * ============================================================ */
 
 [data-design-style='glassmorphism'] {
+  /* 基础表面 */
   --ds-bg-surface: rgba(255, 255, 255, 0.18);
   --ds-bg-elevated: rgba(255, 255, 255, 0.28);
   --ds-bg-overlay: rgba(0, 0, 0, 0.2);
   --ds-border: 1px solid rgba(255, 255, 255, 0.25);
-  --ds-border-top: 1px solid rgba(255, 255, 255, 0.25);
+  --ds-border-top: 1px solid rgba(255, 255, 255, 0.3);
   --ds-border-subtle: 1px solid rgba(255, 255, 255, 0.12);
-  --ds-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --ds-shadow-md: 0 8px 32px rgba(0, 0, 0, 0.08);
-  --ds-shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.12);
-  --ds-blur: 16px;
+  --ds-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  --ds-shadow-md: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --ds-shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  --ds-blur: 20px;
   --ds-saturate: 150%;
   --ds-brightness: 100%;
   --ds-backdrop-opacity: 0.75;
   --ds-inner-shadow: none;
   --ds-gradient: none;
-  --ds-glow: none;
+  --ds-glow: 0 0 20px rgba(99, 102, 241, 0.08);
   --ds-texture: none;
+
+  /* 流程图节点 */
+  --ds-node-bg: rgba(255, 255, 255, 0.65);
+  --ds-node-bg-elevated: rgba(255, 255, 255, 0.85);
+  --ds-node-border-color: rgba(255, 255, 255, 0.35);
+  --ds-node-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --ds-node-shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  --ds-node-shadow-selected: 0 0 0 2px var(--ds-primary-color, #6366f1);
+  --ds-node-text-primary: #1f2937;
+  --ds-node-text-secondary: #6b7280;
+  --ds-node-text-muted: #9ca3af;
+
+  /* 连线 */
+  --ds-edge-color: rgba(99, 102, 241, 0.35);
+
+  /* 画布 */
+  --ds-canvas-bg: linear-gradient(135deg, #f0f4ff 0%, #e8edf5 50%, #f5f0ff 100%);
+  --ds-canvas-dot: rgba(99, 102, 241, 0.12);
+
+  /* 面板 & 工具栏 */
+  --ds-panel-bg: rgba(255, 255, 255, 0.4);
+  --ds-panel-border: 1px solid rgba(255, 255, 255, 0.25);
+  --ds-divider-color: rgba(255, 255, 255, 0.2);
+  --ds-toolbar-bg: rgba(255, 255, 255, 0.5);
+  --ds-toolbar-border: 1px solid rgba(255, 255, 255, 0.2);
+
+  /* 代码块 */
+  --ds-code-bg: rgba(20, 20, 30, 0.92);
+  --ds-code-color: #d4d4d4;
+
+  /* 高亮色 */
+  --ds-highlight-selected: #6366f1;
+  --ds-highlight-upstream: #f59e0b;
+  --ds-highlight-downstream: #10b981;
+
+  /* 状态色 */
+  --ds-success-color: #22c55e;
+  --ds-error-color: #ef4444;
+  --ds-warning-color: #f59e0b;
 }
 
 :root[theme='darkDefault'][data-design-style='glassmorphism'] {
@@ -36,11 +166,29 @@
   --ds-bg-elevated: rgba(255, 255, 255, 0.1);
   --ds-bg-overlay: rgba(0, 0, 0, 0.45);
   --ds-border: 1px solid rgba(255, 255, 255, 0.08);
-  --ds-border-top: 1px solid rgba(255, 255, 255, 0.08);
+  --ds-border-top: 1px solid rgba(255, 255, 255, 0.1);
   --ds-border-subtle: 1px solid rgba(255, 255, 255, 0.04);
   --ds-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
   --ds-shadow-md: 0 8px 32px rgba(0, 0, 0, 0.35);
   --ds-shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.45);
+
+  --ds-node-bg: rgba(255, 255, 255, 0.06);
+  --ds-node-bg-elevated: rgba(255, 255, 255, 0.12);
+  --ds-node-border-color: rgba(255, 255, 255, 0.1);
+  --ds-node-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --ds-node-shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --ds-node-text-primary: #e5e7eb;
+  --ds-node-text-secondary: #9ca3af;
+  --ds-node-text-muted: #6b7280;
+
+  --ds-canvas-bg: linear-gradient(135deg, #0f1729 0%, #131a2e 50%, #151229 100%);
+  --ds-canvas-dot: rgba(99, 102, 241, 0.08);
+
+  --ds-panel-bg: rgba(255, 255, 255, 0.04);
+  --ds-panel-border: 1px solid rgba(255, 255, 255, 0.06);
+  --ds-divider-color: rgba(255, 255, 255, 0.06);
+  --ds-toolbar-bg: rgba(255, 255, 255, 0.05);
+  --ds-toolbar-border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* ============================================================
@@ -49,11 +197,12 @@
  * ============================================================ */
 
 [data-design-style='skeuomorphism'] {
+  /* 基础表面 */
   --ds-bg-surface: #f5f0eb;
   --ds-bg-elevated: #faf8f5;
   --ds-bg-overlay: rgba(0, 0, 0, 0.45);
   --ds-border: 1px solid #c8bfb4;
-  --ds-border-top: 1px solid #c8bfb4;
+  --ds-border-top: 1px solid #d4ccc2;
   --ds-border-subtle: 1px solid #ddd5ca;
   --ds-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
   --ds-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15), 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 -1px 0 rgba(0, 0, 0, 0.04) inset;
@@ -62,10 +211,50 @@
   --ds-saturate: 100%;
   --ds-brightness: 100%;
   --ds-backdrop-opacity: 1;
-  --ds-inner-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.08), inset 0 -1px 0 rgba(255, 255, 255, 0.4);
-  --ds-gradient: linear-gradient(145deg, rgba(255, 255, 255, 0.25), rgba(0, 0, 0, 0.03));
+  --ds-inner-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  --ds-gradient: linear-gradient(145deg, rgba(255, 255, 255, 0.3), rgba(0, 0, 0, 0.03));
   --ds-glow: none;
   --ds-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%23f5f0eb'/%3E%3Crect width='1' height='1' fill='%23ece7e0'/%3E%3C/svg%3E");
+  --ds-texture-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f5f0eb'/%3E%3Crect x='0' y='0' width='1' height='1' fill='%23ece7e0' opacity='0.5'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23e0d8ce' opacity='0.3'/%3E%3C/svg%3E");
+
+  /* 流程图节点 */
+  --ds-node-bg: #faf8f5;
+  --ds-node-bg-elevated: #fffcf8;
+  --ds-node-border-color: #c8bfb4;
+  --ds-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+  --ds-node-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.2), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  --ds-node-shadow-selected: 0 0 0 2px var(--ds-primary-color, #b8860b), 0 4px 12px rgba(0, 0, 0, 0.2);
+  --ds-node-text-primary: #2c1810;
+  --ds-node-text-secondary: #6b5c4f;
+  --ds-node-text-muted: #9c8e80;
+
+  /* 连线 */
+  --ds-edge-color: #b0a494;
+
+  /* 画布 */
+  --ds-canvas-bg: #e8e0d6;
+  --ds-canvas-dot: rgba(180, 168, 150, 0.3);
+
+  /* 面板 & 工具栏 */
+  --ds-panel-bg: #f5f0eb;
+  --ds-panel-border: 1px solid #c8bfb4;
+  --ds-divider-color: #c8bfb4;
+  --ds-toolbar-bg: #faf8f5;
+  --ds-toolbar-border: 1px solid #c8bfb4;
+
+  /* 代码块 */
+  --ds-code-bg: #2c2420;
+  --ds-code-color: #d4c8b8;
+
+  /* 高亮色 */
+  --ds-highlight-selected: #b8860b;
+  --ds-highlight-upstream: #d4a017;
+  --ds-highlight-downstream: #6b8e23;
+
+  /* 状态色 */
+  --ds-success-color: #6b8e23;
+  --ds-error-color: #c0392b;
+  --ds-warning-color: #d4a017;
 }
 
 :root[theme='darkDefault'][data-design-style='skeuomorphism'] {
@@ -73,13 +262,33 @@
   --ds-bg-elevated: #332e28;
   --ds-bg-overlay: rgba(0, 0, 0, 0.6);
   --ds-border: 1px solid #4a4035;
-  --ds-border-top: 1px solid #4a4035;
+  --ds-border-top: 1px solid #544a3e;
   --ds-border-subtle: 1px solid #3d3529;
   --ds-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
   --ds-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
   --ds-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 0 rgba(255, 255, 255, 0.08) inset;
+  --ds-inner-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
   --ds-gradient: linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.12));
   --ds-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%232a2520'/%3E%3Crect width='1' height='1' fill='%23252019'/%3E%3C/svg%3E");
+  --ds-texture-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%232a2520'/%3E%3Crect x='0' y='0' width='1' height='1' fill='%23252019' opacity='0.5'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%231e1a16' opacity='0.3'/%3E%3C/svg%3E");
+
+  --ds-node-bg: #332e28;
+  --ds-node-bg-elevated: #3d3529;
+  --ds-node-border-color: #4a4035;
+  --ds-node-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --ds-node-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  --ds-node-text-primary: #e8ddd0;
+  --ds-node-text-secondary: #b0a494;
+  --ds-node-text-muted: #7a6e60;
+
+  --ds-canvas-bg: #1e1a16;
+  --ds-canvas-dot: rgba(100, 88, 70, 0.25);
+
+  --ds-panel-bg: #2a2520;
+  --ds-panel-border: 1px solid #4a4035;
+  --ds-divider-color: #4a4035;
+  --ds-toolbar-bg: #332e28;
+  --ds-toolbar-border: 1px solid #4a4035;
 }
 
 /* ============================================================
@@ -88,44 +297,99 @@
  * ============================================================ */
 
 [data-design-style='neumorphism'] {
+  /* 基础表面 */
   --ds-bg-surface: #e0e5ec;
   --ds-bg-elevated: #e0e5ec;
   --ds-bg-overlay: rgba(0, 0, 0, 0.25);
   --ds-border: none;
   --ds-border-top: none;
   --ds-border-subtle: none;
-  --ds-shadow-sm: 3px 3px 6px #b8bec7, -3px -3px 6px #ffffff;
-  --ds-shadow-md: 6px 6px 12px #b8bec7, -6px -6px 12px #ffffff;
-  --ds-shadow-lg: 10px 10px 20px #b8bec7, -10px -10px 20px #ffffff;
+  --ds-shadow-sm: 4px 4px 8px #b8bec7, -4px -4px 8px #ffffff;
+  --ds-shadow-md: 6px 6px 14px #b8bec7, -6px -6px 14px #ffffff;
+  --ds-shadow-lg: 10px 10px 24px #b8bec7, -10px -10px 24px #ffffff;
   --ds-blur: 0px;
   --ds-saturate: 100%;
   --ds-brightness: 100%;
   --ds-backdrop-opacity: 1;
-  --ds-inner-shadow: inset 3px 3px 6px #b8bec7, inset -3px -3px 6px #ffffff;
+  --ds-inner-shadow: inset 4px 4px 8px #b8bec7, inset -4px -4px 8px #ffffff;
   --ds-gradient: none;
   --ds-glow: none;
   --ds-texture: none;
   --ds-neu-light: #ffffff;
   --ds-neu-dark: #b8bec7;
+
+  /* 流程图节点 */
+  --ds-node-bg: #e0e5ec;
+  --ds-node-bg-elevated: #e0e5ec;
+  --ds-node-border-color: transparent;
+  --ds-node-shadow: 4px 4px 10px #b8bec7, -4px -4px 10px #ffffff;
+  --ds-node-shadow-hover: 6px 6px 14px #b8bec7, -6px -6px 14px #ffffff;
+  --ds-node-shadow-selected: 0 0 0 3px var(--ds-primary-color, #5b8fa8);
+  --ds-node-text-primary: #2d3436;
+  --ds-node-text-secondary: #636e72;
+  --ds-node-text-muted: #b2bec3;
+
+  /* 连线 */
+  --ds-edge-color: #a0aab0;
+
+  /* 画布 */
+  --ds-canvas-bg: #e0e5ec;
+  --ds-canvas-dot: rgba(160, 170, 180, 0.25);
+
+  /* 面板 & 工具栏 */
+  --ds-panel-bg: #e0e5ec;
+  --ds-panel-border: none;
+  --ds-divider-color: transparent;
+  --ds-toolbar-bg: #e0e5ec;
+  --ds-toolbar-border: none;
+
+  /* 代码块 */
+  --ds-code-bg: #2d3436;
+  --ds-code-color: #dfe6e9;
+
+  /* 高亮色 */
+  --ds-highlight-selected: #5b8fa8;
+  --ds-highlight-upstream: #e2a048;
+  --ds-highlight-downstream: #5fad8b;
+
+  /* 状态色 */
+  --ds-success-color: #5fad8b;
+  --ds-error-color: #e07070;
+  --ds-warning-color: #e2a048;
 }
 
 :root[theme='darkDefault'][data-design-style='neumorphism'] {
   --ds-bg-surface: #2d3436;
   --ds-bg-elevated: #2d3436;
   --ds-bg-overlay: rgba(0, 0, 0, 0.5);
-  --ds-shadow-sm: 3px 3px 6px #1a1d1e, -3px -3px 6px #404b4e;
-  --ds-shadow-md: 6px 6px 12px #1a1d1e, -6px -6px 12px #404b4e;
-  --ds-shadow-lg: 10px 10px 20px #1a1d1e, -10px -10px 20px #404b4e;
-  --ds-inner-shadow: inset 3px 3px 6px #1a1d1e, inset -3px -3px 6px #404b4e;
+  --ds-shadow-sm: 4px 4px 8px #1a1d1e, -4px -4px 8px #404b4e;
+  --ds-shadow-md: 6px 6px 14px #1a1d1e, -6px -6px 14px #404b4e;
+  --ds-shadow-lg: 10px 10px 24px #1a1d1e, -10px -10px 24px #404b4e;
+  --ds-inner-shadow: inset 4px 4px 8px #1a1d1e, inset -4px -4px 8px #404b4e;
   --ds-neu-light: #404b4e;
   --ds-neu-dark: #1a1d1e;
+
+  --ds-node-bg: #2d3436;
+  --ds-node-bg-elevated: #2d3436;
+  --ds-node-shadow: 4px 4px 10px #1a1d1e, -4px -4px 10px #404b4e;
+  --ds-node-shadow-hover: 6px 6px 14px #1a1d1e, -6px -6px 14px #404b4e;
+  --ds-node-text-primary: #dfe6e9;
+  --ds-node-text-secondary: #b2bec3;
+  --ds-node-text-muted: #636e72;
+
+  --ds-canvas-bg: #2d3436;
+  --ds-canvas-dot: rgba(70, 80, 85, 0.3);
+
+  --ds-panel-bg: #2d3436;
+  --ds-divider-color: transparent;
+  --ds-toolbar-bg: #2d3436;
 }
 
 /* ============================================================
  * 全局 antd 组件覆盖规则
  * ============================================================ */
 
-/* 毛玻璃：backdrop-filter */
+/* ---------- 毛玻璃：backdrop-filter ---------- */
 [data-design-style='glassmorphism'] {
   .ant-modal-content,
   .ant-dropdown-menu,
@@ -134,9 +398,49 @@
     backdrop-filter: blur(var(--ds-blur)) saturate(var(--ds-saturate));
     -webkit-backdrop-filter: blur(var(--ds-blur)) saturate(var(--ds-saturate));
   }
+
+  /* Card */
+  .ant-card {
+    backdrop-filter: blur(var(--ds-blur)) saturate(var(--ds-saturate));
+    -webkit-backdrop-filter: blur(var(--ds-blur)) saturate(var(--ds-saturate));
+    border: var(--ds-border);
+    box-shadow: var(--ds-shadow-sm);
+  }
+
+  /* Drawer */
+  .ant-drawer-content {
+    backdrop-filter: blur(var(--ds-blur)) saturate(var(--ds-saturate));
+    -webkit-backdrop-filter: blur(var(--ds-blur)) saturate(var(--ds-saturate));
+  }
+
+  /* Tag */
+  .ant-tag {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  /* Table row hover */
+  .ant-table-tbody > tr:hover > td {
+    background: rgba(255, 255, 255, 0.06) !important;
+  }
+
+  /* Collapse */
+  .ant-collapse-item {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+  }
+  .ant-collapse-content {
+    background: transparent;
+  }
+
+  /* Tabs */
+  .ant-tabs-ink-bar {
+    background: var(--ds-primary-color, #6366f1);
+    opacity: 0.8;
+  }
 }
 
-/* 拟物化：按钮和输入框效果 */
+/* ---------- 拟物化：材质与光影 ---------- */
 [data-design-style='skeuomorphism'] {
   .ant-btn:active {
     box-shadow: var(--ds-inner-shadow) !important;
@@ -148,9 +452,66 @@
   .ant-input-affix-wrapper {
     box-shadow: var(--ds-inner-shadow) !important;
   }
+
+  /* Button 3D */
+  .ant-btn:not(:active):not(.ant-btn-text) {
+    box-shadow: var(--ds-shadow-sm);
+    background-image: var(--ds-gradient);
+  }
+  .ant-btn-primary:not(:active) {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 1px 0 rgba(255, 255, 255, 0.3) inset;
+  }
+
+  /* Card */
+  .ant-card {
+    background-image: var(--ds-texture-fine, var(--ds-texture));
+    box-shadow: var(--ds-shadow-sm);
+  }
+
+  /* Table header */
+  .ant-table-thead > tr > th {
+    background-image: var(--ds-texture-fine, var(--ds-texture));
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+
+  /* Modal */
+  .ant-modal-content {
+    box-shadow: var(--ds-shadow-lg);
+    background-image: var(--ds-texture-fine, var(--ds-texture));
+  }
+  .ant-modal-header {
+    background-image: var(--ds-gradient);
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.06);
+  }
+
+  /* Tag */
+  .ant-tag {
+    box-shadow: var(--ds-shadow-sm);
+  }
+
+  /* Select dropdown */
+  .ant-select-dropdown {
+    box-shadow: var(--ds-shadow-md);
+    background-image: var(--ds-texture-fine, var(--ds-texture));
+  }
+
+  /* Tabs */
+  .ant-tabs-tab {
+    background-image: var(--ds-gradient);
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+  }
+  .ant-tabs-tab-active {
+    box-shadow: var(--ds-shadow-sm), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+  }
+
+  /* Tooltip */
+  .ant-tooltip-inner {
+    box-shadow: var(--ds-shadow-md);
+    background-image: var(--ds-texture);
+  }
 }
 
-/* 新拟态：全局浮雕效果 */
+/* ---------- 新拟态：柔和浮雕 ---------- */
 [data-design-style='neumorphism'] {
   .ant-btn:active {
     box-shadow: var(--ds-inner-shadow) !important;
@@ -166,6 +527,80 @@
   .ant-tabs-tab-active .ant-tabs-tab-btn {
     box-shadow: var(--ds-inner-shadow) !important;
     border-radius: 8px;
+  }
+
+  /* Button default raised */
+  .ant-btn-default {
+    box-shadow: var(--ds-shadow-sm);
+    border: none;
+  }
+  .ant-btn-default:hover {
+    box-shadow: var(--ds-shadow-md);
+  }
+  .ant-btn-primary {
+    box-shadow: var(--ds-shadow-sm);
+  }
+
+  /* Card */
+  .ant-card {
+    box-shadow: var(--ds-shadow-sm);
+    border: none;
+  }
+
+  /* Table header */
+  .ant-table-thead > tr > th {
+    box-shadow: inset var(--ds-inner-shadow);
+  }
+
+  /* Modal */
+  .ant-modal-content {
+    box-shadow: var(--ds-shadow-lg);
+    border: none;
+  }
+
+  /* Tag pressed */
+  .ant-tag {
+    box-shadow: var(--ds-inner-shadow);
+    border: none;
+  }
+
+  /* Dropdown raised */
+  .ant-select-dropdown,
+  .ant-dropdown-menu {
+    box-shadow: var(--ds-shadow-md);
+    border: none;
+  }
+
+  /* Collapse raised */
+  .ant-collapse {
+    box-shadow: var(--ds-shadow-sm);
+    border: none;
+    background: transparent;
+  }
+  .ant-collapse-item {
+    border: none !important;
+  }
+  .ant-collapse-content {
+    background: transparent;
+  }
+
+  /* Switch neumorphic track */
+  .ant-switch {
+    box-shadow: var(--ds-inner-shadow);
+  }
+  .ant-switch-checked {
+    box-shadow: var(--ds-shadow-sm);
+  }
+
+  /* Drawer raised */
+  .ant-drawer-content {
+    box-shadow: var(--ds-shadow-lg);
+  }
+
+  /* Tooltip */
+  .ant-tooltip-inner {
+    box-shadow: var(--ds-shadow-md);
+    border: none;
   }
 }
 

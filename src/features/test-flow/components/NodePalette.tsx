@@ -53,7 +53,7 @@ const panelClass = css`
 const titleClass = css`
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--ds-node-text-primary, #374151);
   padding: 4px 8px 8px;
 `
 
@@ -61,8 +61,9 @@ const cardClass = css`
   display: flex;
   align-items: stretch;
   border-radius: 6px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  background: var(--ds-node-bg, #fff);
+  box-shadow: var(--ds-node-shadow, 0 1px 2px rgba(0, 0, 0, 0.06));
+  border: 1px solid var(--ds-node-border-color, transparent);
   margin-bottom: 6px;
   cursor: grab;
   overflow: hidden;
@@ -70,7 +71,7 @@ const cardClass = css`
   user-select: none;
 
   &:hover {
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--ds-node-shadow-hover, 0 2px 6px rgba(0, 0, 0, 0.12));
   }
 
   &:active {
@@ -102,7 +103,7 @@ const cardTextClass = css`
 const cardLabelClass = css`
   font-size: 12px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--ds-node-text-primary, #1f2937);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -110,7 +111,7 @@ const cardLabelClass = css`
 
 const cardDescClass = css`
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--ds-node-text-muted, #9ca3af);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -165,7 +166,7 @@ export default function NodePalette() {
               className={cardClass}
               style={{
                 opacity: isDragging ? 0.5 : 1,
-                border: isDragging ? '2px solid #1677ff' : undefined,
+                border: isDragging ? '2px solid var(--ds-primary-color, #1677ff)' : undefined,
               }}
               onMouseDown={(e) => handleMouseDown(e, item.type)}
               data-node-type={item.type}
@@ -195,13 +196,13 @@ export default function NodePalette() {
             pointerEvents: 'none',
             zIndex: 9999,
             padding: '8px 12px',
-            background: '#fff',
-            border: '2px solid #1677ff',
+            background: 'var(--ds-node-bg, #fff)',
+            border: '2px solid var(--ds-primary-color, #1677ff)',
             borderRadius: 6,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            boxShadow: 'var(--ds-node-shadow-hover, 0 4px 12px rgba(0,0,0,0.15))',
             fontSize: 12,
             fontWeight: 600,
-            color: '#1f2937',
+            color: 'var(--ds-node-text-primary, #1f2937)',
             top: 0,
             left: 0,
             transform: 'translate(-50%, -50%)',

@@ -78,6 +78,45 @@
   background: transparent;
 }
 
+/* ==================== 设计风格过渡动画 ==================== */
+
+/* 精确定位需要过渡的元素，避免全局 * 通配影响性能 */
+html.theme-ready body,
+html.theme-ready .ant-btn,
+html.theme-ready .ant-input,
+html.theme-ready .ant-input-affix-wrapper,
+html.theme-ready .ant-select-selector,
+html.theme-ready .ant-select-dropdown,
+html.theme-ready .ant-card,
+html.theme-ready .ant-modal-content,
+html.theme-ready .ant-modal-header,
+html.theme-ready .ant-drawer-content,
+html.theme-ready .ant-collapse,
+html.theme-ready .ant-collapse-content,
+html.theme-ready .ant-tag,
+html.theme-ready .ant-tabs-tab,
+html.theme-ready .ant-tabs-ink-bar,
+html.theme-ready .ant-table-thead > tr > th,
+html.theme-ready .ant-table-tbody > tr > td,
+html.theme-ready .ant-menu-item,
+html.theme-ready .ant-switch,
+html.theme-ready .ant-tooltip-inner,
+html.theme-ready .ant-dropdown-menu,
+html.theme-ready .ant-popover-inner {
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    backdrop-filter 0.35s ease,
+    -webkit-backdrop-filter 0.35s ease;
+}
+
+/* 首次加载禁止过渡，避免闪烁 */
+html:not(.theme-ready) * {
+  transition: none !important;
+}
+
 /* ==================== ReactFlow Handle 样式 ==================== */
 
 /* 基础 Handle 样式：增大点击区域和视觉尺寸 */
@@ -85,28 +124,28 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #3b82f6;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3);
+  background: var(--ds-primary-color, #3b82f6);
+  border: 2px solid var(--ds-node-bg, #fff);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ds-primary-color, #3b82f6) 30%, transparent);
   transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 /* Hover 状态：视觉反馈 */
 .react-flow__handle:hover {
-  background: #2563eb;
+  background: color-mix(in srgb, var(--ds-primary-color, #3b82f6) 80%, black);
   transform: scale(1.2);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ds-primary-color, #3b82f6) 50%, transparent);
 }
 
 /* 连接中状态 */
 .react-flow__handle.connecting {
-  background: #60a5fa;
+  background: color-mix(in srgb, var(--ds-primary-color, #3b82f6) 60%, white);
 }
 
 /* 连接有效目标高亮 */
 .react-flow__handle.valid {
-  background: #22c55e;
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.5);
+  background: var(--ds-success-color, #22c55e);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ds-success-color, #22c55e) 50%, transparent);
 }
 
 /* 扩大不可见点击区域 */

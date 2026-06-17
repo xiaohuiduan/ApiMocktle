@@ -45,14 +45,14 @@ const toolbarClass = css`
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fff;
+  border-bottom: var(--ds-toolbar-border, 1px solid #f0f0f0);
+  background: var(--ds-toolbar-bg, #fff);
 `
 
 const dividerClass = css`
   width: 1px;
   height: 20px;
-  background: #e5e7eb;
+  background: var(--ds-divider-color, #e5e7eb);
   margin: 0 4px;
 `
 
@@ -98,7 +98,7 @@ export default function FlowToolbar({
               whiteSpace: 'nowrap',
               fontWeight: 600,
               fontSize: 14,
-              color: '#1f2937',
+              color: 'var(--ds-node-text-primary, #1f2937)',
               marginRight: 4,
               flexShrink: 0,
             }}

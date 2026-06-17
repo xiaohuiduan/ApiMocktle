@@ -18,8 +18,8 @@ const { Text } = Typography
 // ==================== 样式 ====================
 
 const resultBlockClass = css`
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--ds-node-bg-elevated, #f8fafc);
+  border: 1px solid var(--ds-node-border-color, #e2e8f0);
   border-radius: 6px;
   padding: 12px;
   font-size: 12px;
@@ -35,13 +35,13 @@ const resizeHandleClass = css`
   z-index: 10;
   transition: background 0.15s;
   &:hover, &:active {
-    background: #91caff;
+    background: var(--ds-highlight-selected, #91caff);
   }
 `
 
 const codeBlockClass = css`
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: var(--ds-code-bg, #1e1e1e);
+  color: var(--ds-code-color, #d4d4d4);
   border-radius: 4px;
   padding: 8px 10px;
   font-family: 'Cascadia Code', 'Fira Code', monospace;
@@ -610,7 +610,7 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
 
       {/* 错误信息 */}
       {error && (
-        <div className={resultBlockClass} style={{ borderColor: '#fca5a5', background: '#fef2f2', marginBottom: 8 }}>
+        <div className={resultBlockClass} style={{ borderColor: 'var(--ds-error-color, #fca5a5)', background: 'rgba(239, 68, 68, 0.08)', marginBottom: 8 }}>
           <Text type="danger" style={{ fontSize: 12 }}>{error}</Text>
         </div>
       )}
@@ -724,7 +724,7 @@ function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
       flexWrap: 'wrap',
       gap: 2,
       fontSize: 12,
-      color: '#6b7280',
+      color: 'var(--ds-node-text-secondary, #6b7280)',
       padding: '6px 0',
     }}>
       {displayItems.map((item, i) => {
@@ -736,19 +736,19 @@ function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
           <span key={item.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
             {/* 分隔符 */}
             {!isFirst && (
-              <span style={{ margin: '0 4px', color: '#d1d5db' }}>→</span>
+              <span style={{ margin: '0 4px', color: 'var(--ds-divider-color, #d1d5db)' }}>→</span>
             )}
 
             {item.isEllipsis ? (
               <span
                 style={{
                   cursor: 'pointer',
-                  color: '#9ca3af',
+                  color: 'var(--ds-node-text-muted, #9ca3af)',
                   padding: '0 2px',
                 }}
                 onClick={() => setExpanded(true)}
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#3b82f6' }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = '#9ca3af' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--ds-highlight-selected, #3b82f6)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--ds-node-text-muted, #9ca3af)' }}
               >
                 ⋯
               </span>
@@ -756,15 +756,15 @@ function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
               <span
                 style={{
                   fontWeight: isCurrent ? 600 : 400,
-                  color: isCurrent ? '#3b82f6' : '#6b7280',
+                  color: isCurrent ? 'var(--ds-highlight-selected, #3b82f6)' : 'var(--ds-node-text-secondary, #6b7280)',
                   cursor: isCurrent ? 'default' : 'pointer',
                   padding: '0 2px',
                   borderRadius: 2,
                   transition: 'color 0.15s',
                 }}
                 onClick={() => !isCurrent && onSelect(item.id)}
-                onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.color = '#3b82f6' }}
-                onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.color = '#6b7280' }}
+                onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.color = 'var(--ds-highlight-selected, #3b82f6)' }}
+                onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.color = 'var(--ds-node-text-secondary, #6b7280)' }}
               >
                 {isCurrent ? `[${item.label}]` : item.label}
               </span>

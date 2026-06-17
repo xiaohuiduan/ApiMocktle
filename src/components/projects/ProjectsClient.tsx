@@ -68,25 +68,30 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
           <Input
             size="small"
             placeholder="搜索..."
-            prefix={<SearchOutlined className="text-gray-400" />}
+            prefix={<SearchOutlined style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} />}
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
             variant="borderless"
-            className="bg-gray-100 !rounded-md !px-2"
+            style={{ background: 'var(--ds-bg-elevated, #f3f4f6)', borderRadius: 6, padding: '0 8px' }}
           />
         </div>
         <div className="flex-1 space-y-0.5 overflow-y-auto px-1" style={{ scrollbarWidth: 'thin' }}>
           <button
             type="button"
-            className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs transition-colors ${
-              category === '全部'
-                ? 'bg-blue-50 text-blue-600 font-medium'
-                : 'text-gray-500 hover:bg-gray-100'
-            }`}
+            style={{
+              display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 10px',
+              textAlign: 'left', fontSize: 12, transition: 'background 0.15s',
+              background: category === '全部' ? 'var(--ds-highlight-selected, #3b82f6)' + '15' : 'transparent',
+              color: category === '全部' ? 'var(--ds-highlight-selected, #2563eb)' : 'var(--ds-node-text-secondary, #6b7280)',
+              fontWeight: category === '全部' ? 600 : 400,
+              border: 'none', cursor: 'pointer', borderRadius: 4,
+            }}
+            onMouseEnter={(e) => { if (category !== '全部') e.currentTarget.style.background = 'var(--ds-bg-elevated, #f3f4f6)' }}
+            onMouseLeave={(e) => { if (category !== '全部') e.currentTarget.style.background = 'transparent' }}
             onClick={() => { setCategory('全部'); setSearchText('') }}
           >
-            <span className="flex-1">全部</span>
-            <span className="text-[10px] tabular-nums text-gray-400">
+            <span style={{ flex: 1 }}>全部</span>
+            <span style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums', color: 'var(--ds-node-text-muted, #9ca3af)' }}>
               {ICON_OPTIONS.length}
             </span>
           </button>
@@ -98,15 +103,20 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
               <button
                 key={cat.label}
                 type="button"
-                className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs transition-colors ${
-                  category === cat.label
-                    ? 'bg-blue-50 text-blue-600 font-medium'
-                    : 'text-gray-500 hover:bg-gray-100'
-                }`}
+                style={{
+                  display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 10px',
+                  textAlign: 'left', fontSize: 12, transition: 'background 0.15s',
+                  background: category === cat.label ? 'var(--ds-highlight-selected, #3b82f6)' + '15' : 'transparent',
+                  color: category === cat.label ? 'var(--ds-highlight-selected, #2563eb)' : 'var(--ds-node-text-secondary, #6b7280)',
+                  fontWeight: category === cat.label ? 600 : 400,
+                  border: 'none', cursor: 'pointer', borderRadius: 4,
+                }}
+                onMouseEnter={(e) => { if (category !== cat.label) e.currentTarget.style.background = 'var(--ds-bg-elevated, #f3f4f6)' }}
+                onMouseLeave={(e) => { if (category !== cat.label) e.currentTarget.style.background = 'transparent' }}
                 onClick={() => setCategory(cat.label)}
               >
-                <span className="flex-1 truncate">{cat.label}</span>
-                <span className="text-[10px] tabular-nums text-gray-400">
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.label}</span>
+                <span style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums', color: 'var(--ds-node-text-muted, #9ca3af)' }}>
                   {availableInMap}
                 </span>
               </button>
@@ -116,9 +126,9 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
       </div>
 
       {/* 右侧图标网格 */}
-      <div className="flex-1 bg-gray-100 rounded-lg p-2.5" style={{ minHeight: 260, maxHeight: 340 }}>
+      <div className="flex-1 rounded-lg p-2.5" style={{ minHeight: 260, maxHeight: 340, background: 'var(--ds-bg-elevated, #f3f4f6)' }}>
         {shownIcons.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-xs text-gray-400">暂无图标</div>
+          <div className="flex h-full items-center justify-center text-xs" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }}>暂无图标</div>
         ) : (
           <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
             <div className="flex flex-wrap gap-1.5">
@@ -132,7 +142,7 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
                     className="relative flex size-9 cursor-pointer items-center justify-center rounded-lg border-2 transition-all duration-150 hover:scale-110 hover:shadow-md"
                     style={{
                       borderColor: isSelected ? iconColor : 'transparent',
-                      backgroundColor: isSelected ? `${iconColor}0f` : '#f5f5f5',
+                      backgroundColor: isSelected ? `${iconColor}0f` : 'var(--ds-node-bg, #f5f5f5)',
                     }}
                     onClick={() => onChange?.(isSelected ? '' : name)}
                     title={name}
@@ -426,13 +436,13 @@ export function ProjectsClient() {
                     <Typography.Text type="secondary" className="text-xs">
                       {roleText[project.role]}
                     </Typography.Text>
-                    <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                    <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }}>
                       <span>API {project.apiCount}</span>
-                      <span className="text-gray-300">|</span>
+                      <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
                       <span>模型 {project.schemaCount}</span>
-                      <span className="text-gray-300">|</span>
+                      <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
                       <span>快捷请求 {project.requestCount}</span>
-                      <span className="text-gray-300">|</span>
+                      <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
                       <span>自测 {project.testCount}</span>
                     </div>
                   </div>

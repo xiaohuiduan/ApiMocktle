@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import { theme } from 'antd'
-import { css } from '@emotion/css'
+import { css, cx } from '@emotion/css'
 import {
   Play,
   CircleStop,
@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   type LucideIcon,
 } from 'lucide-react'
+import { useDesignStyle } from '@/hooks/useDesignStyle'
 import { FlowNodeType, type NodeExecStatus, type HandleSpec } from '../types/flow.types'
 
 // ==================== 颜色映射 ====================
@@ -74,11 +75,13 @@ const nodeClass = css`
   display: flex;
   align-items: stretch;
   min-width: 180px;
-  background: #fff;
+  background: var(--ds-node-bg, #fff);
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--ds-node-shadow, 0 1px 3px rgba(0, 0, 0, 0.12));
+  border: 1px solid var(--ds-node-border-color, #e5e7eb);
   overflow: hidden;
   font-size: 13px;
+  transition: box-shadow 0.2s ease;
 `
 
 const borderClass = css`
@@ -107,7 +110,7 @@ const iconClass = css`
 
 const labelClass = css`
   font-weight: 600;
-  color: #1f2937;
+  color: var(--ds-node-text-primary, #1f2937);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -115,7 +118,7 @@ const labelClass = css`
 
 const descClass = css`
   font-size: 11px;
-  color: #6b7280;
+  color: var(--ds-node-text-secondary, #6b7280);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -142,7 +145,7 @@ const badgeClass = css`
 const handleLabelClass = css`
   position: absolute;
   font-size: 9px;
-  color: #9ca3af;
+  color: var(--ds-node-text-muted, #9ca3af);
   white-space: nowrap;
   pointer-events: none;
   line-height: 1;
@@ -161,6 +164,27 @@ const handleLabelRightClass = css`
   text-align: center;
   left: 50%;
   transform: translateX(-50%);
+`
+
+// ==================== 设计风格签名效果 ====================
+
+const dsGlassNode = css`
+  background: var(--ds-node-bg);
+  backdrop-filter: blur(var(--ds-blur, 20px)) saturate(var(--ds-saturate, 150%));
+  -webkit-backdrop-filter: blur(var(--ds-blur, 20px)) saturate(var(--ds-saturate, 150%));
+  border: 1px solid var(--ds-node-border-color);
+  box-shadow: var(--ds-node-shadow);
+`
+
+const dsNeuNode = css`
+  border: none;
+  box-shadow: var(--ds-node-shadow);
+`
+
+const dsSkeuoNode = css`
+  background-image: var(--ds-texture-fine, var(--ds-texture, none));
+  border: 1px solid var(--ds-node-border-color);
+  box-shadow: var(--ds-node-shadow);
 `
 
 // ==================== 辅助函数 ====================
@@ -192,6 +216,7 @@ function BaseNodeInner({
   minWidth,
 }: BaseNodeProps) {
   const { token } = theme.useToken()
+  const { isGlassStyle, isNeumorphism, isSkeuomorphism } = useDesignStyle()
 
   const label = (data.label as string) ?? ''
   const execStatus = data.execStatus as NodeExecStatus | undefined
@@ -200,8 +225,17 @@ function BaseNodeInner({
   const color = NODE_COLORS[type] ?? token.colorPrimary
   const Icon = NODE_ICONS[type] ?? Globe
 
+  // 设计风格签名效果类
+  const styleClass = isGlassStyle
+    ? dsGlassNode
+    : isNeumorphism
+      ? dsNeuNode
+      : isSkeuomorphism
+        ? dsSkeuoNode
+        : ''
+
   return (
-    <div className={nodeClass} style={minWidth ? { minWidth } : undefined} data-testid={`node-${type}`} data-exec-status={execStatus || 'idle'}>
+    <div className={cx(nodeClass, styleClass)} style={minWidth ? { minWidth } : undefined} data-testid={`node-${type}`} data-exec-status={execStatus || 'idle'}>
       {/* 左侧彩色边框 */}
       <div
         className={borderClass}
@@ -227,7 +261,7 @@ function BaseNodeInner({
           <span
             style={{
               fontSize: 10,
-              color: execStatus === 'passed' ? '#16a34a' : execStatus === 'skipped' ? '#9ca3af' : '#dc2626',
+              color: execStatus === 'passed' ? 'var(--ds-success-color, #16a34a)' : execStatus === 'skipped' ? 'var(--ds-node-text-muted, #9ca3af)' : 'var(--ds-error-color, #dc2626)',
               lineHeight: 1.3,
               overflow: 'hidden',
               textOverflow: 'ellipsis',

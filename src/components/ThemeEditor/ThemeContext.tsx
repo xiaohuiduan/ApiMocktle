@@ -86,6 +86,13 @@ function getDesignStyleComponents(
       Tree: {
         colorBgContainer: 'transparent',
       },
+      Collapse: {
+        colorBgContainer: 'transparent',
+        colorBorder: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.15)',
+      },
+      Switch: {
+        colorPrimary: isDark ? 'rgba(99, 102, 241, 0.6)' : 'rgba(99, 102, 241, 0.5)',
+      },
     }
   }
 
@@ -145,6 +152,16 @@ function getDesignStyleComponents(
       Tree: {
         colorBgContainer: 'transparent',
       },
+      Drawer: {
+        colorBgElevated: neuBg,
+      },
+      Collapse: {
+        colorBgContainer: 'transparent',
+        colorBorder: 'transparent',
+      },
+      Switch: {
+        colorPrimary: isDark ? '#5b8fa8' : '#5b8fa8',
+      },
     }
   }
 
@@ -200,6 +217,16 @@ function getDesignStyleComponents(
       },
       Tree: {
         colorBgContainer: 'transparent',
+      },
+      Drawer: {
+        colorBgElevated: skeuoBgLight,
+      },
+      Collapse: {
+        colorBgContainer: skeuoBg,
+        colorBorderSecondary: skeuoBorder,
+      },
+      Switch: {
+        colorPrimary: isDark ? '#b8860b' : '#b8860b',
       },
     }
   }
@@ -315,6 +342,16 @@ export function ThemeProvider(props: React.PropsWithChildren<ThemeProviderProps>
   useEffect(() => {
     document.documentElement.setAttribute('data-design-style', designStyle)
   }, [designStyle])
+
+  // 首次渲染后标记 theme-ready，启用过渡动画
+  useEffect(() => {
+    // 使用双 rAF 确保浏览器已完成首次样式计算
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.documentElement.classList.add('theme-ready')
+      })
+    })
+  }, [])
 
   useEffect(() => {
     if (themePresetTokens.colorPrimary) {

@@ -34,7 +34,7 @@ export default function VariablesPanel({ sources }: VariablesPanelProps) {
 
   if (entries.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '32px 0', color: '#9ca3af', fontSize: 12 }}>
+      <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--ds-node-text-muted, #9ca3af)', fontSize: 12 }}>
         运行流程后此处显示变量
       </div>
     )
@@ -50,12 +50,12 @@ export default function VariablesPanel({ sources }: VariablesPanelProps) {
             flexDirection: 'column',
             gap: 2,
             padding: '6px 8px',
-            borderBottom: '1px solid #f0f0f0',
+            borderBottom: '1px solid var(--ds-divider-color, #f0f0f0)',
             fontSize: 12,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <code style={{ fontWeight: 600, color: '#1f2937', fontSize: 11 }}>{key}</code>
+            <code style={{ fontWeight: 600, color: 'var(--ds-node-text-primary, #1f2937)', fontSize: 11 }}>{key}</code>
             <Tag
               color={SOURCE_TYPE_COLORS[src.sourceType]}
               style={{ fontSize: 10, lineHeight: '14px', padding: '0 4px', margin: 0 }}
@@ -63,10 +63,10 @@ export default function VariablesPanel({ sources }: VariablesPanelProps) {
               {SOURCE_TYPE_LABELS[src.sourceType]}
             </Tag>
           </div>
-          <div style={{ fontFamily: 'monospace', color: '#6b7280', fontSize: 11, wordBreak: 'break-all' }}>
+          <div style={{ fontFamily: 'monospace', color: 'var(--ds-node-text-secondary, #6b7280)', fontSize: 11, wordBreak: 'break-all' }}>
             {src.value.length > 100 ? src.value.substring(0, 100) + '...' : src.value}
           </div>
-          <div style={{ display: 'flex', gap: 4, color: '#9ca3af', fontSize: 10 }}>
+          <div style={{ display: 'flex', gap: 4, color: 'var(--ds-node-text-muted, #9ca3af)', fontSize: 10 }}>
             {src.nodeName && <span>节点: {src.nodeName}</span>}
             {src.source && <span>· {src.source}</span>}
           </div>

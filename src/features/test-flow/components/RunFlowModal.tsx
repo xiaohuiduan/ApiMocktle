@@ -19,9 +19,9 @@ const logClass = css`
   line-height: 1.8;
   overflow-y: auto;
   padding: 8px;
-  background: #1e1e1e;
+  background: var(--ds-code-bg, #1e1e1e);
   border-radius: 6px;
-  color: #d4d4d4;
+  color: var(--ds-code-color, #d4d4d4);
   position: relative;
 `
 
@@ -37,7 +37,7 @@ const resizeHandleClass = css`
     right: 30%;
     top: 2px;
     height: 2px;
-    background: #6b7280;
+    background: var(--ds-divider-color, #6b7280);
     border-radius: 1px;
   }
 `
@@ -52,12 +52,12 @@ const logLineClass = css`
 `
 
 const statusIconMap: Record<NodeExecStatus, React.ReactNode> = {
-  idle: <Clock size={12} color="#9ca3af" />,
-  running: <Clock size={12} color="#3b82f6" />,
-  passed: <CheckCircle size={12} color="#22c55e" />,
-  failed: <XCircle size={12} color="#ef4444" />,
-  skipped: <SkipForward size={12} color="#9ca3af" />,
-  error: <AlertTriangle size={12} color="#f97316" />,
+  idle: <Clock size={12} color="var(--ds-node-text-muted, #9ca3af)" />,
+  running: <Clock size={12} color="var(--ds-highlight-selected, #3b82f6)" />,
+  passed: <CheckCircle size={12} color="var(--ds-success-color, #22c55e)" />,
+  failed: <XCircle size={12} color="var(--ds-error-color, #ef4444)" />,
+  skipped: <SkipForward size={12} color="var(--ds-node-text-muted, #9ca3af)" />,
+  error: <AlertTriangle size={12} color="var(--ds-warning-color, #f97316)" />,
 }
 
 const NODE_TYPE_LABELS: Record<string, string> = {
@@ -341,7 +341,7 @@ export default function RunFlowModal({
 
       {/* 初始提示 */}
       {state.status === 'idle' && state.logs.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af' }}>
+        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ds-node-text-muted, #9ca3af)' }}>
           <Play size={32} style={{ marginBottom: 8, opacity: 0.3 }} />
           <div>选择环境后点击「开始运行」</div>
         </div>
@@ -360,23 +360,23 @@ function LogLine({ log }: { log: FlowExecLog }) {
 
   return (
     <div className={logLineClass}>
-      <span style={{ color: '#6b7280', flexShrink: 0, width: 70 }}>{time}</span>
+      <span style={{ color: 'var(--ds-node-text-secondary, #6b7280)', flexShrink: 0, width: 70 }}>{time}</span>
       <span style={{ flexShrink: 0, width: 16 }}>{statusIconMap[log.status]}</span>
-      <span style={{ color: '#94a3b8', flexShrink: 0, width: 40 }}>
+      <span style={{ color: 'var(--ds-node-text-muted, #94a3b8)', flexShrink: 0, width: 40 }}>
         [{NODE_TYPE_LABELS[log.nodeType] || log.nodeType}]
       </span>
-      <span style={{ fontWeight: 600, color: '#e5e7eb', flexShrink: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span style={{ fontWeight: 600, color: 'var(--ds-code-color, #e5e7eb)', flexShrink: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {log.nodeName}
       </span>
-      <span style={{ flex: 1, color: log.status === 'error' || log.status === 'failed' ? '#f87171' : '#d4d4d4' }}>
+      <span style={{ flex: 1, color: log.status === 'error' || log.status === 'failed' ? 'var(--ds-error-color, #f87171)' : 'var(--ds-code-color, #d4d4d4)' }}>
         {log.message}
         {log.durationMs !== undefined && (
-          <span style={{ color: '#6b7280', marginLeft: 4 }}>({log.durationMs}ms)</span>
+          <span style={{ color: 'var(--ds-node-text-secondary, #6b7280)', marginLeft: 4 }}>({log.durationMs}ms)</span>
         )}
       </span>
       {hasDetails && (
         <span
-          style={{ color: '#60a5fa', cursor: 'pointer', fontSize: 11 }}
+          style={{ color: 'var(--ds-highlight-selected, #60a5fa)', cursor: 'pointer', fontSize: 11 }}
           onClick={() => setExpanded(!expanded)}
         >
           {expanded ? '收起' : '详情'}

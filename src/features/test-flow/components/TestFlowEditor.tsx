@@ -324,7 +324,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
           <PanelGroup direction="horizontal" autoSaveId="test-flow-left-panel">
             {/* 左侧面板：节点 + 变量 Tab */}
             <Panel defaultSize={8} minSize={8} maxSize={40}>
-              <div style={{ height: '100%', borderRight: '1px solid #f0f0f0', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ height: '100%', borderRight: 'var(--ds-panel-border, 1px solid #f0f0f0)', background: 'var(--ds-panel-bg, #fafafa)', display: 'flex', flexDirection: 'column' }}>
                 <Tabs
                   size="small"
                   defaultActiveKey="nodes"
@@ -360,7 +360,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
               </div>
             </Panel>
 
-            <PanelResizeHandle className="w-px bg-gray-200 hover:bg-blue-400 transition-colors" />
+            <PanelResizeHandle className="w-px hover:bg-blue-400 transition-colors" style={{ background: 'var(--ds-divider-color, #e5e7eb)' }} />
 
             {/* 中间画布 */}
             <Panel>
