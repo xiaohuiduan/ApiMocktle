@@ -400,14 +400,15 @@ export function ScriptEditor(props: ScriptEditorProps) {
           使用说明
         </Button>
       </div>
-      <div className="rounded border" style={{ borderColor: token.colorBorderSecondary }}>
+      <div className="flex flex-col rounded border" style={{ borderColor: token.colorBorderSecondary, height: 200 }}>
         <MonacoEditor
-          height="200px"
+          height="100%"
           language={language}
           value={value ?? ''}
           onChange={(val) => onChange?.(typeof val === 'string' ? val : '')}
           deserializeOnChange={false}
           options={{
+            readOnly: false,
             minimap: { enabled: false },
             tabSize: 2,
             fontSize: 13,

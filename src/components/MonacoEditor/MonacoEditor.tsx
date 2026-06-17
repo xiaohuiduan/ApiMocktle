@@ -90,7 +90,7 @@ function EditorX<ValueType = unknown>(
         loading="初次加载可能耗时较久，请耐心等待..."
         {...editorProps}
         {...valueObj}
-        options={merge(defaultEditorOptions, editorProps.options)}
+        options={merge({ readOnly: false }, defaultEditorOptions, editorProps.options)}
         onChange={(val) => {
           let changedValue: UnsafeAny
 
@@ -107,6 +107,8 @@ function EditorX<ValueType = unknown>(
           editorProps.onMount?.(editor, monaco)
           editorRef.current = editor
           monacoRef.current = monaco
+          // 确保编辑器始终可编辑
+          editor.updateOptions({ readOnly: false })
           setEditorMounted(true)
         }}
       />
