@@ -132,6 +132,7 @@ function generateCurl(apiDetails: ApiDetails, fullUrl: string): { windows: strin
   const method = (apiDetails.method ?? 'GET').toUpperCase()
   const headers: string[] = []
   const queryParams: string[] = []
+  const cookiePairs: string[] = []
 
   apiDetails.parameters?.header?.forEach((h) => {
     if (h.name && h.enable !== false) {
@@ -145,12 +146,19 @@ function generateCurl(apiDetails: ApiDetails, fullUrl: string): { windows: strin
     }
   })
 
+  apiDetails.parameters?.cookie?.forEach((c) => {
+    if (c.name && c.enable !== false) {
+      cookiePairs.push(`${encodeURIComponent(c.name)}=${encodeURIComponent(String(c.example ?? ''))}`)
+    }
+  })
+
   let targetUrl = fullUrl
   if (queryParams.length > 0) {
     targetUrl += (targetUrl.includes('?') ? '&' : '?') + queryParams.join('&')
   }
 
   const headerStr = headers.length > 0 ? ` ${headers.join(' ')}` : ''
+  const cookieStr = cookiePairs.length > 0 ? ` -b "${cookiePairs.join('; ')}"` : ''
 
   let bodyFlag = ''
   let bodyContent = ''
@@ -167,8 +175,8 @@ function generateCurl(apiDetails: ApiDetails, fullUrl: string): { windows: strin
     }
   }
 
-  const cmdLinux = `curl -X ${method}${headerStr}${bodyFlag}${bodyContent} "${targetUrl}"`
-  const cmdWindows = `curl -X ${method}${headerStr}${bodyFlag}${bodyContent} "${targetUrl}"`
+  const cmdLinux = `curl -X ${method}${headerStr}${cookieStr}${bodyFlag}${bodyContent} "${targetUrl}"`
+  const cmdWindows = `curl -X ${method}${headerStr}${cookieStr}${bodyFlag}${bodyContent} "${targetUrl}"`
 
   return { linux: cmdLinux, windows: cmdWindows }
 }

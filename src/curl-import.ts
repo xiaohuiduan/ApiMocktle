@@ -39,11 +39,14 @@ function inferJsonSchemaFromExample(value: unknown): JsonSchema {
   }
 
   if (typeof value === 'boolean') {
-    return { type: SchemaType.Boolean }
+    return { type: SchemaType.Boolean, example: value }
   }
 
   if (typeof value === 'number') {
-    return { type: Number.isInteger(value) ? SchemaType.Integer : SchemaType.Number }
+    return {
+      type: Number.isInteger(value) ? SchemaType.Integer : SchemaType.Number,
+      example: value,
+    }
   }
 
   if (value && typeof value === 'object') {
@@ -58,7 +61,7 @@ function inferJsonSchemaFromExample(value: unknown): JsonSchema {
     }
   }
 
-  return { type: SchemaType.String }
+  return { type: SchemaType.String, example: String(value) }
 }
 
 function inferParamType(values: string[]) {
