@@ -20,12 +20,12 @@ export default function MainLayout() {
   const { isGlassStyle } = useDesignStyle()
   const { isDarkMode } = useThemeContext()
 
-  // 玻璃风格：中性灰调渐变背景，衬托透明折射效果
+  // 玻璃风格：彩色光晕径向渐变背景，为半透明面板提供可模糊的可见素材，使磨砂玻璃质感真正成立
   const glassGradient = useMemo(() => {
     if (!isGlassStyle) return undefined
     return isDarkMode
-      ? 'linear-gradient(180deg, #1a1d23 0%, #22252b 40%, #1e2128 100%)'
-      : 'linear-gradient(180deg, #f0f2f5 0%, #e8eaed 40%, #f5f5f7 100%)'
+      ? 'radial-gradient(45% 55% at 80% 12%, rgba(99,102,241,0.28), transparent 70%), radial-gradient(40% 50% at 12% 85%, rgba(16,185,129,0.22), transparent 70%), radial-gradient(42% 48% at 55% 50%, rgba(236,72,153,0.16), transparent 72%), linear-gradient(160deg, #15171c, #1d2026)'
+      : 'radial-gradient(45% 55% at 80% 12%, rgba(99,102,241,0.30), transparent 70%), radial-gradient(40% 50% at 12% 85%, rgba(236,72,153,0.22), transparent 70%), radial-gradient(42% 48% at 55% 50%, rgba(16,185,129,0.20), transparent 72%), linear-gradient(160deg, #eef2ff, #f7f3ff)'
   }, [isGlassStyle, isDarkMode])
 
   return (

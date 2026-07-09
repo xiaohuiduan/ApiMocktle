@@ -37,7 +37,7 @@
   --ds-node-border-color: #e5e7eb;
   --ds-node-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   --ds-node-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.15);
-  --ds-node-shadow-selected: 0 0 0 2px #3b82f6;
+  --ds-node-shadow-selected: 0 0 0 2px var(--ds-primary-color, #1677ff);
   --ds-node-text-primary: var(--color-text-primary);
   --ds-node-text-secondary: var(--color-text-secondary);
   --ds-node-text-muted: #9ca3af;
@@ -103,12 +103,12 @@
 
 [data-design-style='glassmorphism'] {
   /* 基础表面 */
-  --ds-bg-surface: rgba(255, 255, 255, 0.18);
-  --ds-bg-elevated: rgba(255, 255, 255, 0.28);
+  --ds-bg-surface: rgba(255, 255, 255, 0.24);
+  --ds-bg-elevated: rgba(255, 255, 255, 0.36);
   --ds-bg-overlay: rgba(0, 0, 0, 0.2);
-  --ds-border: 1px solid rgba(255, 255, 255, 0.25);
-  --ds-border-top: 1px solid rgba(255, 255, 255, 0.3);
-  --ds-border-subtle: 1px solid rgba(255, 255, 255, 0.12);
+  --ds-border: 1px solid rgba(255, 255, 255, 0.32);
+  --ds-border-top: 1px solid rgba(255, 255, 255, 0.45);
+  --ds-border-subtle: 1px solid rgba(255, 255, 255, 0.18);
   --ds-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   --ds-shadow-md: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   --ds-shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.25);
@@ -214,8 +214,8 @@
   --ds-inner-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
   --ds-gradient: linear-gradient(145deg, rgba(255, 255, 255, 0.3), rgba(0, 0, 0, 0.03));
   --ds-glow: none;
-  --ds-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%23f5f0eb'/%3E%3Crect width='1' height='1' fill='%23ece7e0'/%3E%3C/svg%3E");
-  --ds-texture-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%23f5f0eb'/%3E%3Crect x='0' y='0' width='1' height='1' fill='%23ece7e0' opacity='0.5'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23e0d8ce' opacity='0.3'/%3E%3C/svg%3E");
+  --ds-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  --ds-texture-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
 
   /* 流程图节点 */
   --ds-node-bg: #faf8f5;
@@ -269,8 +269,8 @@
   --ds-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 0 rgba(255, 255, 255, 0.08) inset;
   --ds-inner-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
   --ds-gradient: linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.12));
-  --ds-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%232a2520'/%3E%3Crect width='1' height='1' fill='%23252019'/%3E%3C/svg%3E");
-  --ds-texture-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='6' height='6' fill='%232a2520'/%3E%3Crect x='0' y='0' width='1' height='1' fill='%23252019' opacity='0.5'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%231e1a16' opacity='0.3'/%3E%3C/svg%3E");
+  --ds-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  --ds-texture-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
 
   --ds-node-bg: #332e28;
   --ds-node-bg-elevated: #3d3529;
@@ -356,6 +356,12 @@
   --ds-success-color: #5fad8b;
   --ds-error-color: #e07070;
   --ds-warning-color: #e2a048;
+}
+
+/* 新拟态：低对比可点击性补偿，全局 focus-visible 用主色描边 */
+[data-design-style='neumorphism'] :focus-visible {
+  outline: 2px solid var(--ds-primary-color, #5b8fa8);
+  outline-offset: 2px;
 }
 
 :root[theme='darkDefault'][data-design-style='neumorphism'] {

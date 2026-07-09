@@ -23,11 +23,11 @@ function getDesignStyleComponents(
 
   // 玻璃风格
   if (designStyle === 'glassmorphism') {
-    const bg = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.12)'
-    const bgElevated = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.2)'
-    const border = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.25)'
-    const bgHover = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.18)'
-    const bgActive = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.25)'
+    const bg = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.24)'
+    const bgElevated = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.36)'
+    const border = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.32)'
+    const bgHover = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.3)'
+    const bgActive = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.4)'
 
     return {
       Button: {
