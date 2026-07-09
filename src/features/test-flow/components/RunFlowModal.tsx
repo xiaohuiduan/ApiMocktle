@@ -18,7 +18,7 @@ const logClass = css`
   font-size: 12px;
   line-height: 1.8;
   overflow-y: auto;
-  padding: 8px;
+  padding: var(--ds-pad-sm);
   background: var(--ds-code-bg, #1e1e1e);
   border-radius: 6px;
   color: var(--ds-code-color, #d4d4d4);
@@ -284,7 +284,7 @@ export default function RunFlowModal({
       }
     >
       {/* 配置区 */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 'var(--ds-pad-lg)', marginBottom: 'var(--ds-pad-lg)', alignItems: 'center' }}>
         <div style={{ flex: 1 }}>
           <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
             运行环境
@@ -314,7 +314,7 @@ export default function RunFlowModal({
 
       {/* 状态统计 */}
       {state.status !== 'idle' && (
-        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 'var(--ds-pad-md)', marginBottom: 'var(--ds-pad-md)' }}>
           <Tag color={state.status === 'running' ? 'processing' : state.status === 'passed' ? 'success' : 'error'}>
             {state.status === 'running' ? '运行中' : state.status === 'passed' ? '通过' : state.status === 'failed' ? '失败' : '中止'}
           </Tag>
@@ -328,7 +328,7 @@ export default function RunFlowModal({
       {/* 日志面板 */}
       {state.logs.length > 0 && (
         <>
-          <Divider style={{ margin: '8px 0' }} />
+          <Divider style={{ margin: 'var(--ds-pad-sm) 0' }} />
           <div className={logClass} style={{ height: logHeight }}>
             {state.logs.map((log, i) => (
               <LogLine key={i} log={log} />

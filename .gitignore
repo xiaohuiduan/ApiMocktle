@@ -79,3 +79,5 @@ plans/**
 /IMPLEMENTATION_REPORT.md
 /UI_OPTIMIZATION_REPORT.md
 /BODY_EDITOR_BUG_FIX.md
+.trellis
+.qoder

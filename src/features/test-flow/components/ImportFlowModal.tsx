@@ -15,7 +15,7 @@ const mdPreviewClass = css`
   background: var(--ds-node-bg-elevated, #f6f8fa);
   border: 1px solid var(--ds-node-border-color, #d0d7de);
   border-radius: 6px;
-  padding: 16px;
+  padding: var(--ds-pad-lg);
   max-height: 420px;
   overflow: auto;
   font-size: 13px;
@@ -132,7 +132,7 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
       key: 'paste',
       label: <span><FileTextOutlined /> 粘贴 JSON</span>,
       children: (
-        <div style={{ padding: '16px 0' }}>
+        <div style={{ padding: 'var(--ds-pad-lg) 0' }}>
           <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
             将 AI 生成的 JSON 粘贴到下方，导入后会自动布局
           </Text>
@@ -164,7 +164,7 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
       key: 'file',
       label: <span><UploadOutlined /> 导入文件</span>,
       children: (
-        <div style={{ padding: '16px 0', textAlign: 'center' }}>
+        <div style={{ padding: 'var(--ds-pad-lg) 0', textAlign: 'center' }}>
           <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
             选择之前导出的 .json 文件导入
           </Text>
@@ -178,7 +178,7 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
       key: 'prompt',
       label: <span><CopyOutlined /> AI Prompt</span>,
       children: (
-        <div style={{ padding: '16px 0' }}>
+        <div style={{ padding: 'var(--ds-pad-lg) 0' }}>
           <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
             复制下方 Prompt 给 AI，附上你的测试需求，AI 会生成可直接导入的 JSON
           </Text>

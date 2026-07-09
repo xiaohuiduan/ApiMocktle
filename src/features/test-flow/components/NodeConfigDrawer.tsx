@@ -21,7 +21,7 @@ const resultBlockClass = css`
   background: var(--ds-node-bg-elevated, #f8fafc);
   border: 1px solid var(--ds-node-border-color, #e2e8f0);
   border-radius: 6px;
-  padding: 12px;
+  padding: var(--ds-pad-md);
   font-size: 12px;
 `
 
@@ -43,7 +43,7 @@ const codeBlockClass = css`
   background: var(--ds-code-bg, #1e1e1e);
   color: var(--ds-code-color, #d4d4d4);
   border-radius: 4px;
-  padding: 8px 10px;
+  padding: var(--ds-pad-sm) 10px;
   font-family: 'Cascadia Code', 'Fira Code', monospace;
   font-size: 11px;
   line-height: 1.5;
@@ -51,7 +51,7 @@ const codeBlockClass = css`
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-all;
-  margin: 4px 0;
+  margin: var(--ds-pad-xs) 0;
 `
 
 const STATUS_CONFIG: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
@@ -385,7 +385,7 @@ export default function NodeConfigDrawer() {
               )}
             </div>
 
-            <Divider style={{ margin: '12px 0' }} />
+            <Divider style={{ margin: 'var(--ds-pad-md) 0' }} />
 
             {/* 基础字段 */}
             <BaseFields
@@ -396,7 +396,7 @@ export default function NodeConfigDrawer() {
             {/* 运行结果 */}
             {hasExecResult && (
               <>
-                <Divider style={{ margin: '12px 0' }} />
+                <Divider style={{ margin: 'var(--ds-pad-md) 0' }} />
                 <ExecResultSection
                   status={execStatus}
                   error={execError}
@@ -410,7 +410,7 @@ export default function NodeConfigDrawer() {
             {/* 类型特有字段面板 */}
             {PanelComponent && (
               <>
-                <Divider style={{ margin: '12px 0' }} />
+                <Divider style={{ margin: 'var(--ds-pad-md) 0' }} />
                 <PanelComponent
                   data={selectedNode.data as FlowNodeData}
                   onChange={handlePanelChange}
@@ -461,7 +461,7 @@ export default function NodeConfigDrawer() {
           {/* 变量填写 */}
           {runVarNames.length > 0 && (
             <>
-              <Divider style={{ margin: '8px 0' }} />
+              <Divider style={{ margin: 'var(--ds-pad-sm) 0' }} />
               <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
                 该请求包含变量，请填写：
               </Text>
@@ -598,7 +598,7 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ds-gap-sm)', marginBottom: 'var(--ds-pad-sm)' }}>
         <Text strong style={{ fontSize: 13 }}>运行结果</Text>
         <Tag color={config.color} icon={config.icon}>
           {config.label}
@@ -610,7 +610,7 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
 
       {/* 错误信息 */}
       {error && (
-        <div className={resultBlockClass} style={{ borderColor: 'var(--ds-error-color, #fca5a5)', background: 'rgba(239, 68, 68, 0.08)', marginBottom: 8 }}>
+        <div className={resultBlockClass} style={{ borderColor: 'var(--ds-error-color, #fca5a5)', background: 'rgba(239, 68, 68, 0.08)', marginBottom: 'var(--ds-pad-sm)' }}>
           <Text type="danger" style={{ fontSize: 12 }}>{error}</Text>
         </div>
       )}
@@ -725,7 +725,7 @@ function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
       gap: 2,
       fontSize: 12,
       color: 'var(--ds-node-text-secondary, #6b7280)',
-      padding: '6px 0',
+      padding: 'var(--ds-list-gap) 0',
     }}>
       {displayItems.map((item, i) => {
         const isCurrent = item.id === currentId

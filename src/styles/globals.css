@@ -14,6 +14,58 @@
   --layout-header-height: 40px;
   --p-main: 8px;
   --p-tab-content: 16px;
+
+  /* 密集表面专用间距变量：标准档 = 原写死像素值，保证零视觉回归。
+     紧凑档缩小、宽松档放大，由各 [data-density] 块覆盖。 */
+  --ds-node-pad-y: 10px;
+  --ds-node-pad-x: 14px;
+  --ds-pad-xs: 4px;
+  --ds-pad-sm: 8px;
+  --ds-pad-md: 12px;
+  --ds-pad-lg: 16px;
+  --ds-gap-sm: 8px;
+  --ds-list-gap: 6px;
+  --ds-list-row-gap: 6px;
+  --ds-toolbar-pad-y: 6px;
+  --ds-toolbar-pad-x: 12px;
+}
+
+/* 界面密度：通过 ThemeContext 写入的 [data-density] 覆盖布局级间距变量。
+   标准档回落 :root 默认值（8px / 16px），紧凑档压缩、宽松档放大。 */
+:root[data-density='compact'] {
+  --p-main: 4px;
+  --p-tab-content: 10px;
+
+  /* 密集表面：紧凑档压缩 */
+  --ds-node-pad-y: 7px;
+  --ds-node-pad-x: 10px;
+  --ds-pad-xs: 3px;
+  --ds-pad-sm: 6px;
+  --ds-pad-md: 8px;
+  --ds-pad-lg: 10px;
+  --ds-gap-sm: 6px;
+  --ds-list-gap: 4px;
+  --ds-list-row-gap: 2px;
+  --ds-toolbar-pad-y: 4px;
+  --ds-toolbar-pad-x: 8px;
+}
+
+:root[data-density='loose'] {
+  --p-main: 12px;
+  --p-tab-content: 20px;
+
+  /* 密集表面：宽松档放大 */
+  --ds-node-pad-y: 12px;
+  --ds-node-pad-x: 16px;
+  --ds-pad-xs: 6px;
+  --ds-pad-sm: 10px;
+  --ds-pad-md: 16px;
+  --ds-pad-lg: 20px;
+  --ds-gap-sm: 10px;
+  --ds-list-gap: 8px;
+  --ds-list-row-gap: 6px;
+  --ds-toolbar-pad-y: 8px;
+  --ds-toolbar-pad-x: 14px;
 }
 
 :root[theme='lightDefault'] {

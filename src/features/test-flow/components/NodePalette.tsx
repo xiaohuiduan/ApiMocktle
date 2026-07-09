@@ -47,14 +47,14 @@ const panelClass = css`
   height: 100%;
   overflow-y: auto;
   background: transparent;
-  padding: 8px;
+  padding: var(--ds-pad-sm);
 `
 
 const titleClass = css`
   font-size: 13px;
   font-weight: 600;
   color: var(--ds-node-text-primary, #374151);
-  padding: 4px 8px 8px;
+  padding: var(--ds-pad-xs) var(--ds-pad-sm) var(--ds-pad-sm);
 `
 
 const cardClass = css`
@@ -64,7 +64,7 @@ const cardClass = css`
   background: var(--ds-node-bg, #fff);
   box-shadow: var(--ds-node-shadow, 0 1px 2px rgba(0, 0, 0, 0.06));
   border: 1px solid var(--ds-node-border-color, transparent);
-  margin-bottom: 6px;
+  margin-bottom: var(--ds-list-gap);
   cursor: grab;
   overflow: hidden;
   transition: box-shadow 0.15s;
@@ -87,8 +87,8 @@ const colorBarClass = css`
 const cardContentClass = css`
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: var(--ds-gap-sm);
+  padding: var(--ds-pad-sm) 10px;
   flex: 1;
   min-width: 0;
 `
@@ -195,7 +195,7 @@ export default function NodePalette() {
             position: 'fixed',
             pointerEvents: 'none',
             zIndex: 9999,
-            padding: '8px 12px',
+            padding: 'var(--ds-pad-sm) var(--ds-pad-md)',
             background: 'var(--ds-node-bg, #fff)',
             border: '2px solid var(--ds-primary-color, #1677ff)',
             borderRadius: 6,

@@ -14,7 +14,7 @@ const codeBlockClass = css`
   background: var(--ds-code-bg, #1e1e1e);
   color: var(--ds-code-color, #d4d4d4);
   border-radius: 4px;
-  padding: 8px 10px;
+  padding: var(--ds-pad-sm) 10px;
   font-family: 'Cascadia Code', 'Fira Code', monospace;
   font-size: 11px;
   line-height: 1.5;
@@ -22,14 +22,14 @@ const codeBlockClass = css`
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-all;
-  margin: 4px 0;
+  margin: var(--ds-pad-xs) 0;
 `
 
 const resultBlockClass = css`
   background: var(--ds-node-bg-elevated, #f8fafc);
   border: 1px solid var(--ds-node-border-color, #e2e8f0);
   border-radius: 6px;
-  padding: 12px;
+  padding: var(--ds-pad-md);
   font-size: 12px;
 `
 
@@ -158,13 +158,13 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
       onCancel={onClose}
       footer={null}
       width={560}
-      styles={{ body: { padding: '12px 0' } }}
+      styles={{ body: { padding: 'var(--ds-pad-md) 0' } }}
     >
       {/* 错误信息 */}
       {step.errorMessage && (
         <div
           className={resultBlockClass}
-          style={{ marginBottom: 12, borderColor: 'var(--ds-error-color, #fca5a5)', background: 'rgba(239, 68, 68, 0.08)' }}
+          style={{ marginBottom: 'var(--ds-pad-md)', borderColor: 'var(--ds-error-color, #fca5a5)', background: 'rgba(239, 68, 68, 0.08)' }}
         >
           <Text type="danger" style={{ fontSize: 12 }}>{step.errorMessage}</Text>
         </div>
@@ -260,9 +260,9 @@ function ExecutionDetail({ executionId, taskId }: { executionId: string; taskId:
   }, [executionId, getExecutionDetail])
 
   if (loading) return <Spin size="small" style={{ display: 'block', margin: '8px auto' }} />
-  if (error) return <div style={{ padding: 8, color: 'var(--ds-error-color, #ef4444)', fontSize: 11, textAlign: 'center' }}>{error}</div>
+  if (error) return <div style={{ padding: 'var(--ds-pad-sm)', color: 'var(--ds-error-color, #ef4444)', fontSize: 11, textAlign: 'center' }}>{error}</div>
   if (!steps.length) {
-    return <div style={{ padding: 8, color: 'var(--ds-node-text-muted, #9ca3af)', fontSize: 11, textAlign: 'center' }}>无步骤详情</div>
+    return <div style={{ padding: 'var(--ds-pad-sm)', color: 'var(--ds-node-text-muted, #9ca3af)', fontSize: 11, textAlign: 'center' }}>无步骤详情</div>
   }
 
   const sorted = [...steps].sort((a, b) => a.sortOrder - b.sortOrder)
@@ -281,7 +281,7 @@ function ExecutionDetail({ executionId, taskId }: { executionId: string; taskId:
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                padding: '4px 6px',
+                padding: 'var(--ds-pad-xs) var(--ds-pad-sm)',
                 fontSize: 11,
                 cursor: 'pointer',
                 borderRadius: 4,
@@ -341,7 +341,7 @@ export default function ExecutionHistoryPanel({ taskId }: { taskId: string }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '6px 8px', display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ padding: 'var(--ds-list-gap) var(--ds-pad-sm)', display: 'flex', justifyContent: 'flex-end' }}>
         <Button
           size="small"
           type="text"
@@ -351,7 +351,7 @@ export default function ExecutionHistoryPanel({ taskId }: { taskId: string }) {
         />
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 4px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 var(--ds-pad-xs)' }}>
         {executions.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -366,7 +366,7 @@ export default function ExecutionHistoryPanel({ taskId }: { taskId: string }) {
               <div
                 key={exec.id}
                 style={{
-                  marginBottom: 6,
+                  marginBottom: 'var(--ds-list-gap)',
                   border: '1px solid var(--ds-divider-color, #f0f0f0)',
                   borderRadius: 6,
                   overflow: 'hidden',
@@ -375,7 +375,7 @@ export default function ExecutionHistoryPanel({ taskId }: { taskId: string }) {
                 <div
                   onClick={() => setExpandedId(isExpanded ? null : exec.id)}
                   style={{
-                    padding: '6px 8px',
+                    padding: 'var(--ds-list-gap) var(--ds-pad-sm)',
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
@@ -425,7 +425,7 @@ export default function ExecutionHistoryPanel({ taskId }: { taskId: string }) {
                 </div>
 
                 {isExpanded && (
-                  <div style={{ borderTop: '1px solid var(--ds-divider-color, #f0f0f0)', padding: '4px 8px' }}>
+                  <div style={{ borderTop: '1px solid var(--ds-divider-color, #f0f0f0)', padding: 'var(--ds-pad-xs) var(--ds-pad-sm)' }}>
                     <ExecutionDetail executionId={exec.id} taskId={taskId} />
                   </div>
                 )}

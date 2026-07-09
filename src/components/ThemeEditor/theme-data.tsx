@@ -1,10 +1,11 @@
 import type { GlobalToken } from 'antd'
 
-import type { DesignStyle, ThemeMode, ThemeSetting } from './ThemeEditor.type'
+import type { Density, DesignStyle, ThemeMode, ThemeSetting } from './ThemeEditor.type'
 
 export const defaultThemeSetting: ThemeSetting = {
   themeMode: 'lightDefault',
   designStyle: 'default',
+  density: 'compact',
 }
 
 /** 每种设计风格自动配色参数 */
@@ -36,6 +37,62 @@ export const designStylePresets: Record<
     borderRadiusLG: 20,
     borderRadiusSM: 10,
   },
+}
+
+/** 每种密度档位的展示信息，用于设置面板预览卡片 */
+export const densityPresets: Record<
+  Density,
+  { name: string; description: string }
+> = {
+  compact: {
+    name: '紧凑',
+    description: '控件更矮、字号更小、间距更紧，一屏容纳更多信息（默认）',
+  },
+  standard: {
+    name: '标准',
+    description: '接近系统默认尺寸，兼顾密度与可读性',
+  },
+  loose: {
+    name: '宽松',
+    description: '控件更高、留白更多，长时间盯屏更护眼',
+  },
+}
+
+/**
+ * 根据密度档位构建 antd 全局 token 覆盖。
+ * 紧凑档在 antd 默认值基础上压缩控件高度、字号与内边距；宽松档反向放大；
+ * 标准档返回空对象，回落 antd 原生默认值。
+ */
+export function getDensityToken(density: Density): Partial<GlobalToken> {
+  if (density === 'compact') {
+    return {
+      controlHeight: 26,
+      controlHeightSM: 22,
+      controlHeightLG: 32,
+      fontSize: 13,
+      fontSizeSM: 12,
+      padding: 8,
+      paddingSM: 8,
+      paddingXS: 6,
+      sizeStep: 3,
+    }
+  }
+
+  if (density === 'loose') {
+    return {
+      controlHeight: 38,
+      controlHeightSM: 28,
+      controlHeightLG: 44,
+      fontSize: 14,
+      fontSizeSM: 13,
+      padding: 20,
+      paddingSM: 16,
+      paddingXS: 10,
+      sizeStep: 5,
+    }
+  }
+
+  return {}
 }
 
 /* ------------------------------------------------------------------ */

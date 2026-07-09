@@ -653,3 +653,19 @@
   border: var(--ds-border);
   box-shadow: var(--ds-shadow-md);
 }
+
+/* ============================================================
+ * 密度 × 风格 正交保底
+ * 新拟态/拟物靠内边距撑立体感，紧凑档下给布局间距设下限，
+ * 避免浮雕语义被压塌（default/玻璃不保底，按紧凑档全量压缩）。
+ * ============================================================ */
+
+:root[data-density='compact'][data-design-style='neumorphism'],
+:root[data-density='compact'][data-design-style='skeuomorphism'] {
+  --p-main: 7px;
+  --p-tab-content: 13px;
+  --ds-list-row-gap: 3px;
+  /* 节点卡片立体感保底：紧凑档下仍保留比 default/玻璃更大的最小内边距 */
+  --ds-node-pad-y: 9px;
+  --ds-node-pad-x: 12px;
+}

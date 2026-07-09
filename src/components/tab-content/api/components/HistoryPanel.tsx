@@ -109,14 +109,14 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
     >
       {/* 左侧列表 */}
       <div className="flex shrink-0 flex-col" style={{ width: 220, borderRight: `1px solid ${token.colorBorderSecondary}` }}>
-        <div className="flex items-center justify-between px-3 py-2">
+        <div className="flex items-center justify-between px-[var(--ds-pad-md)] py-[var(--ds-pad-sm)]">
           <Typography.Text strong className="text-xs">共 {items.length} 条</Typography.Text>
           <Button size="small" type="link" onClick={() => void loadHistory()}>刷新</Button>
         </div>
         <div className="flex-1 overflow-auto">
           <Spin spinning={loading}>
             {items.length === 0 ? (
-              <div className="px-3 py-4 text-center">
+              <div className="px-[var(--ds-pad-md)] py-[var(--ds-pad-lg)] text-center">
                 <Typography.Text type="secondary" className="text-xs">暂无历史记录</Typography.Text>
               </div>
             ) : (
@@ -125,7 +125,7 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
                 dataSource={items}
                 renderItem={(item) => (
                   <div
-                    className="cursor-pointer px-3 py-2 transition-colors"
+                    className="cursor-pointer px-[var(--ds-pad-md)] py-[var(--ds-pad-sm)] transition-colors"
                     onClick={() => setSelectedId(item.id)}
                     style={{
                       backgroundColor: selectedId === item.id ? token.colorPrimaryBg : undefined,
@@ -164,7 +164,7 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
             <Typography.Text type="secondary">点击左侧记录查看详情</Typography.Text>
           </div>
         ) : (
-          <div className="flex flex-1 flex-col overflow-auto p-4">
+          <div className="flex flex-1 flex-col overflow-auto p-[var(--ds-pad-lg)]">
             {/* 请求摘要 */}
             <div className="mb-4 flex items-center gap-2">
               <Tag color={getStatusColor(result?.status ?? 0)}>{result?.status ?? 'ERR'} {result?.statusText ?? ''}</Tag>

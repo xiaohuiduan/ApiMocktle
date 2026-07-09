@@ -7,6 +7,7 @@ import { DesignStylePicker } from './DesignStylePicker'
 import { storeThemeSetting } from './ThemeEditor.helper'
 import type { ThemeSetting } from './ThemeEditor.type'
 import { ThemePicker } from './ThemePicker'
+import { DensityPicker } from './DensityPicker'
 
 interface ThemeEditorProps {
   value?: ThemeSetting
@@ -51,6 +52,10 @@ export function ThemeEditor(props: ThemeEditorProps) {
 
         <Form.Item label="设计风格" name="designStyle">
           <DesignStylePicker />
+        </Form.Item>
+
+        <Form.Item label="界面密度" name="density">
+          <DensityPicker />
         </Form.Item>
       </Form>
     </div>

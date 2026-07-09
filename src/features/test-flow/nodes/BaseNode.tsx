@@ -93,7 +93,7 @@ const contentClass = css`
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 10px 14px;
+  padding: var(--ds-node-pad-y) var(--ds-node-pad-x);
   flex: 1;
   min-width: 0;
 `

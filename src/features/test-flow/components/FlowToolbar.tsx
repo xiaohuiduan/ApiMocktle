@@ -43,8 +43,8 @@ export interface FlowToolbarProps {
 const toolbarClass = css`
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: var(--ds-gap-sm);
+  padding: var(--ds-toolbar-pad-y) var(--ds-toolbar-pad-x);
   border-bottom: var(--ds-toolbar-border, 1px solid #f0f0f0);
   background: var(--ds-toolbar-bg, #fff);
 `
@@ -53,7 +53,7 @@ const dividerClass = css`
   width: 1px;
   height: 20px;
   background: var(--ds-divider-color, #e5e7eb);
-  margin: 0 4px;
+  margin: 0 var(--ds-pad-xs);
 `
 
 // ==================== 组件 ====================

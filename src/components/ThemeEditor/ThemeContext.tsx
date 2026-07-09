@@ -5,9 +5,9 @@ import { ConfigProvider, theme } from 'antd'
 import type { ThemeConfig } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 
-import { designStylePresets, presetThemes } from './theme-data'
+import { designStylePresets, getDensityToken, presetThemes } from './theme-data'
 import { restoreThemeSetting } from './ThemeEditor.helper'
-import type { DesignStyle, ThemeSetting } from './ThemeEditor.type'
+import type { Density, DesignStyle, ThemeSetting } from './ThemeEditor.type'
 
 const { defaultAlgorithm, darkAlgorithm } = theme
 
@@ -301,7 +301,7 @@ export function ThemeProvider(props: React.PropsWithChildren<ThemeProviderProps>
 
   const [themeSetting, setThemeSetting] = useState<ThemeSetting>(initialValue)
 
-  const { themeMode, designStyle } = themeSetting
+  const { themeMode, designStyle, density } = themeSetting
 
   const isDarkMode = themeMode === 'darkDefault'
 
@@ -312,16 +312,19 @@ export function ThemeProvider(props: React.PropsWithChildren<ThemeProviderProps>
   // 从设计风格预设中自动获取主色和圆角
   const stylePreset = designStylePresets[designStyle] ?? designStylePresets.default
 
+  const densityToken = useMemo(() => getDensityToken(density), [density])
+
   const themePresetTokens = useMemo(() => {
     const preset = presetThemes[themeMode]
     return {
       ...preset.token,
+      ...densityToken,
       colorPrimary: stylePreset.colorPrimary,
       borderRadius: stylePreset.borderRadius,
       borderRadiusLG: stylePreset.borderRadiusLG,
       borderRadiusSM: stylePreset.borderRadiusSM,
     }
-  }, [themeMode, stylePreset])
+  }, [themeMode, stylePreset, densityToken])
 
   // 设计风格全局 token 覆盖
   const designStyleToken = useMemo(
@@ -342,6 +345,10 @@ export function ThemeProvider(props: React.PropsWithChildren<ThemeProviderProps>
   useEffect(() => {
     document.documentElement.setAttribute('data-design-style', designStyle)
   }, [designStyle])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-density', density)
+  }, [density])
 
   // 首次渲染后标记 theme-ready，启用过渡动画
   useEffect(() => {
