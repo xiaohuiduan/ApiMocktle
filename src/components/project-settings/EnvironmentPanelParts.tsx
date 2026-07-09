@@ -1,4 +1,5 @@
-import { Button, Input, Switch, Tabs, Tag, Typography, theme } from 'antd'
+import { useState } from 'react'
+import { Button, Input, Select, Switch, Tabs, Tag, Typography, theme } from 'antd'
 import { GlobeIcon, KeyRoundIcon, PlusIcon, ShieldIcon, TrashIcon } from 'lucide-react'
 
 import { createEnvironmentBaseUrl, createEnvironmentValue } from '@/project-environment-utils'
@@ -13,6 +14,20 @@ import {
 
 import { GLOBAL_PARAMETER_LABELS } from './GlobalParametersEditor'
 import { TabValueEditor, ValueEditor } from './ValueEditor'
+
+// 前置 URL 协议与域名拆分：url 仍存完整地址（如 https://api.example.com），仅用于输入展示
+function parseBaseUrl(url: string): { protocol: 'http' | 'https'; host: string } {
+  const trimmed = (url ?? '').trim()
+  if (/^http:\/\//i.test(trimmed)) {
+    return { protocol: 'http', host: trimmed.replace(/^http:\/\//i, '') }
+  }
+  // 默认 https（含空值、无协议、https:// 开头）
+  return { protocol: 'https', host: trimmed.replace(/^https?:\/\//i, '') }
+}
+function serializeBaseUrl(protocol: 'http' | 'https', host: string): string {
+  const h = (host ?? '').trim()
+  return h ? `${protocol}://${h}` : ''
+}
 
 export type GlobalSectionKey = 'globalVariables' | 'globalParameters' | 'vaultSecrets'
 export type EnvironmentSectionKey = `environment:${string}`
@@ -121,6 +136,22 @@ export function EnvironmentEditor(props: {
   const baseUrls = environment.baseUrls ?? []
   const variables = environment.variables ?? []
 
+  const [activeParamSection, setActiveParamSection] = useState<ApiEnvironmentGlobalParameterSection>(GLOBAL_PARAMETER_SECTIONS[0])
+  const handleAddParam = (section: ApiEnvironmentGlobalParameterSection) => {
+    const sectionParams = environment.parameters?.[section] ?? []
+    onChange({
+      ...environment,
+      parameters: {
+        header: [],
+        cookie: [],
+        query: [],
+        body: [],
+        ...environment.parameters,
+        [section]: [...sectionParams, createEnvironmentValue()],
+      },
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -194,15 +225,36 @@ export function EnvironmentEditor(props: {
                     onChange({ ...environment, baseUrls: updateBaseUrlRow(baseUrls, item.id, 'name', event.target.value) })
                   }}
                 />
-                <Input
-                  variant="borderless"
-                  disabled={!editable}
-                  placeholder="https://api.example.com"
-                  value={item.url}
-                  onChange={(event) => {
-                    onChange({ ...environment, baseUrls: updateBaseUrlRow(baseUrls, item.id, 'url', event.target.value) })
-                  }}
-                />
+                <div className="flex items-center gap-1">
+                  <Select
+                    disabled={!editable}
+                    size="small"
+                    style={{ width: 88, flexShrink: 0 }}
+                    value={parseBaseUrl(item.url).protocol}
+                    options={[
+                      { value: 'http', label: 'http://' },
+                      { value: 'https', label: 'https://' },
+                    ]}
+                    onChange={(protocol) => {
+                      onChange({
+                        ...environment,
+                        baseUrls: updateBaseUrlRow(baseUrls, item.id, 'url', serializeBaseUrl(protocol, parseBaseUrl(item.url).host)),
+                      })
+                    }}
+                  />
+                  <Input
+                    variant="borderless"
+                    disabled={!editable}
+                    placeholder="api.example.com"
+                    value={parseBaseUrl(item.url).host}
+                    onChange={(event) => {
+                      onChange({
+                        ...environment,
+                        baseUrls: updateBaseUrlRow(baseUrls, item.id, 'url', serializeBaseUrl(parseBaseUrl(item.url).protocol, event.target.value)),
+                      })
+                    }}
+                  />
+                </div>
                 <div className="flex items-center justify-center">
                   <Button
                     danger
@@ -240,7 +292,16 @@ export function EnvironmentEditor(props: {
         </div>
 
         <Tabs
+          activeKey={activeParamSection}
           animated={false}
+          onChange={(key) => setActiveParamSection(key as ApiEnvironmentGlobalParameterSection)}
+          tabBarExtraContent={{
+            right: (
+              <Button disabled={!editable} icon={<PlusIcon size={14} />} onClick={() => handleAddParam(activeParamSection)}>
+                添加
+              </Button>
+            ),
+          }}
           items={GLOBAL_PARAMETER_SECTIONS.map((section) => {
             const sectionParams = environment.parameters?.[section] ?? []
             const globalSectionRows = globalParameters?.[section] ?? []
@@ -276,6 +337,7 @@ export function EnvironmentEditor(props: {
 
                   <TabValueEditor
                     editable={editable}
+                    showAdd={false}
                     showEnable
                     rows={sectionParams}
                     onAdd={() => {

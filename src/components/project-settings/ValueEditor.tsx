@@ -150,16 +150,19 @@ export function TabValueEditor(props: {
   onChange: (nextRows: ApiEnvironmentValue[]) => void
   emptyText?: string
   showEnable?: boolean
+  showAdd?: boolean
 }) {
-  const { editable, rows, onAdd, onChange, emptyText, showEnable } = props
+  const { editable, rows, onAdd, onChange, emptyText, showEnable, showAdd = true } = props
 
   return (
     <div className="space-y-3 pt-3">
-      <div className="flex justify-end">
-        <Button disabled={!editable} icon={<PlusIcon size={14} />} onClick={onAdd}>
-          添加
-        </Button>
-      </div>
+      {showAdd && (
+        <div className="flex justify-end">
+          <Button disabled={!editable} icon={<PlusIcon size={14} />} onClick={onAdd}>
+            添加
+          </Button>
+        </div>
+      )}
       <ValueTable editable={editable} emptyText={emptyText} rows={rows} showEnable={showEnable} onChange={onChange} />
     </div>
   )
