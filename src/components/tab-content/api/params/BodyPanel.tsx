@@ -43,6 +43,12 @@ export function BodyPanel(props: BodyPanelProps) {
       || requestBody.type === BodyType.Raw
       || requestBody.type === BodyType.Binary)
 
+  // 「一键填充」按钮仅在 json/xml/raw 下显示（不含 binary），与 QuickRequestRun 对齐
+  const showFillButton = requestBody
+    && (requestBody.type === BodyType.Json
+      || requestBody.type === BodyType.Xml
+      || requestBody.type === BodyType.Raw)
+
   if (!requestBody) {
     return <Typography.Text type="secondary" className="px-3 pt-2">无 Body</Typography.Text>
   }
@@ -51,15 +57,9 @@ export function BodyPanel(props: BodyPanelProps) {
     <div className="flex flex-col h-full min-h-0 px-2 pb-1.5">
       {/* Body Type 选择器 - 固定高度 */}
       <div className="flex-shrink-0">
-        <div className="mb-1 flex items-center justify-between">
-          <Typography.Text strong className="text-sm">Body</Typography.Text>
-          {showBodyEditor && onFillBody && (
-            <Button size="small" onClick={onFillBody}>一键填充</Button>
-          )}
-        </div>
-
-        <div className="mb-1 flex flex-wrap items-center gap-1">
-          {bodyTypeOptions.map(({ n, t }) => {
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1">
+            {bodyTypeOptions.map(({ n, t }) => {
             const hasContent = requestBody
               ? t === BodyType.FormData || t === BodyType.UrlEncoded
                 ? (requestBody.parameters ?? []).some(p => p.name && p.enable !== false)
@@ -85,6 +85,10 @@ export function BodyPanel(props: BodyPanelProps) {
               </Tag.CheckableTag>
             )
           })}
+          </div>
+          {showFillButton && onFillBody && (
+            <Button size="small" className="shrink-0" onClick={onFillBody}>一键填充</Button>
+          )}
         </div>
       </div>
 
