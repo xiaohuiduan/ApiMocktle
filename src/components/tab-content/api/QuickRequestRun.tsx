@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useProxyConfig } from '@/contexts/proxy-config'
 
 import {
@@ -19,7 +19,6 @@ import { nanoid } from 'nanoid'
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { buildSchemaExample } from '@/components/JsonSchema/schema-normalizer'
-import { MonacoEditor } from '@/components/MonacoEditor'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
@@ -27,15 +26,18 @@ import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { useMenuTabContext, useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { BodyType, MenuItemType } from '@/enums'
-import type { ApiDetails, RunTabInfo } from '@/types'
+import type { ApiDetails, RunTabInfo, Parameter } from '@/types'
 
-import { ParamsEditableTable } from './components/ParamsEditableTable'
-import { ParamsTab } from './params/ParamsTab'
 import { useApiRequestRunner } from './useApiRequestRunner'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
 import { HistoryPanel } from './components/HistoryPanel'
-import { ScriptTab, executeScript } from './scripts'
+import { executeScript } from './scripts'
+import { QueryParamsPanel } from './params/QueryParamsPanel'
+import { HeadersParamsPanel } from './params/HeadersParamsPanel'
+import { CookieParamsPanel } from './params/CookieParamsPanel'
+import { BodyPanel } from './params/BodyPanel'
+import { ScriptsPanel } from './params/ScriptsPanel'
 import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
 
 function buildBodyExample(apiDetails: ApiDetails, menuRawList?: unknown): string {
@@ -59,16 +61,6 @@ function buildBodyFillText(apiDetails: ApiDetails, menuRawList?: unknown): strin
   if (body.rawText?.trim()) return body.rawText
   return JSON.stringify({}, null, 2)
 }
-
-const bodyTypeOptions = [
-  { n: 'none', t: BodyType.None },
-  { n: 'form-data', t: BodyType.FormData },
-  { n: 'url-encoded', t: BodyType.UrlEncoded },
-  { n: 'json', t: BodyType.Json },
-  { n: 'xml', t: BodyType.Xml },
-  { n: 'raw', t: BodyType.Raw },
-  { n: 'binary', t: BodyType.Binary },
-]
 
 const DEFAULT_METHOD = 'GET'
 
@@ -128,6 +120,62 @@ export function QuickRequestRun() {
   const [postScriptConsole, setPostScriptConsole] = useState<ScriptConsoleEntry[]>([])
   const [postScriptTests, setPostScriptTests] = useState<ScriptTestResult[]>([])
 
+  // 智能默认参数 tab：POST/PUT/PATCH 默认 Body，其余默认 Params（与 RunTab 一致）
+  const getDefaultActiveTab = useCallback(() => {
+    const method = workCopy?.method?.toUpperCase()
+    if (['POST', 'PUT', 'PATCH'].includes(method ?? '')) return 'body'
+    return 'params'
+  }, [workCopy?.method])
+
+  const [activeParamsTab, setActiveParamsTab] = useState(getDefaultActiveTab())
+
+  // 切换不同快捷请求时重置默认 tab（单请求内不强行覆盖用户手动选择）
+  useEffect(() => {
+    if (tabData.key) {
+      setActiveParamsTab(getDefaultActiveTab())
+    }
+  }, [tabData.key, getDefaultActiveTab])
+
+  // 各 section 内容指示（有内容时 tab 显示 *，与 RunTab 视觉一致）
+  const hasParamsContent = useMemo(
+    () => (workCopy?.parameters?.query ?? []).some(p => p.name && p.enable !== false),
+    [workCopy?.parameters?.query],
+  )
+  const hasHeadersContent = useMemo(
+    () => (workCopy?.parameters?.header ?? []).some(p => p.name && p.enable !== false),
+    [workCopy?.parameters?.header],
+  )
+  const hasCookieContent = useMemo(
+    () => (workCopy?.parameters?.cookie ?? []).some(p => p.name && p.enable !== false),
+    [workCopy?.parameters?.cookie],
+  )
+  const hasBodyContent = useMemo(() => {
+    const body = workCopy?.requestBody
+    if (!body || body.type === BodyType.None) return false
+    if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
+      return (body.parameters ?? []).some(p => p.name && p.enable !== false)
+    }
+    if (body.type === BodyType.Json || body.type === BodyType.Xml) {
+      return !!((body.jsonSchema as { properties?: unknown[] })?.properties?.length)
+    }
+    if (body.type === BodyType.Raw || body.type === BodyType.Binary) {
+      return !!(body.rawText?.trim())
+    }
+    return false
+  }, [workCopy?.requestBody])
+  const hasScriptsContent = useMemo(
+    () => !!(workCopy?.preScript?.trim() || workCopy?.postScript?.trim()),
+    [workCopy?.preScript, workCopy?.postScript],
+  )
+
+  // Tab Label 组件（带绿色 * 标识）
+  const TabLabel = ({ children, hasContent }: { children: React.ReactNode; hasContent: boolean }) => (
+    <span>
+      {children}
+      {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 4 }}>*</span>}
+    </span>
+  )
+
   useEffect(() => {
     if (savedData && !isCreating) {
       setWorkCopy(JSON.parse(JSON.stringify(savedData)) as ApiDetails)
@@ -167,6 +215,14 @@ export function QuickRequestRun() {
     const headers = (workCopy.parameters?.header ?? [])
       .filter(h => h.name && h.enable !== false)
       .map(h => ({ name: h.name!, value: String(h.example ?? '') }))
+
+    // 将启用的 cookie 参数序列化为 Cookie header 发送（与 RunTab 行为对齐）
+    const cookiePairs = (workCopy.parameters?.cookie ?? [])
+      .filter(c => c.name && c.enable !== false)
+      .map(c => `${encodeURIComponent(c.name!)}=${encodeURIComponent(String(c.example ?? ''))}`)
+    if (cookiePairs.length > 0) {
+      headers.push({ name: 'Cookie', value: cookiePairs.join('; ') })
+    }
 
     const body = workCopy.requestBody
     let bodyText = ''
@@ -476,129 +532,76 @@ export function QuickRequestRun() {
             animated={false}
             className="min-w-0 h-full"
             tabBarStyle={{ paddingLeft: 12, marginBottom: 0 }}
+            activeKey={activeParamsTab}
+            onChange={setActiveParamsTab}
             items={[
               {
                 key: 'params',
-                label: 'Params & Body',
+                label: <TabLabel hasContent={hasParamsContent}>Params</TabLabel>,
                 children: (
-                  <>
-                    {/* 参数编辑区 */}
-                    <div className="px-3">
-                      <ParamsTab
-                        value={workCopy.parameters}
-                        onChange={(parameters) => {
-                          setWorkCopy((prev) => ({ ...prev, parameters }))
-                        }}
-                      />
-                    </div>
-
-                    {/* Body 编辑区 */}
-                    <div className="px-3 pb-3">
-                      <div className="mb-2 flex items-center justify-between">
-                        <Typography.Text strong className="text-sm">Body</Typography.Text>
-                        {((workCopy.requestBody?.type === BodyType.Json
-                          || workCopy.requestBody?.type === BodyType.Xml
-                          || workCopy.requestBody?.type === BodyType.Raw)) && (
-                            <Button size="small" onClick={handleFillBody}>一键填充</Button>
-                        )}
-                      </div>
-                      {(() => {
-                        const body = workCopy.requestBody || { type: BodyType.None }
-                        const showEditor = body.type === BodyType.Json
-                          || body.type === BodyType.Xml
-                          || body.type === BodyType.Raw
-
-                        return (
-                          <div>
-                            <div className="mb-2 flex flex-wrap items-center gap-1">
-                              {bodyTypeOptions.map(({ n, t }) => {
-                                const hasContent = t === BodyType.FormData || t === BodyType.UrlEncoded
-                                  ? (body.parameters ?? []).some(p => p.name && p.enable !== false)
-                                  : t === BodyType.Json || t === BodyType.Xml
-                                    ? !!((body.jsonSchema as { properties?: unknown[] })?.properties?.length)
-                                    : t === BodyType.Raw || t === BodyType.Binary
-                                      ? !!(body.rawText?.trim())
-                                      : false
-                                return (
-                                  <Tag.CheckableTag
-                                    key={t}
-                                    checked={body.type === t}
-                                    onChange={(checked) => {
-                                      if (checked) {
-                                        setWorkCopy((prev) => ({
-                                          ...prev,
-                                          requestBody: { ...(prev.requestBody || { type: BodyType.None }), type: t },
-                                        }))
-                                      }
-                                    }}
-                                  >
-                                    {n}
-                                    {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
-                                  </Tag.CheckableTag>
-                                )
-                              })}
-                            </div>
-
-                            {showEditor && (
-                              <div className="rounded border-solid" style={{ borderWidth: 3, borderColor: token.colorBorderSecondary }}>
-                                <MonacoEditor
-                                  height="200px"
-                                  language={
-                                    body.type === BodyType.Xml ? 'xml'
-                                      : body.type === BodyType.Raw ? 'plaintext'
-                                      : 'json'
-                                  }
-                                  deserializeOnChange={false}
-                                  value={bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)}
-                                  onChange={(val) => {
-                                    setBodyRawText(typeof val === 'string' ? val : '')
-                                  }}
-                                  options={{ readOnly: false }}
-                                  onMount={(editor, monaco) => {
-                                    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                                    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
-                                  }}
-                                />
-                              </div>
-                            )}
-
-                            {(body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) && (
-                              <div>
-                                <Typography.Text type="secondary" className="mb-2 block text-xs">
-                                  {body.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
-                                </Typography.Text>
-                                <ParamsEditableTable
-                                  value={body.parameters}
-                                  onChange={(parameters) => {
-                                    setWorkCopy((prev) => ({
-                                      ...prev,
-                                      requestBody: { ...(prev.requestBody || { type: BodyType.None }), parameters },
-                                    }))
-                                  }}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </div>
-                  </>
+                  <div className="px-2 min-w-0 overflow-hidden">
+                    <QueryParamsPanel
+                      value={workCopy.parameters}
+                      onChange={(parameters) => setWorkCopy((prev) => ({ ...prev, parameters }))}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'headers',
+                label: <TabLabel hasContent={hasHeadersContent}>Headers</TabLabel>,
+                children: (
+                  <div className="px-2 min-w-0 overflow-hidden">
+                    <HeadersParamsPanel
+                      value={workCopy.parameters}
+                      onChange={(parameters) => setWorkCopy((prev) => ({ ...prev, parameters }))}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'cookie',
+                label: <TabLabel hasContent={hasCookieContent}>Cookie</TabLabel>,
+                children: (
+                  <div className="px-2 min-w-0 overflow-hidden">
+                    <CookieParamsPanel
+                      value={workCopy.parameters}
+                      onChange={(parameters) => setWorkCopy((prev) => ({ ...prev, parameters }))}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'body',
+                label: <TabLabel hasContent={hasBodyContent}>Body</TabLabel>,
+                children: (
+                  <BodyPanel
+                    requestBody={workCopy.requestBody}
+                    bodyRawText={bodyRawText}
+                    onBodyTypeChange={(type) => setWorkCopy((prev) => ({
+                      ...prev,
+                      requestBody: { ...(prev.requestBody || { type: BodyType.None }), type },
+                    }))}
+                    onBodyRawTextChange={(text) => setBodyRawText(text)}
+                    onBodyParametersChange={(parameters) => setWorkCopy((prev) => ({
+                      ...prev,
+                      requestBody: { ...(prev.requestBody || { type: BodyType.None }), parameters: parameters as Parameter[] },
+                    }))}
+                    onFillBody={handleFillBody}
+                    buildBodyExample={() => buildBodyExample(workCopy, menuRawList)}
+                  />
                 ),
               },
               {
                 key: 'scripts',
-                label: 'Scripts',
+                label: <TabLabel hasContent={hasScriptsContent}>Scripts</TabLabel>,
                 children: (
                   <div className="px-3 pb-3">
-                    <ScriptTab
+                    <ScriptsPanel
                       preScript={workCopy.preScript}
                       postScript={workCopy.postScript}
-                      onPreScriptChange={(value) => {
-                        setWorkCopy((prev) => ({ ...prev, preScript: value }))
-                      }}
-                      onPostScriptChange={(value) => {
-                        setWorkCopy((prev) => ({ ...prev, postScript: value }))
-                      }}
+                      onPreScriptChange={(value) => setWorkCopy((prev) => ({ ...prev, preScript: value }))}
+                      onPostScriptChange={(value) => setWorkCopy((prev) => ({ ...prev, postScript: value }))}
                       preScriptConsole={preScriptConsole}
                       preScriptTests={preScriptTests}
                       postScriptConsole={postScriptConsole}
