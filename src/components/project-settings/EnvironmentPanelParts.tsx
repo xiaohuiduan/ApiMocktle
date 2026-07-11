@@ -130,9 +130,10 @@ export function EnvironmentEditor(props: {
   onChange: (nextEnvironment: ApiEnvironment) => void
   onDelete: () => void
   globalParameters?: ProjectEnvironmentConfig['globalParameters']
+  effectiveVarMap?: Map<string, string>
 }) {
   const { token } = theme.useToken()
-  const { editable, environment, onChange, onDelete, globalParameters } = props
+  const { editable, environment, onChange, onDelete, globalParameters, effectiveVarMap } = props
   const baseUrls = environment.baseUrls ?? []
   const variables = environment.variables ?? []
 
@@ -271,10 +272,11 @@ export function EnvironmentEditor(props: {
       </FieldGrid>
 
       <ValueEditor
-        description="环境变量支持远程值和本地值，本地值优先，可用于本地调试覆盖。"
+        description="环境变量支持远程值和本地值，本地值优先，可用于本地调试覆盖。灰色列为实际生效值（会话变量 > 环境变量 > 全局/密钥）。"
         editable={editable}
         rows={variables}
         title="环境变量"
+        effectiveVarMap={effectiveVarMap}
         onAdd={() => {
           onChange({ ...environment, variables: [...variables, createEnvironmentValue()] })
         }}

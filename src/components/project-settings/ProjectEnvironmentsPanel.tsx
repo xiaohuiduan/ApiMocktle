@@ -11,8 +11,10 @@ import {
 } from '@/project-environment-utils'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
 import type { ProjectEnvironmentConfig } from '@/types'
+import { useResolvedVarMap } from '@/components/tab-content/api/useResolvedVarMap'
 
 import {
   createEnvironmentKey,
@@ -55,6 +57,7 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
   const { token } = theme.useToken()
   const { messageApi } = useGlobalContext()
   const { projectEnvironmentConfig, updateProjectEnvironmentConfig } = useMenuHelpersContext()
+  const { sessionVars } = useSessionVariablesContext()
   const [draftConfig, setDraftConfig] = useState<ProjectEnvironmentConfig>(EMPTY_PROJECT_ENVIRONMENT_CONFIG)
   const [selectedKey, setSelectedKey] = useState<SectionKey>('globalVariables')
   const [saving, setSaving] = useState(false)
@@ -85,6 +88,14 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
 
   const selectedEnvironment = useMemo(() => resolveEnvironment(draftConfig, selectedKey), [draftConfig, selectedKey])
   const selectedGlobalSection = useMemo(() => GLOBAL_SECTION_ITEMS.find(({ key }) => key === selectedKey), [selectedKey])
+
+  // 实际生效值映射：会话变量 > 当前环境 > 全局/密钥，用于变量面板「实际生效值」预览列
+  const { varMap: effectiveVarMap } = useResolvedVarMap({
+    globalVariables: draftConfig.globalVariables,
+    vaultSecrets: draftConfig.vaultSecrets,
+    envVariables: selectedEnvironment?.variables ?? [],
+    sessionVars,
+  })
   const selectedValueSectionKey = useMemo(() => {
     if (!selectedGlobalSection || !isValueSectionKey(selectedGlobalSection.key)) {
       return undefined
@@ -195,6 +206,7 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
                     editable={editable}
                     environment={selectedEnvironment}
                     globalParameters={draftConfig.globalParameters}
+                    effectiveVarMap={effectiveVarMap}
                     onDelete={() => {
                       setDraftConfig((current) => {
                         const nextEnvironments = current.environments.filter(({ id }) => id !== selectedEnvironment.id)
@@ -231,6 +243,7 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
                       editable={editable}
                       rows={getValueSectionRows(draftConfig, selectedValueSectionKey)}
                       title={selectedGlobalSection.label}
+                      effectiveVarMap={effectiveVarMap}
                       onAdd={() => {
                         setDraftConfig((current) => ({
                           ...updateValueSection(current, selectedValueSectionKey, [

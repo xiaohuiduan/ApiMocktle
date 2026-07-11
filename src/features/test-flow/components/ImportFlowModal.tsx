@@ -2,8 +2,8 @@ import { useState, useCallback, useEffect } from 'react'
 import { Modal, Tabs, Input, Button, Typography, message, Popconfirm, Spin } from 'antd'
 import { CopyOutlined, UploadOutlined, FileTextOutlined } from '@ant-design/icons'
 import { invoke } from '@tauri-apps/api/core'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { Viewer } from '@bytemd/react'
+import gfm from '@bytemd/plugin-gfm'
 import type { FlowGraph } from '../../types/flow.types'
 import { useAuth } from '@/contexts/auth'
 import { css } from '@emotion/css'
@@ -186,7 +186,7 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
             <div style={{ textAlign: 'center', padding: 40 }}><Spin tip="加载 API 列表..." /></div>
           ) : (
             <div className={mdPreviewClass}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{promptText}</ReactMarkdown>
+              <Viewer value={promptText} plugins={[gfm()]} />
               <p style={{ color: 'var(--ds-highlight-selected, #3b82f6)', marginTop: 8 }}><strong>[你的测试需求写在这里]</strong></p>
             </div>
           )}

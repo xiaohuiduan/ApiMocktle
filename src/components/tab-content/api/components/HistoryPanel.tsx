@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router'
 
-import { Button, Drawer, List, Spin, Table, Tag, Typography, theme } from 'antd'
+import { Button, Checkbox, Drawer, List, Modal, Space, Spin, Table, Tag, Typography, message, theme } from 'antd'
 
 import { api } from '@/api-client'
 import { MonacoEditor } from '@/components/MonacoEditor'
@@ -11,6 +11,8 @@ import { useAuth } from '@/contexts/auth'
 import type { ApiRunResult } from '@/types'
 
 import { ResponseBodyViewer } from './ResponseBodyViewer'
+import { MarkdownDiffView } from './MarkdownDiffView'
+import { buildMarkdownReport, downloadText } from '../exportMarkdown'
 import { calcBodySize, detectLanguage, getStatusColor, headerTableColumns } from '../utils'
 
 interface RequestHistoryItem {
@@ -45,6 +47,12 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<RequestHistoryItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [compareIds, setCompareIds] = useState<string[]>([])
+  const [diffOpen, setDiffOpen] = useState(false)
+
+  const toggleCompare = (id: string) => {
+    setCompareIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev.slice(-1), id]))
+  }
 
   const selectedItem = useMemo(() => items.find(i => i.id === selectedId), [items, selectedId])
 
@@ -113,6 +121,24 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
           <Typography.Text strong className="text-xs">共 {items.length} 条</Typography.Text>
           <Button size="small" type="link" onClick={() => void loadHistory()}>刷新</Button>
         </div>
+        <div className="flex items-center gap-2 px-[var(--ds-pad-md)] pb-[var(--ds-pad-sm)]">
+          <Button
+            size="small"
+            disabled={!selectedId}
+            onClick={() => {
+              const item = items.find(i => i.id === selectedId)
+              if (!item) return
+              const r = item.responseJson
+              const req = item.requestJson
+              const md = buildMarkdownReport(
+                { url: req.url, method: req.method, headers: req.headers, body: req.body, contentType: req.contentType, query: (r.requestQuery ?? []) as never },
+                { status: r.status, statusText: r.statusText, headers: r.headers, body: r.body, durationMs: r.durationMs, contentType: r.contentType },
+              )
+              downloadText(`接口报告-${r.status}-${Date.now()}.md`, md)
+            }}
+          >导出 Markdown</Button>
+          <Button size="small" type="primary" disabled={compareIds.length !== 2} onClick={() => setDiffOpen(true)}>对比</Button>
+        </div>
         <div className="flex-1 overflow-auto">
           <Spin spinning={loading}>
             {items.length === 0 ? (
@@ -138,17 +164,25 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
                       if (selectedId !== item.id) e.currentTarget.style.backgroundColor = ''
                     }}
                   >
-                    <div className="flex items-center gap-1.5">
-                      <Tag color={getStatusColor(item.statusCode)} className="!m-0" style={{ fontSize: 11, lineHeight: '16px', padding: '0 4px' }}>
-                        {item.statusCode || 'ERR'}
-                      </Tag>
-                      <Typography.Text className="text-xs font-medium">{item.requestJson.method}</Typography.Text>
-                      <Typography.Text type="secondary" className="text-[11px]">{item.durationMs}ms</Typography.Text>
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={compareIds.includes(item.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggleCompare(item.id)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Tag color={getStatusColor(item.statusCode)} className="!m-0" style={{ fontSize: 11, lineHeight: '16px', padding: '0 4px' }}>
+                          {item.statusCode || 'ERR'}
+                        </Tag>
+                        <Typography.Text className="text-xs font-medium">{item.requestJson.method}</Typography.Text>
+                        <Typography.Text type="secondary" className="text-[11px]">{item.durationMs}ms</Typography.Text>
+                      </div>
+                      <Typography.Text type="secondary" className="mt-0.5 block truncate text-[11px]" title={item.requestJson.url}>
+                        {item.requestJson.url}
+                      </Typography.Text>
+                      <Typography.Text type="secondary" className="block text-[10px]">{formatTime(item.createdAt)}</Typography.Text>
                     </div>
-                    <Typography.Text type="secondary" className="mt-0.5 block truncate text-[11px]" title={item.requestJson.url}>
-                      {item.requestJson.url}
-                    </Typography.Text>
-                    <Typography.Text type="secondary" className="block text-[10px]">{formatTime(item.createdAt)}</Typography.Text>
                   </div>
                 )}
               />
@@ -226,6 +260,30 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
           </div>
         )}
       </div>
+
+      <Modal
+        title="历史记录对比"
+        open={diffOpen}
+        footer={null}
+        onCancel={() => setDiffOpen(false)}
+        width={900}
+      >
+        {(() => {
+          const pair = compareIds
+            .map(id => items.find(i => i.id === id))
+            .filter((i): i is RequestHistoryItem => Boolean(i))
+          if (pair.length !== 2) return null
+          const [left, right] = pair
+          return (
+            <MarkdownDiffView
+              leftText={left.responseJson.body ?? ''}
+              rightText={right.responseJson.body ?? ''}
+              leftTitle={`${left.requestJson.method} ${left.requestJson.url}`}
+              rightTitle={`${right.requestJson.method} ${right.requestJson.url}`}
+            />
+          )
+        })()}
+      </Modal>
     </Drawer>
   )
 }

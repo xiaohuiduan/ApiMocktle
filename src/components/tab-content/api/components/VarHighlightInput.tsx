@@ -1,4 +1,4 @@
-import { Input, Tag, theme } from 'antd'
+import { Input, Tag, theme, Tooltip } from 'antd'
 import type { InputRef } from 'antd'
 import { useCallback, useMemo, useRef, useState } from 'react'
 
@@ -104,9 +104,11 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
       {referencedVars.length > 0 && (
         <div className="mt-0.5 flex flex-wrap items-center gap-1">
           {definedVars.map((v) => (
-            <Tag key={v} className="text-[10px] leading-none" color="blue">
-              {v}={varMap.get(v)}
-            </Tag>
+            <Tooltip key={v} title={`实际生效值：${varMap.get(v) ?? '—'}`}>
+              <Tag className="text-[10px] leading-none" color="blue">
+                {v}={varMap.get(v)}
+              </Tag>
+            </Tooltip>
           ))}
           {undefinedVars.map((v) => (
             <Tag key={v} className="text-[10px] leading-none" color="orange">

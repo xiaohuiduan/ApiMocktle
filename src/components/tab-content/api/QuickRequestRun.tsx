@@ -29,6 +29,7 @@ import { BodyType, MenuItemType } from '@/enums'
 import type { ApiDetails, RunTabInfo, Parameter } from '@/types'
 
 import { useApiRequestRunner } from './useApiRequestRunner'
+import { buildRequest } from './buildRequest'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
 import { HistoryPanel } from './components/HistoryPanel'
@@ -199,74 +200,28 @@ export function QuickRequestRun() {
       label: <span style={{ color: `var(${color})`, fontWeight: 700 }}>{method}</span>,
     })), [])
 
-  // Build full URL for running
-  const buildRunUrl = () => {
-    const path = workCopy.path ?? '/'
-    const queryParams = (workCopy.parameters?.query ?? [])
-      .filter(p => p.name && p.enable !== false)
-      .map(p => `${encodeURIComponent(p.name!)}=${encodeURIComponent(String(p.example ?? ''))}`)
-      .join('&')
-    return queryParams ? `${path}${path.includes('?') ? '&' : '?'}${queryParams}` : path
-  }
-
   const handleRun = async () => {
-    const url = buildRunUrl()
-
-    const headers = (workCopy.parameters?.header ?? [])
-      .filter(h => h.name && h.enable !== false)
-      .map(h => ({ name: h.name!, value: String(h.example ?? '') }))
-
-    // 将启用的 cookie 参数序列化为 Cookie header 发送（与 RunTab 行为对齐）
-    const cookiePairs = (workCopy.parameters?.cookie ?? [])
-      .filter(c => c.name && c.enable !== false)
-      .map(c => `${encodeURIComponent(c.name!)}=${encodeURIComponent(String(c.example ?? ''))}`)
-    if (cookiePairs.length > 0) {
-      headers.push({ name: 'Cookie', value: cookiePairs.join('; ') })
-    }
-
-    const body = workCopy.requestBody
-    let bodyText = ''
-    let contentType: string | undefined
-    let formDataFiles: Array<{ name: string, path: string }> | undefined
-
-    if (body && body.type !== BodyType.None) {
-      if (body.type === BodyType.Json || body.type === BodyType.Xml || body.type === BodyType.Raw) {
-        const raw = bodyRawText !== undefined ? bodyRawText : buildBodyExample(workCopy, menuRawList)
-        bodyText = raw
-        contentType = body.type === BodyType.Xml ? 'application/xml'
-          : body.type === BodyType.Raw ? 'text/plain'
-          : 'application/json'
-      } else if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
-        const allParams = (body.parameters ?? []).map(p => ({
-          name: p.name,
-          enable: p.enable,
-          example: p.example,
-          type: p.type,
-          filePath: (p as any).filePath,
-        }))
-
-        const textParams: Array<{ name: string, example: string }> = []
-        const fileParams: Array<{ name: string, path: string }> = []
-
-        for (const p of allParams) {
-          if (!p.name || p.enable === false) continue
-          if (p.type === 'file') {
-            const filePath = p.filePath
-            if (filePath) {
-              fileParams.push({ name: p.name, path: filePath })
-            }
-          } else {
-            textParams.push({ name: p.name, example: String(p.example ?? '') })
+    // 统一通过共享核心构建请求（URL/Query/Header/Cookie/Body），cookie 序列化已内置于 buildRequest
+    const built = buildRequest({
+      method: workCopy.method ?? DEFAULT_METHOD,
+      path: workCopy.path,
+      query: workCopy.parameters?.query ?? [],
+      header: workCopy.parameters?.header ?? [],
+      cookie: workCopy.parameters?.cookie ?? [],
+      body: workCopy.requestBody
+        ? {
+            type: workCopy.requestBody.type,
+            rawText: bodyRawText ?? workCopy.requestBody.rawText,
+            parameters: workCopy.requestBody.parameters ?? [],
           }
-        }
-
-        bodyText = textParams
-          .map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.example)}`)
-          .join('&')
-        contentType = body.type === BodyType.FormData ? 'multipart/form-data' : 'application/x-www-form-urlencoded'
-        formDataFiles = fileParams.length > 0 ? fileParams : undefined
-      }
-    }
+        : undefined,
+      resolveVars: (s) => s,
+      buildBodyExample,
+      apiDetails: workCopy,
+      menuRawList,
+      insecureSkipVerify,
+    })
+    const { url, headers, bodyText } = built
 
     // ====== 前置脚本执行 ======
     if (workCopy.preScript?.trim()) {
@@ -305,7 +260,7 @@ export function QuickRequestRun() {
       }
     }
 
-    const runResult = await run(isCreating ? undefined : tabData.key, url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
+    const runResult = await run(isCreating ? undefined : tabData.key, url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, built.contentType, built.formDataFiles, built.insecureSkipVerify)
 
     // ====== 后置脚本执行 ======
     if (workCopy.postScript?.trim() && runResult) {
@@ -618,8 +573,14 @@ export function QuickRequestRun() {
             result={result}
             error={error}
             onRetry={handleRun}
+            menuItemId={isCreating ? undefined : tabData.key}
             curlContent={(() => {
-              const url = buildRunUrl()
+              const qPath = workCopy.path ?? '/'
+              const qQuery = (workCopy.parameters?.query ?? [])
+                .filter(p => p.name && p.enable !== false)
+                .map(p => `${encodeURIComponent(p.name as string)}=${encodeURIComponent(String(p.example ?? ''))}`)
+                .join('&')
+              const url = qQuery ? `${qPath}${qPath.includes('?') ? '&' : '?'}${qQuery}` : qPath
               const method = workCopy.method ?? DEFAULT_METHOD
               return (
                 <div className="flex flex-col gap-3">

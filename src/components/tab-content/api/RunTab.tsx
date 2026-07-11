@@ -40,6 +40,8 @@ import { CookieParamsPanel } from './params/CookieParamsPanel'
 import { BodyPanel } from './params/BodyPanel'
 import { ScriptsPanel } from './params/ScriptsPanel'
 import { useApiRequestRunner } from './useApiRequestRunner'
+import { buildRequest } from './buildRequest'
+import { useResolvedVarMap, buildVarMaps, makeResolveVars } from './useResolvedVarMap'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
 import { HistoryPanel } from './components/HistoryPanel'
@@ -366,19 +368,13 @@ export function RunTab() {
     return getPrimaryEnvironmentUrl(currentEnv)
   }, [currentEnv])
 
-  // 收集所有可用变量用于 {{var}} 自动补全和高亮
-  const varMap = useMemo(() => {
-    const map = new Map<string, string>()
-    const envVars = [
-      ...(projectEnvironmentConfig?.globalVariables ?? []),
-      ...(projectEnvironmentConfig?.vaultSecrets ?? []),
-      ...(currentEnv?.variables ?? []),
-    ]
-    for (const v of envVars) {
-      if (v.name && v.value != null) map.set(v.name, v.value)
-    }
-    return map
-  }, [projectEnvironmentConfig?.globalVariables, projectEnvironmentConfig?.vaultSecrets, currentEnv?.variables])
+  // 收集所有可用变量用于 {{var}} 自动补全和高亮（统一优先级：global/vault < env < sessionVars）
+  const { varMap } = useResolvedVarMap({
+    globalVariables: projectEnvironmentConfig?.globalVariables,
+    vaultSecrets: projectEnvironmentConfig?.vaultSecrets,
+    envVariables: currentEnv?.variables,
+    sessionVars,
+  })
 
   // 一键复原
   const handleReset = () => {
@@ -499,32 +495,15 @@ export function RunTab() {
     if (!workCopy) return
 
     // 收集环境变量用于 {{var}} 替换
-    const varMap = new Map<string, string>()
-    const envVars = [
-      ...(projectEnvironmentConfig?.globalVariables ?? []),
-      ...(projectEnvironmentConfig?.vaultSecrets ?? []),
-      ...(currentEnv?.variables ?? []),
-    ]
-    for (const v of envVars) {
-      if (v.name && v.value != null) varMap.set(v.name, v.value)
-    }
-    // 会话变量覆盖环境变量（最高优先级）
-    for (const [k, v] of Object.entries(sessionVars)) {
-      varMap.set(k, v)
-    }
+    // 统一构建变量映射（global/vault < env < sessionVars）
+    const { varMap, globalsMap, envMap } = buildVarMaps({
+      globalVariables: projectEnvironmentConfig?.globalVariables,
+      vaultSecrets: projectEnvironmentConfig?.vaultSecrets,
+      envVariables: currentEnv?.variables,
+      sessionVars,
+    })
+    const resolveVars = makeResolveVars(varMap)
 
-    const globalsMap: Record<string, string> = {}
-    for (const v of [...(projectEnvironmentConfig?.globalVariables ?? []), ...(projectEnvironmentConfig?.vaultSecrets ?? [])]) {
-      if (v.name && v.value != null) globalsMap[v.name] = v.value
-    }
-    const envMap: Record<string, string> = {}
-    for (const v of (currentEnv?.variables ?? [])) {
-      if (v.name && v.value != null) envMap[v.name] = v.value
-    }
-    // 会话变量合并到 envMap
-    Object.assign(envMap, sessionVars)
-
-    const resolveVars = (s: string) => s.replace(/\{\{(\w+)\}\}/g, (_, name) => varMap.get(name) ?? `{{${name}}}`)
 
     // ====== 前置脚本执行 ======
     if (workCopy.preScript?.trim()) {
@@ -569,92 +548,45 @@ export function RunTab() {
 
     const envParams = currentEnv?.parameters ?? { header: [], cookie: [], query: [], body: [] }
 
-    // 构建完整 URL（含 query 参数）
-    const base = envBaseUrl ? envBaseUrl.replace(/\/$/, '') : ''
-    const path = resolveVars(workCopy.path ?? '/')
-    const fullPath = path.startsWith('http://') || path.startsWith('https://')
-      ? path
-      : base ? `${base}${path}` : path
+    // 统一通过共享核心构建请求（URL/Query/Header/Cookie/Body），避免与 QuickRequestRun 重复
+    const allBodyParams: Array<{ name?: string, enable?: boolean, example?: string, type?: string, filePath?: string }> = [
+      ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map(p => ({ name: p.name, enable: p.enable, example: p.value as string })),
+      ...envParams.body.map(p => ({ name: p.name, enable: p.enable, example: p.value as string })),
+      ...(workCopy.requestBody?.parameters ?? []).map(p => ({ name: p.name, enable: p.enable, example: p.example as string, type: p.type as string, filePath: (p as any).filePath })),
+    ]
 
-    const mergedQuery = mergeParams(
-      (projectEnvironmentConfig?.globalParameters?.query ?? []).filter(p => p.enable !== false),
-      envParams.query.filter(p => p.enable !== false),
-      workCopy.parameters?.query ?? [],
-    )
-    const queryParams = mergedQuery
-      .filter(p => p.name && p.enable !== false)
-      .map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(resolveVars(String(p.example ?? '')))}`)
-      .join('&')
-    const url = queryParams ? `${fullPath}${fullPath.includes('?') ? '&' : '?'}${queryParams}` : fullPath
+    const built = buildRequest({
+      method: workCopy.method ?? 'GET',
+      baseUrl: envBaseUrl,
+      path: workCopy.path,
+      query: mergeParams(
+        (projectEnvironmentConfig?.globalParameters?.query ?? []).filter(p => p.enable !== false),
+        envParams.query.filter(p => p.enable !== false),
+        workCopy.parameters?.query ?? [],
+      ),
+      header: mergeParams(
+        (projectEnvironmentConfig?.globalParameters?.header ?? []).filter(p => p.enable !== false),
+        envParams.header.filter(p => p.enable !== false),
+        workCopy.parameters?.header ?? [],
+      ),
+      cookie: mergeParams(
+        (projectEnvironmentConfig?.globalParameters?.cookie ?? []).filter(p => p.enable !== false),
+        envParams.cookie.filter(p => p.enable !== false),
+        workCopy.parameters?.cookie ?? [],
+      ),
+      body: workCopy.requestBody
+        ? { type: workCopy.requestBody.type, rawText: workCopy.requestBody.rawText, parameters: allBodyParams }
+        : undefined,
+      resolveVars,
+      buildBodyExample,
+      apiDetails: workCopy,
+      menuRawList,
+      insecureSkipVerify,
+    })
 
-    // 构建 Header
-    const mergedHeader = mergeParams(
-      (projectEnvironmentConfig?.globalParameters?.header ?? []).filter(p => p.enable !== false),
-      envParams.header.filter(p => p.enable !== false),
-      workCopy.parameters?.header ?? [],
-    )
-    const headers = mergedHeader
-      .filter(h => h.name && h.enable !== false)
-      .map(h => ({ name: h.name, value: resolveVars(String(h.example ?? '')) }))
+    const { url, headers, bodyText } = built
 
-    // 构建 Cookie（序列化为 Cookie header）
-    const mergedCookie = mergeParams(
-      (projectEnvironmentConfig?.globalParameters?.cookie ?? []).filter(p => p.enable !== false),
-      envParams.cookie.filter(p => p.enable !== false),
-      workCopy.parameters?.cookie ?? [],
-    )
-    const cookiePairs = mergedCookie
-      .filter(c => c.name && c.enable !== false)
-      .map(c => `${encodeURIComponent(c.name)}=${encodeURIComponent(resolveVars(String(c.example ?? '')))}`)
-    if (cookiePairs.length > 0) {
-      headers.push({ name: 'Cookie', value: cookiePairs.join('; ') })
-    }
-
-    // 构建 Body
-    const body = workCopy.requestBody
-    let bodyText = ''
-    let contentType: string | undefined
-    let formDataFiles: Array<{ name: string, path: string }> | undefined
-
-    if (body && body.type !== BodyType.None) {
-      if (body.type === BodyType.Json || body.type === BodyType.Xml || body.type === BodyType.Raw) {
-        const raw = body.rawText ?? buildBodyExample(workCopy, menuRawList)
-        bodyText = resolveVars(raw)
-        contentType = body.type === BodyType.Xml ? 'application/xml'
-          : body.type === BodyType.Raw ? 'text/plain'
-          : 'application/json'
-      } else if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
-        const allParams: Array<{ name?: string, enable?: boolean, example?: string | string[], type?: string, filePath?: string }> = [
-          ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map(p => ({ name: p.name, enable: p.enable, example: p.value as string })),
-          ...envParams.body.map(p => ({ name: p.name, enable: p.enable, example: p.value as string })),
-          ...(body.parameters ?? []).map(p => ({ name: p.name, enable: p.enable, example: p.example, type: p.type as string, filePath: (p as any).filePath })),
-        ]
-
-        // 分离普通参数和文件参数
-        const textParams: Array<{ name: string, example: string }> = []
-        const fileParams: Array<{ name: string, path: string }> = []
-
-        for (const p of allParams) {
-          if (!p.name || p.enable === false) continue
-          if (p.type === 'file') {
-            const filePath = p.filePath
-            if (filePath) {
-              fileParams.push({ name: p.name, path: filePath })
-            }
-          } else {
-            textParams.push({ name: p.name, example: resolveVars(String(p.example ?? '')) })
-          }
-        }
-
-        bodyText = textParams
-          .map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.example)}`)
-          .join('&')
-        contentType = body.type === BodyType.FormData ? 'multipart/form-data' : 'application/x-www-form-urlencoded'
-        formDataFiles = fileParams.length > 0 ? fileParams : undefined
-      }
-    }
-
-    const runResult = await run(tabData.key, url, workCopy.method ?? 'GET', headers, bodyText, contentType, formDataFiles, insecureSkipVerify)
+    const runResult = await run(tabData.key, url, workCopy.method ?? 'GET', headers, bodyText, built.contentType, built.formDataFiles, built.insecureSkipVerify)
 
     // ====== 后置脚本执行 ======
     if (workCopy.postScript?.trim() && runResult) {
@@ -1024,6 +956,7 @@ export function RunTab() {
             result={result}
             error={error}
             onRetry={handleRun}
+            menuItemId={tabData.key}
             curlContent={
               <div className="flex flex-col gap-3">
                 <div>

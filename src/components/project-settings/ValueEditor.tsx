@@ -1,7 +1,17 @@
-import { Button, Input, Switch, Typography, theme } from 'antd'
+import { Button, Input, Switch, Tooltip, Typography, theme } from 'antd'
 import { PlusIcon, TrashIcon } from 'lucide-react'
 
 import type { ApiEnvironmentValue } from '@/types'
+
+/** 计算变量的最终生效值（会话变量 > 环境变量 > 全局/密钥），无法解析时回退到原值 */
+function resolveEffectiveValue(
+  row: ApiEnvironmentValue,
+  effectiveVarMap?: Map<string, string>,
+): string | undefined {
+  if (!effectiveVarMap || !row.name) return row.value ?? undefined
+  if (effectiveVarMap.has(row.name)) return effectiveVarMap.get(row.name)
+  return row.value ?? undefined
+}
 
 function updateValueRow(
   list: ApiEnvironmentValue[],
@@ -18,9 +28,10 @@ function ValueRowsTable(props: {
   onChange: (nextRows: ApiEnvironmentValue[]) => void
   emptyText?: string
   showEnable?: boolean
+  effectiveVarMap?: Map<string, string>
 }) {
   const { token } = theme.useToken()
-  const { editable, rows, onChange, emptyText = '当前还没有内容，点击右上角"添加"开始配置。', showEnable } = props
+  const { editable, rows, onChange, emptyText = '当前还没有内容，点击右上角"添加"开始配置。', showEnable, effectiveVarMap } = props
 
   if (rows.length === 0) {
     return (
@@ -30,60 +41,74 @@ function ValueRowsTable(props: {
     )
   }
 
-  return rows.map((row, index) => (
-    <div
-      key={row.id}
-      className="grid"
-      style={{
-        gridTemplateColumns: showEnable
-          ? 'minmax(0,1fr) minmax(0,1.5fr) 60px 56px'
-          : 'minmax(0,1fr) minmax(0,1.5fr) minmax(0,1.5fr) 56px',
-        borderBottom: index === rows.length - 1 ? 'none' : `1px solid ${token.colorBorderSecondary}`,
-      }}
-    >
-      <Input
-        variant="borderless"
-        disabled={!editable}
-        placeholder="添加变量"
-        value={row.name}
-        onChange={(event) => {
-          onChange(updateValueRow(rows, row.id, 'name', event.target.value))
+  return rows.map((row, index) => {
+    const effective = resolveEffectiveValue(row, effectiveVarMap)
+    const overridden = effectiveVarMap != null && effective !== row.value
+    return (
+      <div
+        key={row.id}
+        className="grid"
+        style={{
+          gridTemplateColumns: showEnable
+            ? 'minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.2fr) 60px 56px'
+            : 'minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.2fr) 56px',
+          borderBottom: index === rows.length - 1 ? 'none' : `1px solid ${token.colorBorderSecondary}`,
         }}
-      />
-      <Input
-        variant="borderless"
-        disabled={!editable}
-        placeholder="值"
-        value={row.value}
-        onChange={(event) => {
-          onChange(updateValueRow(rows, row.id, 'value', event.target.value))
-        }}
-      />
-      {showEnable && (
+      >
+        <Input
+          variant="borderless"
+          disabled={!editable}
+          placeholder="添加变量"
+          value={row.name}
+          onChange={(event) => {
+            onChange(updateValueRow(rows, row.id, 'name', event.target.value))
+          }}
+        />
+        <Input
+          variant="borderless"
+          disabled={!editable}
+          placeholder="值"
+          value={row.value}
+          onChange={(event) => {
+            onChange(updateValueRow(rows, row.id, 'value', event.target.value))
+          }}
+        />
+        {effectiveVarMap && (
+          <Tooltip title={overridden ? '已被更高优先级变量覆盖' : '当前值即为生效值'}>
+            <div
+              className="flex items-center truncate px-2 text-xs"
+              style={{ color: overridden ? token.colorPrimary : token.colorTextSecondary }}
+            >
+              {effective ?? '—'}
+            </div>
+          </Tooltip>
+        )}
+        {showEnable && (
+          <div className="flex items-center justify-center">
+            <Switch
+              checked={row.enable !== false}
+              disabled={!editable}
+              size="small"
+              onChange={(checked) => {
+                onChange(updateValueRow(rows, row.id, 'enable', checked))
+              }}
+            />
+          </div>
+        )}
         <div className="flex items-center justify-center">
-          <Switch
-            checked={row.enable !== false}
+          <Button
+            danger
             disabled={!editable}
-            size="small"
-            onChange={(checked) => {
-              onChange(updateValueRow(rows, row.id, 'enable', checked))
+            icon={<TrashIcon size={14} />}
+            type="text"
+            onClick={() => {
+              onChange(rows.filter((item) => item.id !== row.id))
             }}
           />
         </div>
-      )}
-      <div className="flex items-center justify-center">
-        <Button
-          danger
-          disabled={!editable}
-          icon={<TrashIcon size={14} />}
-          type="text"
-          onClick={() => {
-            onChange(rows.filter((item) => item.id !== row.id))
-          }}
-        />
       </div>
-    </div>
-  ))
+    )
+  })
 }
 
 function ValueTable(props: {
@@ -92,10 +117,17 @@ function ValueTable(props: {
   onChange: (nextRows: ApiEnvironmentValue[]) => void
   emptyText?: string
   showEnable?: boolean
+  effectiveVarMap?: Map<string, string>
 }) {
   const { token } = theme.useToken()
-  const { editable, rows, onChange, emptyText, showEnable } = props
-  const headers = showEnable ? ['变量名', '值', '启用', ''] : ['变量名', '值', '', '']
+  const { editable, rows, onChange, emptyText, showEnable, effectiveVarMap } = props
+  const headers = effectiveVarMap
+    ? showEnable
+      ? ['变量名', '值', '实际生效值', '启用', '']
+      : ['变量名', '值', '实际生效值', '']
+    : showEnable
+      ? ['变量名', '值', '启用', '']
+      : ['变量名', '值', '', '']
 
   return (
     <div style={{ border: `1px solid ${token.colorBorderSecondary}`, borderRadius: token.borderRadiusLG }}>
@@ -110,7 +142,14 @@ function ValueTable(props: {
           </div>
         ))}
       </div>
-      <ValueRowsTable editable={editable} emptyText={emptyText} rows={rows} showEnable={showEnable} onChange={onChange} />
+      <ValueRowsTable
+        editable={editable}
+        emptyText={emptyText}
+        rows={rows}
+        showEnable={showEnable}
+        effectiveVarMap={effectiveVarMap}
+        onChange={onChange}
+      />
     </div>
   )
 }
@@ -123,8 +162,9 @@ export function ValueEditor(props: {
   onAdd: () => void
   onChange: (nextRows: ApiEnvironmentValue[]) => void
   showEnable?: boolean
+  effectiveVarMap?: Map<string, string>
 }) {
-  const { editable, title, description, rows, onAdd, onChange, showEnable } = props
+  const { editable, title, description, rows, onAdd, onChange, showEnable, effectiveVarMap } = props
 
   return (
     <section className="space-y-3">
@@ -138,7 +178,13 @@ export function ValueEditor(props: {
         </Button>
       </div>
 
-      <ValueTable editable={editable} rows={rows} showEnable={showEnable} onChange={onChange} />
+      <ValueTable
+        editable={editable}
+        rows={rows}
+        showEnable={showEnable}
+        effectiveVarMap={effectiveVarMap}
+        onChange={onChange}
+      />
     </section>
   )
 }
@@ -163,7 +209,13 @@ export function TabValueEditor(props: {
           </Button>
         </div>
       )}
-      <ValueTable editable={editable} emptyText={emptyText} rows={rows} showEnable={showEnable} onChange={onChange} />
+      <ValueTable
+        editable={editable}
+        emptyText={emptyText}
+        rows={rows}
+        showEnable={showEnable}
+        onChange={onChange}
+      />
     </div>
   )
 }

@@ -1,25 +1,34 @@
 'use client'
 
 import { ReactNode, useMemo, useState } from 'react'
+import { useParams } from 'react-router'
 
 import {
   Button,
+  List,
+  Modal,
   Table,
   Tabs,
   Tag,
   Tooltip,
   Typography,
+  message,
   theme,
 } from 'antd'
 import { MinusIcon, PlusIcon, TerminalIcon } from 'lucide-react'
 
+import { api } from '@/api-client'
 import { useProxyConfig } from '@/contexts/proxy-config'
+import { useAuth } from '@/contexts/auth'
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { useStyles } from '@/hooks/useStyle'
 import type { ApiRunResult } from '@/types'
 
 import { ResponseBodyViewer } from './ResponseBodyViewer'
 import { ErrorDisplay } from './ErrorDisplay'
+import { MarkdownDiffView } from './MarkdownDiffView'
+import { buildMarkdownReport, downloadText } from '../exportMarkdown'
+import { formatTime } from './HistoryPanel'
 import { calcBodySize, detectLanguage, getStatusColor, headerTableColumns } from '../utils'
 
 import { css } from '@emotion/css'
@@ -29,14 +38,46 @@ interface ResultViewerProps {
   error?: string
   curlContent?: ReactNode
   onRetry?: () => void
+  menuItemId?: string
 }
 
-export function ResultViewer({ result, error, curlContent, onRetry }: ResultViewerProps) {
+interface HistoryPickItem {
+  id: string
+  statusCode: number
+  requestJson: { method: string; url: string }
+  responseJson: ApiRunResult
+  createdAt: string
+}
+
+export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }: ResultViewerProps) {
   const { token } = theme.useToken()
   const { proxyConfig } = useProxyConfig()
+  const { projectId } = useParams()
+  const { sessionId } = useAuth()
   const proxyTooltip = proxyConfig && proxyConfig.proxyType !== 'none'
     ? `${proxyConfig.host}:${proxyConfig.port}`
     : null
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyList, setHistoryList] = useState<HistoryPickItem[]>([])
+  const [compareWith, setCompareWith] = useState<ApiRunResult | null>(null)
+  const [diffOpen, setDiffOpen] = useState(false)
+
+  const openHistoryPicker = async () => {
+    if (!menuItemId || !sessionId || !projectId) return
+    try {
+      const list = await api<HistoryPickItem[]>('list_request_history', { sessionId, projectId, menuItemId })
+      setHistoryList(list)
+      setHistoryOpen(true)
+    } catch {
+      message.error('获取历史记录失败')
+    }
+  }
+
+  const startCompare = (item: HistoryPickItem) => {
+    setCompareWith(item.responseJson)
+    setHistoryOpen(false)
+    setDiffOpen(true)
+  }
 
   // 格式化按钮状态
   const isJson = result?.contentType?.toLowerCase().includes('json')
@@ -201,6 +242,14 @@ export function ResultViewer({ result, error, curlContent, onRetry }: ResultView
         tabBarExtraContent={{
           right: (
             <div className="flex items-center gap-3 text-sm max-w-full overflow-hidden">
+              <Button type="text" size="small" onClick={() => {
+                const md = buildMarkdownReport(
+                  { url: result.url, method: result.method, headers: result.requestHeaders, body: result.requestBodyText, contentType: result.contentType, query: result.requestQuery },
+                  { status: result.status, statusText: result.statusText, headers: result.headers, body: result.body, durationMs: result.durationMs, contentType: result.contentType },
+                )
+                downloadText(`接口报告-${result.status}-${Date.now()}.md`, md)
+              }}>导出</Button>
+              <Button type="text" size="small" disabled={!menuItemId} onClick={() => void openHistoryPicker()}>对比历史</Button>
               {/* 格式化按钮：仅在"响应内容" tab 且是 JSON 时显示 */}
               {activeTab === 'resContent' && isJson && (
                 <Button
@@ -230,6 +279,29 @@ export function ResultViewer({ result, error, curlContent, onRetry }: ResultView
           )
         }}
       />
+
+      <Modal title="选择历史记录对比" open={historyOpen} footer={null} onCancel={() => setHistoryOpen(false)} width={640}>
+        <List
+          size="small"
+          dataSource={historyList}
+          renderItem={(item) => (
+            <List.Item className="cursor-pointer" onClick={() => startCompare(item)} actions={[<Tag color={getStatusColor(item.statusCode)}>{item.statusCode || 'ERR'}</Tag>]}>
+              <List.Item.Meta title={`${item.requestJson.method} ${item.requestJson.url}`} description={formatTime(item.createdAt)} />
+            </List.Item>
+          )}
+        />
+      </Modal>
+
+      <Modal title="响应对比（当前 vs 历史）" open={diffOpen} footer={null} onCancel={() => setDiffOpen(false)} width={900}>
+        {compareWith && (
+          <MarkdownDiffView
+            leftText={compareWith.body ?? ''}
+            rightText={result.body ?? ''}
+            leftTitle="历史响应"
+            rightTitle="当前响应"
+          />
+        )}
+      </Modal>
     </div>
   )
 }
