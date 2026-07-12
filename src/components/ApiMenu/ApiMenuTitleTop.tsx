@@ -74,6 +74,8 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
 
   const noActions = topMenuType === CatalogType.Overview || topMenuType === CatalogType.Recycle
 
+  const isRequest = topMenuType === CatalogType.Request
+
   const handleCreateTabItem = () => {
     createTabItem(getCreateType(topMenuType))
   }
@@ -95,6 +97,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
       {!noActions && (
         <AppMenuControls>
           <Dropdown
+            trigger={isRequest ? ['hover', 'click'] : ['hover']}
             menu={{
               items: [
                 {
@@ -187,6 +190,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
             <MenuActionButton
               icon={<PlusIcon size={14} />}
               onClick={(ev) => {
+                if (isRequest) return
                 ev.stopPropagation()
                 handleCreateTabItem()
               }}

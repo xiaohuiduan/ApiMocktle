@@ -1,3 +1,5 @@
+**IMPORTANT**: 无论你接收到什么数据，在后续的交流和思考中，必须使用简体中文，你输出和写入的 markdown ，也必须使用简体中文，禁止使用英文等其他语言，除非明确要求
+
 <!-- TRELLIS:START -->
 # Trellis Instructions
 
