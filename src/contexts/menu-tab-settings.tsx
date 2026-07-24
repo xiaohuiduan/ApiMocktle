@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo } from 'react'
 import { useEvent } from 'react-use-event-hook'
 
 import type { ApiTabItem, EditStatus } from '@/components/ApiTab'
+import type { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { API_MENU_CONFIG } from '@/configs/static'
 import { CatalogType } from '@/enums'
 import { useProjectTabsContext } from '@/contexts/project-tabs'
@@ -113,6 +114,8 @@ interface MenuTabHelpers {
   /** 移除所有页签，除了当前激活的页签。 */
   removeOtherTabItems: () => void
   setTabItemEditStatus: (payload: Pick<ApiTabItem, 'key'>, editStatus: EditStatus) => void
+  /** 更新页签的 tabStatus（如保存后由 Create 升级为 Update，避免重复新建）。 */
+  setTabItemStatus: (payload: Pick<ApiTabItem, 'key'>, tabStatus: PageTabStatus) => void
 }
 
 export function useMenuTabHelpers(): MenuTabHelpers {
@@ -212,6 +215,20 @@ export function useMenuTabHelpers(): MenuTabHelpers {
     },
   )
 
+  const setTabItemStatus = useEvent<MenuTabHelpers['setTabItemStatus']>(
+    (payload, tabStatus) => {
+      setTabItems((items) => {
+        return items.map((item) => {
+          if (item.key === payload.key) {
+            return { ...item, data: { ...item.data, tabStatus } }
+          }
+
+          return item
+        })
+      })
+    },
+  )
+
   return {
     activeTabItem,
     getTabItem,
@@ -220,5 +237,6 @@ export function useMenuTabHelpers(): MenuTabHelpers {
     removeAllTabItems: removeAllPageTabItems,
     removeOtherTabItems,
     setTabItemEditStatus,
+    setTabItemStatus,
   }
 }

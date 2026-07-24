@@ -19,6 +19,7 @@ import { BadgeInfoIcon, XIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import type { CatalogId } from '@/components/ApiMenu'
+import { isDraftEmpty } from '@/contexts/menu-drafts'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useStyles } from '@/hooks/useStyle'
 
@@ -91,7 +92,7 @@ const DraggableTabNode = (props: DraggableTabPaneProps) => {
 export function ApiTab(props: TabsProps) {
   const [confirmKey, setConfirmKey] = useState<CatalogId>()
 
-  const { menuRawList } = useMenuHelpersContext()
+  const { menuRawList, discardDraft } = useMenuHelpersContext()
   const { tabItems, setTabItems, activeTabKey } = useMenuTabContext()
   const { activeTabItem, addTabItem, getTabItem, removeTabItem } = useMenuTabHelpers()
   const { menuItems } = useApiTabActions()
@@ -104,6 +105,13 @@ export function ApiTab(props: TabsProps) {
     }
     else {
       setConfirmKey(undefined)
+
+      // 关闭空的新建草稿时自动丢弃（未入库，无需保留）。
+      const menuData = menuRawList?.find((it) => it.id === key)
+      if (menuData?.__isDraft && isDraftEmpty(menuData)) {
+        discardDraft(key)
+      }
+
       removeTabItem({ key })
     }
   })

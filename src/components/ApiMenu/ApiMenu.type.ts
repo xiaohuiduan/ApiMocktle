@@ -8,6 +8,8 @@ export interface ApiMenuBase {
   parentId?: ApiMenuBase['id']
   name: string
   type: MenuItemType
+  /** 运行时标记：该节点为未保存的新建草稿（仅内存/localStorage，未入库），供左侧树渲染红 `*`。 */
+  __isDraft?: boolean
 }
 
 interface ApiMenuInterface extends ApiMenuBase {

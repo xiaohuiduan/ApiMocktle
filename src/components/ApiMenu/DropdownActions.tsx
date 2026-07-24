@@ -45,11 +45,12 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
   const {
     addMenuItem,
     removeMenuItem,
+    discardDraft,
     menuRawList,
     projectEnvironmentConfig,
     currentProjectEnvironmentId,
   } = useMenuHelpersContext()
-  const { addTabItem } = useMenuTabHelpers()
+  const { addTabItem, removeTabItem } = useMenuTabHelpers()
   const { createTabItem } = useHelpers()
   const { sessionVars } = useSessionVariablesContext()
   const { run } = useApiRequestRunner()
@@ -231,6 +232,20 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
     },
   ]
 
+  const draftActionMenu: MenuProps['items'] = [
+    {
+      key: 'discard-draft',
+      label: '删除草稿',
+      icon: <TrashIcon size={14} />,
+      onClick: (ev) => {
+        ev.domEvent.stopPropagation()
+        // 草稿仅存在于 localStorage，直接丢弃（不进回收站）并关闭其页签。
+        discardDraft(catalog.id)
+        removeTabItem({ key: catalog.id })
+      },
+    },
+  ]
+
   const handleRunAll = async () => {
     const apis = collectFolderApis(catalog.id, menuRawList ?? [])
     if (!apis.length) {
@@ -287,7 +302,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
     <>
       <Dropdown
         menu={{
-          items: isFolder ? folderActionMenu : fileActionMenu,
+          items: catalog.__isDraft ? draftActionMenu : isFolder ? folderActionMenu : fileActionMenu,
           onContextMenu: (ev) => {
             ev.preventDefault()
             ev.stopPropagation()

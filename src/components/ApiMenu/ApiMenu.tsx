@@ -31,7 +31,7 @@ function toDeletableMenuIds(
     return []
   }
 
-  const valid = new Set(menuRawList.map((m) => m.id))
+  const valid = new Set(menuRawList.filter((m) => !m.__isDraft).map((m) => m.id))
 
   return rawKeys.filter((k): k is string => typeof k === 'string' && valid.has(k))
 }
@@ -146,7 +146,7 @@ export function ApiMenu() {
                 label: catalog.name,
                 contentType: catalog.type,
                 data: {
-                  tabStatus: PageTabStatus.Update,
+                  tabStatus: catalog.__isDraft ? PageTabStatus.Create : PageTabStatus.Update,
                 },
               })
             }
@@ -254,6 +254,14 @@ export function ApiMenu() {
                   return false
                 }
 
+                // 草稿节点（未入库）不可作为拖拽源或落点，避免触发数据库移动。
+                if (
+                  (dragNode as CatalogDataNode).customData.catalog.__isDraft
+                  || (dropNode as CatalogDataNode).customData.catalog.__isDraft
+                ) {
+                  return false
+                }
+
                 return isMenuSameGroup(
                   (dragNode as CatalogDataNode).customData.catalog,
                   (dropNode as CatalogDataNode).customData.catalog,
@@ -267,7 +275,16 @@ export function ApiMenu() {
                   : {
                       icon: false,
                       nodeDraggable: (node) => {
-                        return !node.className?.includes('top-folder')
+                        if (node.className?.includes('top-folder')) {
+                          return false
+                        }
+
+                        // 草稿节点禁止拖拽。
+                        if ((node as unknown as CatalogDataNode).customData.catalog.__isDraft) {
+                          return false
+                        }
+
+                        return true
                       },
                     }
               }

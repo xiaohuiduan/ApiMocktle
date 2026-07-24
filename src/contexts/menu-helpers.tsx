@@ -17,6 +17,11 @@ import type {
 import { api } from '@/api-client'
 import { CatalogType, MenuItemType } from '@/enums'
 import { useAuth } from '@/contexts/auth'
+import {
+  mergeDraftsIntoList,
+  removeDraftById,
+  upsertDraft,
+} from '@/contexts/menu-drafts'
 import { useProjectTabsContext } from '@/contexts/project-tabs'
 
 interface MenuHelpers {
@@ -35,10 +40,16 @@ interface MenuHelpers {
   updateProjectEnvironmentConfig: (config: ProjectEnvironmentConfig) => Promise<void>
   applyServerState: (state: ProjectStateSnapshot) => void
   reloadState: () => Promise<void>
+  /** 写入/更新一条草稿到 localStorage 并刷新合并列表（isNew=true 新建草稿，false 为已入库项的未保存修改覆盖层）。 */
+  saveDraft: (menuData: ApiMenuData, isNew: boolean) => void
+  /** 丢弃指定 id 的草稿并刷新合并列表。 */
+  discardDraft: (id: string) => void
 }
 
 interface MenuHelpersContextData extends MenuHelpers {
   menuRawList?: ApiMenuData[]
+  /** 仅数据库的菜单列表（不含草稿），用于草稿写入前的“是否变更”比较。 */
+  dbMenuRawList?: ApiMenuData[]
   recyleRawData?: RecycleData
   projectEnvironments: ApiEnvironment[]
   projectEnvironmentConfig: ProjectEnvironmentConfig
@@ -227,13 +238,39 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
   } = useProjectTabsContext()
 
   // ----- 从 ProjectTabsContext 派生状态 -----
-  const menuRawList = activeTabState?.projectState.menuRawList
+  const dbMenuRawList = activeTabState?.projectState.menuRawList
   const recyleRawData = activeTabState?.projectState.recyleRawData
   const projectEnvironments = activeTabState?.projectState.projectEnvironments ?? []
   const projectEnvironmentConfig = activeTabState?.projectState.projectEnvironmentConfig ?? EMPTY_PROJECT_ENVIRONMENT_CONFIG
   const currentProjectEnvironmentId = activeTabState?.projectState.currentProjectEnvironmentId
   const menuSearchWord = activeTabState?.projectState.menuSearchWord
   const apiDetailDisplay = activeTabState?.projectState.apiDetailDisplay ?? 'name'
+
+  // ----- 草稿合并：DB 列表 + localStorage 草稿 → 单一数据源 menuRawList -----
+  // draftsTick 仅用于在草稿写入/丢弃后触发合并列表重算。
+  const [draftsTick, setDraftsTick] = useState(0)
+
+  const menuRawList = useMemo(() => {
+    if (!activeProjectId) {
+      return dbMenuRawList
+    }
+
+    return mergeDraftsIntoList(activeProjectId, dbMenuRawList)
+    // draftsTick 作为显式依赖用于强制重算，忽略 exhaustive-deps 警告
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId, dbMenuRawList, draftsTick])
+
+  const saveDraft = useCallback((menuData: ApiMenuData, isNew: boolean) => {
+    if (!activeProjectId) return
+    upsertDraft(activeProjectId, menuData, isNew)
+    setDraftsTick((t) => t + 1)
+  }, [activeProjectId])
+
+  const discardDraft = useCallback((id: string) => {
+    if (!activeProjectId) return
+    removeDraftById(activeProjectId, id)
+    setDraftsTick((t) => t + 1)
+  }, [activeProjectId])
 
   // ----- Setters 包装器（写入 ProjectTabsContext） -----
   const setCurrentProjectEnvironmentId = useCallback(
@@ -440,6 +477,8 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
     return {
       applyServerState,
       reloadState,
+      saveDraft,
+      discardDraft,
       addMenuItem: (menuData) => {
         const id = guardProject()
 
@@ -544,12 +583,13 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         applyState(id, state)
       },
     }
-  }, [applyServerState, activeProjectId, sessionId, reloadState, applyState])
+  }, [applyServerState, activeProjectId, sessionId, reloadState, applyState, saveDraft, discardDraft])
 
   return (
     <MenuHelpersContext.Provider
       value={{
         menuRawList,
+        dbMenuRawList,
         recyleRawData,
         projectEnvironments,
         projectEnvironmentConfig,

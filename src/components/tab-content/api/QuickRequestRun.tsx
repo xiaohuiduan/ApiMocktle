@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEvent } from 'react-use-event-hook'
 import { useProxyConfig } from '@/contexts/proxy-config'
 
 import {
@@ -18,9 +19,11 @@ import { nanoid } from 'nanoid'
 
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
+import type { ApiMenuData } from '@/components/ApiMenu/ApiMenu.type'
 import { buildSchemaExample } from '@/components/JsonSchema/schema-normalizer'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
+import { isDraftEmpty } from '@/contexts/menu-drafts'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { useMenuTabContext, useMenuTabHelpers } from '@/contexts/menu-tab-settings'
@@ -90,8 +93,15 @@ export function QuickRequestRun() {
   const { token } = theme.useToken()
   const { tabData } = useTabContentContext()
   const { messageApi } = useGlobalContext()
-  const { menuRawList, addMenuItem, updateMenuItem } = useMenuHelpersContext()
-  const { addTabItem } = useMenuTabHelpers()
+  const {
+    menuRawList,
+    dbMenuRawList,
+    addMenuItem,
+    updateMenuItem,
+    saveDraft,
+    discardDraft,
+  } = useMenuHelpersContext()
+  const { setTabItemStatus, setTabItemEditStatus } = useMenuTabHelpers()
   const { activeTabKey } = useMenuTabContext()
   const { sessionVars, setSessionVars } = useSessionVariablesContext()
 
@@ -102,6 +112,11 @@ export function QuickRequestRun() {
   }, [menuRawList, tabData.key])
 
   const savedData = menuItem?.data as ApiDetails | undefined
+
+  // 数据库原始数据（不含草稿覆盖层），用于判断已入库项是否被改动。
+  const dbSavedData = useMemo(() => {
+    return dbMenuRawList?.find(({ id }) => id === tabData.key)?.data as ApiDetails | undefined
+  }, [dbMenuRawList, tabData.key])
 
   const [workCopy, setWorkCopy] = useState<ApiDetails>(() => {
     if (savedData) return JSON.parse(JSON.stringify(savedData)) as ApiDetails
@@ -185,6 +200,87 @@ export function QuickRequestRun() {
   }, [savedData?.id, isCreating])
 
   const { run, running, result, error, resetResult } = useApiRequestRunner()
+
+  // ---- 草稿持久化 ----
+  const buildRunTabInfo = useCallback((data: ApiDetails): RunTabInfo => ({
+    serverId: data.serverId,
+    parameters: data.parameters,
+    bodyType: data.requestBody?.type,
+    bodyParameters: data.requestBody?.parameters,
+    bodyRawText: data.requestBody?.rawText,
+    preScript: data.preScript,
+    postScript: data.postScript,
+  }), [])
+
+  const buildMenuData = useCallback((data: ApiDetails): ApiMenuData => {
+    const menuName = data.name || '快捷请求'
+    return {
+      id: tabData.key,
+      name: menuName,
+      type: MenuItemType.HttpRequest,
+      data: { ...data, name: menuName },
+      runTabInfo: buildRunTabInfo(data),
+    } as ApiMenuData
+  }, [tabData.key, buildRunTabInfo])
+
+  // 将当前编辑内容写入 localStorage 草稿（新建始终写；已入库项按是否变更写覆盖层/清覆盖层）。
+  const persistDraft = useEvent(() => {
+    if (isCreating) {
+      const draftItem = buildMenuData(workCopy)
+
+      // 空的新建草稿不重复写入（保留 createApiRequest 的初始写入即可）；
+      // 关闭其 tab 时由 ApiTab 负责丢弃，避免此处 flush 把它再写回。
+      if (isDraftEmpty(draftItem)) {
+        return
+      }
+
+      saveDraft(draftItem, true)
+      return
+    }
+
+    if (dbSavedData && JSON.stringify(workCopy) === JSON.stringify(dbSavedData)) {
+      discardDraft(tabData.key)
+      setTabItemEditStatus({ key: tabData.key }, 'saved')
+    }
+    else {
+      saveDraft(buildMenuData(workCopy), false)
+      setTabItemEditStatus({ key: tabData.key }, 'changed')
+    }
+  })
+
+  // 将当前编辑内容升级为数据库正式记录（运行 / 保存时调用），并清除对应草稿。
+  const persistToDb = useEvent(async () => {
+    const menuName = workCopy.name || '快捷请求'
+    const runTabInfo = buildRunTabInfo(workCopy)
+
+    if (isCreating) {
+      addMenuItem(buildMenuData(workCopy))
+      discardDraft(tabData.key)
+      setTabItemStatus({ key: tabData.key }, PageTabStatus.Update)
+      setTabItemEditStatus({ key: tabData.key }, 'saved')
+    }
+    else {
+      await updateMenuItem({
+        id: tabData.key,
+        name: menuName,
+        data: { ...workCopy, name: menuName },
+        runTabInfo,
+      })
+      discardDraft(tabData.key)
+      setTabItemEditStatus({ key: tabData.key }, 'saved')
+    }
+  })
+
+  // 编辑防抖写草稿（~500ms）。
+  useEffect(() => {
+    const timer = setTimeout(() => persistDraft(), 500)
+    return () => clearTimeout(timer)
+  }, [workCopy, persistDraft])
+
+  // 组件卸载（切换 tab/项目）时强制 flush，避免丢失未保存编辑。
+  useEffect(() => {
+    return () => persistDraft()
+  }, [persistDraft])
 
   const { proxyConfig } = useProxyConfig()
   const proxyInfo = proxyConfig && proxyConfig.proxyType !== 'none'
@@ -296,56 +392,22 @@ export function QuickRequestRun() {
         messageApi.error(`后置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
       }
     }
+
+    // ====== 运行后自动保存：URL 非空即升级为数据库正式记录（成功/失败都保存） ======
+    if (workCopy.path?.trim()) {
+      try {
+        await persistToDb()
+      } catch {
+        // 自动保存失败不打断运行结果展示
+      }
+    }
   }
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      const menuName = workCopy.name || '快捷请求'
-      if (isCreating) {
-        const menuItemId = nanoid(6)
-        const runTabInfo: RunTabInfo = {
-          serverId: workCopy.serverId,
-          parameters: workCopy.parameters,
-          bodyType: workCopy.requestBody?.type,
-          bodyParameters: workCopy.requestBody?.parameters,
-          bodyRawText: workCopy.requestBody?.rawText,
-          preScript: workCopy.preScript,
-          postScript: workCopy.postScript,
-        }
-        addMenuItem({
-          id: menuItemId,
-          name: menuName,
-          type: MenuItemType.HttpRequest,
-          data: { ...workCopy, name: menuName },
-          runTabInfo,
-        })
-        addTabItem(
-          {
-            key: menuItemId,
-            label: menuName,
-            contentType: MenuItemType.HttpRequest,
-          },
-          { replaceTab: tabData.key },
-        )
-      } else {
-        const runTabInfo: RunTabInfo = {
-          serverId: workCopy.serverId,
-          parameters: workCopy.parameters,
-          bodyType: workCopy.requestBody?.type,
-          bodyParameters: workCopy.requestBody?.parameters,
-          bodyRawText: workCopy.requestBody?.rawText,
-          preScript: workCopy.preScript,
-          postScript: workCopy.postScript,
-        }
-        await updateMenuItem({
-          id: tabData.key,
-          name: menuName,
-          data: { ...workCopy, name: menuName },
-          runTabInfo,
-        })
-        messageApi.success('保存成功')
-      }
+      await persistToDb()
+      messageApi.success('保存成功')
     } catch {
       messageApi.error('保存失败')
     } finally {
