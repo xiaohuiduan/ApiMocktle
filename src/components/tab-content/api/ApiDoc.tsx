@@ -241,6 +241,56 @@ function SchemaLayout({ leftPanel, rightPanel, autoSaveId }: SchemaLayoutProps) 
   )
 }
 
+/** 请求/响应 Body 参数结构表：整列共享宽度（字段名/类型/必填按最宽内容自适应，说明占剩余）。 */
+function SchemaFieldTable({ rows }: { rows: SchemaFieldRow[] }) {
+  return (
+    <div className="schema-rows">
+      <table className="schema-table">
+        <thead>
+          <tr>
+            <th>字段名</th>
+            <th>类型</th>
+            <th>必填</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length > 0
+            ? rows.map((row) => (
+                <tr key={row.key}>
+                  <td>
+                    <span style={{ paddingLeft: row.depth * 16 }}>
+                      <Tooltip title={row.name}>
+                        <span className="schema-field-name">{row.name}</span>
+                      </Tooltip>
+                    </span>
+                  </td>
+                  <td>
+                    <span className="schema-type-text">{row.typeLabel}</span>
+                  </td>
+                  <td>
+                    <span className={`schema-required${row.required ? ' is-required' : ''}`}>
+                      {row.required ? '必填' : '可选'}
+                    </span>
+                  </td>
+                  <td>
+                    <Tooltip title={row.description ?? '-'}>
+                      <span className="schema-desc">{row.description ?? '-'}</span>
+                    </Tooltip>
+                  </td>
+                </tr>
+              ))
+            : (
+                <tr>
+                  <td className="schema-empty" colSpan={4}>暂无字段定义</td>
+                </tr>
+              )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export function ApiDoc() {
   const { token } = theme.useToken()
 
@@ -360,36 +410,48 @@ export function ApiDoc() {
           background: token.colorFillTertiary,
         },
 
-        '.schema-table-head, .schema-row': {
-          display: 'grid',
-          gridTemplateColumns: 'max-content max-content max-content minmax(0, 1fr)',
-          gap: token.paddingXS,
-          padding: `${token.paddingXXS}px ${token.paddingSM}px`,
-          alignItems: 'center',
-        },
-
-        '.schema-table-head': {
-          position: 'sticky',
-          top: 0,
-          zIndex: 1,
-          background: token.colorFillSecondary,
-          color: token.colorTextSecondary,
-          fontSize: 12,
-          borderBottom: `1px solid ${token.colorBorderSecondary}`,
-        },
-
         '.schema-rows': {
           maxHeight: 335,
           overflow: 'auto',
         },
 
-        '.schema-row': {
+        '.schema-table': {
+          width: '100%',
+          tableLayout: 'auto',
+          borderCollapse: 'collapse',
           color: token.colorText,
-          borderBottom: `1px solid ${token.colorBorderSecondary}`,
-          minHeight: 36,
+
+          'th, td': {
+            textAlign: 'left',
+            verticalAlign: 'middle',
+            padding: `${token.paddingXS}px ${token.padding}px`,
+            borderBottom: `1px solid ${token.colorBorderSecondary}`,
+          },
+
+          'th': {
+            position: 'sticky',
+            top: 0,
+            zIndex: 1,
+            background: token.colorFillSecondary,
+            color: token.colorTextSecondary,
+            fontSize: 12,
+          },
+
+          // 字段名/类型/必填按内容自适应，说明列吃满剩余宽度
+          'th:nth-child(4), td:nth-child(4)': {
+            width: '100%',
+          },
+
+          'td': {
+            minWidth: 0,
+          },
         },
 
-        '.schema-field-name': {
+        '.schema-table td:first-child': {
+          whiteSpace: 'nowrap',
+        },
+
+        '.schema-table .schema-field-name': {
           display: 'inline-flex',
           alignItems: 'center',
           padding: '2px 8px',
@@ -402,21 +464,24 @@ export function ApiDoc() {
           whiteSpace: 'nowrap',
         },
 
-        '.schema-type-text': {
+        '.schema-table .schema-type-text': {
           color: token.colorTextSecondary,
           fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+          whiteSpace: 'nowrap',
         },
 
-        '.schema-required': {
+        '.schema-table .schema-required': {
           color: token.colorTextTertiary,
           fontSize: 12,
+          whiteSpace: 'nowrap',
         },
 
-        '.schema-required.is-required': {
+        '.schema-table .schema-required.is-required': {
           color: token.colorError,
         },
 
-        '.schema-desc': {
+        '.schema-table .schema-desc': {
+          display: 'block',
           color: token.colorTextDescription,
           fontSize: 12,
           overflow: 'hidden',
@@ -424,9 +489,8 @@ export function ApiDoc() {
           whiteSpace: 'nowrap',
         },
 
-        '.schema-empty': {
+        '.schema-table .schema-empty': {
           color: token.colorTextTertiary,
-          padding: token.paddingSM,
           fontSize: 12,
         },
 
@@ -656,30 +720,7 @@ export function ApiDoc() {
                             <span>参数结构</span>
                             <span>{requestSchemaRows.length} fields</span>
                           </div>
-                          <div className="schema-table-head">
-                            <span>字段名</span>
-                            <span>类型</span>
-                            <span>必填</span>
-                            <span>说明</span>
-                          </div>
-                          <div className="schema-rows">
-                            {requestSchemaRows.length > 0
-                              ? requestSchemaRows.map((row) => (
-                                  <div key={row.key} className="schema-row">
-                                    <span style={{ paddingLeft: row.depth * 16 }}>
-                                      <Tooltip title={row.name}>
-                                        <span className="schema-field-name">{row.name}</span>
-                                      </Tooltip>
-                                    </span>
-                                    <span className="schema-type-text">{row.typeLabel}</span>
-                                    <span className={`schema-required${row.required ? ' is-required' : ''}`}>{row.required ? '必填' : '可选'}</span>
-                                    <Tooltip title={row.description ?? '-'}>
-                                      <span className="schema-desc">{row.description ?? '-'}</span>
-                                    </Tooltip>
-                                  </div>
-                                ))
-                              : <div className="schema-empty">暂无字段定义</div>}
-                          </div>
+                          <SchemaFieldTable rows={requestSchemaRows} />
                         </>
                       }
                       rightPanel={
@@ -761,30 +802,7 @@ export function ApiDoc() {
                                 <span>参数结构</span>
                                 <span>{resSchemaRows.length} fields</span>
                               </div>
-                              <div className="schema-table-head">
-                                <span>字段名</span>
-                                <span>类型</span>
-                                <span>必填</span>
-                                <span>说明</span>
-                              </div>
-                              <div className="schema-rows">
-                                {resSchemaRows.length > 0
-                                  ? resSchemaRows.map((row) => (
-                                      <div key={row.key} className="schema-row">
-                                        <span style={{ paddingLeft: row.depth * 16 }}>
-                                          <Tooltip title={row.name}>
-                                            <span className="schema-field-name">{row.name}</span>
-                                          </Tooltip>
-                                        </span>
-                                        <span className="schema-type-text">{row.typeLabel}</span>
-                                        <span className={`schema-required${row.required ? ' is-required' : ''}`}>{row.required ? '必填' : '可选'}</span>
-                                        <Tooltip title={row.description ?? '-'}>
-                                          <span className="schema-desc">{row.description ?? '-'}</span>
-                                        </Tooltip>
-                                      </div>
-                                    ))
-                                  : <div className="schema-empty">暂无字段定义</div>}
-                              </div>
+                              <SchemaFieldTable rows={resSchemaRows} />
                             </>
                           }
                           rightPanel={
