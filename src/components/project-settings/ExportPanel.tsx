@@ -5,7 +5,7 @@ import type { CheckboxChangeEvent } from 'antd/es/checkbox'
 import { Checkbox } from 'antd'
 import type { DataNode } from 'antd/es/tree'
 import { Tree } from 'antd'
-import { DownloadIcon } from 'lucide-react'
+import { DownloadIcon, GlobeIcon } from 'lucide-react'
 
 import { api } from '@/api-client'
 import { useAuth } from '@/contexts/auth'
@@ -14,6 +14,7 @@ import type { ApiMenuData } from '@/components/ApiMenu'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import type { ApiDetails } from '@/types'
 import { downloadMarkdown, type ExportTreeInput } from '@/utils/api-doc-markdown'
+import { downloadMhtml } from '@/utils/api-doc-mhtml'
 
 interface ProjectInfo {
   id: string
@@ -26,6 +27,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
   const [msgApi, contextHolder] = message.useMessage()
 
   const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState<'markdown' | 'mhtml'>('markdown')
   const [checkedApiIds, setCheckedApiIds] = useState<Set<string>>(new Set())
   const [exporting, setExporting] = useState(false)
 
@@ -73,7 +75,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
   const isAllChecked = allApiIds.length > 0 && checkedApiIds.size === allApiIds.length
   const isIndeterminate = checkedApiIds.size > 0 && checkedApiIds.size < allApiIds.length
 
-  const handleExport = async () => {
+  const handleExport = async (format: 'markdown' | 'mhtml') => {
     if (!projectId || !sessionId) return
     if (checkedApiIds.size === 0) {
       msgApi.error('请至少选择一个接口')
@@ -124,7 +126,9 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
         .map(({ id, name, data }) => ({ id, name, data }))
 
       // Generate and show save dialog
-      const saved = await downloadMarkdown(projectName, treeInput)
+      const saved = format === 'markdown'
+        ? await downloadMarkdown(projectName, treeInput)
+        : await downloadMhtml(projectName, treeInput)
       if (saved) {
         msgApi.success(`已导出 ${treeInput.totalCount} 个接口`)
         setExportModalOpen(false)
@@ -137,7 +141,8 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
     }
   }
 
-  const openExportModal = () => {
+  const openExportModal = (format: 'markdown' | 'mhtml') => {
+    setExportFormat(format)
     setCheckedApiIds(new Set(allApiIds))
     setExportModalOpen(true)
   }
@@ -146,19 +151,22 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
     <div className="flex max-w-3xl flex-col gap-4">
       {contextHolder}
 
-      <div className="flex items-center justify-between">
-        <Button type="primary" icon={<DownloadIcon size={14} />} onClick={openExportModal}>
+      <div className="flex items-center gap-2">
+        <Button type="primary" icon={<DownloadIcon size={14} />} onClick={() => { openExportModal('markdown') }}>
           导出 Markdown
+        </Button>
+        <Button icon={<GlobeIcon size={14} />} onClick={() => { openExportModal('mhtml') }}>
+          导出 MHTML
         </Button>
       </div>
 
       <Modal
         destroyOnClose
         open={exportModalOpen}
-        title="导出 Markdown 文档"
+        title={exportFormat === 'markdown' ? '导出 Markdown 文档' : '导出 MHTML 文档'}
         width={640}
         onCancel={() => setExportModalOpen(false)}
-        onOk={() => void handleExport()}
+        onOk={() => void handleExport(exportFormat)}
         okText="导出"
         confirmLoading={exporting}
       >
