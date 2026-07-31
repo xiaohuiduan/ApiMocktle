@@ -12,9 +12,10 @@ import {
   Tag,
   Tooltip,
   Typography,
+  message,
   theme,
 } from 'antd'
-import { ClockIcon, PlayIcon, RotateCcwIcon } from 'lucide-react'
+import { ClockIcon, CopyIcon, PlayIcon, RotateCcwIcon } from 'lucide-react'
 
 import { useParams } from 'react-router'
 import { api } from '@/api-client'
@@ -242,6 +243,8 @@ export function RunTab() {
   const [resetCounter, setResetCounter] = useState(0)
   const [historyLoaded, setHistoryLoaded] = useState(0)
   const [fillWithComments, setFillWithComments] = useState(true)
+  // 各 body 类型的文本缓存：切换类型时保存/恢复，避免内容丢失
+  const bodyTextsRef = useRef<Partial<Record<BodyType, string>>>({})
 
   // 智能默认 tab：根据 HTTP 方法选择
   const getDefaultActiveTab = useCallback(() => {
@@ -358,6 +361,7 @@ export function RunTab() {
   }
 
   const doReset = (source: 'define' | 'saved') => {
+    bodyTextsRef.current = {}
     if (source === 'saved' && savedRunTabInfo) {
       // 复原到最新保存的运行时信息
       const merged = mergeRunTabInfo(originalDocRef.current!, savedRunTabInfo)
@@ -614,13 +618,11 @@ export function RunTab() {
     if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
       return (body.parameters ?? []).some(p => p.name && p.enable !== false)
     }
-    if (body.type === BodyType.Json || body.type === BodyType.Xml) {
+    if (body.type === BodyType.Json) {
       return !!((body.jsonSchema as { properties?: unknown[] })?.properties?.length)
+        || !!(body.rawText?.trim())
     }
-    if (body.type === BodyType.Raw || body.type === BodyType.Binary) {
-      return !!(body.rawText?.trim())
-    }
-    return false
+    return !!(body.rawText?.trim())
   }, [workCopy?.requestBody])
 
   const hasScriptsContent = useMemo(() => {
@@ -835,9 +837,17 @@ export function RunTab() {
                     requestBody={workCopy.requestBody}
                     bodyRawText={workCopy.requestBody?.rawText}
                     onBodyTypeChange={(type) => {
+                      const oldType = workCopy.requestBody?.type
+                      const oldText = workCopy.requestBody?.rawText
+
+                      if (oldType && oldText !== undefined) {
+                        bodyTextsRef.current[oldType] = oldText
+                      }
+
+                      const nextText = type === oldType ? oldText : bodyTextsRef.current[type]
                       const next = {
                         ...workCopy,
-                        requestBody: { ...workCopy.requestBody!, type },
+                        requestBody: { ...workCopy.requestBody!, type, rawText: nextText },
                       }
                       setWorkCopy(next)
                       persist(next)
@@ -902,13 +912,33 @@ export function RunTab() {
             curlContent={
               <div className="flex flex-col gap-3">
                 <div>
-                  <Typography.Text strong className="mb-1 block text-xs">Windows</Typography.Text>
+                  <div className="mb-1 flex items-center justify-between">
+                    <Typography.Text strong className="text-xs">Windows</Typography.Text>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<CopyIcon size={12} />}
+                      onClick={() => {
+                        void navigator.clipboard.writeText(curlCommands.windows).then(() => message.success('已复制'))
+                      }}
+                    />
+                  </div>
                   <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                     {curlCommands.windows}
                   </pre>
                 </div>
                 <div>
-                  <Typography.Text strong className="mb-1 block text-xs">Linux / macOS</Typography.Text>
+                  <div className="mb-1 flex items-center justify-between">
+                    <Typography.Text strong className="text-xs">Linux / macOS</Typography.Text>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<CopyIcon size={12} />}
+                      onClick={() => {
+                        void navigator.clipboard.writeText(curlCommands.linux).then(() => message.success('已复制'))
+                      }}
+                    />
+                  </div>
                   <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                     {curlCommands.linux}
                   </pre>

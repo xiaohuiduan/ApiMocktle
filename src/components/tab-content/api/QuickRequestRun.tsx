@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useEvent } from 'react-use-event-hook'
 import { useProxyConfig } from '@/contexts/proxy-config'
 
@@ -12,9 +12,10 @@ import {
   Tag,
   Tooltip,
   Typography,
+  message,
   theme,
 } from 'antd'
-import { ClockIcon, PlayIcon, PencilIcon } from 'lucide-react'
+import { ClockIcon, CopyIcon, PlayIcon, PencilIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
@@ -124,6 +125,8 @@ export function QuickRequestRun() {
   })
 
   const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
+  // 各 body 类型的文本缓存：切换类型时保存/恢复，避免内容丢失
+  const bodyTextsRef = useRef<Partial<Record<BodyType, string>>>({})
   const [fillWithComments, setFillWithComments] = useState(true)
   const [saving, setSaving] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -172,13 +175,11 @@ export function QuickRequestRun() {
     if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
       return (body.parameters ?? []).some(p => p.name && p.enable !== false)
     }
-    if (body.type === BodyType.Json || body.type === BodyType.Xml) {
+    if (body.type === BodyType.Json) {
       return !!((body.jsonSchema as { properties?: unknown[] })?.properties?.length)
+        || !!(body.rawText?.trim())
     }
-    if (body.type === BodyType.Raw || body.type === BodyType.Binary) {
-      return !!(body.rawText?.trim())
-    }
-    return false
+    return !!(body.rawText?.trim())
   }, [workCopy?.requestBody])
   const hasScriptsContent = useMemo(
     () => !!(workCopy?.preScript?.trim() || workCopy?.postScript?.trim()),
@@ -597,10 +598,19 @@ export function QuickRequestRun() {
                   <BodyPanel
                     requestBody={workCopy.requestBody}
                     bodyRawText={bodyRawText}
-                    onBodyTypeChange={(type) => setWorkCopy((prev) => ({
-                      ...prev,
-                      requestBody: { ...(prev.requestBody || { type: BodyType.None }), type },
-                    }))}
+                    onBodyTypeChange={(type) => {
+                      const oldType = workCopy.requestBody?.type
+
+                      if (oldType && bodyRawText !== undefined) {
+                        bodyTextsRef.current[oldType] = bodyRawText
+                      }
+
+                      setBodyRawText(type === oldType ? bodyRawText : bodyTextsRef.current[type])
+                      setWorkCopy((prev) => ({
+                        ...prev,
+                        requestBody: { ...(prev.requestBody ?? { type: BodyType.None }), type },
+                      }))
+                    }}
                     onBodyRawTextChange={(text) => setBodyRawText(text)}
                     onBodyParametersChange={(parameters) => setWorkCopy((prev) => ({
                       ...prev,
@@ -658,13 +668,33 @@ export function QuickRequestRun() {
               return (
                 <div className="flex flex-col gap-3">
                   <div>
-                    <Typography.Text strong className="mb-1 block text-xs">Windows</Typography.Text>
+                    <div className="mb-1 flex items-center justify-between">
+                      <Typography.Text strong className="text-xs">Windows</Typography.Text>
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<CopyIcon size={12} />}
+                        onClick={() => {
+                          void navigator.clipboard.writeText(windows).then(() => message.success('已复制'))
+                        }}
+                      />
+                    </div>
                     <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                       {windows}
                     </pre>
                   </div>
                   <div>
-                    <Typography.Text strong className="mb-1 block text-xs">Linux / macOS</Typography.Text>
+                    <div className="mb-1 flex items-center justify-between">
+                      <Typography.Text strong className="text-xs">Linux / macOS</Typography.Text>
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<CopyIcon size={12} />}
+                        onClick={() => {
+                          void navigator.clipboard.writeText(linux).then(() => message.success('已复制'))
+                        }}
+                      />
+                    </div>
                     <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                       {linux}
                     </pre>

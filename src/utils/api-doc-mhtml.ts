@@ -89,6 +89,7 @@ function renderParamsTable(params: Parameter[] | undefined, title: string): stri
   }
 
   const rows = params
+    .filter(p => p.name)
     .map((p) => {
       const example = Array.isArray(p.example) ? p.example.join(', ') : p.example
 

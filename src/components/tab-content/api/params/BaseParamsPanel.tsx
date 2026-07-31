@@ -162,17 +162,6 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
     }
   }
 
-  const getSectionLabel = () => {
-    switch (type) {
-      case 'query':
-        return 'Query 参数'
-      case 'header':
-        return 'Header 参数'
-      case 'cookie':
-        return 'Cookie 参数'
-    }
-  }
-
   const handleChange = (newParams: ApiEnvironmentValue[] | undefined) => {
     const updated = { ...parameters }
     switch (type) {
@@ -200,13 +189,8 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
         onToggle={(name, enabled) => onToggleInheritedParam?.(type, name, enabled)}
       />
 
-      {type === 'query' && (
-        <div className="py-1">
-          <Typography.Text type="secondary">{getSectionLabel()}</Typography.Text>
-        </div>
-      )}
-
       <ParamsEditableTable
+        showDescriptionColumn={false}
         showRequiredColumn={false}
         varMap={varMap}
         exampleColumnTitle={exampleColumnTitle}
@@ -221,8 +205,8 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
           </div>
           <ParamsEditableTable
             isPathParamsTable
+            showDescriptionColumn={false}
             showRequiredColumn={false}
-            autoNewRow={false}
             removable={false}
             exampleColumnTitle={exampleColumnTitle}
             value={parameters.path}

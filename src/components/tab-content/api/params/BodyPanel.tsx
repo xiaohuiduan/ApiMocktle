@@ -4,6 +4,29 @@ import { ParamsEditableTable } from '../components/ParamsEditableTable'
 import { BodyType } from '@/enums'
 import type { ApiRequestBody, ApiEnvironmentValue } from '@/types'
 
+/** 判断某个 body 类型是否已有内容（用于类型标签的绿标） */
+function bodyTypeHasContent(requestBody: ApiRequestBody | undefined, t: BodyType): boolean {
+  if (!requestBody) {
+    return false
+  }
+
+  if (t === BodyType.FormData || t === BodyType.UrlEncoded) {
+    return (requestBody.parameters ?? []).some((p) => p.name && p.enable !== false)
+  }
+
+  if (t === BodyType.Json) {
+    const schema = requestBody.jsonSchema as { properties?: unknown[] } | undefined
+
+    return !!(schema?.properties?.length) || !!(requestBody.rawText?.trim())
+  }
+
+  if (t === BodyType.Xml || t === BodyType.Raw || t === BodyType.Binary) {
+    return !!(requestBody.rawText?.trim())
+  }
+
+  return false
+}
+
 const bodyTypeOptions = [
   { n: 'none', t: BodyType.None },
   { n: 'form-data', t: BodyType.FormData },
@@ -64,15 +87,7 @@ export function BodyPanel(props: BodyPanelProps) {
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1">
             {bodyTypeOptions.map(({ n, t }) => {
-            const hasContent = requestBody
-              ? t === BodyType.FormData || t === BodyType.UrlEncoded
-                ? (requestBody.parameters ?? []).some(p => p.name && p.enable !== false)
-                : t === BodyType.Json || t === BodyType.Xml
-                  ? !!((requestBody.jsonSchema as { properties?: unknown[] })?.properties?.length)
-                  : t === BodyType.Raw || t === BodyType.Binary
-                    ? !!(requestBody.rawText?.trim())
-                    : false
-              : false
+              const hasContent = bodyTypeHasContent(requestBody, t)
 
             return (
               <Tag.CheckableTag
@@ -116,7 +131,7 @@ export function BodyPanel(props: BodyPanelProps) {
                   : 'json'
               }
               deserializeOnChange={false}
-              value={bodyRawText !== undefined ? bodyRawText : (buildBodyExample?.() ?? '')}
+              value={bodyRawText ?? (requestBody.type === BodyType.Json ? (buildBodyExample?.() ?? '') : '')}
               onChange={(val) => {
                 if (onBodyRawTextChange) {
                   onBodyRawTextChange(typeof val === 'string' ? val : '')
@@ -140,6 +155,7 @@ export function BodyPanel(props: BodyPanelProps) {
               {requestBody.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
             </Typography.Text>
             <ParamsEditableTable
+              showDescriptionColumn={false}
               value={requestBody.parameters}
               onChange={onBodyParametersChange}
             />

@@ -37,7 +37,7 @@ const DraggableTabNode = (props: DraggableTabPaneProps) => {
 }
 
 interface ColumnType<RecordType> {
-  title?: string
+  title?: React.ReactNode
   dataIndex?: string
   width?: number | string
   render?: (text: AnyType, record: RecordType, index: number) => React.ReactNode

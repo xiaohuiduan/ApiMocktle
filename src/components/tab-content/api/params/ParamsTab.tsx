@@ -179,7 +179,6 @@ export function ParamsTab(props: ParamsTabProps) {
                       </div>
                       <ParamsEditableTable
                         isPathParamsTable
-                        autoNewRow={false}
                         removable={false}
                         exampleColumnTitle={exampleColumnTitle}
                         value={parameters.path}

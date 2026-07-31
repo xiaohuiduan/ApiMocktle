@@ -35,7 +35,9 @@ function esc(s: string): string {
 
 function renderParamsTable(params: Parameter[] | undefined, title: string): string {
   if (!params?.length) return ''
-  const rows = params.map(p =>
+  const rows = params
+    .filter(p => p.name)
+    .map(p =>
     `| ${esc(p.name ?? '')} | ${esc(String(p.type))} | ${p.required ? '是' : '否'} | ${esc(p.description ?? '-')} | ${esc(p.example != null ? String(p.example) : '-')} |`,
   ).join('\n')
   return `**${esc(title)}**\n\n| 参数名 | 类型 | 必填 | 说明 | 示例 |\n|--------|------|------|------|------|\n${rows}\n`
