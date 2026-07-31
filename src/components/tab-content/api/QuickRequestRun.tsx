@@ -77,7 +77,6 @@ function createEmptyApiDetails(): ApiDetails {
     path: '',
     name: '快捷请求',
     status: 'developing' as ApiDetails['status'],
-    serverId: '',
     serverUrl: '',
     parameters: {
       query: [],
@@ -87,7 +86,6 @@ function createEmptyApiDetails(): ApiDetails {
     },
     requestBody: { type: BodyType.None },
     responses: [],
-    responseExamples: [],
   }
 }
 
@@ -206,7 +204,6 @@ export function QuickRequestRun() {
 
   // ---- 草稿持久化 ----
   const buildRunTabInfo = useCallback((data: ApiDetails): RunTabInfo => ({
-    serverId: data.serverId,
     parameters: data.parameters,
     bodyType: data.requestBody?.type,
     bodyParameters: data.requestBody?.parameters,

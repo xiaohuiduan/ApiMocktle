@@ -8,8 +8,6 @@ import type {
   ProjectEnvironmentConfig,
 } from '@/types'
 
-export const DEFAULT_ENVIRONMENT_MODULE_NAME = '默认模块'
-
 export function createGlobalParameters(): ApiEnvironmentGlobalParameters {
   return {
     header: [],
@@ -23,7 +21,6 @@ export const EMPTY_PROJECT_ENVIRONMENT_CONFIG: ProjectEnvironmentConfig = {
   globalVariables: [],
   globalParameters: createGlobalParameters(),
   legacyGlobalParameters: [],
-  vaultSecrets: [],
   environments: [],
 }
 
@@ -39,7 +36,6 @@ export function createEnvironmentValue(): ApiEnvironmentValue {
 export function createEnvironmentBaseUrl(): ApiEnvironmentBaseUrl {
   return {
     id: nanoid(6),
-    name: DEFAULT_ENVIRONMENT_MODULE_NAME,
     url: '',
   }
 }
@@ -49,7 +45,6 @@ export function createEnvironment(): ApiEnvironment {
     id: nanoid(6),
     name: '新建环境',
     url: '',
-    shared: true,
     baseUrls: [createEnvironmentBaseUrl()],
     variables: [],
     parameters: createGlobalParameters(),

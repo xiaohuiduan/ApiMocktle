@@ -138,8 +138,6 @@ pub struct ProjectEnvironmentConfig {
     pub legacy_global_parameters: Vec<serde_json::Value>,
     #[serde(rename = "globalVariables", default)]
     pub global_variables: Vec<serde_json::Value>,
-    #[serde(rename = "vaultSecrets", default)]
-    pub vault_secrets: Vec<serde_json::Value>,
     #[serde(rename = "environments", default)]
     pub environments: Vec<serde_json::Value>,
 }

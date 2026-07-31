@@ -3,7 +3,6 @@ import { nanoid } from 'nanoid'
 import type { ApiMenuData } from '@/components/ApiMenu'
 import type { ApiTabItem } from '@/components/ApiTab'
 import { SchemaType } from '@/components/JsonSchema'
-import { SERVER_INHERIT } from '@/configs/static'
 import { PROJECT_ABOUT_DOC_TITLE, PROJECT_ABOUT_MARKDOWN } from '@/content/project-about'
 import {
   ApiStatus,
@@ -88,7 +87,6 @@ export const apiDirectoryData: ApiMenuData[] = [
       method: HttpMethod.Get,
       status: ApiStatus.Released,
       responsibleId: creator.id,
-      serverId: SERVER_INHERIT,
       responses: [defaultResponse()],
       parameters: {
         query: [
@@ -117,7 +115,6 @@ export const apiDirectoryData: ApiMenuData[] = [
       method: HttpMethod.Get,
       status: ApiStatus.Released,
       responsibleId: creator.id,
-      serverId: SERVER_INHERIT,
       responses: [defaultResponse()],
     },
   },
@@ -139,7 +136,6 @@ export const apiDirectoryData: ApiMenuData[] = [
       status: ApiStatus.Developing,
       responsibleId: creator.id,
       tags: ['宠物', '示例', '模板'],
-      serverId: SERVER_INHERIT,
       description: '## 接口说明',
       parameters: {
         query: [
@@ -219,41 +215,6 @@ export const apiDirectoryData: ApiMenuData[] = [
           },
         },
       ],
-      responseExamples: [
-        {
-          id: '1',
-          responseId: RESPONSE_ID_1,
-          name: '成功示例',
-          data: JSON.stringify({
-            code: 0,
-            data: {
-              name: 'Hello Kitty',
-              photoUrls: ['http://dummyimage.com/400x400'],
-              id: 3,
-              category: {
-                id: 71,
-                name: 'Cat',
-              },
-              tags: [
-                {
-                  id: 22,
-                  name: 'Cat',
-                },
-              ],
-              status: 'sold',
-            },
-          }),
-        },
-        {
-          id: '2',
-          responseId: RESPONSE_ID_2,
-          name: '异常示例',
-          data: JSON.stringify({
-            code: -1,
-            message: 'Not found',
-          }),
-        },
-      ],
       createdAt: '2022-03-23T12:00:00.000Z',
       updatedAt: '2022-03-23T12:00:00.000Z',
     },
@@ -271,7 +232,6 @@ export const apiDirectoryData: ApiMenuData[] = [
       status: ApiStatus.Testing,
       responsibleId: creator.id,
       tags: ['宠物'],
-      serverId: SERVER_INHERIT,
       responses: [defaultResponse()],
     },
   },
@@ -400,7 +360,6 @@ export const apiDirectoryData: ApiMenuData[] = [
       method: HttpMethod.Get,
       status: ApiStatus.Developing,
       tags: ['宠物'],
-      serverId: SERVER_INHERIT,
       responses: [
         {
           id: nanoid(6),
@@ -447,7 +406,6 @@ export const recycleGroupData: RecycleData = {
             method: HttpMethod.Get,
             status: ApiStatus.Released,
             responsibleId: creator.id,
-            serverId: SERVER_INHERIT,
           },
         },
         expiredAt: '29天',
@@ -513,7 +471,6 @@ export const recycleGroupData: RecycleData = {
             method: HttpMethod.Get,
             status: ApiStatus.Released,
             responsibleId: creator.id,
-            serverId: SERVER_INHERIT,
           },
         },
         expiredAt: '16天',
@@ -569,7 +526,6 @@ export const initialCreateApiDetailsData: ApiDetails = {
   id: nanoid(6),
   method: HttpMethod.Get,
   status: ApiStatus.Developing,
-  serverId: SERVER_INHERIT,
   responses: [defaultResponse()],
 }
 

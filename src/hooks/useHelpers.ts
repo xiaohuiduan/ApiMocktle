@@ -18,7 +18,6 @@ function createEmptyRequestDetails(name: string, id: string): ApiDetails {
     path: '',
     name,
     status: 'developing' as ApiDetails['status'],
-    serverId: '',
     serverUrl: '',
     parameters: {
       query: [],
@@ -28,7 +27,6 @@ function createEmptyRequestDetails(name: string, id: string): ApiDetails {
     },
     requestBody: { type: BodyType.None },
     responses: [],
-    responseExamples: [],
   }
 }
 

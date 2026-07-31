@@ -22,34 +22,24 @@ import {
   getFallbackSection,
   GLOBAL_SECTION_ITEMS,
   resolveEnvironment,
-  type GlobalSectionKey,
   type SectionKey,
 } from './EnvironmentPanelParts'
 import { GlobalParametersEditor } from './GlobalParametersEditor'
 import { ValueEditor } from './ValueEditor'
 
-type ValueSectionKey = Exclude<GlobalSectionKey, 'globalParameters'>
-
 function cloneConfig(config: ProjectEnvironmentConfig) {
   return JSON.parse(JSON.stringify(config)) as ProjectEnvironmentConfig
 }
 
-function isValueSectionKey(key: GlobalSectionKey): key is ValueSectionKey {
-  return key !== 'globalParameters'
-}
-
-function getValueSectionRows(config: ProjectEnvironmentConfig, key: ValueSectionKey) {
-  return key === 'globalVariables' ? config.globalVariables : config.vaultSecrets
+function getValueSectionRows(config: ProjectEnvironmentConfig) {
+  return config.globalVariables
 }
 
 function updateValueSection(
   config: ProjectEnvironmentConfig,
-  key: ValueSectionKey,
   rows: ProjectEnvironmentConfig['globalVariables'],
 ) {
-  return key === 'globalVariables'
-    ? { ...config, globalVariables: rows }
-    : { ...config, vaultSecrets: rows }
+  return { ...config, globalVariables: rows }
 }
 
 export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
@@ -89,20 +79,12 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
   const selectedEnvironment = useMemo(() => resolveEnvironment(draftConfig, selectedKey), [draftConfig, selectedKey])
   const selectedGlobalSection = useMemo(() => GLOBAL_SECTION_ITEMS.find(({ key }) => key === selectedKey), [selectedKey])
 
-  // 实际生效值映射：会话变量 > 当前环境 > 全局/密钥，用于变量面板「实际生效值」预览列
+  // 实际生效值映射：会话变量 > 当前环境 > 全局，用于变量面板「实际生效值」预览列
   const { varMap: effectiveVarMap } = useResolvedVarMap({
     globalVariables: draftConfig.globalVariables,
-    vaultSecrets: draftConfig.vaultSecrets,
     envVariables: selectedEnvironment?.variables ?? [],
     sessionVars,
   })
-  const selectedValueSectionKey = useMemo(() => {
-    if (!selectedGlobalSection || !isValueSectionKey(selectedGlobalSection.key)) {
-      return undefined
-    }
-
-    return selectedGlobalSection.key
-  }, [selectedGlobalSection])
 
   return (
     <div
@@ -237,26 +219,26 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
                       }}
                     />
                   )
-                : selectedGlobalSection && selectedValueSectionKey && (
-                    <ValueEditor
-                      description={selectedGlobalSection.description}
-                      editable={editable}
-                      rows={getValueSectionRows(draftConfig, selectedValueSectionKey)}
-                      title={selectedGlobalSection.label}
-                      effectiveVarMap={effectiveVarMap}
-                      onAdd={() => {
-                        setDraftConfig((current) => ({
-                          ...updateValueSection(current, selectedValueSectionKey, [
-                            ...getValueSectionRows(current, selectedValueSectionKey),
-                            createEnvironmentValue(),
-                          ]),
-                        }))
-                      }}
-                      onChange={(nextRows) => {
-                        setDraftConfig((current) => updateValueSection(current, selectedValueSectionKey, nextRows))
-                      }}
-                    />
-                  )}
+                : selectedGlobalSection?.key === 'globalVariables' && (
+                  <ValueEditor
+                    description={selectedGlobalSection.description}
+                    editable={editable}
+                    rows={getValueSectionRows(draftConfig)}
+                    title={selectedGlobalSection.label}
+                    effectiveVarMap={effectiveVarMap}
+                    onAdd={() => {
+                      setDraftConfig((current) => ({
+                        ...updateValueSection(current, [
+                          ...getValueSectionRows(current),
+                          createEnvironmentValue(),
+                        ]),
+                      }))
+                    }}
+                    onChange={(nextRows) => {
+                      setDraftConfig((current) => updateValueSection(current, nextRows))
+                    }}
+                  />
+                )}
           </div>
 
           <div

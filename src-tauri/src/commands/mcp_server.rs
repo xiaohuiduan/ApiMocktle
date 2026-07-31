@@ -13,9 +13,7 @@ pub struct McpServerStatus {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct McpServerConfig {
-    pub enabled: bool,
     pub port: u16,
-    pub auto_start: bool,
 }
 
 #[tauri::command]
@@ -79,24 +77,12 @@ pub async fn stop_mcp_server(
 pub async fn get_mcp_server_config(
     app_config: State<'_, Arc<crate::services::app_config::AppConfigService>>,
 ) -> Result<ApiResult<McpServerConfig>, String> {
-    let enabled = app_config
-        .get("mcp_enabled")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
     let port = app_config
         .get("mcp_port")
         .and_then(|v| v.as_u64())
         .unwrap_or(14203) as u16;
-    let auto_start = app_config
-        .get("mcp_auto_start")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
 
-    Ok(ApiResult::success(McpServerConfig {
-        enabled,
-        port,
-        auto_start,
-    }))
+    Ok(ApiResult::success(McpServerConfig { port }))
 }
 
 #[tauri::command]
@@ -104,9 +90,7 @@ pub async fn save_mcp_server_config(
     app_config: State<'_, Arc<crate::services::app_config::AppConfigService>>,
     config: McpServerConfig,
 ) -> Result<ApiResult<()>, String> {
-    app_config.set("mcp_enabled", serde_json::json!(config.enabled));
     app_config.set("mcp_port", serde_json::json!(config.port));
-    app_config.set("mcp_auto_start", serde_json::json!(config.auto_start));
 
     Ok(ApiResult::success(()))
 }

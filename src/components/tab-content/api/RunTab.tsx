@@ -316,10 +316,9 @@ export function RunTab() {
     return getPrimaryEnvironmentUrl(currentEnv)
   }, [currentEnv])
 
-  // 收集所有可用变量用于 {{var}} 自动补全和高亮（统一优先级：global/vault < env < sessionVars）
+  // 收集所有可用变量用于 {{var}} 自动补全和高亮（统一优先级：global < env < sessionVars）
   const { varMap } = useResolvedVarMap({
     globalVariables: projectEnvironmentConfig?.globalVariables,
-    vaultSecrets: projectEnvironmentConfig?.vaultSecrets,
     envVariables: currentEnv?.variables,
     sessionVars,
   })
@@ -443,10 +442,9 @@ export function RunTab() {
     if (!workCopy) return
 
     // 收集环境变量用于 {{var}} 替换
-    // 统一构建变量映射（global/vault < env < sessionVars）
+    // 统一构建变量映射（global < env < sessionVars）
     const { varMap, globalsMap, envMap } = buildVarMaps({
       globalVariables: projectEnvironmentConfig?.globalVariables,
-      vaultSecrets: projectEnvironmentConfig?.vaultSecrets,
       envVariables: currentEnv?.variables,
       sessionVars,
     })

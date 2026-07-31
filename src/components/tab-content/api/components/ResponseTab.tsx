@@ -6,7 +6,6 @@ import { nanoid } from 'nanoid'
 
 import { IconText } from '@/components/IconText'
 import { JsonSchemaCard } from '@/components/JsonSchemaCard'
-import { JsonViewer } from '@/components/JsonViewer'
 import { ModalNewResponse } from '@/components/tab-content/api/ModalNewResponse'
 import { useStyles } from '@/hooks/useStyle'
 import type { ApiDetails } from '@/types'
@@ -99,47 +98,6 @@ export function ResponseTab(props: ResponseTabProps) {
                 )}
 
                 <ResponseSchemaEditor idx={idx} />
-
-                <Form.Item noStyle dependencies={['responseExamples']}>
-                  {({ getFieldValue: getFieldValue2 }) => {
-                    const examples: ApiDetails['responseExamples'] = getFieldValue2(['responseExamples'])
-                    const targetExamples = examples?.filter(
-                      ({ responseId }) => responseId === resp.id,
-                    )
-
-                    if (Array.isArray(targetExamples) && targetExamples.length > 0) {
-                      return (
-                        <Tabs
-                          className={styles.tabWithBorder}
-                          items={targetExamples.map((it) => {
-                            const targetIdx = examples?.findIndex((itt) => itt.id === it.id)
-
-                            return {
-                              key: it.id,
-                              label: it.name,
-                              children:
-                                typeof targetIdx === 'number' && targetIdx !== -1
-                                  ? (
-                                      <div className="p-tabContent">
-                                        <Form.Item
-                                          noStyle
-                                          name={['responseExamples', targetIdx, 'data']}
-                                        >
-                                          <JsonViewer />
-                                        </Form.Item>
-                                      </div>
-                                    )
-                                  : null,
-                            }
-                          })}
-                          type="card"
-                        />
-                      )
-                    }
-
-                    return null
-                  }}
-                </Form.Item>
               </div>
             ),
           }

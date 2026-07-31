@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Button, Input, Select, Switch, Tabs, Tag, Typography, theme } from 'antd'
-import { GlobeIcon, KeyRoundIcon, PlusIcon, ShieldIcon, TrashIcon } from 'lucide-react'
+
+import { Button, Input, Select, Tabs, Tag, Typography, theme } from 'antd'
+import { GlobeIcon, KeyRoundIcon, PlusIcon, TrashIcon } from 'lucide-react'
 
 import { createEnvironmentBaseUrl, createEnvironmentValue } from '@/project-environment-utils'
 import {
   GLOBAL_PARAMETER_SECTIONS,
   type ApiEnvironment,
-  type ApiEnvironmentBaseUrl,
   type ApiEnvironmentGlobalParameterSection,
   type ApiEnvironmentValue,
   type ProjectEnvironmentConfig,
@@ -29,7 +29,7 @@ function serializeBaseUrl(protocol: 'http' | 'https', host: string): string {
   return h ? `${protocol}://${h}` : ''
 }
 
-export type GlobalSectionKey = 'globalVariables' | 'globalParameters' | 'vaultSecrets'
+export type GlobalSectionKey = 'globalVariables' | 'globalParameters'
 export type EnvironmentSectionKey = `environment:${string}`
 export type SectionKey = GlobalSectionKey | EnvironmentSectionKey
 export const GLOBAL_SECTION_ITEMS: Array<{
@@ -50,21 +50,8 @@ export const GLOBAL_SECTION_ITEMS: Array<{
     icon: <KeyRoundIcon size={14} />,
     description: '用于按 Header、Cookie、Query、Body 分类维护跨环境复用的请求参数。',
   },
-  {
-    key: 'vaultSecrets',
-    label: 'Vault Secrets（密钥库）',
-    icon: <ShieldIcon size={14} />,
-    description: '用于保存敏感值，当前按项目独立存储。',
-  },
 ]
-function updateBaseUrlRow(
-  list: ApiEnvironmentBaseUrl[],
-  targetId: string,
-  field: keyof ApiEnvironmentBaseUrl,
-  value: string,
-) {
-  return list.map((item) => (item.id === targetId ? { ...item, [field]: value } : item))
-}
+
 export function createEnvironmentKey(environmentId: string) {
   return `environment:${environmentId}` as EnvironmentSectionKey
 }
@@ -81,49 +68,6 @@ export function resolveEnvironment(config: ProjectEnvironmentConfig, key: Sectio
   return config.environments.find(({ id }) => id === key.slice('environment:'.length))
 }
 
-function FieldGrid(props: {
-  editable: boolean
-  title: string
-  description: string
-  headers: string[]
-  children: React.ReactNode
-  onAdd?: () => void
-}) {
-  const { token } = theme.useToken()
-  const { editable, title, description, headers, children, onAdd } = props
-
-  return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <Typography.Title level={5}>{title}</Typography.Title>
-          <Typography.Paragraph className="!mb-0" type="secondary">{description}</Typography.Paragraph>
-        </div>
-        {onAdd && (
-          <Button disabled={!editable} icon={<PlusIcon size={14} />} onClick={onAdd}>
-            添加
-          </Button>
-        )}
-      </div>
-
-      <div style={{ border: `1px solid ${token.colorBorderSecondary}`, borderRadius: token.borderRadiusLG }}>
-        <div className="grid" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
-          {headers.map((header, i) => (
-            <div
-              key={i}
-              className="px-3 py-2 text-sm"
-              style={{ borderBottom: `1px solid ${token.colorBorderSecondary}`, color: token.colorTextSecondary }}
-            >
-              {header}
-            </div>
-          ))}
-        </div>
-        {children}
-      </div>
-    </section>
-  )
-}
-
 export function EnvironmentEditor(props: {
   editable: boolean
   environment: ApiEnvironment
@@ -136,6 +80,12 @@ export function EnvironmentEditor(props: {
   const { editable, environment, onChange, onDelete, globalParameters, effectiveVarMap } = props
   const baseUrls = environment.baseUrls ?? []
   const variables = environment.variables ?? []
+  const primaryBaseUrl = baseUrls[0] ?? createEnvironmentBaseUrl()
+
+  const updatePrimaryUrl = (url: string) => {
+    const nextBaseUrls = baseUrls.length > 0 ? baseUrls : [createEnvironmentBaseUrl()]
+    onChange({ ...environment, baseUrls: [{ ...nextBaseUrls[0], url }, ...nextBaseUrls.slice(1)] })
+  }
 
   const [activeParamSection, setActiveParamSection] = useState<ApiEnvironmentGlobalParameterSection>(GLOBAL_PARAMETER_SECTIONS[0])
   const handleAddParam = (section: ApiEnvironmentGlobalParameterSection) => {
@@ -166,16 +116,6 @@ export function EnvironmentEditor(props: {
               onChange({ ...environment, name: event.target.value })
             }}
           />
-          <div className="flex items-center gap-3">
-            <Typography.Text>共享</Typography.Text>
-            <Switch
-              checked={environment.shared ?? true}
-              disabled={!editable}
-              onChange={(checked) => {
-                onChange({ ...environment, shared: checked })
-              }}
-            />
-          </div>
         </div>
         <Button danger disabled={!editable} icon={<TrashIcon size={14} />} onClick={onDelete}>
           删除环境
@@ -183,96 +123,49 @@ export function EnvironmentEditor(props: {
       </div>
 
       <Input
-            disabled={!editable}
-            placeholder="Mock Agent URL（如 http://localhost:19876）"
-            value={environment.agentUrl || ''}
-            onChange={(event) => {
-              onChange({ ...environment, agentUrl: event.target.value || undefined })
-            }}
-            addonBefore="Mock Agent"
-            allowClear
-          />
-
-      <FieldGrid
-        description="每个环境都可以维护多个模块的前置 URL，当前运行默认使用第一项。"
-        editable={editable}
-        headers={['模块', '前置 URL', '']}
-        title="前置 URL"
-        onAdd={() => {
-          onChange({ ...environment, baseUrls: [...baseUrls, createEnvironmentBaseUrl()] })
+        allowClear
+        addonBefore="Mock Agent"
+        disabled={!editable}
+        placeholder="Mock Agent URL（如 http://localhost:19876）"
+        value={environment.agentUrl ?? ''}
+        onChange={(event) => {
+          onChange({ ...environment, agentUrl: event.target.value || undefined })
         }}
-      >
-        {baseUrls.length === 0
-          ? (
-              <div className="px-3 py-6 text-center" style={{ color: token.colorTextSecondary }}>
-                当前还没有前置 URL，点击右上角“添加”创建模块。
-              </div>
-            )
-          : baseUrls.map((item, index) => (
-              <div
-                key={item.id}
-                className="grid"
-                style={{
-                  gridTemplateColumns: '220px minmax(0,1fr) 56px',
-                  borderBottom: index === baseUrls.length - 1 ? 'none' : `1px solid ${token.colorBorderSecondary}`,
-                }}
-              >
-                <Input
-                  variant="borderless"
-                  disabled={!editable}
-                  placeholder="默认模块"
-                  value={item.name}
-                  onChange={(event) => {
-                    onChange({ ...environment, baseUrls: updateBaseUrlRow(baseUrls, item.id, 'name', event.target.value) })
-                  }}
-                />
-                <div className="flex items-center gap-1">
-                  <Select
-                    disabled={!editable}
-                    size="small"
-                    style={{ width: 88, flexShrink: 0 }}
-                    value={parseBaseUrl(item.url).protocol}
-                    options={[
-                      { value: 'http', label: 'http://' },
-                      { value: 'https', label: 'https://' },
-                    ]}
-                    onChange={(protocol) => {
-                      onChange({
-                        ...environment,
-                        baseUrls: updateBaseUrlRow(baseUrls, item.id, 'url', serializeBaseUrl(protocol, parseBaseUrl(item.url).host)),
-                      })
-                    }}
-                  />
-                  <Input
-                    variant="borderless"
-                    disabled={!editable}
-                    placeholder="api.example.com"
-                    value={parseBaseUrl(item.url).host}
-                    onChange={(event) => {
-                      onChange({
-                        ...environment,
-                        baseUrls: updateBaseUrlRow(baseUrls, item.id, 'url', serializeBaseUrl(parseBaseUrl(item.url).protocol, event.target.value)),
-                      })
-                    }}
-                  />
-                </div>
-                <div className="flex items-center justify-center">
-                  <Button
-                    danger
-                    disabled={!editable}
-                    icon={<TrashIcon size={14} />}
-                    type="text"
-                    onClick={() => {
-                      onChange({ ...environment, baseUrls: baseUrls.filter(({ id }) => id !== item.id) })
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-      </FieldGrid>
+      />
+
+      <section className="space-y-3">
+        <div>
+          <Typography.Title level={5}>前置 URL</Typography.Title>
+          <Typography.Paragraph className="!mb-0" type="secondary">
+            环境的基础 URL，用于拼接接口地址。
+          </Typography.Paragraph>
+        </div>
+        <div className="flex items-center gap-1">
+          <Select
+            disabled={!editable}
+            style={{ width: 88, flexShrink: 0 }}
+            value={parseBaseUrl(primaryBaseUrl.url).protocol}
+            options={[
+              { value: 'http', label: 'http://' },
+              { value: 'https', label: 'https://' },
+            ]}
+            onChange={(protocol) => {
+              updatePrimaryUrl(serializeBaseUrl(protocol, parseBaseUrl(primaryBaseUrl.url).host))
+            }}
+          />
+          <Input
+            disabled={!editable}
+            placeholder="api.example.com"
+            value={parseBaseUrl(primaryBaseUrl.url).host}
+            onChange={(event) => {
+              updatePrimaryUrl(serializeBaseUrl(parseBaseUrl(primaryBaseUrl.url).protocol, event.target.value))
+            }}
+          />
+        </div>
+      </section>
 
       <ValueEditor
-        description="环境变量支持远程值和本地值，本地值优先，可用于本地调试覆盖。灰色列为实际生效值（会话变量 > 环境变量 > 全局/密钥）。"
+        description="环境变量支持远程值和本地值，本地值优先，可用于本地调试覆盖。灰色列为实际生效值（会话变量 > 环境变量 > 全局）。"
         editable={editable}
         rows={variables}
         title="环境变量"

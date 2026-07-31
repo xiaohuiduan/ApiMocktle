@@ -255,7 +255,6 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
 
     const { varMap } = buildVarMaps({
       globalVariables: projectEnvironmentConfig?.globalVariables,
-      vaultSecrets: projectEnvironmentConfig?.vaultSecrets,
       envVariables: currentEnv?.variables,
       sessionVars,
     })

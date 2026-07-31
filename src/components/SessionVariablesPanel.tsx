@@ -18,10 +18,7 @@ export function SessionVariablesPanel() {
   // 当前环境变量
   const currentEnv = projectEnvironmentConfig?.environments?.find(e => e.id === currentProjectEnvironmentId)
   const envVars = currentEnv?.variables?.filter(v => v.name && v.enable !== false) ?? []
-  const globalVars = [
-    ...(projectEnvironmentConfig?.globalVariables ?? []),
-    ...(projectEnvironmentConfig?.vaultSecrets ?? []),
-  ].filter(v => v.name && v.enable !== false)
+  const globalVars = (projectEnvironmentConfig?.globalVariables ?? []).filter(v => v.name && v.enable !== false)
 
   const sessionColumns = [
     {

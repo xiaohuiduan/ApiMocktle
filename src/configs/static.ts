@@ -3,9 +3,6 @@ import { ApiStatus, CatalogType, HttpMethod, ParamType } from '@/enums'
 /** 根目录 ID。 */
 export const ROOT_CATALOG = '_'
 
-/** 服务 ID： 继承自父级。 */
-export const SERVER_INHERIT = ''
-
 /** 有关 HTTP 方法的用于展示配置。 */
 export const HTTP_METHOD_CONFIG = {
   [HttpMethod.Get]: {

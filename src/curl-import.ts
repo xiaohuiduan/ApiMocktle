@@ -2,7 +2,6 @@ import { nanoid } from 'nanoid'
 
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { SchemaType, type JsonSchema } from '@/components/JsonSchema'
-import { SERVER_INHERIT } from '@/configs/static'
 import {
   buildExtraQueryPairs,
   extractHeaders,
@@ -226,7 +225,6 @@ export function convertCurlToApiMenuItem(curlText: string, options: ConvertCurlO
       path: url.pathname || '/',
       method,
       status: ApiStatus.Developing,
-      serverId: SERVER_INHERIT,
       serverUrl: url.origin,
       parameters: {
         query: parameters.query,

@@ -138,12 +138,12 @@ export default function NodeConfigDrawer() {
   const { sessionId } = useAuth()
 
   // 加载项目环境
-  const [environments, setEnvironments] = useState<Array<{ name: string; agentUrl?: string; baseUrls?: Array<{ url: string }> }>>([])
+  const [environments, setEnvironments] = useState<Array<{ name: string; agentUrl?: string; baseUrls?: Array<{ id: string; url: string }> }>>([])
   useEffect(() => {
     if (!sessionId || !projectId) return
     const fetchEnvs = async () => {
       try {
-        const result = await invoke<{ ok: boolean; data?: { environments: Array<{ name: string; agentUrl?: string; baseUrls?: Array<{ url: string }> }> } }>(
+        const result = await invoke<{ ok: boolean; data?: { environments: Array<{ name: string; agentUrl?: string; baseUrls?: Array<{ id: string; url: string }> }> } }>(
           'get_project_environments',
           { sessionId, projectId },
         )

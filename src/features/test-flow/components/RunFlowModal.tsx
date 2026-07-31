@@ -78,7 +78,7 @@ const NODE_TYPE_LABELS: Record<string, string> = {
 interface Environment {
   name: string
   url?: string
-  baseUrls?: Array<{ id: string; name: string; url: string }>
+  baseUrls?: Array<{ id: string; url: string }>
   variables?: Array<{ id: string; name: string; value?: string; enable?: boolean }>
   [key: string]: unknown
 }

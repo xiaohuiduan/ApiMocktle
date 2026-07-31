@@ -4,8 +4,7 @@ import { Button, Form, Input } from 'antd'
 
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { SelectorCatalog } from '@/components/SelectorCatalog'
-import { SelectorService } from '@/components/SelectorService'
-import { ROOT_CATALOG, SERVER_INHERIT } from '@/configs/static'
+import { ROOT_CATALOG } from '@/configs/static'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { MenuItemType } from '@/enums'
@@ -30,8 +29,6 @@ export function FolderSetting() {
       form.setFieldsValue({
         name: apiFolder.name,
         parentId: apiFolder.parentId ?? ROOT_CATALOG,
-        serverId: apiFolder.data?.serverId ?? SERVER_INHERIT,
-        description: apiFolder.data?.description,
       })
     }
   }, [form, apiFolder])
@@ -61,18 +58,6 @@ export function FolderSetting() {
             exclued={apiFolder?.id ? [apiFolder.id] : undefined}
             type={MenuItemType.ApiDetailFolder}
           />
-        </Form.Item>
-
-        <Form.Item
-          label="服务（前置URL）"
-          name="serverId"
-          tooltip="指定服务后，该目录下的所有接口，运行时都会使用该服务对应的 “前置 URL”（在环境里设置）。"
-        >
-          <SelectorService />
-        </Form.Item>
-
-        <Form.Item label="备注" name="description">
-          <Input.TextArea placeholder="如需展示在发布的文档中，请在“文档” Tab 里编辑" rows={4} />
         </Form.Item>
 
         <Form.Item wrapperCol={{ offset: 6 }}>

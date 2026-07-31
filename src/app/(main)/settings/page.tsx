@@ -11,7 +11,6 @@ import {
   Menu,
   type MenuProps,
   Space,
-  Switch,
   Tag,
   theme,
   Typography,
@@ -304,14 +303,12 @@ interface McpServerStatus {
 }
 
 interface McpServerConfig {
-  enabled: boolean
   port: number
-  auto_start: boolean
 }
 
 function McpServerPanel() {
   const [status, setStatus] = useState<McpServerStatus>({ running: false, port: 0 })
-  const [config, setConfig] = useState<McpServerConfig>({ enabled: false, port: 14203, auto_start: false })
+  const [config, setConfig] = useState<McpServerConfig>({ port: 14203 })
   const [loading, setLoading] = useState(false)
   const [msgApi, contextHolder] = message.useMessage()
 
@@ -458,12 +455,6 @@ function McpServerPanel() {
 
       <Card title="服务配置">
         <Form layout="vertical">
-          <Form.Item label="启用 MCP 服务">
-            <Switch
-              checked={config.enabled}
-              onChange={(checked) => setConfig({ ...config, enabled: checked })}
-            />
-          </Form.Item>
           <Form.Item label="端口号">
             <InputNumber
               value={config.port}
@@ -471,12 +462,6 @@ function McpServerPanel() {
               min={1024}
               max={65535}
               style={{ width: 200 }}
-            />
-          </Form.Item>
-          <Form.Item label="随应用启动">
-            <Switch
-              checked={config.auto_start}
-              onChange={(checked) => setConfig({ ...config, auto_start: checked })}
             />
           </Form.Item>
           <Form.Item>

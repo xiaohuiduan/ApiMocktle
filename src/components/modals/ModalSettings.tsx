@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { Viewer } from '@bytemd/react'
 import { create, useModal } from '@ebay/nice-modal-react'
-import { Button, Card, ConfigProvider, Form, InputNumber, Menu, type MenuProps, Modal, type ModalProps, Space, Switch, Tag, theme, Typography, message, Alert } from 'antd'
+import { Button, Card, ConfigProvider, Form, InputNumber, Menu, type MenuProps, Modal, type ModalProps, Space, Tag, theme, Typography, message, Alert } from 'antd'
 import { Copy, Globe, InfoIcon, Play, ShirtIcon, Zap } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -202,14 +202,12 @@ interface McpServerStatus {
 }
 
 interface McpServerConfig {
-  enabled: boolean
   port: number
-  auto_start: boolean
 }
 
 function McpServerSettings() {
   const [status, setStatus] = useState<McpServerStatus>({ running: false, port: 0 })
-  const [config, setConfig] = useState<McpServerConfig>({ enabled: false, port: 14203, auto_start: false })
+  const [config, setConfig] = useState<McpServerConfig>({ port: 14203 })
   const [loading, setLoading] = useState(false)
   const [msgApi, contextHolder] = message.useMessage()
 
@@ -358,12 +356,6 @@ function McpServerSettings() {
 
       <Card size="small" title="服务配置">
         <Form layout="vertical" size="small">
-          <Form.Item label="启用 MCP 服务">
-            <Switch
-              checked={config.enabled}
-              onChange={(checked) => setConfig({ ...config, enabled: checked })}
-            />
-          </Form.Item>
           <Form.Item label="端口号">
             <InputNumber
               value={config.port}
@@ -371,12 +363,6 @@ function McpServerSettings() {
               min={1024}
               max={65535}
               style={{ width: 150 }}
-            />
-          </Form.Item>
-          <Form.Item label="随应用启动">
-            <Switch
-              checked={config.auto_start}
-              onChange={(checked) => setConfig({ ...config, auto_start: checked })}
             />
           </Form.Item>
           <Form.Item>

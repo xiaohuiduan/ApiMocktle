@@ -404,7 +404,6 @@ pub fn get_project_state(
             global_parameters: serde_json::json!({}),
             legacy_global_parameters: vec![],
             global_variables: vec![],
-            vault_secrets: vec![],
             environments: vec![],
         });
 

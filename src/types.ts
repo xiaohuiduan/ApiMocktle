@@ -55,13 +55,6 @@ export interface ApiDetailsResponse {
   jsonSchema?: JsonSchema
 }
 
-interface ApiDetailsResponseExample {
-  id: string
-  responseId: ApiDetailsResponse['id']
-  name: string
-  data: string
-}
-
 export interface ApiRequestBody {
   type: BodyType
   parameters?: Parameter[]
@@ -88,7 +81,6 @@ export type ApiEnvironmentGlobalParameters = Record<ApiEnvironmentGlobalParamete
 
 export interface ApiEnvironmentBaseUrl {
   id: string
-  name: string
   url: string
 }
 
@@ -96,7 +88,6 @@ export interface ApiEnvironment {
   id: string
   name: string
   url: string
-  shared?: boolean
   baseUrls?: ApiEnvironmentBaseUrl[]
   variables?: ApiEnvironmentValue[]
   parameters?: ApiEnvironmentGlobalParameters
@@ -107,7 +98,6 @@ export interface ProjectEnvironmentConfig {
   globalVariables: ApiEnvironmentValue[]
   globalParameters: ApiEnvironmentGlobalParameters
   legacyGlobalParameters?: ApiEnvironmentValue[]
-  vaultSecrets: ApiEnvironmentValue[]
   environments: ApiEnvironment[]
 }
 
@@ -195,8 +185,6 @@ export interface ApiDetails {
   creatorId?: string
   /** 接口标签 */
   tags?: string[]
-  /** 前置 URL 选择 */
-  serverId?: string
   /** 接口前置 URL */
   serverUrl?: string
   /** 接口说明 */
@@ -212,8 +200,6 @@ export interface ApiDetails {
   requestBody?: ApiRequestBody
   /** 返回响应 */
   responses?: ApiDetailsResponse[]
-  /** 响应示例 */
-  responseExamples?: ApiDetailsResponseExample[]
   /** 接口文档创建时间 */
   createdAt?: string
   /** 接口文档更新时间 */
@@ -226,8 +212,6 @@ export interface ApiDetails {
 
 /** RunTab 运行时信息 */
 export interface RunTabInfo {
-  /** 运行时选择的环境 ID */
-  serverId?: string
   /** 运行时修改的参数 */
   parameters?: {
     cookie?: Parameter[]
@@ -301,10 +285,6 @@ export interface ApiSchema {
 export interface ApiFolder {
   name: string
   parentId?: ApiMenuBase['id']
-  serverId?: string
-  serverUrl?: string
-  /** 文件夹备注。 */
-  description?: string
 }
 
 export interface RecycleDataItem {
