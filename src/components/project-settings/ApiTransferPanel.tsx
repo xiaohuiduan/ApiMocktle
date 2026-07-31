@@ -463,12 +463,12 @@ export function ApiTransferPanel() {
                 checkedKeys={Array.from(checkedApiIds)}
                 defaultExpandAll
                 treeData={apiTreeData}
-                onCheck={(_keys, info) => {
-                  // Filter to only leaf node keys (ApiDetail items)
-                  const leafKeys = info.checkedNodes
-                    .filter((n) => n.isLeaf)
-                    .map((n) => n.key as string)
-                  setCheckedApiIds(new Set(leafKeys))
+                onCheck={(checkedKeys) => {
+                  // 文件夹节点 checkable=false，不会进入 checkedKeys，这里只会拿到接口叶子 key
+                  const keys = Array.isArray(checkedKeys)
+                    ? checkedKeys
+                    : checkedKeys.checked
+                  setCheckedApiIds(new Set(keys as string[]))
                 }}
               />
             )
