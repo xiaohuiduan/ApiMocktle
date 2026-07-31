@@ -20,6 +20,13 @@ export interface StoredDraft {
 const getDraftsKey = (projectId: string) => `project-drafts:${projectId}`
 
 /**
+ * 新建草稿的默认名称集合。
+ * 仅带这些默认名（快捷请求 / 接口的初始名与保存兜底名）视为“未命名”，不计入非空判定；
+ * 用户改成其它名称即视为有意义的编辑。
+ */
+const DEFAULT_DRAFT_NAMES = new Set(['新建接口', '未命名接口', '新建快捷请求', '快捷请求'])
+
+/**
  * 已被“显式删除草稿”的新建草稿 id 墓碑集合。
  *
  * 用于解决时序竞态：删除草稿会同时关闭其页签，导致对应编辑组件卸载，
@@ -138,8 +145,11 @@ export function mergeDraftsIntoList(
 }
 
 /**
- * 判断一条快捷请求草稿是否“为空”（新建后未做任何有意义的编辑）。
+ * 判断一条草稿（快捷请求或接口）是否“为空”（新建后未做任何有意义的编辑）。
  * 空草稿在关闭其 tab 时自动丢弃，避免堆积垃圾。
+ *
+ * 接口草稿默认自带一条 200 空响应，此默认响应基线不计入“非空”；
+ * 只有响应被改动（新增第二条、或默认响应填了 schema/改了状态码/改了名称）才算非空。
  */
 export function isDraftEmpty(item: ApiMenuData): boolean {
   const data = item.data as ApiDetails | undefined
@@ -147,6 +157,10 @@ export function isDraftEmpty(item: ApiMenuData): boolean {
   if (!data) {
     return true
   }
+
+  const trimmedName = data.name?.trim()
+  const hasName = Boolean(trimmedName) && !DEFAULT_DRAFT_NAMES.has(trimmedName!)
+  const hasDescription = Boolean(data.description?.trim())
 
   const hasPath = Boolean(data.path?.trim())
   const isDefaultMethod = data.method.toUpperCase() === 'GET'
@@ -177,7 +191,30 @@ export function isDraftEmpty(item: ApiMenuData): boolean {
     }
   }
 
+  const responses = data.responses ?? []
+  let hasResponses = false
+
+  if (responses.length > 1) {
+    hasResponses = true
+  }
+  else if (responses.length === 1) {
+    const [res] = responses
+    const props = (res.jsonSchema as { properties?: unknown[] } | undefined)?.properties
+    const resName = res.name.trim()
+    const nameChanged = Boolean(resName) && resName !== '成功'
+    hasResponses = res.code !== 200 || nameChanged || Boolean(props?.length)
+  }
+
   const hasScripts = Boolean(data.preScript?.trim()) || Boolean(data.postScript?.trim())
 
-  return !hasPath && isDefaultMethod && !hasParams && !hasBody && !hasScripts
+  return (
+    !hasName
+    && !hasDescription
+    && !hasPath
+    && isDefaultMethod
+    && !hasParams
+    && !hasBody
+    && !hasResponses
+    && !hasScripts
+  )
 }

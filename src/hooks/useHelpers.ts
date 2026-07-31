@@ -6,6 +6,7 @@ import type { ApiTabItem } from '@/components/ApiTab/ApiTab.type'
 import { API_MENU_CONFIG } from '@/configs/static'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
+import { initialCreateApiDetailsData } from '@/data/remote'
 import { BodyType, CatalogType, MenuItemType } from '@/enums'
 import type { ApiDetails } from '@/types'
 
@@ -40,16 +41,27 @@ export function useHelpers() {
     config?: { autoActive?: boolean; replaceTab?: ApiTabItem['key'] }
   ) => {
     const { newLabel } = API_MENU_CONFIG[CatalogType.Http]
+    // 用同一个 id 作为 tab key / 草稿 id / 将来入库的 DB id，保证全程一致。
+    const id = nanoid(6)
+
+    // 新建即写入草稿，使其立即出现在左侧树（带红 *），并在切换项目后可恢复。
+    const draftItem = {
+      id,
+      name: newLabel,
+      type: MenuItemType.ApiDetail,
+      data: { ...initialCreateApiDetailsData, id, name: newLabel },
+    } as ApiMenuData
+    saveDraft(draftItem, true)
 
     addTabItem(
       {
         ...payload,
-        key: nanoid(6),
+        key: id,
         label: newLabel,
         contentType: MenuItemType.ApiDetail,
         data: { tabStatus: PageTabStatus.Create },
       },
-      config
+      { autoActive: true, ...config }
     )
   }
 

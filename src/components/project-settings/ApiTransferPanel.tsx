@@ -171,6 +171,24 @@ export function ApiTransferPanel() {
     }
   }
 
+  const handleExportSwagger = async () => {
+    if (!projectId || !sessionId) {
+      msgApi.error('请在项目页面执行导出')
+      return
+    }
+
+    try {
+      const payload = await api<{ content: string, format: string }>('export_openapi', {
+        sessionId,
+        projectId,
+        format: 'swagger',
+      })
+      await saveExportFile('swagger', 'json', payload.content)
+    } catch (err) {
+      msgApi.error((err as Error).message)
+    }
+  }
+
   const handleImport = async (file: File) => {
     if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导入')
@@ -374,7 +392,7 @@ export function ApiTransferPanel() {
               <Button
                 size="small"
                 onClick={() => {
-                  void handleExport('json').catch(() => {})
+                  void handleExportSwagger()
                 }}
               >
                 导出 JSON
