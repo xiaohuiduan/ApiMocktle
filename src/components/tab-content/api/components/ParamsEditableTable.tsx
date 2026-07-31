@@ -30,6 +30,7 @@ interface ParamsEditableTableProps extends Pick<EditableTableProps, 'autoNewRow'
   onChange?: (value: ParamsEditableTableProps['value']) => void
   removable?: boolean
   isPathParamsTable?: boolean
+  showRequiredColumn?: boolean
   varMap?: Map<string, string>
   exampleColumnTitle?: string
 }
@@ -43,6 +44,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     isPathParamsTable = false,
     autoNewRow = !isPathParamsTable,
     removable = true,
+    showRequiredColumn = true,
     varMap,
     exampleColumnTitle = '请求值',
   } = props
@@ -246,26 +248,30 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
         )
       },
     },
-    {
-      title: '必填',
-      dataIndex: 'required',
-      width: 60,
-      render: (required, record, ridx) => {
-        return (
-          <ParamsEditableCell>
-            <div className="flex items-center justify-center size-full">
-              <Switch
-                checked={!!required}
-                size="small"
-                onChange={(checked) => {
-                  handleChange(ridx, { required: checked })
-                }}
-              />
-            </div>
-          </ParamsEditableCell>
-        )
-      },
-    },
+    ...(showRequiredColumn
+      ? [
+          {
+            title: '必填',
+            dataIndex: 'required',
+            width: 60,
+            render: (required: boolean, record: Parameter, ridx: number) => {
+              return (
+                <ParamsEditableCell>
+                  <div className="flex items-center justify-center size-full">
+                    <Switch
+                      checked={!!required}
+                      size="small"
+                      onChange={(checked) => {
+                        handleChange(ridx, { required: checked })
+                      }}
+                    />
+                  </div>
+                </ParamsEditableCell>
+              )
+            },
+          },
+        ]
+      : []),
     {title: exampleColumnTitle,
       dataIndex: 'example',
       width: 180,

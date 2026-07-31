@@ -207,6 +207,7 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
       )}
 
       <ParamsEditableTable
+        showRequiredColumn={false}
         varMap={varMap}
         exampleColumnTitle={exampleColumnTitle}
         value={getParamsByType()}
@@ -220,6 +221,7 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
           </div>
           <ParamsEditableTable
             isPathParamsTable
+            showRequiredColumn={false}
             autoNewRow={false}
             removable={false}
             exampleColumnTitle={exampleColumnTitle}
