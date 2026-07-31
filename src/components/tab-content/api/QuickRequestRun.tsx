@@ -34,6 +34,7 @@ import type { ApiDetails, RunTabInfo, Parameter } from '@/types'
 import { useApiRequestRunner } from './useApiRequestRunner'
 import { buildRequest } from './buildRequest'
 import { generateCurl } from './curl'
+import { buildJsoncBodyFillText } from './bodyJsonc'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
 import { HistoryPanel } from './components/HistoryPanel'
@@ -125,6 +126,7 @@ export function QuickRequestRun() {
   })
 
   const [bodyRawText, setBodyRawText] = useState<string | undefined>(undefined)
+  const [fillWithComments, setFillWithComments] = useState(true)
   const [saving, setSaving] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
@@ -419,7 +421,9 @@ export function QuickRequestRun() {
   useCtrlSave(handleSave, activeTabKey === tabData.key)
 
   const handleFillBody = () => {
-    const text = buildBodyFillText(workCopy, menuRawList)
+    const text = fillWithComments
+      ? buildJsoncBodyFillText(workCopy, menuRawList)
+      : buildBodyFillText(workCopy, menuRawList)
     setBodyRawText(text)
   }
 
@@ -606,6 +610,8 @@ export function QuickRequestRun() {
                       requestBody: { ...(prev.requestBody || { type: BodyType.None }), parameters: parameters as Parameter[] },
                     }))}
                     onFillBody={handleFillBody}
+                    fillWithComments={fillWithComments}
+                    onFillWithCommentsChange={setFillWithComments}
                     buildBodyExample={() => buildBodyExample(workCopy, menuRawList)}
                   />
                 ),

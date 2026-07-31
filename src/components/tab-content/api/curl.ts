@@ -1,4 +1,5 @@
 import { BodyType } from '@/enums'
+import { stripJsonComments } from './bodyJsonc'
 
 export interface CurlParam {
   name?: string
@@ -93,10 +94,14 @@ export function generateCurl(input: CurlInput): CurlOutput {
   const bodyType = body?.type
 
   if (bodyType === BodyType.Json || bodyType === BodyType.Xml || bodyType === BodyType.Raw) {
-    const raw = body?.rawText?.trim()
-    if (raw) {
+    // JSON 允许注释，cURL 输出前剥离，避免复制出的命令带注释失效
+    const raw = body?.rawText
+    const payload = bodyType === BodyType.Json
+      ? stripJsonComments(raw ?? '').trim()
+      : (raw ?? '').trim()
+    if (payload) {
       args.push('-H', quoteSingle(`Content-Type: ${contentTypeForBody(bodyType)}`))
-      args.push('-d', quoteSingle(raw))
+      args.push('-d', quoteSingle(payload))
     }
   } else if (bodyType === BodyType.UrlEncoded) {
     const pairs = enabledParams(body?.parameters)

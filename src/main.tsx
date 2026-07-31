@@ -12,6 +12,16 @@ import { SessionVariablesProvider } from '@/contexts/session-variables'
 // Monaco Editor 本地加载（离线可用）
 loader.config({ paths: { vs: '/monaco-editor/vs' } })
 
+// JSON 编辑器允许注释（JSONC），发送请求前会自动剥离
+void loader.init().then((monaco) => {
+  monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+    validate: true,
+    allowComments: true,
+    comments: 'ignore',
+    trailingCommas: 'error',
+  })
+})
+
 import { appRoutes } from './routes'
 
 import '@/styles/globals.css'

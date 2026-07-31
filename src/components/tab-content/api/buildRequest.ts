@@ -1,5 +1,6 @@
 import { BodyType } from '@/enums'
 import type { ApiDetails } from '@/types'
+import { stripJsonComments } from './bodyJsonc'
 
 export interface BuildRequestParam {
   name?: string
@@ -92,7 +93,8 @@ export function buildRequest(ctx: BuildRequestContext): BuildRequestResult {
   if (body && body.type !== BodyType.None) {
     if (body.type === BodyType.Json || body.type === BodyType.Xml || body.type === BodyType.Raw) {
       const raw = body.rawText ?? buildBodyExample(apiDetails, menuRawList)
-      bodyText = resolveVars(raw)
+      // JSON 允许编辑器内写注释，发送前剥离，保证服务器收到标准 JSON
+      bodyText = body.type === BodyType.Json ? stripJsonComments(resolveVars(raw)) : resolveVars(raw)
       contentType = body.type === BodyType.Xml ? 'application/xml'
         : body.type === BodyType.Raw ? 'text/plain'
         : 'application/json'

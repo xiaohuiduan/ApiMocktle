@@ -42,6 +42,7 @@ import { ScriptsPanel } from './params/ScriptsPanel'
 import { useApiRequestRunner } from './useApiRequestRunner'
 import { buildRequest } from './buildRequest'
 import { generateCurl } from './curl'
+import { buildJsoncBodyFillText } from './bodyJsonc'
 import { useResolvedVarMap, buildVarMaps, makeResolveVars } from './useResolvedVarMap'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
@@ -240,6 +241,7 @@ export function RunTab() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [resetCounter, setResetCounter] = useState(0)
   const [historyLoaded, setHistoryLoaded] = useState(0)
+  const [fillWithComments, setFillWithComments] = useState(true)
 
   // 智能默认 tab：根据 HTTP 方法选择
   const getDefaultActiveTab = useCallback(() => {
@@ -575,7 +577,9 @@ export function RunTab() {
   // 一键填充 Body
   const handleFillBody = () => {
     if (!workCopy) return
-    const text = buildBodyFillText(workCopy, menuRawList)
+    const text = fillWithComments
+      ? buildJsoncBodyFillText(workCopy, menuRawList)
+      : buildBodyFillText(workCopy, menuRawList)
     const next = {
       ...workCopy,
       requestBody: { ...workCopy.requestBody!, rawText: text },
@@ -857,6 +861,8 @@ export function RunTab() {
                       persist(next)
                     }}
                     onFillBody={handleFillBody}
+                    fillWithComments={fillWithComments}
+                    onFillWithCommentsChange={setFillWithComments}
                     buildBodyExample={() => buildBodyExample(workCopy, menuRawList)}
                   />
                 ),

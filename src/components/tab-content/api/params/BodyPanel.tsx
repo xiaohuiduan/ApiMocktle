@@ -1,4 +1,4 @@
-import { Button, Tag, Typography, theme } from 'antd'
+import { Button, Switch, Tag, Typography, theme } from 'antd'
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
 import { BodyType } from '@/enums'
@@ -21,6 +21,8 @@ interface BodyPanelProps {
   onBodyRawTextChange?: (text: string) => void
   onBodyParametersChange?: (params: ApiEnvironmentValue[]) => void
   onFillBody?: () => void
+  fillWithComments?: boolean
+  onFillWithCommentsChange?: (value: boolean) => void
   buildBodyExample?: () => string
 }
 
@@ -32,6 +34,8 @@ export function BodyPanel(props: BodyPanelProps) {
     onBodyRawTextChange,
     onBodyParametersChange,
     onFillBody,
+    fillWithComments = true,
+    onFillWithCommentsChange,
     buildBodyExample,
   } = props
 
@@ -87,7 +91,15 @@ export function BodyPanel(props: BodyPanelProps) {
           })}
           </div>
           {showFillButton && onFillBody && (
-            <Button size="small" className="shrink-0" onClick={onFillBody}>一键填充</Button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Switch
+                checked={fillWithComments}
+                size="small"
+                onChange={onFillWithCommentsChange}
+              />
+              <span className="text-xs" style={{ color: token.colorTextSecondary }}>注释</span>
+              <Button size="small" onClick={onFillBody}>一键填充</Button>
+            </div>
           )}
         </div>
       </div>
