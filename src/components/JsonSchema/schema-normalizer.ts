@@ -216,13 +216,14 @@ function resolveRef(
   return schema
 }
 
-export function getTypeLabel(node: JsonSchema): string {
+export function getTypeLabel(node?: JsonSchema): string {
+  if (!node) return 'unknown'
   if (node.type === SchemaType.Array) {
     const itemType = getTypeLabel(node.items)
     return `array<${itemType}>`
   }
   if (node.type === SchemaType.Refer) return extractRefName(node.$ref)
-  return node.type
+  return node.type ?? 'unknown'
 }
 
 export function buildSchemaRows(

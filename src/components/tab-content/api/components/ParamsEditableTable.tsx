@@ -149,7 +149,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     {
       title: '参数名',
       dataIndex: 'name',
-      width: '25%',
+      width: 160,
       render: (text, record, ridx) => {
         const isNewRow = testIsNewRow(record)
 
@@ -246,9 +246,29 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
         )
       },
     },
+    {
+      title: '必填',
+      dataIndex: 'required',
+      width: 60,
+      render: (required, record, ridx) => {
+        return (
+          <ParamsEditableCell>
+            <div className="flex items-center justify-center size-full">
+              <Switch
+                checked={!!required}
+                size="small"
+                onChange={(checked) => {
+                  handleChange(ridx, { required: checked })
+                }}
+              />
+            </div>
+          </ParamsEditableCell>
+        )
+      },
+    },
     {title: exampleColumnTitle,
       dataIndex: 'example',
-      width: '25%',
+      width: 180,
       render: (exampleVal, record, ridx) => {
         if (record.type === ParamType.Array) {
           const example: string[]
@@ -355,7 +375,6 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     {
       title: '说明',
       dataIndex: 'description',
-      width: '40%',
       render: (text, _, ridx) => {
         return (
           <ParamsEditableCell className="py-0">

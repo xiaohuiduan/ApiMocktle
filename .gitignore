@@ -81,3 +81,4 @@ plans/**
 /BODY_EDITOR_BUG_FIX.md
 .trellis
 .qoder
+.pnpm-store/v11/index.db

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { CaretRightOutlined } from '@ant-design/icons'
-import { Input, Tooltip } from 'antd'
+import { Input, Switch, Tooltip } from 'antd'
 import { omit } from 'lodash-es'
 import { CirclePlusIcon } from 'lucide-react'
 
@@ -141,7 +141,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
 
         name: css(
           {
-            flex: '1 1 263px',
+            flex: '0 1 180px',
             position: 'relative',
             display: 'flex',
             flexDirection: 'row',
@@ -185,8 +185,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
 
         title: css(
           {
-            flex: '1 0 36px',
-            maxWith: '108px',
+            flex: '0 1 120px',
             display: 'flex',
             alignItems: 'center',
             color: 'inherit',
@@ -196,7 +195,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
 
         description: css(
           {
-            flex: '1 0 54px',
+            flex: '1 1 280px',
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
@@ -204,6 +203,17 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
             color: 'inherit',
           },
           { label: 'desc' },
+        ),
+
+        required: css(
+          {
+            flex: '0 0 60px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'inherit',
+          },
+          { label: 'required' },
         ),
 
         actions: css(
@@ -387,17 +397,6 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
         />
       </div>
 
-      <div className={`${styles.row.col} ${styles.row.description} ${styles.row.colHover}`}>
-        <Input
-          disabled={disabled}
-          placeholder="说明"
-          value={description ?? ''}
-          onChange={(ev) => {
-            triggerChange?.({ ...value, description: ev.target.value })
-          }}
-        />
-      </div>
-
       <div className={`${styles.row.col} ${styles.row.title} ${styles.row.colHover}`}>
         <Input
           disabled={disabled}
@@ -405,6 +404,34 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
           value={typeof example === 'string' ? example : (example != null ? JSON.stringify(example) : '')}
           onChange={(ev) => {
             triggerChange?.({ ...value, example: ev.target.value })
+          }}
+        />
+      </div>
+
+      <div className={`${styles.row.col} ${styles.row.required}`}>
+        {readOnly
+          ? (
+              <span style={{ fontSize: 12 }}>{value.required ? '必填' : '可选'}</span>
+            )
+          : (
+              <Switch
+                checked={!!value.required}
+                disabled={disabled || isRoot || isItems}
+                size="small"
+                onChange={(checked) => {
+                  triggerChange?.({ ...value, required: checked })
+                }}
+              />
+            )}
+      </div>
+
+      <div className={`${styles.row.col} ${styles.row.description} ${styles.row.colHover}`}>
+        <Input
+          disabled={disabled}
+          placeholder="说明"
+          value={description ?? ''}
+          onChange={(ev) => {
+            triggerChange?.({ ...value, description: ev.target.value })
           }}
         />
       </div>

@@ -2,10 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { theme } from 'antd'
 import { produce } from 'immer'
 import { get, set } from 'lodash-es'
 
-import { defaultFieldData, KEY_ITEMS, KEY_PROPERTIES, SchemaType } from './constants'
+import { css } from '@emotion/css'
+
+import { columnHeight, defaultFieldData, KEY_ITEMS, KEY_PROPERTIES, SchemaType } from './constants'
 import { JsonSchemaContextProvider } from './JsonSchema.context'
 import type { ArraySchema, ColumnType, FieldPath, JsonSchema } from './JsonSchema.type'
 import { JsonSchemaNode, type JsonSchemaNodeProps } from './JsonSchemaNode'
@@ -22,6 +25,8 @@ export interface JsonSchemaEditorProps extends Pick<JsonSchemaNodeProps, 'value'
 }
 
 export function JsonSchemaEditor(props: JsonSchemaEditorProps) {
+  const { token } = theme.useToken()
+
   const {
     defaultExpandAll = false,
     defaultValue,
@@ -123,6 +128,32 @@ export function JsonSchemaEditor(props: JsonSchemaEditorProps) {
         },
       }}
     >
+      <div
+        className={css({
+          display: 'flex',
+          height: columnHeight,
+          alignItems: 'center',
+          fontSize: '12px',
+          color: token.colorTextSecondary,
+          borderBottom: `1px solid ${token.colorFillQuaternary}`,
+
+          '> span': {
+            margin: '0 3px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          },
+        })}
+      >
+        <span style={{ flex: '0 1 180px' }}>字段名</span>
+        <span style={{ flex: '0 1 182px' }}>类型</span>
+        <span style={{ flex: '0 1 120px' }}>中文名</span>
+        <span style={{ flex: '0 1 120px' }}>示例值</span>
+        <span style={{ flex: '0 0 60px', textAlign: 'center' }}>必填</span>
+        <span style={{ flex: '1 1 280px' }}>说明</span>
+        <span style={{ flex: '0 0 48px' }} />
+      </div>
+
       <JsonSchemaNode
         {...restRenderProps}
         value={value}

@@ -362,7 +362,7 @@ export function ApiDoc() {
 
         '.schema-table-head, .schema-row': {
           display: 'grid',
-          gridTemplateColumns: '2.2fr 1.3fr 0.8fr 2fr',
+          gridTemplateColumns: 'max-content max-content max-content minmax(0, 1fr)',
           gap: token.paddingXS,
           padding: `${token.paddingXXS}px ${token.paddingSM}px`,
           alignItems: 'center',
