@@ -26,7 +26,6 @@ import { api } from '@/api-client'
 import { useAuth } from '@/contexts/auth'
 import { ProjectEnvironmentsPanel } from '@/components/project-settings/ProjectEnvironmentsPanel'
 import { ApiTransferPanel } from '@/components/project-settings/ApiTransferPanel'
-import { ExportPanel } from '@/components/project-settings/ExportPanel'
 import {
   ProjectMembersSection,
   type MemberItem,
@@ -41,7 +40,6 @@ const enum SettingsSectionKey {
   Members = 'members',
   Environments = 'environments',
   ImportApi = 'import-api',
-  ShareApi = 'share-api',
   McpServer = 'mcp-server',
 }
 
@@ -82,19 +80,6 @@ const items: MenuItem[] = [
     key: 'g3',
     label: (
       <div className="flex items-center gap-2">
-        <LayersIcon size={16} />
-        协同共享
-      </div>
-    ),
-    type: 'group',
-    children: [
-      { key: SettingsSectionKey.ShareApi, label: '接口分享' },
-    ],
-  },
-  {
-    key: 'g4',
-    label: (
-      <div className="flex items-center gap-2">
         <Play size={16} />
         MCP 服务
       </div>
@@ -118,13 +103,6 @@ function sectionMeta(section: SettingsSectionKey) {
     return {
       title: '环境管理',
       description: '统一维护项目环境、前置 URL、全局变量与密钥。',
-    }
-  }
-
-  if (section === SettingsSectionKey.ShareApi) {
-    return {
-      title: '接口分享',
-      description: '选择接口导出为 MARKDOWN 文档，可离线查看完整的 API 接口文档。',
     }
   }
 
@@ -169,10 +147,6 @@ export default function SettingsPage() {
 
     if (section === SettingsSectionKey.ImportApi) {
       return SettingsSectionKey.ImportApi
-    }
-
-    if (section === SettingsSectionKey.ShareApi) {
-      return SettingsSectionKey.ShareApi
     }
 
     return SettingsSectionKey.Members
@@ -240,11 +214,6 @@ export default function SettingsPage() {
 
     if (section === SettingsSectionKey.ImportApi) {
       setSelectedSection(SettingsSectionKey.ImportApi)
-      return
-    }
-
-    if (section === SettingsSectionKey.ShareApi) {
-      setSelectedSection(SettingsSectionKey.ShareApi)
       return
     }
 
@@ -316,11 +285,7 @@ export default function SettingsPage() {
                 ? (
                 <ApiTransferPanel />
                   )
-                : selectedSection === SettingsSectionKey.ShareApi
-                  ? (
-                      <ExportPanel projectId={projectId} />
-                    )
-                  : selectedSection === SettingsSectionKey.McpServer
+                : selectedSection === SettingsSectionKey.McpServer
                     ? (
                         <McpServerPanel />
                       )

@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/auth'
 import { MenuItemType } from '@/enums'
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { type ProjectStateSnapshot, useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { ExportPanel } from '@/components/project-settings/ExportPanel'
 
 function resolveProjectId(pathname: string) {
   const parts = pathname.split('/').filter(Boolean)
@@ -386,6 +387,17 @@ export function ApiTransferPanel() {
             </Button>
           </div>
         </div>
+      </section>
+
+      <section
+        className="rounded-xl border border-solid p-5"
+        style={{ borderColor: token.colorBorderSecondary }}
+      >
+        <Typography.Title level={5}>导出 Markdown 文档</Typography.Title>
+        <Typography.Paragraph className="!mb-4" type="secondary">
+          选择接口导出为 Markdown 文档，可离线查看完整的 API 接口文档。
+        </Typography.Paragraph>
+        <ExportPanel projectId={projectId} />
       </section>
 
       <Modal

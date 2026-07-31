@@ -33,6 +33,7 @@ import type { ApiDetails, RunTabInfo, Parameter } from '@/types'
 
 import { useApiRequestRunner } from './useApiRequestRunner'
 import { buildRequest } from './buildRequest'
+import { generateCurl } from './curl'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
 import { HistoryPanel } from './components/HistoryPanel'
@@ -637,25 +638,32 @@ export function QuickRequestRun() {
             onRetry={handleRun}
             menuItemId={isCreating ? undefined : tabData.key}
             curlContent={(() => {
-              const qPath = workCopy.path ?? '/'
-              const qQuery = (workCopy.parameters?.query ?? [])
-                .filter(p => p.name && p.enable !== false)
-                .map(p => `${encodeURIComponent(p.name as string)}=${encodeURIComponent(String(p.example ?? ''))}`)
-                .join('&')
-              const url = qQuery ? `${qPath}${qPath.includes('?') ? '&' : '?'}${qQuery}` : qPath
-              const method = workCopy.method ?? DEFAULT_METHOD
+              const { linux, windows } = generateCurl({
+                method: workCopy.method ?? DEFAULT_METHOD,
+                url: workCopy.path ?? '/',
+                headers: workCopy.parameters?.header ?? [],
+                query: workCopy.parameters?.query ?? [],
+                cookie: workCopy.parameters?.cookie ?? [],
+                body: workCopy.requestBody
+                  ? {
+                      type: workCopy.requestBody.type,
+                      rawText: bodyRawText ?? workCopy.requestBody.rawText,
+                      parameters: workCopy.requestBody.parameters ?? [],
+                    }
+                  : undefined,
+              })
               return (
                 <div className="flex flex-col gap-3">
                   <div>
                     <Typography.Text strong className="mb-1 block text-xs">Windows</Typography.Text>
                     <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                      {`curl -X ${method} "${url}"`}
+                      {windows}
                     </pre>
                   </div>
                   <div>
                     <Typography.Text strong className="mb-1 block text-xs">Linux / macOS</Typography.Text>
                     <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                      {`curl -X ${method} '${url}'`}
+                      {linux}
                     </pre>
                   </div>
                 </div>

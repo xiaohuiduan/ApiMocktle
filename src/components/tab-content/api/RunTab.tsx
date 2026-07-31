@@ -41,6 +41,7 @@ import { BodyPanel } from './params/BodyPanel'
 import { ScriptsPanel } from './params/ScriptsPanel'
 import { useApiRequestRunner } from './useApiRequestRunner'
 import { buildRequest } from './buildRequest'
+import { generateCurl } from './curl'
 import { useResolvedVarMap, buildVarMaps, makeResolveVars } from './useResolvedVarMap'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
@@ -116,7 +117,6 @@ function mergeRunTabInfo(docValue: ApiDetails, runTabInfo: RunTabInfo): ApiDetai
   const hasBodyChanges = runTabInfo.bodyType !== undefined || runTabInfo.bodyParameters !== undefined || runTabInfo.bodyRawText !== undefined
   return {
     ...base,
-    serverId: runTabInfo.serverId ?? base.serverId,
     parameters: runTabInfo.parameters ?? base.parameters,
     requestBody: hasBodyChanges
       ? {
@@ -128,59 +128,6 @@ function mergeRunTabInfo(docValue: ApiDetails, runTabInfo: RunTabInfo): ApiDetai
     preScript: runTabInfo.preScript ?? base.preScript,
     postScript: runTabInfo.postScript ?? base.postScript,
   }
-}
-
-function generateCurl(apiDetails: ApiDetails, fullUrl: string): { windows: string, linux: string } {
-  const method = (apiDetails.method ?? 'GET').toUpperCase()
-  const headers: string[] = []
-  const queryParams: string[] = []
-  const cookiePairs: string[] = []
-
-  apiDetails.parameters?.header?.forEach((h) => {
-    if (h.name && h.enable !== false) {
-      headers.push(`-H "${h.name}: ${String(h.example ?? '')}"`)
-    }
-  })
-
-  apiDetails.parameters?.query?.forEach((q) => {
-    if (q.name && q.enable !== false) {
-      queryParams.push(`${encodeURIComponent(q.name)}=${encodeURIComponent(String(q.example ?? ''))}`)
-    }
-  })
-
-  apiDetails.parameters?.cookie?.forEach((c) => {
-    if (c.name && c.enable !== false) {
-      cookiePairs.push(`${encodeURIComponent(c.name)}=${encodeURIComponent(String(c.example ?? ''))}`)
-    }
-  })
-
-  let targetUrl = fullUrl
-  if (queryParams.length > 0) {
-    targetUrl += (targetUrl.includes('?') ? '&' : '?') + queryParams.join('&')
-  }
-
-  const headerStr = headers.length > 0 ? ` ${headers.join(' ')}` : ''
-  const cookieStr = cookiePairs.length > 0 ? ` -b "${cookiePairs.join('; ')}"` : ''
-
-  let bodyFlag = ''
-  let bodyContent = ''
-  if (apiDetails.requestBody && apiDetails.requestBody.type !== BodyType.None) {
-    if (apiDetails.requestBody.type === BodyType.Json) {
-      bodyFlag = ' -H "Content-Type: application/json"'
-      bodyContent = apiDetails.requestBody.rawText?.trim()
-        ? ` -d '${apiDetails.requestBody.rawText.replace(/'/g, "'\\''")}'`
-        : apiDetails.requestBody.jsonSchema
-          ? ` -d '${JSON.stringify(buildSchemaExample(apiDetails.requestBody.jsonSchema as never))}'`
-          : ''
-    } else if (apiDetails.requestBody.rawText?.trim()) {
-      bodyContent = ` -d '${apiDetails.requestBody.rawText.replace(/'/g, "'\\''")}'`
-    }
-  }
-
-  const cmdLinux = `curl -X ${method}${headerStr}${cookieStr}${bodyFlag}${bodyContent} "${targetUrl}"`
-  const cmdWindows = `curl -X ${method}${headerStr}${cookieStr}${bodyFlag}${bodyContent} "${targetUrl}"`
-
-  return { linux: cmdLinux, windows: cmdWindows }
 }
 
 function buildBodyExample(apiDetails: ApiDetails, menuRawList?: unknown): string {
@@ -358,10 +305,9 @@ export function RunTab() {
 
   // 当前环境
   const currentEnv = useMemo(() => {
-    const envId = workCopy?.serverId || currentProjectEnvironmentId
-    return projectEnvironments?.find((e) => e.id === envId)
-      ?? projectEnvironmentConfig?.environments.find((e) => e.id === envId)
-  }, [workCopy?.serverId, currentProjectEnvironmentId, projectEnvironments, projectEnvironmentConfig?.environments])
+    return projectEnvironments?.find((e) => e.id === currentProjectEnvironmentId)
+      ?? projectEnvironmentConfig?.environments.find((e) => e.id === currentProjectEnvironmentId)
+  }, [currentProjectEnvironmentId, projectEnvironments, projectEnvironmentConfig?.environments])
 
   const envBaseUrl = useMemo(() => {
     if (!currentEnv) return ''
@@ -695,7 +641,20 @@ export function RunTab() {
     const resolvedUrl = envBaseUrl
       ? `${envBaseUrl.replace(/\/$/, '')}${workCopy.path ?? '/'}`
       : workCopy.path ?? '/'
-    return generateCurl(workCopy, resolvedUrl)
+    return generateCurl({
+      method: workCopy.method ?? 'GET',
+      url: resolvedUrl,
+      headers: workCopy.parameters?.header ?? [],
+      query: workCopy.parameters?.query ?? [],
+      cookie: workCopy.parameters?.cookie ?? [],
+      body: workCopy.requestBody
+        ? {
+            type: workCopy.requestBody.type,
+            rawText: workCopy.requestBody.rawText,
+            parameters: workCopy.requestBody.parameters ?? [],
+          }
+        : undefined,
+    })
   }, [workCopy, envBaseUrl])
 
   const methodOptions = useMemo(() =>
@@ -708,29 +667,8 @@ export function RunTab() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden" style={{ minWidth: 0, maxWidth: '100%' }}>
-      {/* 环境选择器 + URL 行 */}
+      {/* URL 行 */}
       <div className="flex items-center gap-2 px-2 py-1 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
-        <Typography.Text type="secondary" className="text-xs shrink-0">环境：</Typography.Text>
-        <Select
-          size="small"
-          className="min-w-[120px]"
-          value={workCopy.serverId || currentProjectEnvironmentId || undefined}
-          options={projectEnvironments?.map((env) => ({
-            value: env.id,
-            label: (
-              <span>
-                {env.name}
-                <span className="ml-2 text-xs opacity-50">{getPrimaryEnvironmentUrl(env)}</span>
-              </span>
-            ),
-          }))}
-          onChange={(envId) => {
-            const next = { ...workCopy, serverId: envId }
-            setWorkCopy(next)
-            persist(next)
-          }}
-        />
-
         <Select
           className="shrink-0"
           style={{ minWidth: 90 }}

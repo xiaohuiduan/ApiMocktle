@@ -148,14 +148,14 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
 
       <div className="flex items-center justify-between">
         <Button type="primary" icon={<DownloadIcon size={14} />} onClick={openExportModal}>
-          接口分享
+          导出 Markdown
         </Button>
       </div>
 
       <Modal
         destroyOnClose
         open={exportModalOpen}
-        title="接口分享 — 导出 Markdown 文档"
+        title="导出 Markdown 文档"
         width={640}
         onCancel={() => setExportModalOpen(false)}
         onOk={() => void handleExport()}

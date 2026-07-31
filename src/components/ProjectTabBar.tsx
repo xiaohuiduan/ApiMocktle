@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 
-import { Button, Dropdown, theme } from 'antd'
+import { Button, Dropdown, Select, theme } from 'antd'
 import { ArrowLeftIcon, CopyIcon, PlusIcon, RefreshCw, XIcon } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import type { MenuProps } from 'antd'
@@ -11,6 +11,7 @@ import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useProjectTabsContext } from '@/contexts/project-tabs'
 import type { ProjectTabState } from '@/contexts/project-tabs'
 import { useDesignStyle } from '@/hooks/useDesignStyle'
+import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 
 /* ------------------------------------------------------------------ */
 /*  TabItem — 单个标签（含右键菜单）                                     */
@@ -162,7 +163,7 @@ export function ProjectTabBar() {
   const { token } = theme.useToken()
   const { isGlassStyle } = useDesignStyle()
   const [refreshing, setRefreshing] = useState(false)
-  const { reloadState } = useMenuHelpersContext()
+  const { reloadState, projectEnvironments, currentProjectEnvironmentId, setCurrentProjectEnvironmentId } = useMenuHelpersContext()
   const {
     openTabs,
     activeProjectId,
@@ -239,6 +240,29 @@ export function ProjectTabBar() {
       {/* 右侧工具栏 */}
       <div className="ml-auto flex shrink-0 items-center gap-1 px-2">
         <ProjectQuickSwitch />
+        {projectEnvironments.length > 0 && (
+          <>
+            <span className="text-xs shrink-0" style={{ color: token.colorTextSecondary }}>环境</span>
+            <Select
+              size="small"
+              className="min-w-[140px]"
+              value={currentProjectEnvironmentId}
+              placeholder="选择环境"
+              options={projectEnvironments.map((env) => ({
+                value: env.id,
+                label: (
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate">{env.name}</span>
+                    {getPrimaryEnvironmentUrl(env) && (
+                      <span className="truncate text-xs opacity-50">{getPrimaryEnvironmentUrl(env)}</span>
+                    )}
+                  </span>
+                ),
+              }))}
+              onChange={(envId) => setCurrentProjectEnvironmentId(envId)}
+            />
+          </>
+        )}
         <Button
           icon={<RefreshCw size={14} />}
           size="small"
