@@ -436,7 +436,9 @@ export function ApiDoc() {
             position: 'sticky',
             top: 0,
             zIndex: 1,
-            background: token.colorFillSecondary,
+            // 表头背景必须不透明：colorFillSecondary 是半透明 rgba，滚动时行内容
+            // 会从表头背景透出（列名与字段名视觉重叠）
+            background: 'var(--color-bg-hover, #eef0f4)',
             color: token.colorTextSecondary,
             fontSize: 12,
           },
