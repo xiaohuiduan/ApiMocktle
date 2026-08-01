@@ -26,6 +26,8 @@ interface TabItemProps {
   hasUnsaved: boolean
   othersHaveDirty: boolean
   rightHaveDirty: boolean
+  /** 本项目未保存的标签名称列表（用于关闭确认弹窗展示） */
+  dirtyItemNames: string[]
   onSelect: () => void
   onClose: () => void
   onCloseOthers: () => void
@@ -42,6 +44,7 @@ function TabItem({
   hasUnsaved,
   othersHaveDirty,
   rightHaveDirty,
+  dirtyItemNames,
   onSelect,
   onClose,
   onCloseOthers,
@@ -53,7 +56,7 @@ function TabItem({
     void navigator.clipboard.writeText(tab.info.name).catch(() => undefined)
   }, [tab.info.name])
 
-  const confirmIfDirty = useCallback((title: string, dirty: boolean, action: () => void) => {
+  const confirmIfDirty = useCallback((title: string, dirty: boolean, action: () => void, dirtyItemNames?: string[]) => {
     if (!dirty) {
       action()
       return
@@ -61,7 +64,17 @@ function TabItem({
 
     Modal.confirm({
       title,
-      content: '该项目存在未保存的修改。关闭后内容会保留为草稿，重新打开项目时可继续编辑。',
+      content: (
+        <div>
+          <p>该项目存在未保存的修改。关闭后内容会保留为草稿，重新打开项目时可继续编辑。</p>
+          {dirtyItemNames && dirtyItemNames.length > 0 && (
+            <div className="mt-2">
+              <span className="font-medium">未保存内容：</span>
+              <span className="text-[color:var(--ant-color-text-secondary)]">{dirtyItemNames.join('、')}</span>
+            </div>
+          )}
+        </div>
+      ),
       okText: '关闭',
       cancelText: '取消',
       onOk: action,
@@ -75,7 +88,7 @@ function TabItem({
         label: '关闭标签页',
         icon: <XIcon size={14} />,
         onClick: () => {
-          confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose)
+          confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose, dirtyItemNames)
         },
       },
       {
@@ -102,7 +115,7 @@ function TabItem({
         label: '全部关闭',
         icon: <XIcon size={14} />,
         onClick: () => {
-          confirmIfDirty('关闭全部项目？', hasUnsaved || othersHaveDirty, onCloseAll)
+          confirmIfDirty('关闭全部项目？', hasUnsaved || othersHaveDirty, onCloseAll, dirtyItemNames)
         },
       },
       { type: 'divider' },
@@ -119,6 +132,7 @@ function TabItem({
       onCloseRight,
       onCloseAll,
       handleCopyName,
+      dirtyItemNames,
       confirmIfDirty,
       tab.info.name,
       hasUnsaved,
@@ -148,7 +162,7 @@ function TabItem({
         onClick={onSelect}
         onAuxClick={(e) => {
           if (e.button === 1) {
-            confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose)
+            confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose, dirtyItemNames)
           }
         }}
         onMouseEnter={(e) => {
@@ -179,28 +193,28 @@ function TabItem({
         {/* 关闭按钮：活跃标签始终显示，不活跃标签 hover 时显示 */}
         <button
           type="button"
-          className={`flex size-4 shrink-0 items-center justify-center rounded transition-all duration-100 ${
+          className={`flex size-8 shrink-0 items-center justify-center rounded transition-all duration-100 ${
             isActive ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
           }`}
           style={{
-            color: isActive ? token.colorTextTertiary : token.colorTextQuaternary,
+            color: isActive ? token.colorTextTertiary : token.colorTextSecondary,
             backgroundColor: 'transparent',
             border: 'none',
             cursor: 'pointer',
           }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--color-bg-hover, #eef0f4)'
+            (e.currentTarget as HTMLElement).style.backgroundColor = token.colorBgTextHover
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
           }}
           onClick={(e) => {
             e.stopPropagation()
-            confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose)
+            confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose, dirtyItemNames)
           }}
           aria-label="关闭标签页"
         >
-          <XIcon size={12} />
+          <XIcon size={28} />
         </button>
       </div>
     </Dropdown>
@@ -235,6 +249,15 @@ export function ProjectTabBar() {
     })
   }
 
+  /** 项目内未保存的标签名称列表（用于关闭确认弹窗） */
+  const dirtyTabNames = (tab: ProjectTabState): string[] => {
+    return tab.tabItems
+      .filter((item) => {
+        return item.data?.editStatus === 'changed' || item.data?.tabStatus === PageTabStatus.Create
+      })
+      .map((item) => (typeof item.label === 'string' ? item.label : item.key))
+  }
+
   return (
     <div
       className="flex shrink-0 items-stretch overflow-hidden"
@@ -258,7 +281,8 @@ export function ProjectTabBar() {
       >
         {openTabs.map((tab, index) => {
           const isActive = tab.info.projectId === activeProjectId
-          const dirty = hasUnsavedTab(tab)
+          const dirtyNames = dirtyTabNames(tab)
+          const dirty = dirtyNames.length > 0
           const othersDirty = openTabs.some(
             (t) => t.info.projectId !== tab.info.projectId && hasUnsavedTab(t),
           )
@@ -274,6 +298,7 @@ export function ProjectTabBar() {
               hasUnsaved={dirty}
               othersHaveDirty={othersDirty}
               rightHaveDirty={rightDirty}
+              dirtyItemNames={dirtyNames}
               onSelect={() => setActiveProjectId(tab.info.projectId)}
               onClose={() => closeProject(tab.info.projectId)}
               onCloseOthers={() => closeOtherProjects(tab.info.projectId)}
