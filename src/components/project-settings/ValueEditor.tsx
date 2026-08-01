@@ -1,4 +1,4 @@
-import { Button, Input, Switch, Tooltip, Typography, theme } from 'antd'
+import { Button, Input, Switch, theme, Tooltip, Typography } from 'antd'
 import { PlusIcon, TrashIcon } from 'lucide-react'
 
 import { useStyles } from '@/hooks/useStyle'
@@ -9,8 +9,14 @@ function resolveEffectiveValue(
   row: ApiEnvironmentValue,
   effectiveVarMap?: Map<string, string>,
 ): string | undefined {
-  if (!effectiveVarMap || !row.name) return row.value ?? undefined
-  if (effectiveVarMap.has(row.name)) return effectiveVarMap.get(row.name)
+  if (!effectiveVarMap || !row.name) {
+    return row.value ?? undefined
+  }
+
+  if (effectiveVarMap.has(row.name)) {
+    return effectiveVarMap.get(row.name)
+  }
+
   return row.value ?? undefined
 }
 
@@ -36,13 +42,17 @@ function buildValueColumns(showEffective: boolean, showEnable: boolean): ValueCo
     { key: 'name', title: '变量名', width: 'minmax(0,1fr)' },
     { key: 'value', title: '值', width: 'minmax(0,1.2fr)' },
   ]
+
   if (showEffective) {
     columns.push({ key: 'effective', title: '实际生效值', width: 'minmax(0,1.2fr)' })
   }
+
   if (showEnable) {
     columns.push({ key: 'enable', title: '启用', width: '60px', align: 'center' })
   }
+
   columns.push({ key: 'remove', title: '', width: '56px', align: 'center' })
+
   return columns
 }
 
@@ -70,6 +80,7 @@ function ValueRowsTable(props: {
   return rows.map((row, index) => {
     const effective = resolveEffectiveValue(row, effectiveVarMap)
     const overridden = effectiveVarMap != null && effective !== row.value
+
     return (
       <div
         key={row.id}
@@ -80,19 +91,19 @@ function ValueRowsTable(props: {
         }}
       >
         <Input
-          variant="borderless"
           disabled={!editable}
           placeholder="添加变量"
           value={row.name}
+          variant="borderless"
           onChange={(event) => {
             onChange(updateValueRow(rows, row.id, 'name', event.target.value))
           }}
         />
         <Input
-          variant="borderless"
           disabled={!editable}
           placeholder="值"
           value={row.value}
+          variant="borderless"
           onChange={(event) => {
             onChange(updateValueRow(rows, row.id, 'value', event.target.value))
           }}
@@ -171,11 +182,11 @@ function ValueTable(props: {
       <ValueRowsTable
         dividerClass={styles.columnDivider}
         editable={editable}
+        effectiveVarMap={effectiveVarMap}
         emptyText={emptyText}
         gridTemplateColumns={gridTemplateColumns}
         rows={rows}
         showEnable={showEnable}
-        effectiveVarMap={effectiveVarMap}
         onChange={onChange}
       />
     </div>
@@ -208,9 +219,9 @@ export function ValueEditor(props: {
 
       <ValueTable
         editable={editable}
+        effectiveVarMap={effectiveVarMap}
         rows={rows}
         showEnable={showEnable}
-        effectiveVarMap={effectiveVarMap}
         onChange={onChange}
       />
     </section>

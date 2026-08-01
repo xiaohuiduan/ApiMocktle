@@ -1,14 +1,14 @@
 import { useState } from 'react'
 
-import { Button, Input, Select, Tabs, Tag, Typography, theme } from 'antd'
+import { Button, Input, Select, Tabs, Tag, theme, Typography } from 'antd'
 import { GlobeIcon, KeyRoundIcon, PlusIcon, TrashIcon } from 'lucide-react'
 
 import { createEnvironmentBaseUrl, createEnvironmentValue } from '@/project-environment-utils'
 import {
-  GLOBAL_PARAMETER_SECTIONS,
   type ApiEnvironment,
   type ApiEnvironmentGlobalParameterSection,
   type ApiEnvironmentValue,
+  GLOBAL_PARAMETER_SECTIONS,
   type ProjectEnvironmentConfig,
 } from '@/types'
 
@@ -16,28 +16,32 @@ import { GLOBAL_PARAMETER_LABELS } from './GlobalParametersEditor'
 import { TabValueEditor, ValueEditor } from './ValueEditor'
 
 // 前置 URL 协议与域名拆分：url 仍存完整地址（如 https://api.example.com），仅用于输入展示
-function parseBaseUrl(url: string): { protocol: 'http' | 'https'; host: string } {
-  const trimmed = (url ?? '').trim()
+function parseBaseUrl(url: string): { protocol: 'http' | 'https', host: string } {
+  const trimmed = url.trim()
+
   if (/^http:\/\//i.test(trimmed)) {
     return { protocol: 'http', host: trimmed.replace(/^http:\/\//i, '') }
   }
+
   // 默认 https（含空值、无协议、https:// 开头）
   return { protocol: 'https', host: trimmed.replace(/^https?:\/\//i, '') }
 }
+
 function serializeBaseUrl(protocol: 'http' | 'https', host: string): string {
-  const h = (host ?? '').trim()
+  const h = host.trim()
+
   return h ? `${protocol}://${h}` : ''
 }
 
 export type GlobalSectionKey = 'globalVariables' | 'globalParameters'
 export type EnvironmentSectionKey = `environment:${string}`
 export type SectionKey = GlobalSectionKey | EnvironmentSectionKey
-export const GLOBAL_SECTION_ITEMS: Array<{
+export const GLOBAL_SECTION_ITEMS: {
   key: GlobalSectionKey
   label: string
   icon: React.ReactNode
   description: string
-}> = [
+}[] = [
   {
     key: 'globalVariables',
     label: '全局变量',
@@ -52,19 +56,23 @@ export const GLOBAL_SECTION_ITEMS: Array<{
   },
 ]
 
-export function createEnvironmentKey(environmentId: string) {
-  return `environment:${environmentId}` as EnvironmentSectionKey
+export function createEnvironmentKey(environmentId: string): EnvironmentSectionKey {
+  return `environment:${environmentId}`
 }
+
 function isEnvironmentSection(key: SectionKey): key is EnvironmentSectionKey {
   return key.startsWith('environment:')
 }
-export function getFallbackSection(config: ProjectEnvironmentConfig) {
+
+export function getFallbackSection(config: ProjectEnvironmentConfig): SectionKey {
   return config.environments[0] ? createEnvironmentKey(config.environments[0].id) : 'globalVariables'
 }
+
 export function resolveEnvironment(config: ProjectEnvironmentConfig, key: SectionKey) {
   if (!isEnvironmentSection(key)) {
     return undefined
   }
+
   return config.environments.find(({ id }) => id === key.slice('environment:'.length))
 }
 
@@ -88,6 +96,7 @@ export function EnvironmentEditor(props: {
   }
 
   const [activeParamSection, setActiveParamSection] = useState<ApiEnvironmentGlobalParameterSection>(GLOBAL_PARAMETER_SECTIONS[0])
+
   const handleAddParam = (section: ApiEnvironmentGlobalParameterSection) => {
     const sectionParams = environment.parameters?.[section] ?? []
     onChange({
@@ -143,12 +152,12 @@ export function EnvironmentEditor(props: {
         <div className="flex items-center gap-1">
           <Select
             disabled={!editable}
-            style={{ width: 88, flexShrink: 0 }}
-            value={parseBaseUrl(primaryBaseUrl.url).protocol}
             options={[
               { value: 'http', label: 'http://' },
               { value: 'https', label: 'https://' },
             ]}
+            style={{ width: 88, flexShrink: 0 }}
+            value={parseBaseUrl(primaryBaseUrl.url).protocol}
             onChange={(protocol) => {
               updatePrimaryUrl(serializeBaseUrl(protocol, parseBaseUrl(primaryBaseUrl.url).host))
             }}
@@ -167,9 +176,9 @@ export function EnvironmentEditor(props: {
       <ValueEditor
         description="环境变量支持远程值和本地值，本地值优先，可用于本地调试覆盖。灰色列为实际生效值（会话变量 > 环境变量 > 全局）。"
         editable={editable}
+        effectiveVarMap={effectiveVarMap}
         rows={variables}
         title="环境变量"
-        effectiveVarMap={effectiveVarMap}
         onAdd={() => {
           onChange({ ...environment, variables: [...variables, createEnvironmentValue()] })
         }}
@@ -189,14 +198,6 @@ export function EnvironmentEditor(props: {
         <Tabs
           activeKey={activeParamSection}
           animated={false}
-          onChange={(key) => setActiveParamSection(key as ApiEnvironmentGlobalParameterSection)}
-          tabBarExtraContent={{
-            right: (
-              <Button disabled={!editable} icon={<PlusIcon size={14} />} onClick={() => handleAddParam(activeParamSection)}>
-                添加
-              </Button>
-            ),
-          }}
           items={GLOBAL_PARAMETER_SECTIONS.map((section) => {
             const sectionParams = environment.parameters?.[section] ?? []
             const globalSectionRows = globalParameters?.[section] ?? []
@@ -212,13 +213,14 @@ export function EnvironmentEditor(props: {
                       className="rounded-lg border px-3 py-2"
                       style={{ borderColor: token.colorBorderSecondary, backgroundColor: token.colorFillQuaternary }}
                     >
-                      <Typography.Text type="secondary" className="text-xs">
+                      <Typography.Text className="text-xs" type="secondary">
                         全局已设置：
                       </Typography.Text>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {globalSectionRows.map((g) => {
                           const overridden = envNames.has(g.name)
                           const label = g.value ? `${g.name}: ${g.value}` : g.name
+
                           return (
                             <Tag key={g.id} color={overridden ? 'default' : 'blue'}>
                               {label}
@@ -231,10 +233,10 @@ export function EnvironmentEditor(props: {
                   )}
 
                   <TabValueEditor
-                    editable={editable}
-                    showAdd={false}
                     showEnable
+                    editable={editable}
                     rows={sectionParams}
+                    showAdd={false}
                     onAdd={() => {
                       onChange({
                         ...environment,
@@ -266,6 +268,14 @@ export function EnvironmentEditor(props: {
               ),
             }
           })}
+          tabBarExtraContent={{
+            right: (
+              <Button disabled={!editable} icon={<PlusIcon size={14} />} onClick={() => { handleAddParam(activeParamSection) }}>
+                添加
+              </Button>
+            ),
+          }}
+          onChange={(key) => { setActiveParamSection(key as ApiEnvironmentGlobalParameterSection) }}
         />
       </section>
     </div>

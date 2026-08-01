@@ -8,11 +8,11 @@ import type { CheckboxChangeEvent } from 'antd/es/checkbox'
 import type { DataNode } from 'antd/es/tree'
 
 import { api } from '@/api-client'
-import { useAuth } from '@/contexts/auth'
-import { MenuItemType } from '@/enums'
 import type { ApiMenuData } from '@/components/ApiMenu'
-import { type ProjectStateSnapshot, useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { ExportPanel } from '@/components/project-settings/ExportPanel'
+import { useAuth } from '@/contexts/auth'
+import { type ProjectStateSnapshot, useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { MenuItemType } from '@/enums'
 
 function resolveProjectId(pathname: string) {
   const parts = pathname.split('/').filter(Boolean)
@@ -26,10 +26,13 @@ async function saveExportFile(specName: string, format: string, content: string)
     defaultPath: `${specName}.${ext}`,
     filters: [{ name: format === 'yaml' ? 'YAML' : 'JSON', extensions: [ext] }],
   })
+
   if (filePath) {
     await invoke('write_export_file', { path: filePath, content })
+
     return true
   }
+
   return false
 }
 
@@ -52,13 +55,15 @@ function pickImportFile(onSelect: (file: File) => void) {
 function countOpenApiPaths(content: string): number | null {
   try {
     const doc = JSON.parse(content) as { paths?: unknown }
-    if (doc?.paths && typeof doc.paths === 'object') {
+
+    if (doc.paths && typeof doc.paths === 'object') {
       return Object.keys(doc.paths).length
     }
   }
   catch {
     // YAML 或其它格式无法用 JSON 统计
   }
+
   return null
 }
 
@@ -83,7 +88,9 @@ export function ApiTransferPanel() {
 
   // 构建 API 接口树
   const apiTreeData = useMemo((): DataNode[] => {
-    if (!menuRawList) return []
+    if (!menuRawList) {
+      return []
+    }
 
     const apis = menuRawList.filter((item) => item.type === MenuItemType.ApiDetail)
     const childrenMap = new Map<string, ApiMenuData[]>()
@@ -94,7 +101,8 @@ export function ApiTransferPanel() {
         const children = childrenMap.get(api.parentId) ?? []
         children.push(api)
         childrenMap.set(api.parentId, children)
-      } else {
+      }
+      else {
         topLevel.push(api)
       }
     }
@@ -102,7 +110,7 @@ export function ApiTransferPanel() {
     function buildNodes(items: ApiMenuData[]): DataNode[] {
       return items.map((item) => ({
         key: item.id,
-        title: `${(item.data as { method?: string })?.method ?? 'GET'} ${(item.data as { path?: string })?.path ?? item.name}`,
+        title: `${(item.data as { method?: string }).method ?? 'GET'} ${(item.data as { path?: string }).path ?? item.name}`,
       }))
     }
 
@@ -118,24 +126,31 @@ export function ApiTransferPanel() {
   }, [menuRawList])
 
   const allApiIds = useMemo(() => {
-    if (!menuRawList) return []
+    if (!menuRawList) {
+      return []
+    }
+
     return menuRawList.filter((i) => i.type === MenuItemType.ApiDetail).map((i) => i.id)
   }, [menuRawList])
 
   const normalizeCheckedIds = (keys: React.Key[]) => {
     const result = new Set<string>()
+
     for (const key of keys) {
       const folder = menuRawList?.some(
         (f) => f.type === MenuItemType.ApiDetailFolder && f.id === key,
       )
+
       if (folder) {
         menuRawList
           ?.filter((a) => a.type === MenuItemType.ApiDetail && a.parentId === key)
           .forEach((a) => result.add(a.id))
-      } else {
+      }
+      else {
         result.add(String(key))
       }
     }
+
     return result
   }
 
@@ -154,13 +169,18 @@ export function ApiTransferPanel() {
   const handleSelectiveExport = async (specFormat: 'openapi' | 'swagger') => {
     if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导出')
+
       return
     }
+
     if (checkedApiIds.size === 0) {
       msgApi.error('请至少选择一个接口')
+
       return
     }
+
     setIsExporting(true)
+
     try {
       const menuIds = Array.from(checkedApiIds).join(',')
       const formatParam = specFormat === 'swagger' ? 'swagger' : 'json'
@@ -172,12 +192,15 @@ export function ApiTransferPanel() {
       })
       const specName = specFormat === 'swagger' ? 'swagger' : 'openapi'
       const saved = await saveExportFile(specName, 'json', payload.content)
+
       if (saved) {
         setSelectModalOpen(false)
       }
-    } catch (err) {
+    }
+    catch (err) {
       msgApi.error((err as Error).message)
-    } finally {
+    }
+    finally {
       setIsExporting(false)
     }
   }
@@ -185,6 +208,7 @@ export function ApiTransferPanel() {
   const handleExport = async (format: 'json' | 'yaml') => {
     if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导出')
+
       return
     }
 
@@ -195,7 +219,8 @@ export function ApiTransferPanel() {
         format,
       })
       await saveExportFile('openapi', format, payload.content)
-    } catch (err) {
+    }
+    catch (err) {
       msgApi.error((err as Error).message)
     }
   }
@@ -203,6 +228,7 @@ export function ApiTransferPanel() {
   const handleExportSwagger = async () => {
     if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导出')
+
       return
     }
 
@@ -213,7 +239,8 @@ export function ApiTransferPanel() {
         format: 'swagger',
       })
       await saveExportFile('swagger', 'json', payload.content)
-    } catch (err) {
+    }
+    catch (err) {
       msgApi.error((err as Error).message)
     }
   }
@@ -221,6 +248,7 @@ export function ApiTransferPanel() {
   const doImport = async (file: File) => {
     if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导入')
+
       return
     }
 
@@ -240,7 +268,7 @@ export function ApiTransferPanel() {
           ? 'json'
           : 'auto'
 
-      const payload = await api<{ imported: { format: string }, state: ProjectStateSnapshot }>('import_api_document', {
+      const payload = await api<{ imported: { format: string }, state?: ProjectStateSnapshot }>('import_api_document', {
         sessionId,
         projectId,
         payload: { format, content },
@@ -248,7 +276,8 @@ export function ApiTransferPanel() {
 
       if (payload.state) {
         applyServerState(payload.state)
-      } else {
+      }
+      else {
         await reloadState()
       }
 
@@ -270,10 +299,12 @@ export function ApiTransferPanel() {
   const handleImport = async (file: File) => {
     if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导入')
+
       return
     }
 
     let pathsCount: number | null = null
+
     try {
       pathsCount = countOpenApiPaths(await file.text())
     }
@@ -295,6 +326,7 @@ export function ApiTransferPanel() {
   const handleImportFromUrl = () => {
     if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导入')
+
       return
     }
 
@@ -310,6 +342,7 @@ export function ApiTransferPanel() {
   const doImportFromUrl = async () => {
     if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导入')
+
       return
     }
 
@@ -317,6 +350,7 @@ export function ApiTransferPanel() {
 
     if (!trimmed) {
       msgApi.error('请填写 OpenAPI 或 Postman 文档的 URL')
+
       return
     }
 
@@ -327,11 +361,13 @@ export function ApiTransferPanel() {
     }
     catch {
       msgApi.error('链接格式不正确')
+
       return
     }
 
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       msgApi.error('仅支持 http 或 https 链接')
+
       return
     }
 
@@ -340,12 +376,14 @@ export function ApiTransferPanel() {
 
     try {
       const response = await fetch(trimmed)
+
       if (!response.ok) {
         throw new Error(`下载失败: HTTP ${response.status}`)
       }
+
       const content = await response.text()
 
-      const payload = await api<{ imported: { format: string }, state: ProjectStateSnapshot }>('import_api_document', {
+      const payload = await api<{ imported: { format: string }, state?: ProjectStateSnapshot }>('import_api_document', {
         sessionId,
         projectId,
         payload: { format: 'auto', content },
@@ -353,7 +391,8 @@ export function ApiTransferPanel() {
 
       if (payload.state) {
         applyServerState(payload.state)
-      } else {
+      }
+      else {
         await reloadState()
       }
 
@@ -400,14 +439,14 @@ export function ApiTransferPanel() {
                 value={importUrl}
                 onChange={(e) => { setImportUrl(e.target.value) }}
                 onPressEnter={() => {
-                  void handleImportFromUrl()
+                  handleImportFromUrl()
                 }}
               />
               <Button
                 disabled={isImporting || isUrlImporting}
                 loading={isUrlImporting}
                 type="primary"
-                onClick={() => void handleImportFromUrl()}
+                onClick={() => { handleImportFromUrl() }}
               >
                 从 URL 导入
               </Button>
@@ -469,7 +508,7 @@ export function ApiTransferPanel() {
             </Space>
           </div>
           <div>
-            <Button type="primary" size="small" onClick={initSelectiveExport}>
+            <Button size="small" type="primary" onClick={initSelectiveExport}>
               选择性导出
             </Button>
           </div>
@@ -489,12 +528,8 @@ export function ApiTransferPanel() {
 
       <Modal
         destroyOnClose
-        open={selectModalOpen}
-        title="选择要导出的接口"
-        width={640}
-        onCancel={() => setSelectModalOpen(false)}
         footer={[
-          <Button key="cancel" onClick={() => setSelectModalOpen(false)}>
+          <Button key="cancel" onClick={() => { setSelectModalOpen(false) }}>
             取消
           </Button>,
           <Button
@@ -514,6 +549,10 @@ export function ApiTransferPanel() {
             导出 Swagger 2.0
           </Button>,
         ]}
+        open={selectModalOpen}
+        title="选择要导出的接口"
+        width={640}
+        onCancel={() => { setSelectModalOpen(false) }}
       >
         <div className="mb-3">
           <Checkbox
@@ -527,10 +566,10 @@ export function ApiTransferPanel() {
         {apiTreeData.length > 0
           ? (
               <Tree
-                checkable
                 blockNode
-                checkedKeys={Array.from(checkedApiIds)}
+                checkable
                 defaultExpandAll
+                checkedKeys={Array.from(checkedApiIds)}
                 treeData={apiTreeData}
                 onCheck={(checkedKeys) => {
                   const keys = Array.isArray(checkedKeys)

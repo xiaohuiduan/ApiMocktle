@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react'
 
-import dayjs from 'dayjs'
-
 import {
   Button,
   Form,
+  message,
   Select,
   Table,
   Tag,
   Typography,
-  message,
 } from 'antd'
+import dayjs from 'dayjs'
 
 import { api } from '@/api-client'
 import { useAuth } from '@/contexts/auth'
@@ -44,8 +43,14 @@ const memberRoleOptions = [
 ]
 
 function roleText(role: Role) {
-  if (role === 'owner') return '拥有者'
-  if (role === 'editor') return '编辑者'
+  if (role === 'owner') {
+    return '拥有者'
+  }
+
+  if (role === 'editor') {
+    return '编辑者'
+  }
+
   return '查看者'
 }
 
@@ -63,19 +68,23 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
       setLoadingUsers(true)
       api<UserItem[]>('list_all_users', { sessionId })
         .then(setAllUsers)
-        .catch(() => {})
-        .finally(() => setLoadingUsers(false))
+        .catch(() => undefined)
+        .finally(() => { setLoadingUsers(false) })
     }
   }, [canManageMembers, sessionId])
 
-  const existingUserIds = new Set(members.map(m => m.userId))
-  const availableUsers = allUsers.filter(u => !existingUserIds.has(u.id))
+  const existingUserIds = new Set(members.map((m) => m.userId))
+  const availableUsers = allUsers.filter((u) => !existingUserIds.has(u.id))
 
   const handleAddMember = async (values: { userId: string, role: string }) => {
-    if (!projectId || !sessionId) return
+    if (!projectId || !sessionId) {
+      return
+    }
+
     setSubmitting(true)
+
     try {
-      const username = availableUsers.find(u => u.id === values.userId)?.username ?? values.userId
+      const username = availableUsers.find((u) => u.id === values.userId)?.username ?? values.userId
       await api('add_project_member', {
         sessionId,
         projectId,
@@ -84,31 +93,41 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
       msgApi.success('已添加成员')
       addForm.resetFields()
       await onRefresh()
-    } catch (error) {
+    }
+    catch (error) {
       msgApi.error((error as Error).message)
-    } finally {
+    }
+    finally {
       setSubmitting(false)
     }
   }
 
   const handleMemberRoleChange = async (userId: string, nextRole: string) => {
-    if (!projectId || !sessionId) return
+    if (!projectId || !sessionId) {
+      return
+    }
+
     try {
       await api('update_member_role', { sessionId, projectId, userId, payload: { role: nextRole } } as any)
       msgApi.success('角色已更新')
       await onRefresh()
-    } catch (error) {
+    }
+    catch (error) {
       msgApi.error((error as Error).message)
     }
   }
 
   const handleMemberDelete = async (userId: string) => {
-    if (!projectId || !sessionId) return
+    if (!projectId || !sessionId) {
+      return
+    }
+
     try {
       await api('remove_project_member', { sessionId, projectId, userId })
       msgApi.success('已移除成员')
       await onRefresh()
-    } catch (error) {
+    }
+    catch (error) {
       msgApi.error((error as Error).message)
     }
   }
@@ -124,16 +143,17 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
             className="mb-4"
             form={addForm}
             layout="inline"
-            onFinish={handleAddMember}
+            onFinish={(values) => {
+              void handleAddMember(values)
+            }}
           >
             <Form.Item name="userId" rules={[{ required: true, message: '请选择用户' }]}>
               <Select
                 showSearch
                 filterOption={(input, option) =>
-                  (option?.label as string ?? '').toLowerCase().includes(input.toLowerCase())
-                }
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                 loading={loadingUsers}
-                options={availableUsers.map(u => ({ label: u.username, value: u.id }))}
+                options={availableUsers.map((u) => ({ label: u.username, value: u.id }))}
                 placeholder="搜索用户"
                 style={{ width: 200 }}
               />
@@ -162,6 +182,7 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
               if (!canManageMembers || record.userId === projectOwnerId || value === 'owner') {
                 return <Tag>{roleText(value)}</Tag>
               }
+
               return (
                 <Select
                   options={memberRoleOptions}
@@ -180,7 +201,10 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
           {
             title: '操作',
             render: (_, record) => {
-              if (!canManageMembers || record.userId === projectOwnerId) return '-'
+              if (!canManageMembers || record.userId === projectOwnerId) {
+                return '-'
+              }
+
               return (
                 <Button danger size="small" onClick={() => void handleMemberDelete(record.userId)}>
                   移除

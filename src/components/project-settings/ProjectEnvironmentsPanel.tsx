@@ -1,20 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { Button, Tag, Typography, theme } from 'antd'
+import { Button, Tag, theme, Typography } from 'antd'
 import { PlusIcon } from 'lucide-react'
 
+import { useResolvedVarMap } from '@/components/tab-content/api/useResolvedVarMap'
+import { useGlobalContext } from '@/contexts/global'
+import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useSessionVariablesContext } from '@/contexts/session-variables'
+import { useCtrlSave } from '@/hooks/useCtrlSave'
 import {
   createEnvironment,
   createEnvironmentValue,
   EMPTY_PROJECT_ENVIRONMENT_CONFIG,
   getPrimaryEnvironmentUrl,
 } from '@/project-environment-utils'
-import { useGlobalContext } from '@/contexts/global'
-import { useMenuHelpersContext } from '@/contexts/menu-helpers'
-import { useSessionVariablesContext } from '@/contexts/session-variables'
-import { useCtrlSave } from '@/hooks/useCtrlSave'
 import type { ProjectEnvironmentConfig } from '@/types'
-import { useResolvedVarMap } from '@/components/tab-content/api/useResolvedVarMap'
 
 import {
   createEnvironmentKey,
@@ -58,7 +58,7 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
       .then(() => {
         messageApi.success('环境配置已保存')
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         messageApi.error(error instanceof Error ? error.message : '保存环境失败')
       })
       .finally(() => {
@@ -72,6 +72,7 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
     setDraftConfig(cloneConfig(projectEnvironmentConfig))
     setSelectedKey((currentKey) => {
       const currentEnvironment = resolveEnvironment(projectEnvironmentConfig, currentKey)
+
       return currentEnvironment ? currentKey : getFallbackSection(projectEnvironmentConfig)
     })
   }, [projectEnvironmentConfig])
@@ -186,17 +187,9 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
               ? (
                   <EnvironmentEditor
                     editable={editable}
+                    effectiveVarMap={effectiveVarMap}
                     environment={selectedEnvironment}
                     globalParameters={draftConfig.globalParameters}
-                    effectiveVarMap={effectiveVarMap}
-                    onDelete={() => {
-                      setDraftConfig((current) => {
-                        const nextEnvironments = current.environments.filter(({ id }) => id !== selectedEnvironment.id)
-                        const nextConfig = { ...current, environments: nextEnvironments }
-                        setSelectedKey(getFallbackSection(nextConfig))
-                        return nextConfig
-                      })
-                    }}
                     onChange={(nextEnvironment) => {
                       setDraftConfig((current) => ({
                         ...current,
@@ -204,6 +197,15 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
                           return item.id === nextEnvironment.id ? { ...nextEnvironment, url: getPrimaryEnvironmentUrl(nextEnvironment) } : item
                         }),
                       }))
+                    }}
+                    onDelete={() => {
+                      setDraftConfig((current) => {
+                        const nextEnvironments = current.environments.filter(({ id }) => id !== selectedEnvironment.id)
+                        const nextConfig = { ...current, environments: nextEnvironments }
+                        setSelectedKey(getFallbackSection(nextConfig))
+
+                        return nextConfig
+                      })
                     }}
                   />
                 )
@@ -223,9 +225,9 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
                   <ValueEditor
                     description={selectedGlobalSection.description}
                     editable={editable}
+                    effectiveVarMap={effectiveVarMap}
                     rows={getValueSectionRows(draftConfig)}
                     title={selectedGlobalSection.label}
-                    effectiveVarMap={effectiveVarMap}
                     onAdd={() => {
                       setDraftConfig((current) => ({
                         ...updateValueSection(current, [

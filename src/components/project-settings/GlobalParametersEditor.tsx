@@ -2,8 +2,8 @@ import { Tabs, Typography } from 'antd'
 
 import { createEnvironmentValue } from '@/project-environment-utils'
 import {
-  GLOBAL_PARAMETER_SECTIONS,
   type ApiEnvironmentGlobalParameterSection,
+  GLOBAL_PARAMETER_SECTIONS,
   type ProjectEnvironmentConfig,
 } from '@/types'
 
@@ -53,8 +53,8 @@ export function GlobalParametersEditor(props: {
           label: GLOBAL_PARAMETER_LABELS[section],
           children: (
             <TabValueEditor
-              editable={editable}
               showEnable
+              editable={editable}
               rows={value[section]}
               onAdd={() => {
                 onChange(updateGlobalParameterRows(value, section, [...value[section], createEnvironmentValue()]))

@@ -1,28 +1,25 @@
-import { describe, expect, it } from 'vitest'
 import { useState } from 'react'
 
 import { render } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Tree } from 'antd'
-
 import type { DataNode } from 'antd/es/tree'
+import { describe, expect, it } from 'vitest'
 
 // antd 在 jsdom 下需要 matchMedia
-if (!window.matchMedia) {
-  Object.defineProperty(window, 'matchMedia', {
-    writable: true,
-    value: (query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: () => {},
-      removeListener: () => {},
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => false,
-    }),
-  })
-}
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    dispatchEvent: () => false,
+  }),
+})
 
 const treeData: DataNode[] = [
   {
@@ -42,10 +39,10 @@ function Harness({ onKeysChange }: { onKeysChange: (keys: React.Key[]) => void }
 
   return (
     <Tree
-      checkable
       blockNode
-      checkedKeys={checkedKeys}
+      checkable
       defaultExpandAll
+      checkedKeys={checkedKeys}
       treeData={treeData}
       onCheck={(keys) => {
         const next = Array.isArray(keys) ? keys : keys.checked

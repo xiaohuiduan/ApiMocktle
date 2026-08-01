@@ -1,17 +1,15 @@
 import { useMemo, useState } from 'react'
 
-import { Button, Modal, Typography, message } from 'antd'
+import { Button, Checkbox, message, Modal, Tree, Typography } from 'antd'
 import type { CheckboxChangeEvent } from 'antd/es/checkbox'
-import { Checkbox } from 'antd'
 import type { DataNode } from 'antd/es/tree'
-import { Tree } from 'antd'
 import { DownloadIcon, GlobeIcon } from 'lucide-react'
 
 import { api } from '@/api-client'
-import { useAuth } from '@/contexts/auth'
-import { MenuItemType } from '@/enums'
 import type { ApiMenuData } from '@/components/ApiMenu'
+import { useAuth } from '@/contexts/auth'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { MenuItemType } from '@/enums'
 import type { ApiDetails } from '@/types'
 import { downloadMarkdown, type ExportTreeInput } from '@/utils/api-doc-markdown'
 import { downloadMhtml } from '@/utils/api-doc-mhtml'
@@ -32,7 +30,9 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
   const [exporting, setExporting] = useState(false)
 
   const apiTreeData = useMemo((): DataNode[] => {
-    if (!menuRawList) return []
+    if (!menuRawList) {
+      return []
+    }
 
     const apis = menuRawList.filter((item) => item.type === MenuItemType.ApiDetail)
     const childrenMap = new Map<string, ApiMenuData[]>()
@@ -43,7 +43,8 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
         const children = childrenMap.get(api.parentId) ?? []
         children.push(api)
         childrenMap.set(api.parentId, children)
-      } else {
+      }
+      else {
         topLevel.push(api)
       }
     }
@@ -51,7 +52,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
     function buildNodes(items: ApiMenuData[]): DataNode[] {
       return items.map((item) => ({
         key: item.id,
-        title: `${(item.data as { method?: string })?.method ?? 'GET'} ${(item.data as { path?: string })?.path ?? item.name}`,
+        title: `${(item.data as { method?: string } | undefined)?.method ?? 'GET'} ${(item.data as { path?: string } | undefined)?.path ?? item.name}`,
       }))
     }
 
@@ -67,24 +68,31 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
   }, [menuRawList])
 
   const allApiIds = useMemo(() => {
-    if (!menuRawList) return []
+    if (!menuRawList) {
+      return []
+    }
+
     return menuRawList.filter((i) => i.type === MenuItemType.ApiDetail).map((i) => i.id)
   }, [menuRawList])
 
   const normalizeCheckedIds = (keys: React.Key[]) => {
     const result = new Set<string>()
+
     for (const key of keys) {
       const folder = menuRawList?.some(
         (f) => f.type === MenuItemType.ApiDetailFolder && f.id === key,
       )
+
       if (folder) {
         menuRawList
           ?.filter((a) => a.type === MenuItemType.ApiDetail && a.parentId === key)
           .forEach((a) => result.add(a.id))
-      } else {
+      }
+      else {
         result.add(String(key))
       }
     }
+
     return result
   }
 
@@ -92,9 +100,13 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
   const isIndeterminate = checkedApiIds.size > 0 && checkedApiIds.size < allApiIds.length
 
   const handleExport = async (format: 'markdown' | 'mhtml') => {
-    if (!projectId || !sessionId) return
+    if (!projectId || !sessionId) {
+      return
+    }
+
     if (checkedApiIds.size === 0) {
       msgApi.error('请至少选择一个接口')
+
       return
     }
 
@@ -106,7 +118,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
         sessionId,
         projectId,
       })
-      const projectName = projectPayload.project?.name ?? 'API文档'
+      const projectName = projectPayload.project.name
 
       // Collect selected API items with their full data (only ApiDetail type)
       const apiItems = menuRawList!
@@ -120,6 +132,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
 
       if (apiItems.length === 0) {
         msgApi.error('所选接口暂无数据')
+
         return
       }
 
@@ -129,6 +142,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
 
       for (const folder of folders) {
         const children = apiItems.filter((api) => api.parentId === folder.id)
+
         if (children.length > 0) {
           treeInput.folders.push({
             name: folder.name,
@@ -145,14 +159,17 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
       const saved = format === 'markdown'
         ? await downloadMarkdown(projectName, treeInput)
         : await downloadMhtml(projectName, treeInput)
+
       if (saved) {
         msgApi.success(`已导出 ${treeInput.totalCount} 个接口`)
         setExportModalOpen(false)
       }
-    } catch (err) {
+    }
+    catch (err) {
       const msg = typeof err === 'string' ? err : (err as Error).message || String(err)
       msgApi.error(msg || '导出失败，请重试')
-    } finally {
+    }
+    finally {
       setExporting(false)
     }
   }
@@ -168,7 +185,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
       {contextHolder}
 
       <div className="flex items-center gap-2">
-        <Button type="primary" icon={<DownloadIcon size={14} />} onClick={() => { openExportModal('markdown') }}>
+        <Button icon={<DownloadIcon size={14} />} type="primary" onClick={() => { openExportModal('markdown') }}>
           导出 Markdown
         </Button>
         <Button icon={<GlobeIcon size={14} />} onClick={() => { openExportModal('mhtml') }}>
@@ -178,13 +195,13 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
 
       <Modal
         destroyOnClose
+        confirmLoading={exporting}
+        okText="导出"
         open={exportModalOpen}
         title={exportFormat === 'markdown' ? '导出 Markdown 文档' : '导出 MHTML 文档'}
         width={640}
-        onCancel={() => setExportModalOpen(false)}
+        onCancel={() => { setExportModalOpen(false) }}
         onOk={() => void handleExport(exportFormat)}
-        okText="导出"
-        confirmLoading={exporting}
       >
         <div className="flex flex-col gap-4">
           <div>
@@ -203,10 +220,10 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
             {apiTreeData.length > 0
               ? (
                   <Tree
-                    checkable
                     blockNode
-                    checkedKeys={Array.from(checkedApiIds)}
+                    checkable
                     defaultExpandAll
+                    checkedKeys={Array.from(checkedApiIds)}
                     style={{ maxHeight: 300, overflow: 'auto' }}
                     treeData={apiTreeData}
                     onCheck={(checkedKeys) => {
