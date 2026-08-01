@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 
-import { Button, Typography, theme } from 'antd'
-import { MinusIcon, PlusIcon } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
+import { save } from '@tauri-apps/plugin-dialog'
+import { Button, message, theme, Typography } from 'antd'
+import { DownloadIcon } from 'lucide-react'
 
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { useStyles } from '@/hooks/useStyle'
@@ -13,9 +15,19 @@ interface ResponseBodyViewerProps {
   contentType?: string
   showFormatted?: boolean
   onToggleFormat?: () => void
+  /** 二进制响应标记；为 true 时内容在 bodyBase64 */
+  isBinary?: boolean
+  /** 二进制响应体（base64） */
+  bodyBase64?: string
+  /** 响应体字节数 */
+  bodySize?: number
+  /** 建议文件名（从请求 URL 推导，用于保存对话框） */
+  fileName?: string
 }
 
 const FORMAT_SIZE_LIMIT = 200 * 1024
+
+const IMAGE_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp', 'image/x-icon', 'image/avif']
 
 function detectLanguage(contentType?: string): string {
   if (!contentType) return 'plaintext'
@@ -37,15 +49,55 @@ function calcBodySize(body: string): string {
 function tryFormatJson(body: string): string | null {
   try {
     return JSON.stringify(JSON.parse(body), null, 2)
-  } catch {
+  }
+  catch {
     return null
   }
 }
 
-export function ResponseBodyViewer({ body, contentType, showFormatted: externalShowFormatted, onToggleFormat }: ResponseBodyViewerProps) {
+/** 从 Content-Type 推导文件扩展名 */
+function extFromContentType(contentType?: string): string {
+  const ct = contentType?.toLowerCase().split(';')[0]?.trim() ?? ''
+  const map: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/svg+xml': 'svg',
+    'image/bmp': 'bmp',
+    'image/x-icon': 'ico',
+    'image/avif': 'avif',
+    'application/pdf': 'pdf',
+    'application/zip': 'zip',
+    'application/gzip': 'gz',
+    'application/json': 'json',
+    'application/xml': 'xml',
+    'application/wasm': 'wasm',
+    'audio/mpeg': 'mp3',
+    'audio/wav': 'wav',
+    'video/mp4': 'mp4',
+  }
+  return map[ct] ?? 'bin'
+}
+
+function isImageContentType(contentType?: string): boolean {
+  const ct = contentType?.toLowerCase().split(';')[0]?.trim() ?? ''
+  return IMAGE_CONTENT_TYPES.includes(ct) || ct.startsWith('image/')
+}
+
+export function ResponseBodyViewer({
+  body,
+  contentType,
+  showFormatted: externalShowFormatted,
+  onToggleFormat,
+  isBinary,
+  bodyBase64,
+  bodySize,
+  fileName,
+}: ResponseBodyViewerProps) {
   const { token } = theme.useToken()
   const isJson = contentType?.toLowerCase().includes('json')
-  const bodySize = useMemo(() => new Blob([body]).size, [body])
+  const bodySizeBytes = bodySize ?? new Blob([body]).size
 
   const { styles } = useStyles(() => ({
     editorContainer: css({
@@ -61,12 +113,80 @@ export function ResponseBodyViewer({ body, contentType, showFormatted: externalS
     return tryFormatJson(body)
   }, [body, isJson])
 
-  const isLarge = bodySize > FORMAT_SIZE_LIMIT
+  const isLarge = bodySizeBytes > FORMAT_SIZE_LIMIT
   const [internalShowFormatted, setInternalShowFormatted] = useState(isJson && !isLarge)
 
   // 如果提供了外部控制，使用外部状态；否则使用内部状态
-  const showFormatted = externalShowFormatted !== undefined ? externalShowFormatted : internalShowFormatted
-  const handleToggle = onToggleFormat || (() => setInternalShowFormatted(v => !v))
+  const showFormatted = externalShowFormatted ?? internalShowFormatted
+  const handleToggle = onToggleFormat ?? (() => {
+    setInternalShowFormatted((v) => !v)
+  })
+
+  // ===== 二进制响应处理 =====
+  const isImage = isBinary && isImageContentType(contentType)
+  const isSvg = isBinary && contentType?.toLowerCase().includes('svg')
+  const imageSrc = isImage && bodyBase64
+    ? `data:${contentType?.toLowerCase().split(';')[0]?.trim() ?? 'image/png'};base64,${bodyBase64}`
+    : undefined
+
+  const handleSaveBinary = async () => {
+    if (!bodyBase64) return
+    try {
+      const ext = extFromContentType(contentType)
+      const urlName = fileName?.split('?')[0]?.split('/').pop() ?? ''
+      const baseName = urlName.includes('.') ? urlName : `response.${ext}`
+      const filePath = await save({
+        defaultPath: baseName,
+        filters: [{ name: '文件', extensions: [ext] }],
+      })
+      if (!filePath) return
+      await invoke('save_response_file', { path: filePath, dataBase64: bodyBase64 })
+      message.success('文件已保存')
+    }
+    catch (err) {
+      message.error(err instanceof Error ? err.message : '保存失败')
+    }
+  }
+
+  if (isBinary) {
+    const sizeText = `${(bodySizeBytes / 1024).toFixed(1)}KB (${bodySizeBytes} 字节)`
+    return (
+      <div className="flex flex-col h-full min-h-0">
+        <div className="mb-2 flex items-center justify-between gap-3 flex-shrink-0">
+          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+            二进制响应 {contentType ? `(${contentType.split(';')[0].trim()})` : ''}{sizeText && ` · ${sizeText}`}
+          </Typography.Text>
+          <Button size="small" icon={<DownloadIcon size={14} />} onClick={() => void handleSaveBinary()}>
+            保存到本地
+          </Button>
+        </div>
+        <div className={styles.editorContainer}>
+          {isImage && imageSrc
+            ? (
+                <div className="flex-1 min-h-0 overflow-auto flex items-start justify-center p-4"
+                  style={{ backgroundColor: token.colorFillQuaternary }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imageSrc}
+                    alt="响应图片"
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+              )
+            : (
+                <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-2"
+                  style={{ color: token.colorTextTertiary }}
+                >
+                  {isSvg
+                    ? <Typography.Text type="secondary">SVG 图片（点击保存按钮下载）</Typography.Text>
+                    : <Typography.Text type="secondary">该响应为二进制内容，不支持文本预览，请保存到本地查看</Typography.Text>}
+                </div>
+              )}
+        </div>
+      </div>
+    )
+  }
 
   const displayBody = showFormatted && formatted ? formatted : body
   const language = detectLanguage(contentType)

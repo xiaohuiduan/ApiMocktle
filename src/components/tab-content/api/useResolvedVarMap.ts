@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 
+import { resolveDynamicVariables } from '@/utils/dynamic-variables'
+
 export interface EnvVarInput {
   name?: string
   value?: string | null
@@ -55,9 +57,15 @@ export function buildVarMaps(input: VarMapInput): ResolvedVarMaps {
   return { varMap, globalsMap, envMap }
 }
 
-/** 生成 {{var}} 替换函数 */
+/** 生成 {{var}} 替换函数；内置动态变量（{{$xxx}}）与用户变量均支持 */
 export function makeResolveVars(varMap: Map<string, string>): (val: string) => string {
-  return (s: string) => s.replace(/\{\{(\w+)\}\}/g, (_, name) => varMap.get(name) ?? `{{${name}}}`)
+  return (s: string) => {
+    // 1. 内置动态变量（{{$timestamp}} 等），每次求值重新生成
+    let resolved = resolveDynamicVariables(s)
+    // 2. 用户变量（{{name}}），未命中保留原样
+    resolved = resolved.replace(/\{\{(\w+)\}\}/g, (_, name) => varMap.get(name) ?? `{{${name}}}`)
+    return resolved
+  }
 }
 
 /** 组件级 hook：随环境/会话变量变化重新计算映射 */

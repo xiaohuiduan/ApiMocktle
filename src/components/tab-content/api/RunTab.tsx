@@ -4,6 +4,7 @@ import { useProxyConfig } from '@/contexts/proxy-config'
 import {
   Button,
   Input,
+  InputNumber,
   Modal,
   Select,
   Space,
@@ -185,6 +186,18 @@ export function RunTab() {
   })
 
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
+  // 请求超时（秒）；undefined 表示跟随全局默认
+  const [timeoutSeconds, setTimeoutSeconds] = useState<number | undefined>(() => {
+    const ms = savedRunTabInfo?.timeoutMs
+    return ms ? Math.round(ms / 1000) : undefined
+  })
+
+  // 数据库 runTabInfo 加载后同步超时值
+  useEffect(() => {
+    if (savedRunTabInfo?.timeoutMs != null) {
+      setTimeoutSeconds(Math.round(savedRunTabInfo.timeoutMs / 1000))
+    }
+  }, [savedRunTabInfo?.timeoutMs])
   const [historyOpen, setHistoryOpen] = useState(false)
   const [resetCounter, setResetCounter] = useState(0)
   const [historyLoaded, setHistoryLoaded] = useState(0)
@@ -323,6 +336,7 @@ export function RunTab() {
     resetResult()
     pendingHistoryRef.current = null
     try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
+    setTimeoutSeconds(undefined)
     setResetCounter(c => c + 1)
   }
 
@@ -488,7 +502,10 @@ export function RunTab() {
 
     const { url, headers, bodyText } = built
 
-    const runResult = await run(tabData.key, url, workCopy.method ?? 'GET', headers, bodyText, built.contentType, built.formDataFiles, built.insecureSkipVerify)
+    // 请求级超时（毫秒）；未设置时 Rust 端回落到全局默认
+    const timeoutMs = timeoutSeconds ? Math.round(timeoutSeconds * 1000) : undefined
+
+    const runResult = await run(tabData.key, url, workCopy.method ?? 'GET', headers, bodyText, built.contentType, built.formDataFiles, built.insecureSkipVerify, timeoutMs)
 
     // ====== 后置脚本执行 ======
     if (workCopy.postScript?.trim() && runResult) {
@@ -553,6 +570,7 @@ export function RunTab() {
       bodyRawText: workCopy.requestBody?.rawText,
       preScript: workCopy.preScript,
       postScript: workCopy.postScript,
+      timeoutMs: timeoutSeconds ? Math.round(timeoutSeconds * 1000) : undefined,
     }
 
     try {
@@ -749,6 +767,20 @@ export function RunTab() {
           </Tooltip>
         )}
 
+        <Tooltip title="请求超时（秒），留空使用全局默认，0 表示不限时">
+          <InputNumber
+            className="shrink-0"
+            size="small"
+            min={0}
+            max={3600}
+            placeholder="超时"
+            addonAfter="秒"
+            value={timeoutSeconds}
+            onChange={(v) => setTimeoutSeconds(v == null ? undefined : Number(v))}
+            style={{ width: 110 }}
+          />
+        </Tooltip>
+
         <Space className="shrink-0" style={{ marginLeft: 'auto' }}>
           <Button icon={<ClockIcon size={14} />} title="历史记录" onClick={() => setHistoryOpen(true)} />
           <Button
@@ -891,6 +923,7 @@ export function RunTab() {
                     fillWithComments={fillWithComments}
                     onFillWithCommentsChange={setFillWithComments}
                     buildBodyExample={() => buildBodyExample(workCopy, menuRawList)}
+                    varMap={varMap}
                   />
                 ),
               },

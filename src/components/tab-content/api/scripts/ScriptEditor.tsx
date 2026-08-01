@@ -214,6 +214,12 @@ pm.request.headers.upsert({ key: 'X-Timestamp', value: String(timestamp) })
 
 变量优先级（从高到低）：会话变量 > 环境变量 > 全局变量
 
+内置动态变量（\`{{$xxx}}\`，每次请求时重新生成，无需定义）：
+- \`{{$timestamp}}\` 秒级时间戳 | \`{{$timestampISO}}\` ISO 8601 时间
+- \`{{$guid}}\` UUID（带横线） | \`{{$randomUUID}}\` UUID（无横线）
+- \`{{$randomInt}}\` 0-1000 随机数 | \`{{$randomEmail}}\` 随机邮箱
+- \`{{$randomIP}}\` 随机 IPv4 | \`{{$randomMobile}}\` 随机手机号 | \`{{$randomString}}\` 8 位随机字符串
+
 请根据我的需求编写脚本代码，直接给出可粘贴的代码即可。`
 
 const HELP_ITEMS = [

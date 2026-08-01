@@ -1,7 +1,8 @@
 import { Switch, Tabs, Tag, theme, Typography } from 'antd'
 
-import type { ApiEnvironmentValue, ApiDetails, ProjectEnvironmentConfig } from '@/types'
+import type { ApiDetails, ApiEnvironmentValue, ProjectEnvironmentConfig } from '@/types'
 
+import { DynamicVariablesHelp } from '../components/DynamicVariablesHelp'
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
 
 function TabLabel(props: React.PropsWithChildren<{ count?: number, hasContent?: boolean }>) {
@@ -36,7 +37,7 @@ interface ParamsTabProps {
   globalParameters?: ProjectEnvironmentConfig['globalParameters']
   envParameters?: ProjectEnvironmentConfig['globalParameters']
   varMap?: Map<string, string>
-  disabledInheritedNames?: { query: Set<string>; header: Set<string>; cookie: Set<string> }
+  disabledInheritedNames?: { query: Set<string>, header: Set<string>, cookie: Set<string> }
   onToggleInheritedParam?: (section: 'query' | 'header' | 'cookie', name: string, enabled: boolean) => void
   exampleColumnTitle?: string
 }
@@ -48,7 +49,7 @@ interface ParamsTabProps {
 function InheritedParamsBar(props: {
   globalRows?: ApiEnvironmentValue[]
   envRows?: ApiEnvironmentValue[]
-  localParams?: { name?: string; enable?: boolean }[]
+  localParams?: { name?: string, enable?: boolean }[]
   sourceLabel: string
   disabledNames?: Set<string>
   onToggle: (name: string, enabled: boolean) => void
@@ -56,32 +57,35 @@ function InheritedParamsBar(props: {
   const { token } = theme.useToken()
   const { globalRows, envRows, localParams, sourceLabel, disabledNames, onToggle } = props
 
-  const localNames = new Set((localParams ?? []).map(p => p.name).filter(Boolean))
+  const localNames = new Set((localParams ?? []).map((p) => p.name).filter(Boolean))
 
-  const allRows: { name: string; value?: string; enable?: boolean; source: 'global' | 'env' }[] = []
+  const allRows: { name: string, value?: string, enable?: boolean, source: 'global' | 'env' }[] = []
+
   for (const g of (globalRows ?? [])) {
-    if (g.name && !allRows.some(r => r.name === g.name)) {
+    if (g.name && !allRows.some((r) => r.name === g.name)) {
       allRows.push({ name: g.name, value: g.value, enable: g.enable, source: 'global' })
     }
   }
+
   for (const e of (envRows ?? [])) {
-    if (e.name && !allRows.some(r => r.name === e.name)) {
+    if (e.name && !allRows.some((r) => r.name === e.name)) {
       // env overrides global by replacing it
-      const existing = allRows.findIndex(r => r.name === e.name)
-      if (existing >= 0) allRows[existing] = { name: e.name, value: e.value, enable: e.enable, source: 'env' }
-      else allRows.push({ name: e.name, value: e.value, enable: e.enable, source: 'env' })
+      const existing = allRows.findIndex((r) => r.name === e.name)
+
+      if (existing >= 0) { allRows[existing] = { name: e.name, value: e.value, enable: e.enable, source: 'env' } }
+      else { allRows.push({ name: e.name, value: e.value, enable: e.enable, source: 'env' }) }
     }
   }
 
-  if (allRows.length === 0) return null
+  if (allRows.length === 0) { return null }
 
   return (
     <div
-      className="mb-3 rounded-lg border px-4 py-3 min-w-0 overflow-hidden"
+      className="mb-3 min-w-0 overflow-hidden rounded-lg border px-4 py-3"
       style={{ borderColor: token.colorBorderSecondary, backgroundColor: token.colorFillQuaternary }}
     >
       <Typography.Text strong>{sourceLabel}</Typography.Text>
-      <Typography.Paragraph type="secondary" className="!mb-2 mt-1">
+      <Typography.Paragraph className="!mb-2 mt-1" type="secondary">
         这些参数来自全局/环境配置，同名接口参数优先。
       </Typography.Paragraph>
       <div className="grid gap-2">
@@ -104,7 +108,7 @@ function InheritedParamsBar(props: {
                 {overridden ? ' (已覆盖)' : ''}
               </Tag>
               <Typography.Text code className="truncate">{r.name}</Typography.Text>
-              <Typography.Text type="secondary" className="truncate">
+              <Typography.Text className="truncate" type="secondary">
                 {r.value || '—'}
               </Typography.Text>
               <div className="flex justify-center">
@@ -138,119 +142,124 @@ export function ParamsTab(props: ParamsTabProps) {
   const hasAnyCookie = (parameters?.cookie?.length ?? 0) + (globalParameters?.cookie?.length ?? 0) + (envParameters?.cookie?.length ?? 0) > 0
 
   return (
-    <Tabs
-      animated={false}
-      className="min-w-0"
-      items={[
-        {
-          key: 'params',
-          label: (
-            <TabLabel count={queryCount}>
-              Params
-            </TabLabel>
-          ),
-          children: (
-            <div>
-              <InheritedParamsBar
-                globalRows={globalParameters?.query}
-                envRows={envParameters?.query}
-                localParams={parameters?.query}
-                sourceLabel="当前全局/环境 Query 参数"
-                disabledNames={disabledInheritedNames?.query}
-                onToggle={(name, enabled) => onToggleInheritedParam?.('query', name, enabled)}
-              />
-              <div className="py-2">
-                <Typography.Text type="secondary">Query 参数</Typography.Text>
+    <div className="min-w-0">
+      <div className="mb-1 flex justify-end">
+        <DynamicVariablesHelp />
+      </div>
+      <Tabs
+        animated={false}
+        className="min-w-0"
+        items={[
+          {
+            key: 'params',
+            label: (
+              <TabLabel count={queryCount}>
+                Params
+              </TabLabel>
+            ),
+            children: (
+              <div>
+                <InheritedParamsBar
+                  disabledNames={disabledInheritedNames?.query}
+                  envRows={envParameters?.query}
+                  globalRows={globalParameters?.query}
+                  localParams={parameters?.query}
+                  sourceLabel="当前全局/环境 Query 参数"
+                  onToggle={(name, enabled) => onToggleInheritedParam?.('query', name, enabled)}
+                />
+                <div className="py-2">
+                  <Typography.Text type="secondary">Query 参数</Typography.Text>
+                </div>
+                <ParamsEditableTable
+                  exampleColumnTitle={exampleColumnTitle}
+                  value={parameters?.query}
+                  varMap={varMap}
+                  onChange={(query) => {
+                    onChange?.({ ...parameters, query })
+                  }}
+                />
+
+                {parameters?.path && parameters.path.length > 0
+                  ? (
+                      <>
+                        <div className="py-2">
+                          <Typography.Text type="secondary">Path 参数</Typography.Text>
+                        </div>
+                        <ParamsEditableTable
+                          isPathParamsTable
+                          exampleColumnTitle={exampleColumnTitle}
+                          removable={false}
+                          value={parameters.path}
+                          onChange={(path) => {
+                            onChange?.({ ...parameters, path })
+                          }}
+                        />
+                      </>
+                    )
+                  : null}
               </div>
-              <ParamsEditableTable
-                varMap={varMap}
-                exampleColumnTitle={exampleColumnTitle}
-                value={parameters?.query}
-                onChange={(query) => {
-                  onChange?.({ ...parameters, query })
-                }}
-              />
+            ),
+          },
 
-              {parameters?.path && parameters.path.length > 0
-                ? (
-                    <>
-                      <div className="py-2">
-                        <Typography.Text type="secondary">Path 参数</Typography.Text>
-                      </div>
-                      <ParamsEditableTable
-                        isPathParamsTable
-                        removable={false}
-                        exampleColumnTitle={exampleColumnTitle}
-                        value={parameters.path}
-                        onChange={(path) => {
-                          onChange?.({ ...parameters, path })
-                        }}
-                      />
-                    </>
-                  )
-                : null}
-            </div>
-          ),
-        },
+          {
+            key: 'headers',
+            label: (
+              <TabLabel hasContent={hasAnyHeader}>
+                Headers
+              </TabLabel>
+            ),
+            children: (
+              <div className="pt-2">
+                <InheritedParamsBar
+                  disabledNames={disabledInheritedNames?.header}
+                  envRows={envParameters?.header}
+                  globalRows={globalParameters?.header}
+                  localParams={parameters?.header}
+                  sourceLabel="当前全局/环境 Header 参数"
+                  onToggle={(name, enabled) => onToggleInheritedParam?.('header', name, enabled)}
+                />
+                <ParamsEditableTable
+                  exampleColumnTitle={exampleColumnTitle}
+                  value={parameters?.header}
+                  varMap={varMap}
+                  onChange={(header) => {
+                    onChange?.({ ...parameters, header })
+                  }}
+                />
+              </div>
+            ),
+          },
 
-        {
-          key: 'headers',
-          label: (
-            <TabLabel hasContent={hasAnyHeader}>
-              Headers
-            </TabLabel>
-          ),
-          children: (
-            <div className="pt-2">
-              <InheritedParamsBar
-                globalRows={globalParameters?.header}
-                envRows={envParameters?.header}
-                localParams={parameters?.header}
-                sourceLabel="当前全局/环境 Header 参数"
-                disabledNames={disabledInheritedNames?.header}
-                onToggle={(name, enabled) => onToggleInheritedParam?.('header', name, enabled)}
-              />
-              <ParamsEditableTable
-                varMap={varMap}
-                exampleColumnTitle={exampleColumnTitle}
-                value={parameters?.header}
-                onChange={(header) => {
-                  onChange?.({ ...parameters, header })
-                }}
-              />
-            </div>
-          ),
-        },
-
-        {
-          key: 'cookie',
-          label: (
-            <TabLabel hasContent={hasAnyCookie}>
-              Cookie
-            </TabLabel>
-          ),
-          children: (
-            <div className="pt-2">
-              <InheritedParamsBar
-                globalRows={globalParameters?.cookie}
-                envRows={envParameters?.cookie}
-                localParams={parameters?.cookie}
-                sourceLabel="当前全局/环境 Cookie 参数"
-                disabledNames={disabledInheritedNames?.cookie}
-                onToggle={(name, enabled) => onToggleInheritedParam?.('cookie', name, enabled)}
-              />
-              <ParamsEditableTable
-                varMap={varMap}
-                exampleColumnTitle={exampleColumnTitle}
-                value={parameters?.cookie}
-                onChange={(cookie) => {
-                  onChange?.({ ...parameters, cookie })
-                }}
-              />
-            </div>
-          ),
-        },
-      ]}
-    />
+          {
+            key: 'cookie',
+            label: (
+              <TabLabel hasContent={hasAnyCookie}>
+                Cookie
+              </TabLabel>
+            ),
+            children: (
+              <div className="pt-2">
+                <InheritedParamsBar
+                  disabledNames={disabledInheritedNames?.cookie}
+                  envRows={envParameters?.cookie}
+                  globalRows={globalParameters?.cookie}
+                  localParams={parameters?.cookie}
+                  sourceLabel="当前全局/环境 Cookie 参数"
+                  onToggle={(name, enabled) => onToggleInheritedParam?.('cookie', name, enabled)}
+                />
+                <ParamsEditableTable
+                  exampleColumnTitle={exampleColumnTitle}
+                  value={parameters?.cookie}
+                  varMap={varMap}
+                  onChange={(cookie) => {
+                    onChange?.({ ...parameters, cookie })
+                  }}
+                />
+              </div>
+            ),
+          },
+        ]}
+      />
+    </div>
   )
 }

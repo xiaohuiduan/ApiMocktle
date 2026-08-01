@@ -1,6 +1,8 @@
-import { Input, Tag, theme, Tooltip } from 'antd'
+import { Input, Popover, Tag, theme, Tooltip } from 'antd'
 import type { InputRef } from 'antd'
 import { useCallback, useMemo, useRef, useState } from 'react'
+
+import { DYNAMIC_VARIABLE_DEFS } from '@/utils/dynamic-variables'
 
 interface VarHighlightInputProps {
   value?: string
@@ -12,6 +14,13 @@ interface VarHighlightInputProps {
 }
 
 const VAR_REGEX = /\{\{(\w+)\}\}/g
+
+/** 动态变量补全项：label 为 $xxx 名称，detail 为说明 */
+interface CompletionItem {
+  label: string
+  detail?: string
+  isDynamic: boolean
+}
 
 function extractVarNames(text: string): string[] {
   const names: string[] = []
@@ -36,13 +45,42 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
   const definedVars = referencedVars.filter((n) => varMap.has(n))
   const undefinedVars = referencedVars.filter((n) => !varMap.has(n))
 
-  const matchingVars = useMemo(() => {
-    if (!dropdownFilter) return Array.from(varMap.keys()).slice(0, 10)
+  /** 动态变量补全项（全部，过滤在下方） */
+  const dynamicItems: CompletionItem[] = useMemo(() => {
+    return DYNAMIC_VARIABLE_DEFS.map((d) => ({
+      label: d.name,
+      detail: d.desc,
+      isDynamic: true,
+    }))
+  }, [])
+
+  /** 用户变量补全项（已定义的，带当前值） */
+  const userItems: CompletionItem[] = useMemo(() => {
+    return Array.from(varMap.entries())
+      .filter(([k]) => k.startsWith('$'))
+      .map(([k, v]) => ({ label: k, detail: v, isDynamic: false }))
+  }, [varMap])
+
+  /** 匹配补全项：动态变量 + 已定义用户变量（最多 10 个） */
+  const matchingItems = useMemo(() => {
+    if (!showDropdown) return []
     const filter = dropdownFilter.toLowerCase()
-    return Array.from(varMap.keys())
-      .filter((k) => k.toLowerCase().includes(filter))
-      .slice(0, 10)
-  }, [varMap, dropdownFilter])
+
+    const dyn = dynamicItems.filter((it) => {
+      // 输入 $ 开头时按 $ 前缀过滤；输入普通字符时按名称包含匹配
+      return filter.startsWith('$')
+        ? it.label.toLowerCase().startsWith(filter)
+        : it.label.toLowerCase().includes(filter)
+    })
+
+    const users = userItems.filter((it) => {
+      return filter.startsWith('$')
+        ? it.label.toLowerCase().startsWith(filter)
+        : it.label.toLowerCase().includes(filter)
+    })
+
+    return [...dyn, ...users.slice(0, 10)]
+  }, [showDropdown, dropdownFilter, dynamicItems, userItems])
 
   const handleChange = useCallback(
     (ev: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,64 +125,71 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
   )
 
   return (
-    <div className="relative" style={{ minWidth: 0 }}>
-      <Input
-        ref={inputRef}
-        disabled={disabled}
-        placeholder={placeholder}
-        readOnly={readOnly}
-        value={value}
-        variant="borderless"
-        onChange={handleChange}
-        onKeyDown={(ev) => {
-          if (showDropdown && ev.key === 'Escape') setShowDropdown(false)
-        }}
-      />
-
-      {referencedVars.length > 0 && (
-        <div className="mt-0.5 flex flex-wrap items-center gap-1">
-          {definedVars.map((v) => (
-            <Tooltip key={v} title={`实际生效值：${varMap.get(v) ?? '—'}`}>
-              <Tag className="text-[10px] leading-none" color="blue">
-                {v}={varMap.get(v)}
-              </Tag>
-            </Tooltip>
-          ))}
-          {undefinedVars.map((v) => (
-            <Tag key={v} className="text-[10px] leading-none" color="orange">
-              {v} 未定义
-            </Tag>
-          ))}
-        </div>
-      )}
-
-      {showDropdown && matchingVars.length > 0 && (
-        <div
-          className="absolute z-50 mt-1 w-max min-w-[160px] rounded-lg border py-1 shadow-lg"
-          style={{ backgroundColor: token.colorBgElevated, borderColor: token.colorBorderSecondary }}
-        >
-          {matchingVars.map((v) => (
+    // Popover 通过 portal 渲染补全列表，避免被表格单元格 overflow:hidden 裁剪
+    <Popover
+      open={showDropdown && matchingItems.length > 0}
+      placement="bottomLeft"
+      arrow={false}
+      styles={{ body: { padding: 0, maxHeight: 240, overflowY: 'auto' } }}
+      onOpenChange={(v) => {
+        if (!v) setShowDropdown(false)
+      }}
+      content={(
+        <div className="py-1 min-w-[200px]">
+          {matchingItems.map((it) => (
             <div
-              key={v}
+              key={it.label}
               className="cursor-pointer px-3 py-1.5 text-sm"
               style={{ color: token.colorText }}
               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = token.colorFillTertiary }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '' }}
               onMouseDown={(e) => {
                 e.preventDefault()
-                selectVariable(v)
+                selectVariable(it.label)
               }}
             >
-              <span className="font-medium" style={{ color: token.colorPrimary }}>
-                {v}
+              <span className="font-medium" style={{ color: it.isDynamic ? token.colorPrimary : token.colorText }}>
+                {it.label}
               </span>
               <span className="ml-2" style={{ color: token.colorTextSecondary }}>
-                {varMap.get(v)}
+                {it.detail}
               </span>
             </div>
           ))}
         </div>
       )}
-    </div>
+    >
+      <div className="relative" style={{ minWidth: 0 }}>
+        <Input
+          ref={inputRef}
+          disabled={disabled}
+          placeholder={placeholder}
+          readOnly={readOnly}
+          value={value}
+          variant="borderless"
+          onChange={handleChange}
+          onKeyDown={(ev) => {
+            if (showDropdown && ev.key === 'Escape') setShowDropdown(false)
+          }}
+        />
+
+        {referencedVars.length > 0 && (
+          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+            {definedVars.map((v) => (
+              <Tooltip key={v} title={`实际生效值：${varMap.get(v) ?? '—'}`}>
+                <Tag className="text-[10px] leading-none" color="blue">
+                  {v}={varMap.get(v)}
+                </Tag>
+              </Tooltip>
+            ))}
+            {undefinedVars.map((v) => (
+              <Tag key={v} className="text-[10px] leading-none" color="orange">
+                {v} 未定义
+              </Tag>
+            ))}
+          </div>
+        )}
+      </div>
+    </Popover>
   )
 }

@@ -1,7 +1,9 @@
 import { api } from '@/api-client'
 import type { ProxyConfig } from '@/types'
+import type { AppRequestConfig } from '@/components/settings/RequestSettingsPanel'
 
 const CONFIG_KEY_PROXY = 'proxy'
+const CONFIG_KEY_REQUEST = 'request'
 
 export async function getProxyConfig(): Promise<ProxyConfig | null> {
   const value = await api<unknown>('get_app_config', { key: CONFIG_KEY_PROXY })
@@ -10,4 +12,13 @@ export async function getProxyConfig(): Promise<ProxyConfig | null> {
 
 export async function setProxyConfig(config: ProxyConfig | null): Promise<void> {
   await api('set_app_config', { key: CONFIG_KEY_PROXY, value: config ?? null })
+}
+
+export async function getAppRequestConfig(): Promise<AppRequestConfig | null> {
+  const value = await api<unknown>('get_app_config', { key: CONFIG_KEY_REQUEST })
+  return value ? (value as AppRequestConfig) : null
+}
+
+export async function setAppRequestConfig(config: AppRequestConfig | null): Promise<void> {
+  await api('set_app_config', { key: CONFIG_KEY_REQUEST, value: config ?? null })
 }

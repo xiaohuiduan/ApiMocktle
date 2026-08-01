@@ -1,7 +1,10 @@
 import { Button, Modal, Switch, Tag, Typography, theme } from 'antd'
+import { useMemo } from 'react'
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
+import { DynamicVariablesHelp } from '../components/DynamicVariablesHelp'
 import { BodyType } from '@/enums'
+import { DYNAMIC_VARIABLE_DEFS } from '@/utils/dynamic-variables'
 import type { ApiRequestBody, Parameter } from '@/types'
 
 /** 判断某个 body 类型是否已有内容（用于类型标签的绿标） */
@@ -47,6 +50,8 @@ interface BodyPanelProps {
   fillWithComments?: boolean
   onFillWithCommentsChange?: (value: boolean) => void
   buildBodyExample?: () => string
+  /** 已定义变量映射（环境/全局/会话），用于补全与 form-data 表格变量提示 */
+  varMap?: Map<string, string>
 }
 
 export function BodyPanel(props: BodyPanelProps) {
@@ -60,9 +65,21 @@ export function BodyPanel(props: BodyPanelProps) {
     fillWithComments = true,
     onFillWithCommentsChange,
     buildBodyExample,
+    varMap,
   } = props
 
   const { token } = theme.useToken()
+
+  // 变量补全项：内置动态变量 + 已定义用户变量
+  const completionItems = useMemo(() => {
+    const dyn = DYNAMIC_VARIABLE_DEFS.map((d) => ({ label: d.name, detail: d.desc }))
+    const users = varMap
+      ? Array.from(varMap.entries())
+          .filter(([k]) => !k.startsWith('$'))
+          .map(([k, v]) => ({ label: k, detail: v }))
+      : []
+    return [...dyn, ...users]
+  }, [varMap])
 
   const showBodyEditor = requestBody
     && (requestBody.type === BodyType.Json
@@ -121,17 +138,20 @@ export function BodyPanel(props: BodyPanelProps) {
             )
           })}
           </div>
-          {showFillButton && onFillBody && (
-            <div className="flex shrink-0 items-center gap-1.5">
-              <Switch
-                checked={fillWithComments}
-                size="small"
-                onChange={onFillWithCommentsChange}
-              />
-              <span className="text-xs" style={{ color: token.colorTextSecondary }}>注释</span>
-              <Button size="small" onClick={handleFillClick}>一键填充</Button>
-            </div>
-          )}
+          <div className="flex shrink-0 items-center gap-1.5">
+            {showFillButton && onFillBody && (
+              <>
+                <Switch
+                  checked={fillWithComments}
+                  size="small"
+                  onChange={onFillWithCommentsChange}
+                />
+                <span className="text-xs" style={{ color: token.colorTextSecondary }}>注释</span>
+                <Button size="small" onClick={handleFillClick}>一键填充</Button>
+              </>
+            )}
+            <DynamicVariablesHelp />
+          </div>
         </div>
       </div>
 
@@ -148,6 +168,7 @@ export function BodyPanel(props: BodyPanelProps) {
               }
               deserializeOnChange={false}
               value={bodyRawText ?? (requestBody.type === BodyType.Json ? (buildBodyExample?.() ?? '') : '')}
+              completionItems={completionItems}
               onChange={(val) => {
                 if (onBodyRawTextChange) {
                   onBodyRawTextChange(typeof val === 'string' ? val : '')
@@ -172,6 +193,8 @@ export function BodyPanel(props: BodyPanelProps) {
             </Typography.Text>
             <ParamsEditableTable
               showDescriptionColumn={false}
+              showRequiredColumn={false}
+              varMap={varMap}
               value={requestBody.parameters}
               onChange={(params) => onBodyParametersChange?.(params ?? [])}
             />

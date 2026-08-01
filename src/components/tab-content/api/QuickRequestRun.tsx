@@ -736,6 +736,7 @@ export function QuickRequestRun() {
                     fillWithComments={fillWithComments}
                     onFillWithCommentsChange={setFillWithComments}
                     buildBodyExample={() => buildBodyExample(workCopy, menuRawList)}
+                    varMap={varMap}
                   />
                 ),
               },

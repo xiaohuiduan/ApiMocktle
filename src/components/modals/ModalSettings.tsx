@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Viewer } from '@bytemd/react'
 import { create, useModal } from '@ebay/nice-modal-react'
 import { ConfigProvider, Menu, type MenuProps, Modal, type ModalProps, theme } from 'antd'
-import { Globe, InfoIcon, KeyRoundIcon, ShirtIcon, Zap } from 'lucide-react'
+import { Globe, InfoIcon, KeyRoundIcon, SendIcon, ShirtIcon, Zap } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 
 import { PROJECT_ABOUT_MARKDOWN } from '@/content/project-about'
@@ -11,6 +11,7 @@ import { ThemeEditor, useThemeContext } from '@/components/ThemeEditor'
 import { ProxySettingsForm } from '@/components/proxy-settings/ProxySettingsForm'
 import { McpServerPanel } from '@/components/project-settings/McpServerPanel'
 import { PersonalTokenPanel } from '@/components/settings/PersonalTokenPanel'
+import { RequestSettingsPanel } from '@/components/settings/RequestSettingsPanel'
 
 export const enum SettingsMenuKey {
   Appearance = '0',
@@ -18,6 +19,7 @@ export const enum SettingsMenuKey {
   Proxy = '2',
   McpServer = '3',
   Tokens = '4',
+  Request = '5',
 }
 
 const settingMenuItems = [
@@ -30,6 +32,11 @@ const settingMenuItems = [
     key: SettingsMenuKey.Proxy,
     icon: <Globe size={16} />,
     label: '网络代理',
+  },
+  {
+    key: SettingsMenuKey.Request,
+    icon: <SendIcon size={16} />,
+    label: '请求',
   },
   {
     key: SettingsMenuKey.Tokens,
@@ -71,6 +78,9 @@ const renderMenuContent = (props: { menuKey: SettingsMenuKey }) => {
 
     case SettingsMenuKey.Proxy:
       return <ProxySettingsForm />
+
+    case SettingsMenuKey.Request:
+      return <RequestSettingsPanel />
 
     case SettingsMenuKey.McpServer:
       return <McpServerPanel />

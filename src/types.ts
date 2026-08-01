@@ -146,6 +146,12 @@ export interface ApiRunResult {
   headers: ApiRunHeader[]
   contentType?: string
   body?: string
+  /** 是否为二进制响应（图片等）；为 true 时 body 为空，内容在 bodyBase64 */
+  isBinary?: boolean
+  /** 响应体字节数 */
+  bodySize?: number
+  /** 二进制响应体（base64 编码） */
+  bodyBase64?: string
   proxyType?: string
   errorInfo?: RequestErrorInfo
 }
@@ -229,6 +235,8 @@ export interface RunTabInfo {
   preScript?: string
   /** 运行时修改的后置脚本 */
   postScript?: string
+  /** 运行时修改的请求超时（毫秒）；0 或 undefined 表示跟随全局默认 */
+  timeoutMs?: number
 }
 
 /** 脚本控制台输出条目 */

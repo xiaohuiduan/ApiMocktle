@@ -26,6 +26,7 @@ export function useApiRequestRunner() {
     contentType?: string,
     formDataFiles?: Array<{ name: string, path: string }>,
     insecureSkipVerify?: boolean,
+    timeoutMs?: number,
   ): Promise<ApiRunResult | undefined> => {
     if (!projectId || !sessionId) {
       const msg = '当前不在项目页面，无法运行请求'
@@ -42,7 +43,7 @@ export function useApiRequestRunner() {
       const payload: Record<string, unknown> = {
         sessionId,
         projectId,
-        payload: { url, method, headers, body, contentType, formDataFiles, insecureSkipVerify },
+        payload: { url, method, headers, body, contentType, formDataFiles, insecureSkipVerify, timeoutMs },
       }
 
       // Attach proxy config if configured
@@ -54,15 +55,16 @@ export function useApiRequestRunner() {
       const apiResult = await api<ApiRunResult>('run_api_request', payload)
       setResult(apiResult)
 
-      // Save history (fire-and-forget)
+      // Save history (fire-and-forget)；二进制 body 不落库（bodyBase64 可能很大）
       if (menuItemId && projectId && sessionId) {
         const requestData = { url, method, headers, body, contentType }
+        const historyResponse = apiResult.isBinary ? { ...apiResult, bodyBase64: undefined } : apiResult
         api('save_request_history', {
           sessionId,
           projectId,
           menuItemId,
           requestJson: requestData,
-          responseJson: apiResult,
+          responseJson: historyResponse,
           statusCode: apiResult.status,
           durationMs: apiResult.durationMs,
         }).catch(() => {})

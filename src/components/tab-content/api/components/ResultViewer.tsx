@@ -154,6 +154,10 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
               contentType={result.contentType}
               showFormatted={showFormatted}
               onToggleFormat={() => setShowFormatted(v => !v)}
+              isBinary={result.isBinary}
+              bodyBase64={result.bodyBase64}
+              bodySize={result.bodySize}
+              fileName={result.url}
             />
           )
         : <Typography.Text type="secondary" className="text-xs">无响应体</Typography.Text>,
@@ -295,7 +299,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
                   </Tooltip>
                 )}
                 {' | '}{result.durationMs}ms
-                {result.body ? ` | ${calcBodySize(result.body)}` : ''}
+                {result.body ? ` | ${calcBodySize(result.body)}` : result.bodySize != null ? ` | ${result.bodySize}B` : ''}
               </span>
             </div>
           )
