@@ -82,3 +82,7 @@ plans/**
 .trellis
 .qoder
 .pnpm-store/v11/index.db
+.agents
+.codex
+.opencode
+.zcode
