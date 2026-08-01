@@ -606,12 +606,22 @@ export function QuickRequestRun() {
           <Input
             variant="borderless"
             className="flex-1 min-w-0"
-            placeholder={envBaseUrl ? '输入路径，如 /users' : '输入完整 URL，如 https://api.example.com/users'}
+            placeholder={envBaseUrl ? '输入路径（如 /users）或完整 URL' : '输入完整 URL，如 https://api.example.com/users'}
+            title={envBaseUrl
+              ? '两种输入方式：\n1. 输入相对路径（如 /users），请求时自动拼接环境 baseUrl；\n2. 输入完整 URL（以 http:// 或 https:// 开头），请求直接使用该地址，不再拼接环境 baseUrl。'
+              : '请输入完整 URL，如 https://api.example.com/users'}
             value={workCopy.path ?? ''}
             onChange={(e) => {
               setWorkCopy((prev) => ({ ...prev, path: e.target.value }))
             }}
           />
+          {/^https?:\/\//i.test(workCopy.path ?? '') && envBaseUrl && (
+            <Tooltip title="已输入完整 URL，请求将直接使用该地址，不再拼接环境 baseUrl">
+              <span className="ml-1 shrink-0 text-xs select-none" style={{ color: token.colorWarning }}>
+                完整 URL
+              </span>
+            </Tooltip>
+          )}
         </div>
 
         {proxyInfo && (
