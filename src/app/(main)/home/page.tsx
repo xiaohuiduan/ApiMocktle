@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 
 import { Button, ConfigProvider, Dropdown, Flex, theme, Tooltip } from 'antd'
 import { FilterIcon, PlusIcon } from 'lucide-react'
@@ -18,16 +18,18 @@ import { PanelLayout } from '../components/PanelLayout'
 
 const ApiMenu = lazy(async () => {
   const mod = await import('@/components/ApiMenu')
+
   return { default: mod.ApiMenu }
 })
 
 const ApiTab = lazy(async () => {
   const mod = await import('@/components/ApiTab')
+
   return { default: mod.ApiTab }
 })
 
 function LoadingPlaceholder() {
-  return <div className="h-full w-full animate-pulse bg-zinc-50 dark:bg-zinc-900/30" />
+  return <div className="size-full animate-pulse bg-zinc-50 dark:bg-zinc-900/30" />
 }
 
 function HomeContent() {

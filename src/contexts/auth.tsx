@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+
 import { api } from '@/api-client'
 
 export interface SessionUser {
@@ -26,11 +27,11 @@ const AuthContext = createContext<AuthContextData>({
   user: null,
   sessionId: '',
   loading: true,
-  login: async () => {},
-  register: async () => {},
-  logout: async () => {},
-  refreshUser: async () => {},
-  changePassword: async () => {},
+  login: async () => { /* noop */ },
+  register: async () => { /* noop */ },
+  logout: async () => { /* noop */ },
+  refreshUser: async () => { /* noop */ },
+  changePassword: async () => { /* noop */ },
 })
 
 const SESSION_KEY = 'session_id'
@@ -38,54 +39,69 @@ const REMEMBER_SESSION_KEY = 'remember_session'
 const SAVED_CREDENTIALS_KEY = 'saved_credentials'
 
 function getStoredSessionId(): string {
-  try { return sessionStorage.getItem(SESSION_KEY) ?? '' } catch { return '' }
+  try { return sessionStorage.getItem(SESSION_KEY) ?? '' }
+  catch { return '' }
 }
 
 function storeSessionId(id: string) {
-  try { sessionStorage.setItem(SESSION_KEY, id) } catch { /* ignore */ }
+  try { sessionStorage.setItem(SESSION_KEY, id) }
+  catch { /* ignore */ }
 }
 
 function clearSessionId() {
-  try { sessionStorage.removeItem(SESSION_KEY) } catch { /* ignore */ }
+  try { sessionStorage.removeItem(SESSION_KEY) }
+  catch { /* ignore */ }
 }
 
 function getRememberedSession(): RememberSession | null {
   try {
     const raw = localStorage.getItem(REMEMBER_SESSION_KEY)
-    if (!raw) return null
+
+    if (!raw) { return null }
+
     const parsed = JSON.parse(raw) as RememberSession
+
     if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
       localStorage.removeItem(REMEMBER_SESSION_KEY)
+
       return null
     }
+
     return parsed
-  } catch { return null }
+  }
+  catch { return null }
 }
 
 function saveRememberedSession(sessionId: string, days: number) {
   try {
     const expiresAt = days === -1 ? Number.MAX_SAFE_INTEGER : Date.now() + days * 86400000
     localStorage.setItem(REMEMBER_SESSION_KEY, JSON.stringify({ sessionId, expiresAt }))
-  } catch { /* ignore */ }
+  }
+  catch { /* ignore */ }
 }
 
 function clearRememberedSession() {
-  try { localStorage.removeItem(REMEMBER_SESSION_KEY) } catch { /* ignore */ }
+  try { localStorage.removeItem(REMEMBER_SESSION_KEY) }
+  catch { /* ignore */ }
 }
 
 export function getSavedCredentials(): { username: string, password: string } | null {
   try {
     const raw = localStorage.getItem(SAVED_CREDENTIALS_KEY)
+
     return raw ? JSON.parse(raw) : null
-  } catch { return null }
+  }
+  catch { return null }
 }
 
 function saveCredentials(username: string, password: string) {
-  try { localStorage.setItem(SAVED_CREDENTIALS_KEY, JSON.stringify({ username, password })) } catch { /* ignore */ }
+  try { localStorage.setItem(SAVED_CREDENTIALS_KEY, JSON.stringify({ username, password })) }
+  catch { /* ignore */ }
 }
 
 function clearSavedCredentials() {
-  try { localStorage.removeItem(SAVED_CREDENTIALS_KEY) } catch { /* ignore */ }
+  try { localStorage.removeItem(SAVED_CREDENTIALS_KEY) }
+  catch { /* ignore */ }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -99,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // sessionStorage 无 session → 检查 localStorage 记住登录
     if (!sid) {
       const remembered = getRememberedSession()
+
       if (remembered) {
         sid = remembered.sessionId
         storeSessionId(sid)
@@ -109,23 +126,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!sid) {
       setUser(null)
       setLoading(false)
+
       return
     }
 
     try {
       const u = await api<SessionUser | null>('get_current_user', { sessionId: sid })
+
       if (u) {
         setUser(u)
         setSessionId(sid)
-      } else {
+      }
+      else {
         setUser(null)
         clearSessionId()
         clearRememberedSession()
         setSessionId('')
       }
-    } catch {
+    }
+    catch {
       setUser(null)
-    } finally {
+    }
+    finally {
       setLoading(false)
     }
   }, [])
@@ -139,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
     opts?: { rememberPassword?: boolean, rememberDays?: number },
   ) => {
-    const result = await api<{ user: SessionUser; session_id: string }>('login', {
+    const result = await api<{ user: SessionUser, session_id: string }>('login', {
       payload: { username, password },
     })
     setUser(result.user)
@@ -148,19 +170,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (opts?.rememberPassword) {
       saveCredentials(username, password)
-    } else {
+    }
+    else {
       clearSavedCredentials()
     }
 
     if (opts?.rememberDays !== undefined && opts.rememberDays !== 0) {
       saveRememberedSession(result.session_id, opts.rememberDays)
-    } else {
+    }
+    else {
       clearRememberedSession()
     }
   }, [])
 
   const register = useCallback(async (username: string, password: string) => {
-    const result = await api<{ user: SessionUser; session_id: string }>('register', {
+    const result = await api<{ user: SessionUser, session_id: string }>('register', {
       payload: { username, password },
     })
     setUser(result.user)
@@ -170,9 +194,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     const sid = getStoredSessionId()
+
     if (sid) {
-      await api('logout', { sessionId: sid }).catch(() => {})
+      await api('logout', { sessionId: sid }).catch(() => { /* noop */ })
     }
+
     setUser(null)
     setSessionId('')
     clearSessionId()

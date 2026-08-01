@@ -4,8 +4,8 @@ import { useEvent } from 'react-use-event-hook'
 import type { ApiTabItem, EditStatus } from '@/components/ApiTab'
 import type { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { API_MENU_CONFIG } from '@/configs/static'
-import { CatalogType } from '@/enums'
 import { useProjectTabsContext } from '@/contexts/project-tabs'
+import { CatalogType } from '@/enums'
 
 function createDefaultTabItems(): ApiTabItem[] {
   return [
@@ -45,9 +45,11 @@ export function MenuTabProvider(props: React.PropsWithChildren) {
   // ----- Setters 包装器（写入 ProjectTabsContext） -----
   const setTabItems = useCallback(
     (value: ApiTabItem[] | ((prev: ApiTabItem[]) => ApiTabItem[])) => {
-      if (!activeProjectId) return
+      if (!activeProjectId) { return }
+
       updateProjectTabState(activeProjectId, (prev) => {
         const newItems = typeof value === 'function' ? value(prev.tabItems) : value
+
         return { ...prev, tabItems: newItems }
       })
     },
@@ -56,7 +58,8 @@ export function MenuTabProvider(props: React.PropsWithChildren) {
 
   const setActiveTabKey = useCallback(
     (value: ApiTabItem['key'] | undefined | ((prev: ApiTabItem['key'] | undefined) => ApiTabItem['key'] | undefined)) => {
-      if (!activeProjectId) return
+      if (!activeProjectId) { return }
+
       updateProjectTabState(activeProjectId, (prev) => ({
         ...prev,
         activeTabKey: typeof value === 'function' ? value(prev.activeTabKey) : value,
@@ -67,7 +70,8 @@ export function MenuTabProvider(props: React.PropsWithChildren) {
 
   const setLastActiveTabKey = useCallback(
     (value: ApiTabItem['key'] | undefined | ((prev: ApiTabItem['key'] | undefined) => ApiTabItem['key'] | undefined)) => {
-      if (!activeProjectId) return
+      if (!activeProjectId) { return }
+
       updateProjectTabState(activeProjectId, (prev) => ({
         ...prev,
         lastActiveTabKey: typeof value === 'function' ? value(prev.lastActiveTabKey) : value,

@@ -78,7 +78,7 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
               setGenSchemaPreview(null)
               setGenExamplePreview('')
               setGenTab('json-to-schema')
-              setGenKey(k => k + 1)
+              setGenKey((k) => k + 1)
               setGenerateModalOpen(true)
             }}
           >
@@ -120,9 +120,6 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
       >
         <Tabs
           activeKey={genTab}
-          onChange={(key) => {
-            setGenTab(key as 'json-to-schema' | 'schema-to-json')
-          }}
           items={[
             {
               key: 'json-to-schema',
@@ -355,6 +352,9 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
               ),
             },
           ]}
+          onChange={(key) => {
+            setGenTab(key as 'json-to-schema' | 'schema-to-json')
+          }}
         />
       </Modal>
 

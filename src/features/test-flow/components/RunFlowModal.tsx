@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Modal, Select, Button, Space, Typography, Tag, Divider, Switch } from 'antd'
-import { Play, Square, CheckCircle, XCircle, Clock, AlertTriangle, SkipForward } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
 import { invoke } from '@tauri-apps/api/core'
+import { Button, Divider, Modal, Select, Space, Switch, Tag, Typography } from 'antd'
+import { AlertTriangle, CheckCircle, Clock, Play, SkipForward, Square, XCircle } from 'lucide-react'
+
+import { type FlowExecLog, type useFlowExecution, type VariableSource } from '../hooks/useFlowExecution'
+import { type FlowEdge, type FlowNode, NODE_TYPE_LABELS, type NodeExecStatus } from '../types/flow.types'
+
 import { css } from '@emotion/css'
-import type { FlowNode, FlowEdge, FlowNodeType, NodeExecStatus } from '../types/flow.types'
-import { NODE_TYPE_LABELS } from '../types/flow.types'
-import { useFlowExecution, type FlowExecLog, type VariableSource } from '../hooks/useFlowExecution'
 
 export type { VariableSource }
 
@@ -52,12 +54,12 @@ const logLineClass = css`
 `
 
 const statusIconMap: Record<NodeExecStatus, React.ReactNode> = {
-  idle: <Clock size={12} color="var(--ds-node-text-muted, #9ca3af)" />,
-  running: <Clock size={12} color="var(--ds-highlight-selected, #3b82f6)" />,
-  passed: <CheckCircle size={12} color="var(--ds-success-color, #22c55e)" />,
-  failed: <XCircle size={12} color="var(--ds-error-color, #ef4444)" />,
-  skipped: <SkipForward size={12} color="var(--ds-node-text-muted, #9ca3af)" />,
-  error: <AlertTriangle size={12} color="var(--ds-error-color, #ef4444)" />,
+  idle: <Clock color="var(--ds-node-text-muted, #9ca3af)" size={12} />,
+  running: <Clock color="var(--ds-highlight-selected, #3b82f6)" size={12} />,
+  passed: <CheckCircle color="var(--ds-success-color, #22c55e)" size={12} />,
+  failed: <XCircle color="var(--ds-error-color, #ef4444)" size={12} />,
+  skipped: <SkipForward color="var(--ds-node-text-muted, #9ca3af)" size={12} />,
+  error: <AlertTriangle color="var(--ds-error-color, #ef4444)" size={12} />,
 }
 
 // ==================== 组件 ====================
@@ -65,8 +67,8 @@ const statusIconMap: Record<NodeExecStatus, React.ReactNode> = {
 interface Environment {
   name: string
   url?: string
-  baseUrls?: Array<{ id: string; url: string }>
-  variables?: Array<{ id: string; name: string; value?: string; enable?: boolean }> | Record<string, string>
+  baseUrls?: { id: string, url: string }[]
+  variables?: { id: string, name: string, value?: string, enable?: boolean }[] | Record<string, string>
   agentUrl?: string
   [key: string]: unknown
 }
@@ -122,15 +124,18 @@ export default function RunFlowModal({
     resizingRef.current = true
     const startY = e.clientY
     const startHeight = logHeight
+
     const onMouseMove = (ev: MouseEvent) => {
       const newHeight = Math.max(150, startHeight + (ev.clientY - startY))
       setLogHeight(newHeight)
     }
+
     const onMouseUp = () => {
       resizingRef.current = false
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
     }
+
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
   }, [logHeight])
@@ -139,6 +144,7 @@ export default function RunFlowModal({
   useEffect(() => {
     if (open) {
       reset()
+
       if (environments.length > 0 && !selectedEnv) {
         setSelectedEnv(environments[0].name)
       }
@@ -147,20 +153,23 @@ export default function RunFlowModal({
 
   const handleRun = useCallback(async () => {
     const env = environments.find((e) => e.name === selectedEnv)
-    if (!env) return // 未选择环境（按钮已禁用，此处兜底）
+
+    if (!env) { return } // 未选择环境（按钮已禁用，此处兜底）
+
     // 优先取 baseUrls[0].url，其次取 env.url
-    const baseUrl = env?.baseUrls?.[0]?.url || env?.url || undefined
+    const baseUrl = env?.baseUrls?.[0]?.url ?? env?.url ?? undefined
     // variables 是 [{name, value}] 数组，转为 Record
     const initialVars: Record<string, string> = {}
+
     if (env?.variables) {
       if (Array.isArray(env.variables)) {
         for (const v of env.variables) {
-          if (v.name && v.enable !== false) initialVars[v.name] = v.value || ''
+          if (v.name && v.enable !== false) { initialVars[v.name] = v.value ?? '' }
         }
       }
       else {
         for (const [name, value] of Object.entries(env.variables)) {
-          if (name) initialVars[name] = value || ''
+          if (name) { initialVars[name] = value || '' }
         }
       }
     }
@@ -188,15 +197,18 @@ export default function RunFlowModal({
     // 持久化执行记录
     if (result) {
       try {
-        const execRes = await invoke<{ ok: boolean; data?: { id: string } }>(
+        const execRes = await invoke<{ ok: boolean, data?: { id: string } }>(
           'create_test_execution',
           { taskId, envJson: selectedEnv ? { name: selectedEnv } : null },
         )
+
         if (execRes.ok && execRes.data) {
           const executionId = execRes.data.id
           let sortOrder = 0
+
           for (const [nodeId, status] of Object.entries(result.nodeStatuses)) {
-            if (status === 'idle') continue
+            if (status === 'idle') { continue }
+
             const stepData = {
               id: crypto.randomUUID(),
               executionId,
@@ -211,12 +223,15 @@ export default function RunFlowModal({
               errorMessage: result.nodeErrors[nodeId] || null,
               executedAt: new Date().toISOString(),
             }
+
             try {
               await invoke('create_test_step_result', { result: stepData })
-            } catch (stepErr) {
+            }
+            catch (stepErr) {
               console.error(`[RunFlowModal] 保存步骤 ${nodeId} 失败:`, stepErr)
             }
           }
+
           const passed = Object.values(result.nodeStatuses).filter((s) => s === 'passed').length
           const failed = Object.values(result.nodeStatuses).filter((s) => s === 'failed' || s === 'error').length
           const skipped = Object.values(result.nodeStatuses).filter((s) => s === 'skipped').length
@@ -230,7 +245,8 @@ export default function RunFlowModal({
             duration,
           })
         }
-      } catch (err) {
+      }
+      catch (err) {
         console.error('[RunFlowModal] 保存执行记录失败:', err)
       }
     }
@@ -240,6 +256,7 @@ export default function RunFlowModal({
     if (state.status === 'running') {
       abort()
     }
+
     onClose()
   }, [state.status, abort, onClose])
 
@@ -254,12 +271,8 @@ export default function RunFlowModal({
 
   return (
     <Modal
-      title="运行测试流程"
-      open={open}
-      onCancel={handleClose}
-      width={720}
       destroyOnClose
-      footer={
+      footer={(
         <Space>
           <Button onClick={handleClose}>
             {state.status === 'running' ? '中止并关闭' : '关闭'}
@@ -271,48 +284,53 @@ export default function RunFlowModal({
           )}
           {(state.status === 'idle' || state.status === 'passed' || state.status === 'failed' || state.status === 'aborted') && (
             <Button
-              type="primary"
-              icon={<Play size={14} />}
-              onClick={handleRun}
               disabled={!selectedEnv}
+              icon={<Play size={14} />}
+              type="primary"
+              onClick={() => { void handleRun() }}
             >
               {state.status === 'idle' ? '开始运行' : '重新运行'}
             </Button>
           )}
         </Space>
-      }
+      )}
+      open={open}
+      title="运行测试流程"
+      width={720}
+      onCancel={handleClose}
     >
       {/* 配置区 */}
       <div style={{ display: 'flex', gap: 'var(--ds-pad-lg)', marginBottom: 'var(--ds-pad-md)', alignItems: 'center' }}>
         <div style={{ flex: 1 }}>
-          <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
+          <Text style={{ display: 'block', fontSize: 12, marginBottom: 4 }} type="secondary">
             运行环境
           </Text>
           <Select
-            value={selectedEnv || undefined}
-            onChange={setSelectedEnv}
-            placeholder="选择运行环境"
-            status={selectedEnv ? undefined : 'warning'}
-            style={{ width: '100%' }}
-            size="small"
             options={environments.map((e) => {
-              const url = e.baseUrls?.[0]?.url || e.url || ''
+              const url = e.baseUrls?.[0]?.url ?? e.url ?? ''
+
               return {
                 value: e.name,
                 label: `${e.name}${url ? ` (${url})` : ''}`,
               }
             })}
+            placeholder="选择运行环境"
+            size="small"
+            status={selectedEnv ? undefined : 'warning'}
+            style={{ width: '100%' }}
+            value={selectedEnv || undefined}
+            onChange={setSelectedEnv}
           />
         </div>
         <div>
-          <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
+          <Text style={{ display: 'block', fontSize: 12, marginBottom: 4 }} type="secondary">
             快速失败
           </Text>
-          <Switch checked={failFast} onChange={setFailFast} size="small" />
+          <Switch checked={failFast} size="small" onChange={setFailFast} />
         </div>
       </div>
       {!selectedEnv && (
-        <Text type="warning" style={{ display: 'block', fontSize: 12, marginBottom: 'var(--ds-pad-md)' }}>
+        <Text style={{ display: 'block', fontSize: 12, marginBottom: 'var(--ds-pad-md)' }} type="warning">
           {environments.length === 0
             ? '当前项目未配置环境。请先在「环境」管理中创建环境（含 Base URL），否则相对路径请求无法解析。'
             : '请先选择运行环境（需包含 Base URL），否则相对路径请求无法解析。'}
@@ -325,7 +343,7 @@ export default function RunFlowModal({
           <Tag color={state.status === 'running' ? 'processing' : state.status === 'passed' ? 'success' : 'error'}>
             {state.status === 'running' ? '运行中' : state.status === 'passed' ? '通过' : state.status === 'failed' ? '失败' : '中止'}
           </Tag>
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text style={{ fontSize: 12 }} type="secondary">
             通过 {stats.passed} / 失败 {stats.failed} / 共 {stats.total}
             {stats.duration !== undefined && ` · ${(stats.duration / 1000).toFixed(1)}s`}
           </Text>
@@ -363,7 +381,7 @@ function LogLine({ log }: { log: FlowExecLog }) {
   const [expanded, setExpanded] = useState(false)
   const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', { hour12: false })
 
-  const hasDetails = log.requestJson || log.responseJson || (log.variables && Object.keys(log.variables).length > 0)
+  const hasDetails = log.requestJson ?? log.responseJson ?? (log.variables && Object.keys(log.variables).length > 0)
 
   return (
     <div className={logLineClass}>
@@ -384,7 +402,7 @@ function LogLine({ log }: { log: FlowExecLog }) {
       {hasDetails && (
         <span
           style={{ color: 'var(--ds-highlight-selected, #60a5fa)', cursor: 'pointer', fontSize: 11 }}
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => { setExpanded(!expanded) }}
         >
           {expanded ? '收起' : '详情'}
         </span>

@@ -1,4 +1,5 @@
-import { Space, Tag } from 'antd'
+import { Tag } from 'antd'
+
 import type { VariableSource } from '../hooks/useFlowExecution'
 
 // ==================== 样式常量 ====================

@@ -1,30 +1,31 @@
 import { useCallback, useState } from 'react'
+
 import { show } from '@ebay/nice-modal-react'
 import { Dropdown, type DropDownProps, type MenuProps, Modal, Table, Tag, theme } from 'antd'
 import { CopyIcon, FolderInputIcon, FolderPlusIcon, PencilIcon, PlayIcon, TrashIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import type { ApiMenuData } from '@/components/ApiMenu/ApiMenu.type'
-import type { ApiDetails } from '@/types'
 import { FileIcon } from '@/components/icons/FileIcon'
 import { ModalImportCurl } from '@/components/modals/ModalImportCurl'
 import { ModalMoveMenu } from '@/components/modals/ModalMoveMenu'
 import { ModalNewCatalog } from '@/components/modals/ModalNewCatalog'
 import { ModalRename } from '@/components/modals/ModalRename'
+import { buildRequest } from '@/components/tab-content/api/buildRequest'
+import { collectFolderApis } from '@/components/tab-content/api/collectFolderApis'
+import { buildBodyExample } from '@/components/tab-content/api/requestBodyExample'
+import { useApiRequestRunner } from '@/components/tab-content/api/useApiRequestRunner'
+import { buildVarMaps, makeResolveVars } from '@/components/tab-content/api/useResolvedVarMap'
 import { API_MENU_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
+import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { MenuItemType } from '@/enums'
 import { getCatalogType, getCreateType } from '@/helpers'
 import { useHelpers } from '@/hooks/useHelpers'
-import { useApiRequestRunner } from '@/components/tab-content/api/useApiRequestRunner'
-import { buildRequest } from '@/components/tab-content/api/buildRequest'
-import { buildVarMaps, makeResolveVars } from '@/components/tab-content/api/useResolvedVarMap'
-import { collectFolderApis } from '@/components/tab-content/api/collectFolderApis'
-import { buildBodyExample } from '@/components/tab-content/api/requestBodyExample'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
-import { useSessionVariablesContext } from '@/contexts/session-variables'
+import type { ApiDetails } from '@/types'
 
 interface DropdownActionsProps extends DropDownProps {
   catalog: ApiMenuData
@@ -55,10 +56,10 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
   const { sessionVars } = useSessionVariablesContext()
   const { run } = useApiRequestRunner()
 
-  const currentEnv = projectEnvironmentConfig?.environments?.find(e => e.id === currentProjectEnvironmentId)
+  const currentEnv = projectEnvironmentConfig?.environments?.find((e) => e.id === currentProjectEnvironmentId)
   const envBaseUrl = currentEnv ? getPrimaryEnvironmentUrl(currentEnv) : ''
 
-  const [batchResult, setBatchResult] = useState<Array<{ name: string; status: number; durationMs: number; error?: string }>>()
+  const [batchResult, setBatchResult] = useState<{ name: string, status: number, durationMs: number, error?: string }[]>()
 
   const notifyDeleted = useCallback(() => {
     messageApi.success({
@@ -120,36 +121,40 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
       },
     },
     ...(catalog.type === MenuItemType.ApiDetailFolder || catalog.type === MenuItemType.RequestFolder
-      ? [{
-          key: 'run-all',
-          label: '运行全部',
-          icon: <PlayIcon size={14} />,
-          onClick: (ev: MenuClickInfo) => {
-            ev.domEvent.stopPropagation()
-            void handleRunAll()
+      ? [
+          {
+            key: 'run-all',
+            label: '运行全部',
+            icon: <PlayIcon size={14} />,
+            onClick: (ev: MenuClickInfo) => {
+              ev.domEvent.stopPropagation()
+              void handleRunAll()
+            },
           },
-        }]
+        ]
       : []),
     ...(catalog.type === MenuItemType.ApiDetailFolder
-      ? [{
-          key: 'importCurl',
-          label: '导入 cURL',
-          icon: <FolderInputIcon size={14} />,
-          onClick: (ev: MenuClickInfo) => {
-            ev.domEvent.stopPropagation()
-            void show(ModalImportCurl, {
-              parentId: catalog.id,
-              onImport: (menuItem) => {
-                addMenuItem(menuItem)
-                addTabItem({
-                  key: menuItem.id,
-                  label: menuItem.name,
-                  contentType: menuItem.type,
-                })
-              },
-            })
+      ? [
+          {
+            key: 'importCurl',
+            label: '导入 cURL',
+            icon: <FolderInputIcon size={14} />,
+            onClick: (ev: MenuClickInfo) => {
+              ev.domEvent.stopPropagation()
+              void show(ModalImportCurl, {
+                parentId: catalog.id,
+                onImport: (menuItem) => {
+                  addMenuItem(menuItem)
+                  addTabItem({
+                    key: menuItem.id,
+                    label: menuItem.name,
+                    contentType: menuItem.type,
+                  })
+                },
+              })
+            },
           },
-        }]
+        ]
       : []),
 
     { type: 'divider' },
@@ -258,8 +263,10 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
 
   const handleRunAll = async () => {
     const apis = collectFolderApis(catalog.id, menuRawList ?? [])
+
     if (!apis.length) {
       messageApi.warning('该目录下没有可运行的接口')
+
       return
     }
 
@@ -270,13 +277,16 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
     })
     const resolveVars = makeResolveVars(varMap)
 
-    const results: Array<{ name: string; status: number; durationMs: number; error?: string }> = []
+    const results: { name: string, status: number, durationMs: number, error?: string }[] = []
+
     for (const api of apis) {
       const details = api.data as ApiDetails
+
       if (!details) {
         results.push({ name: api.name, status: 0, durationMs: 0, error: '缺少接口数据' })
         continue
       }
+
       const built = buildRequest({
         method: details.method ?? 'GET',
         baseUrl: envBaseUrl,
@@ -293,17 +303,22 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
         menuRawList,
         insecureSkipVerify: false,
       })
+
       try {
         const r = await run(api.id, built.url, built.method, built.headers, built.bodyText, built.contentType, built.formDataFiles, false)
+
         if (r) {
           results.push({ name: api.name, status: r.status, durationMs: r.durationMs })
-        } else {
+        }
+        else {
           results.push({ name: api.name, status: 0, durationMs: 0, error: '运行失败' })
         }
-      } catch (err) {
+      }
+      catch (err) {
         results.push({ name: api.name, status: 0, durationMs: 0, error: err instanceof Error ? err.message : String(err) })
       }
     }
+
     setBatchResult(results)
   }
 
@@ -322,22 +337,19 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
         {children}
       </Dropdown>
       <Modal
-        title={`批量运行结果（${batchResult?.length ?? 0}）`}
-        open={!!batchResult}
         footer={null}
-        onCancel={() => setBatchResult(undefined)}
+        open={!!batchResult}
+        title={`批量运行结果（${batchResult?.length ?? 0}）`}
         width={640}
+        onCancel={() => { setBatchResult(undefined) }}
       >
         {batchResult && (
           <>
             <div style={{ marginBottom: 12 }}>
-              成功 {batchResult.filter(r => !r.error && r.status !== 0 && r.status < 400).length} / 失败{' '}
-              {batchResult.filter(r => r.error || r.status >= 400).length}
+              成功 {batchResult.filter((r) => !r.error && r.status !== 0 && r.status < 400).length} / 失败{' '}
+              {batchResult.filter((r) => r.error ?? r.status >= 400).length}
             </div>
             <Table
-              size="small"
-              pagination={false}
-              dataSource={batchResult.map((r, i) => ({ ...r, key: i }))}
               columns={[
                 { title: '接口', dataIndex: 'name', key: 'name' },
                 {
@@ -351,6 +363,9 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
                 { title: '耗时', dataIndex: 'durationMs', key: 'durationMs', render: (v: number) => `${v} ms` },
                 { title: '信息', dataIndex: 'error', key: 'error', render: (v?: string) => v ?? '-' },
               ]}
+              dataSource={batchResult.map((r, i) => ({ ...r, key: i }))}
+              pagination={false}
+              size="small"
             />
           </>
         )}

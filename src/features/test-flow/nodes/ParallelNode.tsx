@@ -1,6 +1,9 @@
 import { memo, useMemo } from 'react'
+
 import type { NodeProps } from '@xyflow/react'
-import { FlowNodeType, type FlowNode, type HandleSpec } from '../types/flow.types'
+
+import { type FlowNode, FlowNodeType, type HandleSpec } from '../types/flow.types'
+
 import BaseNode from './BaseNode'
 
 function ParallelNodeInner({ id, data, type }: NodeProps<FlowNode>) {
@@ -20,15 +23,16 @@ function ParallelNodeInner({ id, data, type }: NodeProps<FlowNode>) {
 
   return (
     <BaseNode
-      id={id}
       data={data as Record<string, unknown>}
-      type={type ?? FlowNodeType.Parallel}
+      id={id}
       inputHandles={['in']}
       outputHandles={outputHandles}
       summary={summary}
+      type={type ?? FlowNodeType.Parallel}
     />
   )
 }
 
 const ParallelNode = memo(ParallelNodeInner)
+
 export default ParallelNode

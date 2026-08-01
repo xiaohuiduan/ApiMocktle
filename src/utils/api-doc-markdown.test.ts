@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { SchemaType, type JsonSchema } from '@/components/JsonSchema'
+
+import { type JsonSchema, SchemaType } from '@/components/JsonSchema'
 import { ApiStatus, BodyType, ContentType, HttpMethod, ParamType } from '@/enums'
 import type { ApiDetails } from '@/types'
-import { generateApiDocMarkdown, type ExportApi, type ExportFolder, type ExportTreeInput } from './api-doc-markdown'
 
-function makeApiDetail(opts?: { id?: string; name?: string; dataOverrides?: Record<string, unknown> }): ExportApi {
+import { type ExportApi, generateApiDocMarkdown } from './api-doc-markdown'
+
+function makeApiDetail(opts?: { id?: string, name?: string, dataOverrides?: Record<string, unknown> }): ExportApi {
   const { id = 'api-1', name = 'Test API', dataOverrides = {} } = opts ?? {}
+
   return {
     id,
     name,
@@ -33,9 +36,7 @@ function makeApiDetail(opts?: { id?: string; name?: string; dataOverrides?: Reco
             {
               name: 'nested',
               type: SchemaType.Object,
-              properties: [
-                { name: 'deep', type: SchemaType.String },
-              ],
+              properties: [{ name: 'deep', type: SchemaType.String }],
             },
           ] satisfies JsonSchema[],
         } satisfies JsonSchema,
@@ -48,23 +49,13 @@ function makeApiDetail(opts?: { id?: string; name?: string; dataOverrides?: Reco
           contentType: ContentType.JSON,
           jsonSchema: {
             type: SchemaType.Object,
-            properties: [
-              { name: 'result', type: SchemaType.String },
-            ] satisfies JsonSchema[],
+            properties: [{ name: 'result', type: SchemaType.String }] satisfies JsonSchema[],
           } satisfies JsonSchema,
         },
       ],
       ...dataOverrides,
     } satisfies ApiDetails,
   }
-}
-
-function treeInput(projectName: string, items: ReturnType<typeof makeApiDetail>[]): ExportTreeInput {
-  return { folders: [], ungrouped: items, totalCount: items.length }
-}
-
-function treeFromFolder(name: string, items: ReturnType<typeof makeApiDetail>[]): ExportTreeInput {
-  return { folders: [{ name, children: items }], ungrouped: [], totalCount: items.length }
 }
 
 // ── generateApiDocMarkdown ──
@@ -153,9 +144,7 @@ describe('schema rendering in markdown', () => {
       items: {
         type: SchemaType.Object,
         name: 'item',
-        properties: [
-          { name: 'id', type: SchemaType.Integer },
-        ] satisfies JsonSchema[],
+        properties: [{ name: 'id', type: SchemaType.Integer }] satisfies JsonSchema[],
       } as JsonSchema,
     } as JsonSchema
     const md = generateApiDocMarkdown('Array', [], [item], 1)
@@ -165,7 +154,7 @@ describe('schema rendering in markdown', () => {
 
   it('handles Object schema with non-array properties', () => {
     const item = makeApiDetail()
-    ;((item.data.requestBody!.jsonSchema as { properties?: unknown }).properties as unknown) = { foo: 'bar' }
+    ;((item.data.requestBody!.jsonSchema as { properties?: unknown }).properties) = { foo: 'bar' }
     expect(() => generateApiDocMarkdown('Bug', [], [item], 1)).not.toThrow()
   })
 
@@ -177,7 +166,7 @@ describe('schema rendering in markdown', () => {
 
   it('handles null properties gracefully', () => {
     const item = makeApiDetail()
-    ;((item.data.requestBody!.jsonSchema as { properties?: unknown }).properties as unknown) = null
+    ;((item.data.requestBody!.jsonSchema as { properties?: unknown }).properties) = null
     expect(() => generateApiDocMarkdown('Null', [], [item], 1)).not.toThrow()
   })
 })
@@ -209,6 +198,7 @@ describe('edge cases in markdown generation', () => {
 
   it('handles all HTTP methods', () => {
     const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+
     for (const method of methods) {
       const item = makeApiDetail()
       item.data.method = method as HttpMethod

@@ -3,7 +3,7 @@ import { theme } from 'antd'
 import { ParamsEditableCell } from '@/components/tab-content/api/components/ParamsEditableCell'
 import { isFirefox } from '@/helpers'
 import { useStyles } from '@/hooks/useStyle'
-import { UnsafeAny } from '@/types'
+import type { UnsafeAny } from '@/types'
 
 import { css } from '@emotion/css'
 

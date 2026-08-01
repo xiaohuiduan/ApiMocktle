@@ -1,8 +1,11 @@
 import { useCallback } from 'react'
+
 import { Typography } from 'antd'
-import type { PanelProps } from './shared/panelRegistry'
+
 import type { SetVariableNodeData } from '../../types/flow.types'
+
 import AssignmentListEditor from './shared/AssignmentListEditor'
+import type { PanelProps } from './shared/panelRegistry'
 
 const { Text } = Typography
 
@@ -19,7 +22,7 @@ export default function SetVariableNodePanel({ data, onChange }: PanelProps<SetV
 
   return (
     <div className="space-y-4">
-      <Text type="secondary" className="block text-xs">
+      <Text className="block text-xs" type="secondary">
         变量赋值配置
       </Text>
 

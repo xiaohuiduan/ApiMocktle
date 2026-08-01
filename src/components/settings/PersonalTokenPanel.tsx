@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { Button, Form, Input, List, Popconfirm, Space, Typography, message } from 'antd'
-import { CopyIcon, TrashIcon } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
+import { Button, Form, Input, List, message, Popconfirm, Space, Typography } from 'antd'
+import { CopyIcon, TrashIcon } from 'lucide-react'
 
 import { api } from '@/api-client'
 import { useAuth } from '@/contexts/auth'
@@ -21,8 +21,10 @@ export function PersonalTokenPanel() {
   const [yapiPort, setYapiPort] = useState<number>(0)
 
   const loadTokens = useCallback(async () => {
-    if (!sessionId) return
+    if (!sessionId) { return }
+
     setLoadingTokens(true)
+
     try {
       setTokens(await api<PersonalToken[]>('list_personal_tokens', { sessionId }))
     }
@@ -40,7 +42,8 @@ export function PersonalTokenPanel() {
   }, [loadTokens])
 
   const handleCreateToken = async (values: { name: string }) => {
-    if (!sessionId) return
+    if (!sessionId) { return }
+
     try {
       await api('create_personal_token', { sessionId, name: values.name })
       message.success('Token 已创建')
@@ -52,7 +55,8 @@ export function PersonalTokenPanel() {
   }
 
   const handleDeleteToken = async (tokenId: string) => {
-    if (!sessionId) return
+    if (!sessionId) { return }
+
     try {
       await api('delete_personal_token', { sessionId, tokenId })
       message.success('已删除')
@@ -67,17 +71,17 @@ export function PersonalTokenPanel() {
     <div>
       {yapiPort > 0 && (
         <Typography.Paragraph
-          type="secondary"
           className="mb-3"
           copyable={{ text: `http://127.0.0.1:${yapiPort}` }}
+          type="secondary"
         >
           服务地址：http://127.0.0.1:{yapiPort}
         </Typography.Paragraph>
       )}
 
       <Form
-        layout="inline"
         className="mb-4"
+        layout="inline"
         onFinish={(values) => void handleCreateToken(values)}
       >
         <Form.Item name="name" rules={[{ required: true, message: '请输入名称' }]}>
@@ -92,8 +96,8 @@ export function PersonalTokenPanel() {
       </Form>
 
       <List
-        loading={loadingTokens}
         dataSource={tokens}
+        loading={loadingTokens}
         locale={{ emptyText: '暂无 Token' }}
         renderItem={(item) => (
           <List.Item
@@ -108,7 +112,6 @@ export function PersonalTokenPanel() {
             ]}
           >
             <List.Item.Meta
-              title={item.name}
               description={(
                 <Space>
                   <Typography.Text code>{item.token}</Typography.Text>
@@ -122,6 +125,7 @@ export function PersonalTokenPanel() {
                   />
                 </Space>
               )}
+              title={item.name}
             />
           </List.Item>
         )}

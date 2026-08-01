@@ -1,31 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEvent } from 'react-use-event-hook'
 
-import { Button, Form, type FormProps, Input, Select, type SelectProps, Space, Typography } from 'antd'
+import { Button, Form, Input, Select, type SelectProps, Space, Typography } from 'antd'
 import { PencilIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import type { ApiMenuData } from '@/components/ApiMenu/ApiMenu.type'
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
-import { useApiSubTabContext } from './Api'
 import { ApiRemoveButton } from '@/components/tab-content/api/ApiRemoveButton'
 import { ResponseTab } from '@/components/tab-content/api/components/ResponseTab'
-import { ParamsBody } from './params/ParamsBody'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { isDraftEmpty } from '@/contexts/menu-drafts'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
-import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { initialCreateApiDetailsData } from '@/data/remote'
 import { MenuItemType, ParamType } from '@/enums'
+import { useCtrlSave } from '@/hooks/useCtrlSave'
 import type { ApiDetails } from '@/types'
 
 import { BaseFormItems } from './components/BaseFormItems'
 import { GroupTitle } from './components/GroupTitle'
 import { PathInput, type PathInputProps } from './components/PathInput'
+import { ParamsBody } from './params/ParamsBody'
 import { ParamsTab } from './params/ParamsTab'
+import { useApiSubTabContext } from './Api'
 
 const DEFAULT_NAME = '未命名接口'
 
@@ -84,14 +84,14 @@ export function ApiDocEditing() {
     return menuRawList?.find(({ id }) => id === tabData.key)?.name ?? DEFAULT_NAME
   }, [menuRawList, tabData.key])
 
-  useCtrlSave(() => form.submit(), isCreating || subTabKey === 'docEdit')
+  useCtrlSave(() => { form.submit() }, isCreating || subTabKey === 'docEdit')
 
   // 挂载/切换页签时从合并列表（含草稿）加载初值：
   // - 新建接口：加载 createApiDetails 写入的草稿（含用户之前的编辑），无草稿时退回默认模板。
   // - 已存接口：加载 DB 数据或其未保存修改覆盖层。
   // 用 initialLoadKey 保证每个 key 只灌一次，避免后续草稿写入触发的 menuRawList 变化覆盖用户输入。
   useEffect(() => {
-    if (initialLoadKey.current === tabData.key) return
+    if (initialLoadKey.current === tabData.key) { return }
 
     const menuData = menuRawList?.find(({ id }) => id === tabData.key)
 
@@ -118,6 +118,7 @@ export function ApiDocEditing() {
   const buildMenuData = useEvent((values: ApiDetails): ApiMenuData => {
     const rawName = values.name?.trim() ?? ''
     const menuName = rawName.length > 0 ? rawName : DEFAULT_NAME
+
     return {
       id: tabData.key,
       name: menuName,
@@ -137,7 +138,9 @@ export function ApiDocEditing() {
       if (isDraftEmpty(draftItem)) {
         return
       }
+
       saveDraft(draftItem, true)
+
       return
     }
 
@@ -158,9 +161,11 @@ export function ApiDocEditing() {
   // 编辑防抖写草稿（~500ms）。
   const schedulePersist = useEvent(() => {
     hasEditedRef.current = true
+
     if (persistTimer.current) {
       clearTimeout(persistTimer.current)
     }
+
     persistTimer.current = setTimeout(() => { persistDraft() }, 500)
   })
 
@@ -170,6 +175,7 @@ export function ApiDocEditing() {
       if (persistTimer.current) {
         clearTimeout(persistTimer.current)
       }
+
       persistDraft()
     }
   }, [persistDraft])
@@ -178,6 +184,7 @@ export function ApiDocEditing() {
     const newName = titleDraft.trim() || DEFAULT_NAME
     form.setFieldValue('name', newName)
     setEditingTitle(false)
+
     if (isCreating) {
       // 新建接口不入库：改名后写回草稿，使左侧树名称与红 * 即时更新。
       hasEditedRef.current = true
@@ -190,7 +197,7 @@ export function ApiDocEditing() {
         id: tabData.key,
         name: newName,
         data: { ...currentFormData, name: newName },
-      } as any).catch(() => {})
+      } as any).catch(() => { /* noop */ })
       // reloadState 后恢复未保存的修改
       form.setFieldsValue(currentFormData)
     }
@@ -200,7 +207,7 @@ export function ApiDocEditing() {
     setEditingTitle(false)
   }
 
-  const handleFinish: FormProps<ApiDetails>['onFinish'] = async (values) => {
+  const handleFinish = async (values: ApiDetails) => {
     const rawName = values.name?.trim() ?? ''
     const menuName = rawName.length > 0 ? rawName : DEFAULT_NAME
 
@@ -227,7 +234,8 @@ export function ApiDocEditing() {
         discardDraft(tabData.key)
         setTabItemEditStatus({ key: tabData.key }, 'saved')
         messageApi.success('保存成功')
-      } catch (err) {
+      }
+      catch (err) {
         messageApi.error((err as Error).message || '保存失败，请检查权限')
       }
     }
@@ -312,7 +320,7 @@ export function ApiDocEditing() {
             <strong>请求参数</strong>
             的&nbsp;
             <strong>Param</strong>
-	&nbsp;中
+  &nbsp;中
           </span>
         ),
         duration: 3,
@@ -327,44 +335,46 @@ export function ApiDocEditing() {
     <Form<ApiDetails>
       className="flex h-full flex-col"
       form={form}
-      onValuesChange={() => {
-        schedulePersist()
-      }}
       onFinish={(values) => {
         handleFinish(values)
       }}
+      onValuesChange={() => {
+        schedulePersist()
+      }}
     >
       {/* 保持 name 字段在表单中注册，确保 onFinish 能读取到 */}
-      <Form.Item name="name" hidden><Input /></Form.Item>
+      <Form.Item hidden name="name">
+        <Input />
+      </Form.Item>
 
       {/* 标题栏 */}
       <div className="flex items-center gap-2 px-tabContent py-1.5" style={{ borderBottom: '1px solid var(--ant-color-border-secondary)' }}>
         {editingTitle
           ? (
-            <>
-              <Input
-                size="small"
-                value={titleDraft}
-                onChange={e => setTitleDraft(e.target.value)}
-                onPressEnter={handleTitleConfirm}
-                className="max-w-[300px]"
-                autoFocus
-              />
-              <Button size="small" type="primary" onClick={handleTitleConfirm}>确认</Button>
-              <Button size="small" onClick={handleTitleCancel}>取消</Button>
-            </>
-          )
+              <>
+                <Input
+                  autoFocus
+                  className="max-w-[300px]"
+                  size="small"
+                  value={titleDraft}
+                  onChange={(e) => { setTitleDraft(e.target.value) }}
+                  onPressEnter={() => { void handleTitleConfirm() }}
+                />
+                <Button size="small" type="primary" onClick={() => { void handleTitleConfirm() }}>确认</Button>
+                <Button size="small" onClick={handleTitleCancel}>取消</Button>
+              </>
+            )
           : (
-            <>
-              <Typography.Text strong className="text-base">{menuApiName}</Typography.Text>
-              <Button
-                type="text"
-                size="small"
-                icon={<PencilIcon size={14} />}
-                onClick={() => { setTitleDraft(menuApiName); setEditingTitle(true) }}
-              />
-            </>
-          )}
+              <>
+                <Typography.Text strong className="text-base">{menuApiName}</Typography.Text>
+                <Button
+                  icon={<PencilIcon size={14} />}
+                  size="small"
+                  type="text"
+                  onClick={() => { setTitleDraft(menuApiName); setEditingTitle(true) }}
+                />
+              </>
+            )}
       </div>
 
       <div className="flex items-center px-tabContent py-3">

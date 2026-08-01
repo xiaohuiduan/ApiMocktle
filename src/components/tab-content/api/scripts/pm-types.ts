@@ -10,14 +10,14 @@ export interface PmContext {
   request: {
     url: string
     method: string
-    headers: Array<{ name: string; value: string }>
+    headers: { name: string, value: string }[]
     body: string
   }
   /** 响应信息（仅后置脚本可用） */
   response?: {
     status: number
     statusText: string
-    headers: Array<{ name: string; value: string }>
+    headers: { name: string, value: string }[]
     body: string
     responseTime: number
   }

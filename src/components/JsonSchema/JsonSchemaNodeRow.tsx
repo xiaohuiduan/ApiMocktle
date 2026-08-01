@@ -342,9 +342,9 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
         <DataTypeSelect
           $ref={type === SchemaType.Refer ? value.$ref : undefined}
           disabled={disabled}
+          menuRawList={menuRawList}
           readOnly={readOnly}
           type={type}
-          menuRawList={menuRawList}
           onRefSelect={($ref) => {
             triggerChange?.({ ...value, $ref } as JsonSchema)
           }}

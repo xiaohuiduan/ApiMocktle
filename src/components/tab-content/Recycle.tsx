@@ -91,9 +91,9 @@ function RecycleTable(props: RecycleTableProps) {
             <Button disabled={!hasSelection}>批量恢复</Button>
           </Popconfirm>
           <Popconfirm
+            description="彻底删除后无法恢复"
             placement="left"
             title={`确定彻底删除选中的 ${selectedRecycleIds.length} 项？`}
-            description="彻底删除后无法恢复"
             onConfirm={() => {
               onSelectionChange([])
               deleteRecycleItems(selectedRecycleIds)

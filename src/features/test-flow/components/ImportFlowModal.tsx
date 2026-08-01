@@ -1,11 +1,15 @@
-import { useState, useCallback, useEffect } from 'react'
-import { Modal, Tabs, Input, Button, Typography, message, Popconfirm, Spin } from 'antd'
-import { CopyOutlined, UploadOutlined, FileTextOutlined } from '@ant-design/icons'
-import { invoke } from '@tauri-apps/api/core'
-import { Viewer } from '@bytemd/react'
+import { useCallback, useEffect, useState } from 'react'
+
+import { CopyOutlined, FileTextOutlined, UploadOutlined } from '@ant-design/icons'
 import gfm from '@bytemd/plugin-gfm'
-import type { FlowGraph } from '../types/flow.types'
+import { Viewer } from '@bytemd/react'
+import { invoke } from '@tauri-apps/api/core'
+import { Button, Input, message, Modal, Popconfirm, Spin, Tabs, Typography } from 'antd'
+
 import { useAuth } from '@/contexts/auth'
+
+import type { FlowGraph } from '../types/flow.types'
+
 import { css } from '@emotion/css'
 
 const { Text } = Typography
@@ -58,22 +62,24 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
 
   // 从后端获取 prompt
   useEffect(() => {
-    if (!open || !projectId || !sessionId) return
+    if (!open || !projectId || !sessionId) { return }
+
     setPromptLoading(true)
     invoke<{ data: { prompt: string } }>('get_flow_prompt', { sessionId, projectId })
-      .then((res) => setPromptText(res.data.prompt))
-      .catch((err) => {
+      .then((res) => { setPromptText(res.data.prompt) })
+      .catch((err: unknown) => {
         console.error('获取 Prompt 失败:', err)
         setPromptText('获取 Prompt 失败，请重试')
       })
-      .finally(() => setPromptLoading(false))
+      .finally(() => { setPromptLoading(false) })
   }, [open, projectId, sessionId])
 
   const handleCopyPrompt = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(promptText)
       message.success('Prompt 已复制到剪贴板，粘贴给 AI 即可')
-    } catch {
+    }
+    catch {
       message.error('复制失败，请手动复制')
     }
   }, [promptText])
@@ -82,47 +88,63 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.json'
+
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
-      if (!file) return
+
+      if (!file) { return }
+
       const reader = new FileReader()
+
       reader.onload = (event) => {
         try {
           const graph = JSON.parse(event.target?.result as string)
           onImport(graph)
           onClose()
           message.success('导入成功')
-        } catch {
+        }
+        catch {
           message.error('JSON 解析失败，请检查文件格式')
         }
       }
+
       reader.readAsText(file)
     }
+
     input.click()
   }, [onImport, onClose])
 
   const handleImportJson = useCallback(() => {
     if (!jsonText.trim()) {
       message.warning('请先粘贴 JSON 内容')
+
       return
     }
+
     try {
       const graph = JSON.parse(jsonText)
+
       if (!graph.nodes || !Array.isArray(graph.nodes)) {
         message.error('JSON 缺少 nodes 数组')
+
         return
       }
+
       if (!graph.edges || !Array.isArray(graph.edges)) {
         message.error('JSON 缺少 edges 数组')
+
         return
       }
+
       setImporting(true)
       onImport(graph)
       onClose()
       message.success('导入成功')
-    } catch (err) {
+    }
+    catch (err) {
       message.error('JSON 格式错误：' + (err as Error).message)
-    } finally {
+    }
+    finally {
       setImporting(false)
     }
   }, [jsonText, onImport, onClose])
@@ -130,29 +152,35 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
   const tabItems = [
     {
       key: 'paste',
-      label: <span><FileTextOutlined /> 粘贴 JSON</span>,
+      label: (
+        <span>
+          <FileTextOutlined />
+          {' '}
+          粘贴 JSON
+        </span>
+      ),
       children: (
         <div style={{ padding: 'var(--ds-pad-lg) 0' }}>
-          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+          <Text style={{ display: 'block', marginBottom: 8 }} type="secondary">
             将 AI 生成的 JSON 粘贴到下方，导入后会自动布局
           </Text>
           <TextArea
-            value={jsonText}
-            onChange={(e) => setJsonText(e.target.value)}
             placeholder='{ "nodes": [...], "edges": [...] }'
             rows={14}
             style={{ fontFamily: 'monospace', fontSize: 12 }}
+            value={jsonText}
+            onChange={(e) => { setJsonText(e.target.value) }}
           />
           <div style={{ marginTop: 12, textAlign: 'right' }}>
             <Popconfirm
-              title="确认导入"
-              description="导入将覆盖当前画布上的所有节点和连线，确定继续？"
-              onConfirm={handleImportJson}
-              okText="确定导入"
               cancelText="取消"
+              description="导入将覆盖当前画布上的所有节点和连线，确定继续？"
               disabled={!jsonText.trim()}
+              okText="确定导入"
+              title="确认导入"
+              onConfirm={handleImportJson}
             >
-              <Button type="primary" loading={importing} disabled={!jsonText.trim()}>
+              <Button disabled={!jsonText.trim()} loading={importing} type="primary">
                 导入并覆盖
               </Button>
             </Popconfirm>
@@ -162,13 +190,19 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
     },
     {
       key: 'file',
-      label: <span><UploadOutlined /> 导入文件</span>,
+      label: (
+        <span>
+          <UploadOutlined />
+          {' '}
+          导入文件
+        </span>
+      ),
       children: (
         <div style={{ padding: 'var(--ds-pad-lg) 0', textAlign: 'center' }}>
-          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+          <Text style={{ display: 'block', marginBottom: 16 }} type="secondary">
             选择之前导出的 .json 文件导入
           </Text>
-          <Button type="primary" icon={<UploadOutlined />} onClick={handleImportFile} size="large">
+          <Button icon={<UploadOutlined />} size="large" type="primary" onClick={handleImportFile}>
             选择 JSON 文件
           </Button>
         </div>
@@ -176,22 +210,34 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
     },
     {
       key: 'prompt',
-      label: <span><CopyOutlined /> AI Prompt</span>,
+      label: (
+        <span>
+          <CopyOutlined />
+          {' '}
+          AI Prompt
+        </span>
+      ),
       children: (
         <div style={{ padding: 'var(--ds-pad-lg) 0' }}>
-          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+          <Text style={{ display: 'block', marginBottom: 8 }} type="secondary">
             复制下方 Prompt 给 AI，附上你的测试需求，AI 会生成可直接导入的 JSON
           </Text>
-          {promptLoading ? (
-            <div style={{ textAlign: 'center', padding: 40 }}><Spin tip="加载 API 列表..." /></div>
-          ) : (
-            <div className={mdPreviewClass}>
-              <Viewer value={promptText} plugins={[gfm()]} />
-              <p style={{ color: 'var(--ds-highlight-selected, #3b82f6)', marginTop: 8 }}><strong>[你的测试需求写在这里]</strong></p>
-            </div>
-          )}
+          {promptLoading
+            ? (
+                <div style={{ textAlign: 'center', padding: 40 }}>
+                  <Spin tip="加载 API 列表..." />
+                </div>
+              )
+            : (
+                <div className={mdPreviewClass}>
+                  <Viewer plugins={[gfm()]} value={promptText} />
+                  <p style={{ color: 'var(--ds-highlight-selected, #3b82f6)', marginTop: 8 }}>
+                    <strong>[你的测试需求写在这里]</strong>
+                  </p>
+                </div>
+              )}
           <div style={{ marginTop: 12, textAlign: 'right' }}>
-            <Button type="primary" icon={<CopyOutlined />} onClick={handleCopyPrompt} disabled={promptLoading || !promptText}>
+            <Button disabled={promptLoading || !promptText} icon={<CopyOutlined />} type="primary" onClick={() => { void handleCopyPrompt() }}>
               复制 Prompt
             </Button>
           </div>
@@ -202,14 +248,14 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
 
   return (
     <Modal
-      title="导入测试流程"
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={680}
       destroyOnClose
+      footer={null}
+      open={open}
+      title="导入测试流程"
+      width={680}
+      onCancel={onClose}
     >
-      <Tabs items={tabItems} defaultActiveKey="prompt" />
+      <Tabs defaultActiveKey="prompt" items={tabItems} />
     </Modal>
   )
 }

@@ -186,6 +186,7 @@ export function CreateShareModal({
     for (let i = 0; i < 6; i += 1) {
       pwd += chars[Math.floor(Math.random() * chars.length)]
     }
+
     setPassword(pwd)
   }
 

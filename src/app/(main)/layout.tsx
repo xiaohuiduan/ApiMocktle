@@ -1,16 +1,16 @@
 'use client'
 
 import { useMemo } from 'react'
-
-import { theme } from 'antd'
 import { Outlet } from 'react-router'
 
+import { theme } from 'antd'
+
 import { SideNav } from '@/app/(main)/components/SideNav'
+import { useThemeContext } from '@/components/ThemeEditor/ThemeContext'
 import { LayoutProvider } from '@/contexts/layout-settings'
 import { MenuTabProvider } from '@/contexts/menu-tab-settings'
 import { useCssVariable } from '@/hooks/useCssVariable'
 import { useDesignStyle } from '@/hooks/useDesignStyle'
-import { useThemeContext } from '@/components/ThemeEditor/ThemeContext'
 
 export default function MainLayout() {
   const { token } = theme.useToken()
@@ -21,7 +21,8 @@ export default function MainLayout() {
 
   // 玻璃风格：彩色光晕径向渐变背景，为半透明面板提供可模糊的可见素材，使磨砂玻璃质感真正成立
   const glassGradient = useMemo(() => {
-    if (!isGlassStyle) return undefined
+    if (!isGlassStyle) { return undefined }
+
     return isDarkMode
       ? 'radial-gradient(45% 55% at 80% 12%, rgba(99,102,241,0.28), transparent 70%), radial-gradient(40% 50% at 12% 85%, rgba(16,185,129,0.22), transparent 70%), radial-gradient(42% 48% at 55% 50%, rgba(236,72,153,0.16), transparent 72%), linear-gradient(160deg, #15171c, #1d2026)'
       : 'radial-gradient(45% 55% at 80% 12%, rgba(99,102,241,0.30), transparent 70%), radial-gradient(40% 50% at 12% 85%, rgba(236,72,153,0.22), transparent 70%), radial-gradient(42% 48% at 55% 50%, rgba(16,185,129,0.20), transparent 72%), linear-gradient(160deg, #eef2ff, #f7f3ff)'

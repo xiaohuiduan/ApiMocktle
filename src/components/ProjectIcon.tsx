@@ -1,5 +1,6 @@
 import type { ComponentType, SVGAttributes } from 'react'
 
+import { theme } from 'antd'
 import {
   Accessibility,
   Activity,
@@ -47,6 +48,7 @@ import {
   ArrowRightFromLine,
   ArrowRightLeft,
   ArrowRightToLine,
+  ArrowsUpFromLine,
   ArrowUp,
   ArrowUp01,
   ArrowUp10,
@@ -60,7 +62,6 @@ import {
   ArrowUpToLine,
   ArrowUpWideNarrow,
   ArrowUpZA,
-  ArrowsUpFromLine,
   AtSign,
   Award,
   Baby,
@@ -116,13 +117,13 @@ import {
   Bomb,
   Bone,
   Book,
-  BookOpen,
-  BookUser,
   Bookmark,
   BookmarkCheck,
   BookmarkMinus,
   BookmarkPlus,
   BookmarkX,
+  BookOpen,
+  BookUser,
   Bot,
   Box,
   Braces,
@@ -167,10 +168,10 @@ import {
   CandyCane,
   CandyOff,
   Car,
-  CarFront,
-  CarTaxiFront,
   Caravan,
+  CarFront,
   Carrot,
+  CarTaxiFront,
   CaseLower,
   CaseSensitive,
   CaseUpper,
@@ -205,7 +206,6 @@ import {
   ChevronLast,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   ChevronsDown,
   ChevronsDownUp,
   ChevronsLeft,
@@ -214,6 +214,7 @@ import {
   ChevronsRightLeft,
   ChevronsUp,
   ChevronsUpDown,
+  ChevronUp,
   Church,
   CircleArrowDown,
   CircleArrowLeft,
@@ -245,9 +246,6 @@ import {
   ClipboardType,
   Clock,
   Clock1,
-  Clock10,
-  Clock11,
-  Clock12,
   Clock2,
   Clock3,
   Clock4,
@@ -256,6 +254,9 @@ import {
   Clock7,
   Clock8,
   Clock9,
+  Clock10,
+  Clock11,
+  Clock12,
   Cloud,
   CloudCog,
   CloudDownload,
@@ -407,10 +408,10 @@ import {
   FolderOpen,
   FolderOutput,
   FolderPlus,
+  Folders,
   FolderSearch,
   FolderSymlink,
   FolderX,
-  Folders,
   Forward,
   Frame,
   Frown,
@@ -423,13 +424,13 @@ import {
   Gift,
   GitBranch,
   GitCommit,
+  Github,
+  Gitlab,
   GitPullRequest,
   GitPullRequestArrow,
   GitPullRequestClosed,
   GitPullRequestCreateArrow,
   GitPullRequestDraft,
-  Github,
-  Gitlab,
   Glasses,
   Globe,
   GraduationCap,
@@ -470,6 +471,7 @@ import {
   Import,
   Inbox,
   Indent,
+  // eslint-disable-next-line no-shadow-restricted-names -- lucide 图标名固定
   Infinity,
   Info,
   Instagram,
@@ -478,9 +480,9 @@ import {
   IterationCw,
   Joystick,
   Key,
+  Keyboard,
   KeyRound,
   KeySquare,
-  Keyboard,
   Lamp,
   LampCeiling,
   Landmark,
@@ -529,11 +531,11 @@ import {
   MapPinHouse,
   MapPinMinus,
   MapPinMinusInside,
+  MapPinned,
   MapPinPlus,
   MapPinPlusInside,
   MapPinX,
   MapPinXInside,
-  MapPinned,
   Martini,
   Maximize,
   Maximize2,
@@ -591,8 +593,8 @@ import {
   PackagePlus,
   PackageSearch,
   PackageX,
-  PaintBucket,
   Paintbrush,
+  PaintBucket,
   Palette,
   Panda,
   PanelBottom,
@@ -611,8 +613,8 @@ import {
   Parentheses,
   Pause,
   PawPrint,
-  PenTool,
   Pencil,
+  PenTool,
   Percent,
   PersonStanding,
   Phone,
@@ -841,10 +843,10 @@ import {
   UserRoundPlus,
   UserRoundSearch,
   UserRoundX,
-  UserSearch,
-  UserX,
   Users,
+  UserSearch,
   UsersRound,
+  UserX,
   Utensils,
   UtensilsCrossed,
   Variable,
@@ -887,8 +889,6 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
-
-import { theme } from 'antd'
 
 type IconComponent = ComponentType<SVGAttributes<SVGElement> & { size?: string | number }>
 
@@ -1784,7 +1784,7 @@ export const ICON_OPTIONS = Object.keys(ICON_MAP)
 
 /** kebab-case → PascalCase */
 export function kebabToPascal(name: string): string {
-  return name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')
+  return name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')
 }
 
 export interface IconCategory { label: string, icons: string[] }
@@ -2741,16 +2741,18 @@ const ICON_COLORS = [
 
 export function getIconColor(name: string): string {
   let hash = 0
+
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash)
   }
+
   return ICON_COLORS[Math.abs(hash) % ICON_COLORS.length]
 }
 
 export function ProjectIcon({ icon, size = 32 }: { icon?: string, size?: number }) {
   const { token } = theme.useToken()
   const Component = icon ? ICON_MAP[icon] : undefined
-  const RocketIcon = ICON_MAP['Rocket']
+  const RocketIcon = ICON_MAP.Rocket
   const iconSize = size * 0.55
   const bgSize = size
 

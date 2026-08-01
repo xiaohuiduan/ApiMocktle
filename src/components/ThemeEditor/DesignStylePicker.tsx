@@ -45,7 +45,7 @@ const styleColors: Record<DesignStyle, string> = {
 /** 预览卡片内部装饰元素的样式 */
 const innerDecorations: Record<
   DesignStyle,
-  { box1: React.CSSProperties; box2: React.CSSProperties }
+  { box1: React.CSSProperties, box2: React.CSSProperties }
 > = {
   default: {
     box1: { backgroundColor: '#f0f0f0', border: '1px solid #e4e7ec', borderRadius: 4 },
@@ -126,15 +126,17 @@ export function DesignStylePicker(props: DesignStylePickerProps) {
               }}
             >
               {/* 中性渐变背景（玻璃风格） */}
-              {style === 'glassmorphism' ? (
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'linear-gradient(135deg, #e8eaed 0%, #d0d3d9 50%, #c8ccd3 100%)',
-                  }}
-                />
-              ) : null}
+              {style === 'glassmorphism'
+                ? (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'linear-gradient(135deg, #e8eaed 0%, #d0d3d9 50%, #c8ccd3 100%)',
+                      }}
+                    />
+                  )
+                : null}
               {/* 主卡片 */}
               <div
                 style={{

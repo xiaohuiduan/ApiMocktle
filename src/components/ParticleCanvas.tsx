@@ -162,6 +162,7 @@ class ParticleEngine {
       const dx = this.mouse.x - p.x
       const dy = this.mouse.y - p.y
       const dist = Math.sqrt(dx * dx + dy * dy)
+
       if (dist < 150 && dist > 0) {
         const force = 0.0005
         p.vx += dx * force
@@ -173,10 +174,13 @@ class ParticleEngine {
     p.y += p.vy
 
     // Edge wrapping
-    if (p.x < -10) p.x = width + 10
-    if (p.x > width + 10) p.x = -10
-    if (p.y < -10) p.y = height + 10
-    if (p.y > height + 10) p.y = -10
+    if (p.x < -10) { p.x = width + 10 }
+
+    if (p.x > width + 10) { p.x = -10 }
+
+    if (p.y < -10) { p.y = height + 10 }
+
+    if (p.y > height + 10) { p.y = -10 }
   }
 
   private updateShape(s: GeometricShape): void {
@@ -185,10 +189,13 @@ class ParticleEngine {
     s.y += s.vy
     s.rotation += s.rotationSpeed
 
-    if (s.x < -50) s.x = width + 50
-    if (s.x > width + 50) s.x = -50
-    if (s.y < -50) s.y = height + 50
-    if (s.y > height + 50) s.y = -50
+    if (s.x < -50) { s.x = width + 50 }
+
+    if (s.x > width + 50) { s.x = -50 }
+
+    if (s.y < -50) { s.y = height + 50 }
+
+    if (s.y > height + 50) { s.y = -50 }
   }
 
   // ── Draw ──────────────────────────────────────────────────────────────────
@@ -203,11 +210,13 @@ class ParticleEngine {
 
   private drawConnections(): void {
     const { ctx, particles, colors, connectionDistance } = this
+
     for (let i = 0; i < particles.length; i++) {
       for (let j = i + 1; j < particles.length; j++) {
         const dx = particles[i].x - particles[j].x
         const dy = particles[i].y - particles[j].y
         const dist = Math.sqrt(dx * dx + dy * dy)
+
         if (dist < connectionDistance) {
           const opacity = (1 - dist / connectionDistance) * 0.25
           ctx.beginPath()
@@ -227,13 +236,16 @@ class ParticleEngine {
     ctx.translate(s.x, s.y)
     ctx.rotate(s.rotation)
     ctx.beginPath()
+
     for (let i = 0; i < s.sides; i++) {
       const angle = (i / s.sides) * Math.PI * 2 - Math.PI / 2
       const px = Math.cos(angle) * s.size
       const py = Math.sin(angle) * s.size
-      if (i === 0) ctx.moveTo(px, py)
-      else ctx.lineTo(px, py)
+
+      if (i === 0) { ctx.moveTo(px, py) }
+      else { ctx.lineTo(px, py) }
     }
+
     ctx.closePath()
     ctx.strokeStyle = colors.shape(s.opacity)
     ctx.lineWidth = 1
@@ -260,17 +272,21 @@ class ParticleEngine {
         const cx = col * gridSize + (row % 2 !== 0 ? gridSize / 2 : 0)
         const cy = row * rowHeight
         ctx.beginPath()
+
         for (let i = 0; i < 6; i++) {
           const angle = (i / 6) * Math.PI * 2 - Math.PI / 6
           const px = cx + Math.cos(angle) * hexRadius
           const py = cy + Math.sin(angle) * hexRadius
-          if (i === 0) ctx.moveTo(px, py)
-          else ctx.lineTo(px, py)
+
+          if (i === 0) { ctx.moveTo(px, py) }
+          else { ctx.lineTo(px, py) }
         }
+
         ctx.closePath()
         ctx.stroke()
       }
     }
+
     ctx.globalAlpha = 1
   }
 
@@ -281,12 +297,16 @@ class ParticleEngine {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     this.drawHexGrid()
-    for (const p of this.particles) this.updateParticle(p)
-    for (const s of this.shapes) this.updateShape(s)
+
+    for (const p of this.particles) { this.updateParticle(p) }
+
+    for (const s of this.shapes) { this.updateShape(s) }
 
     this.drawConnections()
-    for (const p of this.particles) this.drawParticle(p)
-    for (const s of this.shapes) this.drawShape(s)
+
+    for (const p of this.particles) { this.drawParticle(p) }
+
+    for (const s of this.shapes) { this.drawShape(s) }
 
     this.animationId = requestAnimationFrame(this.animate)
   }
@@ -303,7 +323,9 @@ class ParticleEngine {
 
   resize(): void {
     const parent = this.canvas.parentElement
-    if (!parent) return
+
+    if (!parent) { return }
+
     const dpr = window.devicePixelRatio || 1
     const w = parent.clientWidth
     const h = parent.clientHeight
@@ -342,7 +364,8 @@ export function ParticleCanvas(props: ParticleCanvasProps) {
   // Initialise engine
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas) return
+
+    if (!canvas) { return }
 
     const engine = new ParticleEngine(
       canvas,
@@ -369,14 +392,15 @@ export function ParticleCanvas(props: ParticleCanvasProps) {
   // Resize observer
   useEffect(() => {
     const container = containerRef.current
-    if (!container) return
+
+    if (!container) { return }
 
     const observer = new ResizeObserver(() => {
       engineRef.current?.resize()
     })
     observer.observe(container)
 
-    return () => observer.disconnect()
+    return () => { observer.disconnect() }
   }, [])
 
   const isFullscreen = variant === 'fullscreen'
@@ -387,7 +411,7 @@ export function ParticleCanvas(props: ParticleCanvasProps) {
       className={clsx(
         isFullscreen
           ? 'fixed inset-0 z-0'
-          : 'absolute inset-0 z-0 overflow-hidden pointer-events-none',
+          : 'pointer-events-none absolute inset-0 z-0 overflow-hidden',
         className,
       )}
       style={style}

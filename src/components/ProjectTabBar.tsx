@@ -1,16 +1,14 @@
 import { useCallback, useMemo, useState } from 'react'
-
-import { Button, Dropdown, Modal, Select, Tooltip, theme } from 'antd'
-import { ArrowLeftIcon, CopyIcon, PlusIcon, RefreshCw, Settings2Icon, XIcon } from 'lucide-react'
 import { useNavigate } from 'react-router'
-import type { MenuProps } from 'antd'
 
+import { Button, Dropdown, type MenuProps, Modal, Select, theme, Tooltip } from 'antd'
+import { ArrowLeftIcon, CopyIcon, PlusIcon, RefreshCw, Settings2Icon, XIcon } from 'lucide-react'
+
+import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { ProjectIcon } from '@/components/ProjectIcon'
 import { ProjectQuickSwitch } from '@/components/ProjectQuickSwitch'
-import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
-import { useProjectTabsContext } from '@/contexts/project-tabs'
-import type { ProjectTabState } from '@/contexts/project-tabs'
+import { type ProjectTabState, useProjectTabsContext } from '@/contexts/project-tabs'
 import { useDesignStyle } from '@/hooks/useDesignStyle'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 
@@ -59,6 +57,7 @@ function TabItem({
   const confirmIfDirty = useCallback((title: string, dirty: boolean, action: () => void, dirtyItemNames?: string[]) => {
     if (!dirty) {
       action()
+
       return
     }
 
@@ -144,9 +143,9 @@ function TabItem({
   )
 
   return (
-    <Dropdown trigger={['contextMenu']} menu={{ items: menuItems }}>
+    <Dropdown menu={{ items: menuItems }} trigger={['contextMenu']}>
       <div
-        className="group relative flex shrink-0 cursor-pointer items-center gap-1.5 select-none"
+        className="group relative flex shrink-0 cursor-pointer select-none items-center gap-1.5"
         style={{
           height: 38,
           padding: '0 10px',
@@ -159,12 +158,12 @@ function TabItem({
           marginBottom: isActive ? -1 : 0,
           transition: 'color 0.12s, background-color 0.12s',
         }}
-        onClick={onSelect}
         onAuxClick={(e) => {
           if (e.button === 1) {
             confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose, dirtyItemNames)
           }
         }}
+        onClick={onSelect}
         onMouseEnter={(e) => {
           if (!isActive) {
             e.currentTarget.style.backgroundColor = token.colorFillTertiary
@@ -184,17 +183,17 @@ function TabItem({
 
         {hasUnsaved && (
           <span
+            aria-label="有未保存修改"
             className="size-1.5 shrink-0 rounded-full"
             style={{ backgroundColor: token.colorWarning }}
-            aria-label="有未保存修改"
           />
         )}
 
         {/* 关闭按钮：活跃标签始终显示，不活跃标签 hover 时显示 */}
         <button
-          type="button"
+          aria-label="关闭标签页"
           className={`flex size-8 shrink-0 items-center justify-center rounded transition-all duration-100 ${
-            isActive ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
+            isActive ? '' : 'opacity-0 focus-visible:opacity-100 group-hover:opacity-100'
           }`}
           style={{
             color: isActive ? token.colorTextTertiary : token.colorTextSecondary,
@@ -202,17 +201,17 @@ function TabItem({
             border: 'none',
             cursor: 'pointer',
           }}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose, dirtyItemNames)
+          }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLElement).style.backgroundColor = token.colorBgTextHover
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
           }}
-          onClick={(e) => {
-            e.stopPropagation()
-            confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose, dirtyItemNames)
-          }}
-          aria-label="关闭标签页"
         >
           <XIcon size={28} />
         </button>
@@ -241,7 +240,7 @@ export function ProjectTabBar() {
     closeAllProjects,
   } = useProjectTabsContext()
 
-  if (openTabs.length === 0) return null
+  if (openTabs.length === 0) { return null }
 
   const hasUnsavedTab = (tab: ProjectTabState) => {
     return tab.tabItems.some((item) => {
@@ -291,20 +290,20 @@ export function ProjectTabBar() {
           return (
             <TabItem
               key={tab.info.projectId}
-              tab={tab}
-              index={index}
-              total={openTabs.length}
-              isActive={isActive}
+              dirtyItemNames={dirtyNames}
               hasUnsaved={dirty}
+              index={index}
+              isActive={isActive}
               othersHaveDirty={othersDirty}
               rightHaveDirty={rightDirty}
-              dirtyItemNames={dirtyNames}
-              onSelect={() => setActiveProjectId(tab.info.projectId)}
-              onClose={() => closeProject(tab.info.projectId)}
-              onCloseOthers={() => closeOtherProjects(tab.info.projectId)}
-              onCloseRight={() => closeRightProjects(tab.info.projectId)}
-              onCloseAll={closeAllProjects}
+              tab={tab}
               token={token}
+              total={openTabs.length}
+              onClose={() => { closeProject(tab.info.projectId) }}
+              onCloseAll={closeAllProjects}
+              onCloseOthers={() => { closeOtherProjects(tab.info.projectId) }}
+              onCloseRight={() => { closeRightProjects(tab.info.projectId) }}
+              onSelect={() => { setActiveProjectId(tab.info.projectId) }}
             />
           )
         })}
@@ -323,8 +322,8 @@ export function ProjectTabBar() {
           border: 'none',
           backgroundColor: 'transparent',
         }}
-        onClick={() => navigate('/projects?create=1')}
         title="新建项目"
+        onClick={() => { void navigate('/projects?create=1') }}
       >
         <PlusIcon size={16} />
       </button>
@@ -333,13 +332,10 @@ export function ProjectTabBar() {
       <div className="ml-auto flex shrink-0 items-center gap-1 px-2">
         <ProjectQuickSwitch />
         <>
-          <span className="text-xs shrink-0" style={{ color: token.colorTextSecondary }}>环境</span>
+          <span className="shrink-0 text-xs" style={{ color: token.colorTextSecondary }}>环境</span>
           {projectEnvironments.length > 0 && (
             <Select
-              size="small"
               className="min-w-[140px]"
-              value={currentProjectEnvironmentId}
-              placeholder="选择环境"
               options={projectEnvironments.map((env) => ({
                 value: env.id,
                 label: (
@@ -351,13 +347,16 @@ export function ProjectTabBar() {
                   </span>
                 ),
               }))}
-              onChange={(envId) => setCurrentProjectEnvironmentId(envId)}
+              placeholder="选择环境"
+              size="small"
+              value={currentProjectEnvironmentId}
+              onChange={(envId) => { setCurrentProjectEnvironmentId(envId) }}
             />
           )}
           <Tooltip title="管理环境">
             <Button
-              size="small"
               icon={<Settings2Icon size={14} />}
+              size="small"
               onClick={() => {
                 if (activeProjectId) {
                   navigate(`/projects/${activeProjectId}/settings?section=environments`)
@@ -368,17 +367,19 @@ export function ProjectTabBar() {
         </>
         <Button
           icon={<RefreshCw size={14} />}
-          size="small"
           loading={refreshing}
-          onClick={async () => {
-            setRefreshing(true)
-            await reloadState()
-            setRefreshing(false)
+          size="small"
+          onClick={() => {
+            void (async () => {
+              setRefreshing(true)
+              await reloadState()
+              setRefreshing(false)
+            })()
           }}
         >
           刷新
         </Button>
-        <Button icon={<ArrowLeftIcon size={14} />} size="small" onClick={() => navigate('/projects')}>
+        <Button icon={<ArrowLeftIcon size={14} />} size="small" onClick={() => { void navigate('/projects') }}>
           项目列表
         </Button>
       </div>

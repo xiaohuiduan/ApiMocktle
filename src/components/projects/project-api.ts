@@ -24,6 +24,7 @@ export class ApiRequestError extends Error {
 
 export async function requestProjects(sessionId: string) {
   const result = await api<{ projects: ProjectItem[] }>('list_projects', { sessionId })
+
   return result.projects
 }
 
@@ -32,6 +33,7 @@ export async function requestCreateProject(sessionId: string, values: { name: st
     sessionId,
     payload: values,
   })
+
   return result.project
 }
 
@@ -41,6 +43,7 @@ export async function requestUpdateProject(sessionId: string, projectId: string,
     projectId,
     payload: values,
   })
+
   return result.project
 }
 
@@ -49,5 +52,6 @@ export async function requestDeleteProject(sessionId: string, projectId: string)
     sessionId,
     projectId,
   })
+
   return result.projectId
 }

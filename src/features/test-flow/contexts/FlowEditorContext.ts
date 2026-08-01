@@ -9,9 +9,11 @@ const FlowEditorContext = createContext<FlowEditorContextValue | null>(null)
 
 export function useFlowEditorContext() {
   const ctx = useContext(FlowEditorContext)
+
   if (!ctx) {
     throw new Error('useFlowEditorContext must be used inside FlowEditorContext.Provider')
   }
+
   return ctx
 }
 

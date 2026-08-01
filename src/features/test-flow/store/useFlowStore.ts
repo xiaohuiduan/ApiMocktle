@@ -1,24 +1,15 @@
-import { create } from 'zustand'
 import {
-  applyNodeChanges,
-  applyEdgeChanges,
   addEdge,
-} from '@xyflow/react'
+  applyEdgeChanges,
+  applyNodeChanges, type Connection,
+  type EdgeChange,
+  type NodeChange } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
-import type {
-  NodeChange,
-  EdgeChange,
-  Connection,
-} from '@xyflow/react'
-import type {
-  FlowNode,
-  FlowEdge,
-  FlowNodeData,
-  FlowGraph,
-  FlowNodeType,
-} from '../types/flow.types'
-import { getOutputHandleIds, getInputHandleIds } from '../nodes/handleUtils'
+import { create } from 'zustand'
+
+import { getInputHandleIds, getOutputHandleIds } from '../nodes/handleUtils'
 import { migrateGraph } from '../nodes/migrations'
+import type { FlowEdge, FlowGraph, FlowNode, FlowNodeData } from '../types/flow.types'
 
 // ==================== 接口定义 ====================
 
@@ -83,7 +74,8 @@ const MAX_HISTORY = 50
 const AGENT_URL_LS_KEY = 'flow-agent-url'
 
 function tryLoadAgentUrl(): string {
-  try { return localStorage.getItem(AGENT_URL_LS_KEY) || '' } catch { return '' }
+  try { return localStorage.getItem(AGENT_URL_LS_KEY) ?? '' }
+  catch { return '' }
 }
 
 // ==================== Store 实现 ====================
@@ -142,9 +134,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       nodes: get().nodes.filter((node) => !nodeSet.has(node.id)),
       edges: get().edges.filter(
-        (edge) => !nodeSet.has(edge.source) && !nodeSet.has(edge.target)
+        (edge) => !nodeSet.has(edge.source) && !nodeSet.has(edge.target),
       ),
-      selectedNodeId: nodeSet.has(get().selectedNodeId || '') ? null : get().selectedNodeId,
+      selectedNodeId: nodeSet.has(get().selectedNodeId ?? '') ? null : get().selectedNodeId,
       isDirty: true,
     })
   },
@@ -156,7 +148,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes: get().nodes.map((node) =>
         node.id === nodeId
           ? { ...node, data: { ...node.data, ...data } }
-          : node
+          : node,
       ),
       isDirty: true,
     })
@@ -168,10 +160,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   cleanupOrphanedEdges: (nodeId: string) => {
     const { nodes, edges } = get()
     const node = nodes.find((n) => n.id === nodeId)
-    if (!node) return
 
-    const nodeType = node.type as FlowNodeType
-    const nodeData = node.data as FlowNodeData
+    if (!node) { return }
+
+    const nodeType = node.type
+    const nodeData = node.data
 
     const validSourceHandles = new Set(getOutputHandleIds(nodeType, nodeData))
     validSourceHandles.add(undefined as any) // 允许没有 handle ID 的边
@@ -186,12 +179,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           return false
         }
       }
+
       // 检查目标节点的 handle
       if (edge.target === nodeId) {
         if (edge.targetHandle && !validTargetHandles.has(edge.targetHandle)) {
           return false
         }
       }
+
       return true
     })
 
@@ -224,7 +219,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   setDrawerOpen: (open) => {
     if (!open) {
       set({ drawerOpen: false, selectedNodeId: null })
-    } else {
+    }
+    else {
       set({ drawerOpen: true })
     }
   },
@@ -232,7 +228,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Agent 地址
   setAgentUrl: (url) => {
     set({ agentUrl: url })
-    try { localStorage.setItem(AGENT_URL_LS_KEY, url) } catch { /* ignore */ }
+
+    try { localStorage.setItem(AGENT_URL_LS_KEY, url) }
+    catch { /* ignore */ }
   },
 
   // 加载图
@@ -253,6 +251,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // 获取图
   getGraph: () => {
     const { nodes, edges } = get()
+
     return {
       nodes: nodes.map(({ id, type, position, data }) => {
         // 剔除运行结果字段（exec*），避免污染存档
@@ -262,6 +261,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         delete cleanData.execDurationMs
         delete cleanData.execRequest
         delete cleanData.execResponse
+
         return { id, type, position, data: cleanData as FlowNodeData }
       }) as FlowNode[],
       edges: edges.map(({ id, source, target, sourceHandle, targetHandle, label, data }) => ({
@@ -311,7 +311,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // 撤销
   undo: () => {
     const { history, historyIndex } = get()
-    if (historyIndex < 0) return
+
+    if (historyIndex < 0) { return }
 
     const previousGraph = history[historyIndex]
     set({
@@ -325,7 +326,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // 重做
   redo: () => {
     const { history, historyIndex } = get()
-    if (historyIndex >= history.length - 1) return
+
+    if (historyIndex >= history.length - 1) { return }
 
     const nextIndex = historyIndex + 1
     const nextGraph = history[nextIndex]
@@ -364,7 +366,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // 自动布局（使用 ELK 算法，最小化边交叉）
   autoLayout: async () => {
     const { nodes, edges } = get()
-    if (nodes.length === 0) return
+
+    if (nodes.length === 0) { return }
 
     get().pushHistory()
 
@@ -400,18 +403,21 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     try {
       const layouted = await elk.layout(graph)
-      const posMap = new Map<string, { x: number; y: number }>()
-      for (const child of layouted.children || []) {
-        posMap.set(child.id, { x: child.x || 0, y: child.y || 0 })
+      const posMap = new Map<string, { x: number, y: number }>()
+
+      for (const child of layouted.children ?? []) {
+        posMap.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 })
       }
 
       const layoutedNodes = nodes.map((node) => {
         const pos = posMap.get(node.id)
+
         return pos ? { ...node, position: pos } : node
       })
 
       set({ nodes: layoutedNodes, isDirty: true })
-    } catch (err) {
+    }
+    catch (err) {
       console.error('[autoLayout] ELK layout failed:', err)
     }
   },

@@ -1,4 +1,5 @@
 import type { ScriptExecutionResult } from '@/types'
+
 import type { PmContext, ScriptWorkerRequest, ScriptWorkerResponse } from './pm-types'
 
 export type { PmContext }
@@ -8,9 +9,8 @@ const DEFAULT_TIMEOUT_MS = 5000
 let workerInstance: Worker | null = null
 
 function getWorker(): Worker {
-  if (!workerInstance) {
-    workerInstance = new Worker(new URL('./script-worker.ts', import.meta.url), { type: 'module' })
-  }
+  workerInstance ??= new Worker(new URL('./script-worker.ts', import.meta.url), { type: 'module' })
+
   return workerInstance
 }
 

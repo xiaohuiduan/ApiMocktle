@@ -11,7 +11,7 @@ export const defaultThemeSetting: ThemeSetting = {
 /** 每种设计风格自动配色参数 */
 export const designStylePresets: Record<
   DesignStyle,
-  { colorPrimary: string; borderRadius: number; borderRadiusLG: number; borderRadiusSM: number }
+  { colorPrimary: string, borderRadius: number, borderRadiusLG: number, borderRadiusSM: number }
 > = {
   default: {
     colorPrimary: '#1677ff',
@@ -42,7 +42,7 @@ export const designStylePresets: Record<
 /** 每种密度档位的展示信息，用于设置面板预览卡片 */
 export const densityPresets: Record<
   Density,
-  { name: string; description: string }
+  { name: string, description: string }
 > = {
   compact: {
     name: '紧凑',
@@ -280,7 +280,7 @@ export const presetThemes = {
 
 export const presetDesignStyles: Record<
   DesignStyle,
-  { name: string; description: string }
+  { name: string, description: string }
 > = {
   default: {
     name: '默认',

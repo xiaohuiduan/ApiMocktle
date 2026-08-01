@@ -5,8 +5,8 @@ import { HashRouter, Routes } from 'react-router'
 import { loader } from '@monaco-editor/react'
 
 import { AuthProvider } from '@/contexts/auth'
-import { ProxyConfigProvider } from '@/contexts/proxy-config'
 import { ProjectTabsProvider } from '@/contexts/project-tabs'
+import { ProxyConfigProvider } from '@/contexts/proxy-config'
 import { SessionVariablesProvider } from '@/contexts/session-variables'
 
 // Monaco Editor 本地加载（离线可用）

@@ -1,18 +1,22 @@
 import { memo } from 'react'
+
 import type { NodeProps } from '@xyflow/react'
-import { FlowNodeType, type FlowNode } from '../types/flow.types'
+
+import { type FlowNode, FlowNodeType } from '../types/flow.types'
+
 import BaseNode from './BaseNode'
 
 function StartNodeInner({ id, data, type }: NodeProps<FlowNode>) {
   return (
     <BaseNode
-      id={id}
       data={data as Record<string, unknown>}
-      type={type ?? FlowNodeType.Start}
+      id={id}
       outputHandles={['out']}
+      type={type ?? FlowNodeType.Start}
     />
   )
 }
 
 const StartNode = memo(StartNodeInner)
+
 export default StartNode

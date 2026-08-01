@@ -95,9 +95,6 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
       {!noActions && (
         <AppMenuControls>
           <Dropdown
-            open={plusOpen}
-            onOpenChange={setPlusOpen}
-            trigger={['click']}
             menu={{
               items: [
                 {
@@ -170,6 +167,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
                                   path: (d.serverUrl ?? '') + (d.path ?? '/'),
                                 }
                               }
+
                               menuItem.type = MenuItemType.HttpRequest
                               addMenuItem(menuItem)
                               addTabItem({
@@ -186,6 +184,9 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
                 ...extraDropdownMenuItems,
               ],
             }}
+            open={plusOpen}
+            trigger={['click']}
+            onOpenChange={setPlusOpen}
           >
             <MenuActionButton
               icon={<PlusIcon size={14} />}
@@ -218,7 +219,6 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
 
           {topMenuType === CatalogType.Http && (
             <Dropdown
-              trigger={['click']}
               menu={{
                 items: [
                   {
@@ -257,6 +257,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
                   },
                 ],
               }}
+              trigger={['click']}
             >
               <MenuActionButton
                 icon={(

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 
-import { Badge, Button, Empty, Popover, Table, Tag, Tooltip, Typography, theme } from 'antd'
-import { VariableIcon, Trash2Icon, DatabaseIcon } from 'lucide-react'
+import { Badge, Button, Empty, Popover, Table, Tag, theme, Tooltip, Typography } from 'antd'
+import { DatabaseIcon, Trash2Icon, VariableIcon } from 'lucide-react'
 
-import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useSessionVariablesContext } from '@/contexts/session-variables'
 
 export function SessionVariablesPanel() {
   const { token } = theme.useToken()
@@ -16,9 +16,9 @@ export function SessionVariablesPanel() {
   const sessionCount = sessionEntries.length
 
   // 当前环境变量
-  const currentEnv = projectEnvironmentConfig?.environments?.find(e => e.id === currentProjectEnvironmentId)
-  const envVars = currentEnv?.variables?.filter(v => v.name && v.enable !== false) ?? []
-  const globalVars = (projectEnvironmentConfig?.globalVariables ?? []).filter(v => v.name && v.enable !== false)
+  const currentEnv = projectEnvironmentConfig?.environments?.find((e) => e.id === currentProjectEnvironmentId)
+  const envVars = currentEnv?.variables?.filter((v) => v.name && v.enable !== false) ?? []
+  const globalVars = (projectEnvironmentConfig?.globalVariables ?? []).filter((v) => v.name && v.enable !== false)
 
   const sessionColumns = [
     {
@@ -40,10 +40,10 @@ export function SessionVariablesPanel() {
       width: 32,
       render: (_: unknown, record: { name: string }) => (
         <Button
-          type="text"
-          size="small"
           icon={<Trash2Icon size={12} />}
-          onClick={() => removeSessionVar(record.name)}
+          size="small"
+          type="text"
+          onClick={() => { removeSessionVar(record.name) }}
         />
       ),
     },
@@ -66,70 +66,76 @@ export function SessionVariablesPanel() {
   ]
 
   const content = (
-    <div className="w-[380px] max-h-[500px] overflow-auto">
+    <div className="max-h-[500px] w-[380px] overflow-auto">
       {/* 会话变量 */}
       <div className="mb-3">
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-2 flex items-center justify-between">
           <Typography.Text strong className="text-sm">
             会话变量
-            <Tag color="blue" className="ml-1">脚本设置</Tag>
+            <Tag className="ml-1" color="blue">脚本设置</Tag>
           </Typography.Text>
           {sessionCount > 0 && (
-            <Button size="small" type="text" danger onClick={clearSessionVars}>
+            <Button danger size="small" type="text" onClick={clearSessionVars}>
               清空
             </Button>
           )}
         </div>
-        {sessionCount > 0 ? (
-          <Table
-            size="small"
-            columns={sessionColumns}
-            dataSource={sessionEntries.map(([name, value]) => ({ name, value, key: name }))}
-            pagination={false}
-            scroll={{ y: 150 }}
-          />
-        ) : (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无会话变量" />
-        )}
+        {sessionCount > 0
+          ? (
+              <Table
+                columns={sessionColumns}
+                dataSource={sessionEntries.map(([name, value]) => ({ name, value, key: name }))}
+                pagination={false}
+                scroll={{ y: 150 }}
+                size="small"
+              />
+            )
+          : (
+              <Empty description="暂无会话变量" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            )}
       </div>
 
       {/* 环境变量 */}
       <div className="mb-3">
-        <Typography.Text strong className="text-sm mb-2 block">
-          <DatabaseIcon size={12} className="inline mr-1" />
+        <Typography.Text strong className="mb-2 block text-sm">
+          <DatabaseIcon className="mr-1 inline" size={12} />
           环境变量
           {currentEnv && <Tag className="ml-1">{currentEnv.name}</Tag>}
         </Typography.Text>
-        {envVars.length > 0 ? (
-          <Table
-            size="small"
-            columns={envColumns}
-            dataSource={envVars.map(v => ({ name: v.name, value: v.value, key: v.id }))}
-            pagination={false}
-            scroll={{ y: 120 }}
-          />
-        ) : (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无环境变量" className="py-2" />
-        )}
+        {envVars.length > 0
+          ? (
+              <Table
+                columns={envColumns}
+                dataSource={envVars.map((v) => ({ name: v.name, value: v.value, key: v.id }))}
+                pagination={false}
+                scroll={{ y: 120 }}
+                size="small"
+              />
+            )
+          : (
+              <Empty className="py-2" description="暂无环境变量" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            )}
       </div>
 
       {/* 全局变量 */}
       <div>
-        <Typography.Text strong className="text-sm mb-2 block">
-          <DatabaseIcon size={12} className="inline mr-1" />
+        <Typography.Text strong className="mb-2 block text-sm">
+          <DatabaseIcon className="mr-1 inline" size={12} />
           全局变量
         </Typography.Text>
-        {globalVars.length > 0 ? (
-          <Table
-            size="small"
-            columns={envColumns}
-            dataSource={globalVars.map(v => ({ name: v.name, value: v.value, key: v.id }))}
-            pagination={false}
-            scroll={{ y: 120 }}
-          />
-        ) : (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无全局变量" className="py-2" />
-        )}
+        {globalVars.length > 0
+          ? (
+              <Table
+                columns={envColumns}
+                dataSource={globalVars.map((v) => ({ name: v.name, value: v.value, key: v.id }))}
+                pagination={false}
+                scroll={{ y: 120 }}
+                size="small"
+              />
+            )
+          : (
+              <Empty className="py-2" description="暂无全局变量" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            )}
       </div>
     </div>
   )
@@ -138,22 +144,22 @@ export function SessionVariablesPanel() {
     <div>
       <Popover
         content={content}
+        open={open}
+        placement="right"
         title="变量管理"
         trigger="click"
-        open={open}
         onOpenChange={setOpen}
-        placement="right"
       >
-        <Tooltip title="查看变量" placement="right">
-          <Badge count={sessionCount} size="small" offset={[-4, 4]}>
+        <Tooltip placement="right" title="查看变量">
+          <Badge count={sessionCount} offset={[-4, 4]} size="small">
             <Button
-              type="primary"
-              shape="circle"
               icon={<VariableIcon size={18} />}
+              shape="circle"
               size="large"
               style={{
                 boxShadow: token.boxShadowSecondary,
               }}
+              type="primary"
             />
           </Badge>
         </Tooltip>

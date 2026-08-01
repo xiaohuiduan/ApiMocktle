@@ -1,29 +1,28 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router'
 
-import { Button, Card, Empty, Form, Input, Modal, Space, Spin, Tooltip, Typography, message, theme } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
 import { show } from '@ebay/nice-modal-react'
+import { Button, Card, Empty, Form, Input, message, Modal, Space, Spin, theme, Tooltip, Typography } from 'antd'
 import { SettingsIcon } from 'lucide-react'
-import { useNavigate, useSearchParams } from 'react-router'
 
 import { ModalSettings } from '@/components/modals/ModalSettings'
 import { ParticleCanvas } from '@/components/ParticleCanvas'
-import { UserMenu } from '@/components/UserMenu'
-
-import { useAuth } from '@/contexts/auth'
-import { useDesignStyle } from '@/hooks/useDesignStyle'
-import { useProjectTabsContext } from '@/contexts/project-tabs'
-import { type IconCategory, ICON_OPTIONS, ICON_MAP, ICON_CATEGORIES, ProjectIcon, getIconColor, kebabToPascal } from '@/components/ProjectIcon'
+import { getIconColor, ICON_CATEGORIES, ICON_MAP, ICON_OPTIONS, kebabToPascal, ProjectIcon } from '@/components/ProjectIcon'
 import {
   ApiRequestError,
+  type ProjectItem,
   requestCreateProject,
   requestDeleteProject,
   requestProjects,
   requestUpdateProject,
-  type ProjectItem,
 } from '@/components/projects/project-api'
+import { UserMenu } from '@/components/UserMenu'
+import { useAuth } from '@/contexts/auth'
+import { useProjectTabsContext } from '@/contexts/project-tabs'
+import { useDesignStyle } from '@/hooks/useDesignStyle'
 
 interface ProjectFormValues {
   name: string
@@ -46,18 +45,23 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
   const [searchText, setSearchText] = useState('')
 
   const filteredCategories = useMemo(() => {
-    if (!searchText) return ICON_CATEGORIES
+    if (!searchText) { return ICON_CATEGORIES }
+
     const t = searchText.toLowerCase()
-    return ICON_CATEGORIES.filter(c => c.label.includes(t) || c.icons.some(name => name.toLowerCase().includes(t)))
+
+    return ICON_CATEGORIES.filter((c) => c.label.includes(t) || c.icons.some((name) => name.toLowerCase().includes(t)))
   }, [searchText])
 
   const shownIcons = useMemo(() => {
-    if (category === '全部') return ICON_OPTIONS
-    const cat = ICON_CATEGORIES.find(c => c.label === category)
-    if (!cat) return []
+    if (category === '全部') { return ICON_OPTIONS }
+
+    const cat = ICON_CATEGORIES.find((c) => c.label === category)
+
+    if (!cat) { return [] }
+
     return cat.icons
       .map(kebabToPascal)
-      .filter(name => name in ICON_MAP)
+      .filter((name) => name in ICON_MAP)
   }, [category])
 
   return (
@@ -66,18 +70,17 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
       <div className="flex shrink-0 flex-col" style={{ width: 140 }}>
         <div className="mb-1.5 px-1">
           <Input
-            size="small"
             placeholder="搜索..."
             prefix={<SearchOutlined style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} />}
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            variant="borderless"
+            size="small"
             style={{ background: 'var(--ds-bg-elevated, #f3f4f6)', borderRadius: 6, padding: '0 8px' }}
+            value={searchText}
+            variant="borderless"
+            onChange={(e) => { setSearchText(e.target.value) }}
           />
         </div>
         <div className="flex-1 space-y-0.5 overflow-y-auto px-1" style={{ scrollbarWidth: 'thin' }}>
           <button
-            type="button"
             style={{
               display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 10px',
               textAlign: 'left', fontSize: 12, transition: 'background 0.15s',
@@ -86,23 +89,24 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
               fontWeight: category === '全部' ? 600 : 400,
               border: 'none', cursor: 'pointer', borderRadius: 4,
             }}
-            onMouseEnter={(e) => { if (category !== '全部') e.currentTarget.style.background = 'var(--ds-bg-elevated, #f3f4f6)' }}
-            onMouseLeave={(e) => { if (category !== '全部') e.currentTarget.style.background = 'transparent' }}
+            type="button"
             onClick={() => { setCategory('全部'); setSearchText('') }}
+            onMouseEnter={(e) => { if (category !== '全部') { e.currentTarget.style.background = 'var(--ds-bg-elevated, #f3f4f6)' } }}
+            onMouseLeave={(e) => { if (category !== '全部') { e.currentTarget.style.background = 'transparent' } }}
           >
             <span style={{ flex: 1 }}>全部</span>
             <span style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums', color: 'var(--ds-node-text-muted, #9ca3af)' }}>
               {ICON_OPTIONS.length}
             </span>
           </button>
-          {filteredCategories.map(cat => {
+          {filteredCategories.map((cat) => {
             const availableInMap = category === cat.label
               ? shownIcons.length
-              : cat.icons.map(kebabToPascal).filter(n => n in ICON_MAP).length
+              : cat.icons.map(kebabToPascal).filter((n) => n in ICON_MAP).length
+
             return (
               <button
                 key={cat.label}
-                type="button"
                 style={{
                   display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 10px',
                   textAlign: 'left', fontSize: 12, transition: 'background 0.15s',
@@ -111,9 +115,10 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
                   fontWeight: category === cat.label ? 600 : 400,
                   border: 'none', cursor: 'pointer', borderRadius: 4,
                 }}
-                onMouseEnter={(e) => { if (category !== cat.label) e.currentTarget.style.background = 'var(--ds-bg-elevated, #f3f4f6)' }}
-                onMouseLeave={(e) => { if (category !== cat.label) e.currentTarget.style.background = 'transparent' }}
-                onClick={() => setCategory(cat.label)}
+                type="button"
+                onClick={() => { setCategory(cat.label) }}
+                onMouseEnter={(e) => { if (category !== cat.label) { e.currentTarget.style.background = 'var(--ds-bg-elevated, #f3f4f6)' } }}
+                onMouseLeave={(e) => { if (category !== cat.label) { e.currentTarget.style.background = 'transparent' } }}
               >
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.label}</span>
                 <span style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums', color: 'var(--ds-node-text-muted, #9ca3af)' }}>
@@ -127,33 +132,36 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
 
       {/* 右侧图标网格 */}
       <div className="flex-1 rounded-lg p-2.5" style={{ minHeight: 260, maxHeight: 340, background: 'var(--ds-bg-elevated, #f3f4f6)' }}>
-        {shownIcons.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-xs" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }}>暂无图标</div>
-        ) : (
-          <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
-            <div className="flex flex-wrap gap-1.5">
-              {shownIcons.map((name) => {
-                const isSelected = value === name
-                const iconColor = getIconColor(name)
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    className="relative flex size-9 cursor-pointer items-center justify-center rounded-lg border-2 transition-all duration-150 hover:scale-110 hover:shadow-md"
-                    style={{
-                      borderColor: isSelected ? iconColor : 'transparent',
-                      backgroundColor: isSelected ? `${iconColor}0f` : 'var(--ds-node-bg, #f5f5f5)',
-                    }}
-                    onClick={() => onChange?.(isSelected ? '' : name)}
-                    title={name}
-                  >
-                    <ProjectIcon icon={name} size={22} />
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
+        {shownIcons.length === 0
+          ? (
+              <div className="flex h-full items-center justify-center text-xs" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }}>暂无图标</div>
+            )
+          : (
+              <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                <div className="flex flex-wrap gap-1.5">
+                  {shownIcons.map((name) => {
+                    const isSelected = value === name
+                    const iconColor = getIconColor(name)
+
+                    return (
+                      <button
+                        key={name}
+                        className="relative flex size-9 cursor-pointer items-center justify-center rounded-lg border-2 transition-all duration-150 hover:scale-110 hover:shadow-md"
+                        style={{
+                          borderColor: isSelected ? iconColor : 'transparent',
+                          backgroundColor: isSelected ? `${iconColor}0f` : 'var(--ds-node-bg, #f5f5f5)',
+                        }}
+                        title={name}
+                        type="button"
+                        onClick={() => onChange?.(isSelected ? '' : name)}
+                      >
+                        <ProjectIcon icon={name} size={22} />
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
       </div>
     </div>
   )
@@ -188,7 +196,8 @@ export function ProjectsClient() {
   const [messageApi, contextHolder] = message.useMessage()
 
   const fetchProjects = async () => {
-    if (!sessionId) return
+    if (!sessionId) { return }
+
     setLoading(true)
 
     try {
@@ -197,6 +206,7 @@ export function ProjectsClient() {
     catch (error) {
       if (isUnauthorized(error)) {
         navigate('/login', { replace: true })
+
         return
       }
 
@@ -230,7 +240,8 @@ export function ProjectsClient() {
   }
 
   const submitProject = async (values: ProjectFormValues) => {
-    if (!sessionId) return
+    if (!sessionId) { return }
+
     setSubmitting(true)
 
     try {
@@ -239,6 +250,7 @@ export function ProjectsClient() {
         closeDialog()
         await fetchProjects()
         messageApi.success('项目已更新')
+
         return
       }
 
@@ -256,6 +268,7 @@ export function ProjectsClient() {
     catch (error) {
       if (isUnauthorized(error)) {
         navigate('/login', { replace: true })
+
         return
       }
 
@@ -278,7 +291,8 @@ export function ProjectsClient() {
       cancelText: '取消',
       maskClosable: true,
       onOk: async () => {
-        if (!sessionId) return
+        if (!sessionId) { return }
+
         try {
           await requestDeleteProject(sessionId, project.id)
           await fetchProjects()
@@ -287,6 +301,7 @@ export function ProjectsClient() {
         catch (error) {
           if (isUnauthorized(error)) {
             navigate('/login', { replace: true })
+
             return
           }
 
@@ -301,193 +316,195 @@ export function ProjectsClient() {
 
   return (
     <div className="relative" style={{ minHeight: '100%', backgroundColor: token.colorFillTertiary }}>
-      <ParticleCanvas variant="embedded" preset="projects" primaryColor={token.colorPrimary} />
+      <ParticleCanvas preset="projects" primaryColor={token.colorPrimary} variant="embedded" />
       <div className="relative z-10 px-8 py-10">
-      {contextHolder}
+        {contextHolder}
 
-      <div className="mb-6 flex items-center">
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          项目列表
-        </Typography.Title>
+        <div className="mb-6 flex items-center">
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            项目列表
+          </Typography.Title>
 
-        <Space className="ml-auto">
-          <Tooltip title="全局设置">
-            <Button
-              type="text"
-              icon={<SettingsIcon size={16} />}
-              onClick={() => void show(ModalSettings)}
-            />
-          </Tooltip>
-          <UserMenu />
-          <Button type="primary" onClick={openCreateDialog}>
-            新建项目
-          </Button>
-        </Space>
-      </div>
-
-      <Spin spinning={loading}>
-        {!loading && projects.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 py-20">
-            <Empty description="还没有项目" />
+          <Space className="ml-auto">
+            <Tooltip title="全局设置">
+              <Button
+                icon={<SettingsIcon size={16} />}
+                type="text"
+                onClick={() => void show(ModalSettings)}
+              />
+            </Tooltip>
+            <UserMenu />
             <Button type="primary" onClick={openCreateDialog}>
               新建项目
             </Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {projects.map((project) => {
-            const iconColor = getIconColor(project.icon || '')
-            const IconComp = ICON_MAP[project.icon || '']
+          </Space>
+        </div>
 
-            const cardBaseStyle: React.CSSProperties = isGlassStyle
-              ? {
-                  backgroundColor: `color-mix(in srgb, ${iconColor} 10%, var(--ds-node-bg, rgba(255,255,255,0.1)))`,
-                  backdropFilter: `blur(var(--ds-blur, 20px)) saturate(var(--ds-saturate, 150%))`,
-                  WebkitBackdropFilter: `blur(var(--ds-blur, 20px)) saturate(var(--ds-saturate, 150%))`,
-                  border: 'var(--ds-border-subtle, 1px solid rgba(255,255,255,0.2))',
-                  boxShadow: 'var(--ds-shadow-md, 0 4px 16px rgba(0,0,0,0.06))',
-                }
-              : isNeumorphism
-                ? {
-                    backgroundColor: token.colorBgContainer,
-                    boxShadow: 'var(--ds-shadow-md)',
-                    border: 'none',
-                  }
-                : isSkeuomorphism
-                  ? {
-                      backgroundColor: `${iconColor}12`,
-                      boxShadow: 'var(--ds-shadow-md)',
-                    }
-                  : {
-                      backgroundColor: `${iconColor}12`,
-                    }
-
-            return (
-              <Card
-                key={project.id}
-                hoverable
-                className="group"
-                styles={{ body: { padding: '16px' } }}
-                style={{
-                  ...cardBaseStyle,
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isNeumorphism) {
-                    (e.currentTarget as HTMLElement).style.backgroundColor = isGlassStyle
-                      ? `color-mix(in srgb, ${iconColor} 15%, rgba(255,255,255,0.15))`
-                      : `${iconColor}20`
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isNeumorphism) {
-                    (e.currentTarget as HTMLElement).style.backgroundColor = isGlassStyle
-                      ? `color-mix(in srgb, ${iconColor} 10%, rgba(255,255,255,0.1))`
-                      : `${iconColor}12`
-                  }
-                }}
-                onClick={() => {
-                  openProject({
-                    projectId: project.id,
-                    name: project.name,
-                    icon: project.icon,
-                    role: project.role,
-                  })
-                }}
-              >
-                <div className="relative">
-                  {/* 水印图标 */}
-                  {IconComp && (
-                    <div className="pointer-events-none absolute -bottom-2 -right-2 opacity-[0.06]">
-                      <IconComp size={90} strokeWidth={0.8} />
-                    </div>
-                  )}
-
-                  {/* 操作按钮 */}
-                  {project.role === 'owner' && (
-                    <div
-                      className="absolute right-0 top-0 z-10 flex gap-1 opacity-70 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
-                      onClick={(event) => { event.stopPropagation() }}
-                    >
-                      <Button
-                        size="small"
-                        className="!rounded-md"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          openEditDialog(project)
-                        }}
-                      >
-                        编辑
-                      </Button>
-                      <Button
-                        danger
-                        size="small"
-                        className="!rounded-md"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          confirmDeleteProject(project)
-                        }}
-                      >
-                        删除
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* 内容区 */}
-                  <div className="flex flex-col items-center gap-2 pt-1">
-                    <ProjectIcon icon={project.icon} size={36} />
-                    <Typography.Title
-                      level={5}
-                      className="!mb-0 !mt-1 truncate text-center"
-                      style={{ maxWidth: '100%' }}
-                      title={project.name}
-                    >
-                      {project.name}
-                    </Typography.Title>
-                    <Typography.Text type="secondary" className="text-xs">
-                      {roleText[project.role]}
-                    </Typography.Text>
-                    <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }}>
-                      <span>API {project.apiCount}</span>
-                      <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
-                      <span>模型 {project.schemaCount}</span>
-                      <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
-                      <span>快捷请求 {project.requestCount}</span>
-                      <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
-                      <span>自测 {project.testCount}</span>
-                    </div>
-                  </div>
+        <Spin spinning={loading}>
+          {!loading && projects.length === 0
+            ? (
+                <div className="flex flex-col items-center gap-4 py-20">
+                  <Empty description="还没有项目" />
+                  <Button type="primary" onClick={openCreateDialog}>
+                    新建项目
+                  </Button>
                 </div>
-              </Card>
-            )
-            })}
-          </div>
-        )}
-      </Spin>
+              )
+            : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {projects.map((project) => {
+                    const iconColor = getIconColor(project.icon ?? '')
+                    const IconComp = ICON_MAP[project.icon ?? '']
 
-      <Modal
-        confirmLoading={submitting}
-        open={dialog !== null}
-        title={getDialogTitle(dialog)}
-        onCancel={closeDialog}
-        onOk={() => {
-          void form.validateFields().then(submitProject).catch(() => undefined)
-        }}
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item
-            label="项目名称"
-            name="name"
-            rules={[{ required: true, message: '请输入项目名称' }]}
-          >
-            <Input placeholder="请输入项目名称" />
-          </Form.Item>
-          <Form.Item label="项目图标" name="icon">
-            <IconPicker />
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
+                    const cardBaseStyle: React.CSSProperties = isGlassStyle
+                      ? {
+                          backgroundColor: `color-mix(in srgb, ${iconColor} 10%, var(--ds-node-bg, rgba(255,255,255,0.1)))`,
+                          backdropFilter: 'blur(var(--ds-blur, 20px)) saturate(var(--ds-saturate, 150%))',
+                          WebkitBackdropFilter: 'blur(var(--ds-blur, 20px)) saturate(var(--ds-saturate, 150%))',
+                          border: 'var(--ds-border-subtle, 1px solid rgba(255,255,255,0.2))',
+                          boxShadow: 'var(--ds-shadow-md, 0 4px 16px rgba(0,0,0,0.06))',
+                        }
+                      : isNeumorphism
+                        ? {
+                            backgroundColor: token.colorBgContainer,
+                            boxShadow: 'var(--ds-shadow-md)',
+                            border: 'none',
+                          }
+                        : isSkeuomorphism
+                          ? {
+                              backgroundColor: `${iconColor}12`,
+                              boxShadow: 'var(--ds-shadow-md)',
+                            }
+                          : {
+                              backgroundColor: `${iconColor}12`,
+                            }
+
+                    return (
+                      <Card
+                        key={project.id}
+                        hoverable
+                        className="group"
+                        style={{
+                          ...cardBaseStyle,
+                          transition: 'all 0.2s',
+                        }}
+                        styles={{ body: { padding: '16px' } }}
+                        onClick={() => {
+                          openProject({
+                            projectId: project.id,
+                            name: project.name,
+                            icon: project.icon,
+                            role: project.role,
+                          })
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isNeumorphism) {
+                            (e.currentTarget as HTMLElement).style.backgroundColor = isGlassStyle
+                              ? `color-mix(in srgb, ${iconColor} 15%, rgba(255,255,255,0.15))`
+                              : `${iconColor}20`
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isNeumorphism) {
+                            (e.currentTarget as HTMLElement).style.backgroundColor = isGlassStyle
+                              ? `color-mix(in srgb, ${iconColor} 10%, rgba(255,255,255,0.1))`
+                              : `${iconColor}12`
+                          }
+                        }}
+                      >
+                        <div className="relative">
+                          {/* 水印图标 */}
+                          {IconComp && (
+                            <div className="pointer-events-none absolute -bottom-2 -right-2 opacity-[0.06]">
+                              <IconComp size={90} strokeWidth={0.8} />
+                            </div>
+                          )}
+
+                          {/* 操作按钮 */}
+                          {project.role === 'owner' && (
+                            <div
+                              className="absolute right-0 top-0 z-10 flex gap-1 opacity-70 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+                              onClick={(event) => { event.stopPropagation() }}
+                            >
+                              <Button
+                                className="!rounded-md"
+                                size="small"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  openEditDialog(project)
+                                }}
+                              >
+                                编辑
+                              </Button>
+                              <Button
+                                danger
+                                className="!rounded-md"
+                                size="small"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  confirmDeleteProject(project)
+                                }}
+                              >
+                                删除
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* 内容区 */}
+                          <div className="flex flex-col items-center gap-2 pt-1">
+                            <ProjectIcon icon={project.icon} size={36} />
+                            <Typography.Title
+                              className="!mb-0 !mt-1 truncate text-center"
+                              level={5}
+                              style={{ maxWidth: '100%' }}
+                              title={project.name}
+                            >
+                              {project.name}
+                            </Typography.Title>
+                            <Typography.Text className="text-xs" type="secondary">
+                              {roleText[project.role]}
+                            </Typography.Text>
+                            <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }}>
+                              <span>API {project.apiCount}</span>
+                              <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
+                              <span>模型 {project.schemaCount}</span>
+                              <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
+                              <span>快捷请求 {project.requestCount}</span>
+                              <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
+                              <span>自测 {project.testCount}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+        </Spin>
+
+        <Modal
+          confirmLoading={submitting}
+          open={dialog !== null}
+          title={getDialogTitle(dialog)}
+          onCancel={closeDialog}
+          onOk={() => {
+            void form.validateFields().then(submitProject).catch(() => undefined)
+          }}
+        >
+          <Form form={form} layout="vertical">
+            <Form.Item
+              label="项目名称"
+              name="name"
+              rules={[{ required: true, message: '请输入项目名称' }]}
+            >
+              <Input placeholder="请输入项目名称" />
+            </Form.Item>
+            <Form.Item label="项目图标" name="icon">
+              <IconPicker />
+            </Form.Item>
+          </Form>
+        </Modal>
+      </div>
     </div>
   )
 }

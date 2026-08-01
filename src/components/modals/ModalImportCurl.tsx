@@ -4,8 +4,8 @@ import { create, useModal } from '@ebay/nice-modal-react'
 import { Form, Input, Modal, type ModalProps, Switch, Typography } from 'antd'
 
 import type { ApiMenuData } from '@/components/ApiMenu'
-import { convertCurlToApiMenuItem } from '@/curl-import'
 import { useGlobalContext } from '@/contexts/global'
+import { convertCurlToApiMenuItem } from '@/curl-import'
 
 interface ModalImportCurlProps extends Omit<ModalProps, 'open' | 'onOk'> {
   parentId?: string
@@ -46,8 +46,10 @@ export const ModalImportCurl = create(({ parentId, onImport, ...props }: ModalIm
       }
       catch (error) {
         messageApi.error(error instanceof Error ? error.message : 'cURL 导入失败')
+
         return
       }
+
       handleHide()
     })
   }

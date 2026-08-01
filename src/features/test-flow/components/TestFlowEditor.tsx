@@ -1,27 +1,30 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Modal, message, Tabs } from 'antd'
-import { invoke } from '@tauri-apps/api/core'
-import { Layers, Database, ListTree, History } from 'lucide-react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
-import { useFlowStore } from '../store/useFlowStore'
-import { useFlowPersistence } from '../hooks/useFlowPersistence'
-import { useFlowExecution } from '../hooks/useFlowExecution'
-import { FlowEditorContext } from '../contexts/FlowEditorContext'
-import { PathHighlightContext } from '../contexts/PathHighlightContext'
-import { usePathHighlight } from '../hooks/usePathHighlight'
+
+import { invoke } from '@tauri-apps/api/core'
+import { message, Modal, Tabs } from 'antd'
+import { Database, History, Layers, ListTree } from 'lucide-react'
+
 import { useAuth } from '@/contexts/auth'
 import { useTestTaskDetail } from '@/hooks/useTestTask'
-import { FlowNodeType as NT, type FlowGraph, type NodeExecStatus } from '../types/flow.types'
-import type { VariableSource } from '../hooks/useFlowExecution'
-import FlowToolbar from './FlowToolbar'
-import NodePalette from './NodePalette'
-import VariablesPanel from './VariablesPanel'
-import NodeOutlinePanel from './NodeOutlinePanel'
+
+import { FlowEditorContext } from '../contexts/FlowEditorContext'
+import { PathHighlightContext } from '../contexts/PathHighlightContext'
+import { useFlowExecution, type VariableSource } from '../hooks/useFlowExecution'
+import { useFlowPersistence } from '../hooks/useFlowPersistence'
+import { usePathHighlight } from '../hooks/usePathHighlight'
+import { useFlowStore } from '../store/useFlowStore'
+import { type FlowGraph, FlowNodeType as NT, type NodeExecStatus } from '../types/flow.types'
+
 import ExecutionHistoryPanel from './ExecutionHistoryPanel'
 import FlowCanvas from './FlowCanvas'
-import NodeConfigDrawer from './NodeConfigDrawer'
+import FlowToolbar from './FlowToolbar'
 import ImportFlowModal from './ImportFlowModal'
+import NodeConfigDrawer from './NodeConfigDrawer'
+import NodeOutlinePanel from './NodeOutlinePanel'
+import NodePalette from './NodePalette'
 import RunFlowModal from './RunFlowModal'
+import VariablesPanel from './VariablesPanel'
 
 // ==================== Props ====================
 
@@ -74,19 +77,23 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
   // 获取项目环境列表
   useEffect(() => {
     const fetchEnvs = async () => {
-      if (!sessionId) return
+      if (!sessionId) { return }
+
       try {
-        const result = await invoke<{ ok: boolean; data?: { environments: Environment[] } }>(
+        const result = await invoke<{ ok: boolean, data?: { environments: Environment[] } }>(
           'get_project_environments',
           { sessionId, projectId },
         )
+
         if (result.ok && result.data) {
           setEnvironments(result.data.environments || [])
         }
-      } catch (err) {
+      }
+      catch (err) {
         console.error('[TestFlowEditor] Failed to fetch environments:', err)
       }
     }
+
     fetchEnvs()
   }, [projectId, sessionId])
 
@@ -101,34 +108,44 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
     // 1. 检查起止节点
     const startNodes = currentNodes.filter((n) => n.type === NT.Start)
     const endNodes = currentNodes.filter((n) => n.type === NT.End)
-    if (startNodes.length === 0) errors.push('缺少 Start 节点')
-    if (startNodes.length > 1) errors.push(`有 ${startNodes.length} 个 Start 节点（应只有 1 个）`)
-    if (endNodes.length === 0) errors.push('缺少 End 节点')
-    if (endNodes.length > 1) warnings.push(`有 ${endNodes.length} 个 End 节点`)
+
+    if (startNodes.length === 0) { errors.push('缺少 Start 节点') }
+
+    if (startNodes.length > 1) { errors.push(`有 ${startNodes.length} 个 Start 节点（应只有 1 个）`) }
+
+    if (endNodes.length === 0) { errors.push('缺少 End 节点') }
+
+    if (endNodes.length > 1) { warnings.push(`有 ${endNodes.length} 个 End 节点`) }
 
     // 2. 边引用有效性
     const nodeIds = new Set(currentNodes.map((n) => n.id))
+
     for (const edge of currentEdges) {
-      if (!nodeIds.has(edge.source)) errors.push(`边引用了不存在的源节点: ${edge.source}`)
-      if (!nodeIds.has(edge.target)) errors.push(`边引用了不存在的目标节点: ${edge.target}`)
+      if (!nodeIds.has(edge.source)) { errors.push(`边引用了不存在的源节点: ${edge.source}`) }
+
+      if (!nodeIds.has(edge.target)) { errors.push(`边引用了不存在的目标节点: ${edge.target}`) }
     }
 
     // 3. 孤立节点检查
     const hasIncoming = new Set(currentEdges.map((e) => e.target))
     const hasOutgoing = new Set(currentEdges.map((e) => e.source))
+
     for (const node of currentNodes) {
       if (node.type === NT.Start && !hasOutgoing.has(node.id)) {
-        warnings.push(`Start 节点「${(node.data?.label as string) || node.id}」没有出边`)
+        warnings.push(`Start 节点「${(node.data?.label) || node.id}」没有出边`)
       }
+
       if (node.type === NT.End && !hasIncoming.has(node.id)) {
-        warnings.push(`End 节点「${(node.data?.label as string) || node.id}」没有入边`)
+        warnings.push(`End 节点「${(node.data?.label) || node.id}」没有入边`)
       }
+
       if (node.type !== NT.Start && node.type !== NT.End) {
         if (!hasIncoming.has(node.id)) {
-          warnings.push(`节点「${(node.data?.label as string) || node.id}」没有入边`)
+          warnings.push(`节点「${(node.data?.label) || node.id}」没有入边`)
         }
+
         if (!hasOutgoing.has(node.id)) {
-          warnings.push(`节点「${(node.data?.label as string) || node.id}」没有出边`)
+          warnings.push(`节点「${(node.data?.label) || node.id}」没有出边`)
         }
       }
     }
@@ -136,20 +153,22 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
     // 4. httpRequest 节点的 menuItemId
     for (const node of currentNodes) {
       if (node.type === NT.HttpRequest && !(node.data?.menuItemId as string)) {
-        errors.push(`HTTP 请求节点「${(node.data?.label as string) || node.id}」未选择 API`)
+        errors.push(`HTTP 请求节点「${(node.data?.label) || node.id}」未选择 API`)
       }
     }
 
     // 5. 定位到第一个有问题的节点
     const firstProblemNode = currentNodes.find((n) => {
-      if (n.type === NT.HttpRequest && !(n.data?.menuItemId as string)) return true
+      if (n.type === NT.HttpRequest && !(n.data?.menuItemId as string)) { return true }
+
       return false
     })
 
     // 结果展示
     if (errors.length === 0 && warnings.length === 0) {
       message.success('流程校验通过 ✓')
-    } else if (errors.length > 0) {
+    }
+    else if (errors.length > 0) {
       Modal.error({
         title: `流程校验失败 (${errors.length} 个错误)`,
         content: (
@@ -159,10 +178,12 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
           </div>
         ),
       })
+
       if (firstProblemNode) {
         useFlowStore.getState().selectNode(firstProblemNode.id)
       }
-    } else {
+    }
+    else {
       Modal.warning({
         title: `校验通过，但有 ${warnings.length} 个警告`,
         content: (
@@ -198,9 +219,11 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
 
   const handleSave = useCallback(async () => {
     const ok = await forceSave()
+
     if (ok) {
       message.success('已保存')
-    } else {
+    }
+    else {
       message.error('保存失败，请重试')
     }
   }, [forceSave])
@@ -213,8 +236,10 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
         handleSave()
       }
     }
+
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+
+    return () => { window.removeEventListener('keydown', handleKeyDown) }
   }, [handleSave])
 
   // 导入弹窗状态
@@ -238,6 +263,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
 
   const handleImportConfirm = useCallback((graph: FlowGraph) => {
     const currentNodes = useFlowStore.getState().nodes
+
     if (currentNodes.length > 0) {
       Modal.confirm({
         title: '确认覆盖',
@@ -249,7 +275,8 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
           setImportModalOpen(false)
         },
       })
-    } else {
+    }
+    else {
       loadGraph(graph)
       setImportModalOpen(false)
     }
@@ -284,7 +311,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
                 execResponse: extra?.execResponse,
               },
             }
-          : n
+          : n,
       ),
     }))
   }, [])
@@ -302,110 +329,130 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
 
   return (
     <FlowEditorContext.Provider value={{ projectId, taskId }}>
-    <PathHighlightContext.Provider value={pathHighlight}>
-      <div className="flex h-full flex-col" data-testid="test-flow-editor">
-        {/* 顶部工具栏 */}
-        <FlowToolbar
-          taskName={taskDetail?.task?.name}
-          onRun={handleRun}
-          onAbort={handleAbort}
-          onAutoLayout={handleAutoLayout}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          onSave={handleSave}
-          onExport={handleExport}
-          onImport={handleImport}
-          onValidate={handleValidate}
-          onClear={handleClear}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          isRunning={isRunning}
-          isDirty={isDirty}
-          isSaving={isSaving}
+      <PathHighlightContext.Provider value={pathHighlight}>
+        <div className="flex h-full flex-col" data-testid="test-flow-editor">
+          {/* 顶部工具栏 */}
+          <FlowToolbar
+            agentUrl={agentUrl}
+            canRedo={canRedo}
+            canUndo={canUndo}
+            environments={environments}
+            isDirty={isDirty}
+            isRunning={isRunning}
+            isSaving={isSaving}
+            taskName={taskDetail?.task?.name}
+            onAbort={handleAbort}
+            onAgentUrlChange={setAgentUrl}
+            onAutoLayout={() => { void handleAutoLayout() }}
+            onClear={handleClear}
+            onExport={handleExport}
+            onImport={handleImport}
+            onRedo={handleRedo}
+            onRun={handleRun}
+            onSave={() => { void handleSave() }}
+            onUndo={handleUndo}
+            onValidate={handleValidate}
+          />
+
+          <div className="flex flex-1 overflow-hidden">
+            <PanelGroup autoSaveId="test-flow-left-panel" direction="horizontal">
+              {/* 左侧面板：节点 + 变量 Tab */}
+              <Panel defaultSize={8} maxSize={40} minSize={8}>
+                <div style={{ height: '100%', borderRight: 'var(--ds-panel-border, 1px solid #f0f0f0)', background: 'var(--ds-panel-bg, #fafafa)', display: 'flex', flexDirection: 'column' }}>
+                  <Tabs
+                    defaultActiveKey="nodes"
+                    items={[
+                      {
+                        key: 'nodes',
+                        label: (
+                          <span style={{ fontSize: 12 }}>
+                            <Layers size={12} style={{ marginRight: 4 }} />
+                            节点
+                          </span>
+                        ),
+                        children: <NodePalette />,
+                      },
+                      {
+                        key: 'outline',
+                        label: (
+                          <span style={{ fontSize: 12 }}>
+                            <ListTree size={12} style={{ marginRight: 4 }} />
+                            大纲
+                          </span>
+                        ),
+                        children: <NodeOutlinePanel />,
+                      },
+                      {
+                        key: 'variables',
+                        label: (
+                          <span style={{ fontSize: 12 }}>
+                            <Database size={12} style={{ marginRight: 4 }} />
+                            变量
+                          </span>
+                        ),
+                        children: (
+                          <div style={{ height: 'calc(100vh - 140px)', overflowY: 'auto' }}>
+                            <VariablesPanel sources={variableSources} />
+                          </div>
+                        ),
+                      },
+                      {
+                        key: 'history',
+                        label: (
+                          <span style={{ fontSize: 12 }}>
+                            <History size={12} style={{ marginRight: 4 }} />
+                            历史
+                          </span>
+                        ),
+                        children: <ExecutionHistoryPanel taskId={taskId} />,
+                      },
+                    ]}
+                    size="small"
+                    style={{ flex: 1, overflow: 'hidden' }}
+                    tabBarStyle={{ margin: 0, paddingLeft: 8, minHeight: 32 }}
+                  />
+                </div>
+              </Panel>
+
+              <PanelResizeHandle className="w-px transition-colors hover:bg-[color:var(--ds-highlight-selected,#3b82f6)]" style={{ background: 'var(--ds-divider-color, #e5e7eb)' }} />
+
+              {/* 中间画布 */}
+              <Panel>
+                <div className="h-full min-h-0">
+                  <FlowCanvas />
+                </div>
+              </Panel>
+            </PanelGroup>
+
+            {/* 右侧配置抽屉 */}
+            <NodeConfigDrawer />
+          </div>
+        </div>
+
+        {/* 运行弹窗 */}
+        <RunFlowModal
+          edges={edges}
           environments={environments}
-          agentUrl={agentUrl}
-          onAgentUrlChange={setAgentUrl}
+          execution={execution}
+          nodes={nodes}
+          open={runModalOpen}
+          projectId={projectId}
+          taskId={taskId}
+          onClose={() => {
+            setRunModalOpen(false)
+          }}
+          onNodeStatusChange={handleNodeStatusChange}
+          onRunComplete={handleRunComplete}
         />
 
-        <div className="flex flex-1 overflow-hidden">
-          <PanelGroup direction="horizontal" autoSaveId="test-flow-left-panel">
-            {/* 左侧面板：节点 + 变量 Tab */}
-            <Panel defaultSize={8} minSize={8} maxSize={40}>
-              <div style={{ height: '100%', borderRight: 'var(--ds-panel-border, 1px solid #f0f0f0)', background: 'var(--ds-panel-bg, #fafafa)', display: 'flex', flexDirection: 'column' }}>
-                <Tabs
-                  size="small"
-                  defaultActiveKey="nodes"
-                  style={{ flex: 1, overflow: 'hidden' }}
-                  tabBarStyle={{ margin: 0, paddingLeft: 8, minHeight: 32 }}
-                  items={[
-                    {
-                      key: 'nodes',
-                      label: <span style={{ fontSize: 12 }}><Layers size={12} style={{ marginRight: 4 }} />节点</span>,
-                      children: <NodePalette />,
-                    },
-                    {
-                      key: 'outline',
-                      label: <span style={{ fontSize: 12 }}><ListTree size={12} style={{ marginRight: 4 }} />大纲</span>,
-                      children: <NodeOutlinePanel />,
-                    },
-                    {
-                      key: 'variables',
-                      label: <span style={{ fontSize: 12 }}><Database size={12} style={{ marginRight: 4 }} />变量</span>,
-                      children: (
-                        <div style={{ height: 'calc(100vh - 140px)', overflowY: 'auto' }}>
-                          <VariablesPanel sources={variableSources} />
-                        </div>
-                      ),
-                    },
-                    {
-                      key: 'history',
-                      label: <span style={{ fontSize: 12 }}><History size={12} style={{ marginRight: 4 }} />历史</span>,
-                      children: <ExecutionHistoryPanel taskId={taskId} />,
-                    },
-                  ]}
-                />
-              </div>
-            </Panel>
-
-            <PanelResizeHandle className="w-px hover:bg-[color:var(--ds-highlight-selected,#3b82f6)] transition-colors" style={{ background: 'var(--ds-divider-color, #e5e7eb)' }} />
-
-            {/* 中间画布 */}
-            <Panel>
-              <div className="h-full min-h-0">
-                <FlowCanvas />
-              </div>
-            </Panel>
-          </PanelGroup>
-
-          {/* 右侧配置抽屉 */}
-          <NodeConfigDrawer />
-        </div>
-      </div>
-
-      {/* 运行弹窗 */}
-      <RunFlowModal
-        open={runModalOpen}
-        onClose={() => {
-          setRunModalOpen(false)
-        }}
-        taskId={taskId}
-        nodes={nodes}
-        edges={edges}
-        projectId={projectId}
-        environments={environments}
-        execution={execution}
-        onNodeStatusChange={handleNodeStatusChange}
-        onRunComplete={handleRunComplete}
-      />
-
-      {/* 导入弹窗 */}
-      <ImportFlowModal
-        open={importModalOpen}
-        projectId={projectId}
-        onClose={() => setImportModalOpen(false)}
-        onImport={handleImportConfirm}
-      />
-    </PathHighlightContext.Provider>
+        {/* 导入弹窗 */}
+        <ImportFlowModal
+          open={importModalOpen}
+          projectId={projectId}
+          onClose={() => { setImportModalOpen(false) }}
+          onImport={handleImportConfirm}
+        />
+      </PathHighlightContext.Provider>
     </FlowEditorContext.Provider>
   )
 }

@@ -1,18 +1,19 @@
-import { Tag, Typography } from 'antd'
-import { FlowNodeType, NODE_TYPE_LABELS } from '../../types/flow.types'
-import { NODE_TYPE_COLORS } from '../../nodes/nodeColors'
 import {
-  PlayCircleOutlined,
-  StopOutlined,
-  GlobalOutlined,
-  BranchesOutlined,
-  ReloadOutlined,
-  PartitionOutlined,
-  ClockCircleOutlined,
   ApartmentOutlined,
-  SettingOutlined,
+  BranchesOutlined,
+  ClockCircleOutlined,
+  GlobalOutlined,
+  PartitionOutlined,
+  PlayCircleOutlined,
+  ReloadOutlined,
   SafetyOutlined,
+  SettingOutlined,
+  StopOutlined,
 } from '@ant-design/icons'
+import { Tag, Typography } from 'antd'
+
+import { NODE_TYPE_COLORS } from '../../nodes/nodeColors'
+import { type FlowNodeType, NODE_TYPE_LABELS } from '../../types/flow.types'
 
 const { Text } = Typography
 
@@ -43,16 +44,16 @@ interface TypeHeaderProps {
 export default function TypeHeader({ nodeType, nodeId }: TypeHeaderProps) {
   const label = NODE_TYPE_LABELS[nodeType]
   const color = NODE_TYPE_COLORS[nodeType]
-  const icon = NODE_TYPE_ICONS[nodeType] || null
+  const icon = NODE_TYPE_ICONS[nodeType] ?? null
 
   return (
     <div className="space-y-2">
       {/* 节点类型标签 */}
       <div>
         <Tag
+          className="text-sm"
           color={color}
           icon={icon}
-          className="text-sm"
         >
           {label}
         </Tag>
@@ -60,7 +61,7 @@ export default function TypeHeader({ nodeType, nodeId }: TypeHeaderProps) {
 
       {/* 节点 ID */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           节点 ID
         </Text>
         <Text code className="text-xs">

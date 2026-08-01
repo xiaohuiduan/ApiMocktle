@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+
 import { useFlowStore } from '../store/useFlowStore'
 import type { FlowEdge } from '../types/flow.types'
 
@@ -19,7 +20,7 @@ export interface PathHighlight {
   onNodeHover: (nodeId: string | null) => void
   onNodeClick: (nodeId: string) => void
   onPaneClick: () => void
-  breadcrumbs: { id: string; label: string }[] | null
+  breadcrumbs: { id: string, label: string }[] | null
 }
 
 // ==================== BFS 工具函数 ====================
@@ -33,6 +34,7 @@ function getUpstream(nodeId: string, edges: FlowEdge[]): PathResult {
 
   while (queue.length > 0) {
     const current = queue.shift()!
+
     for (const edge of edges) {
       if (edge.target === current && !visited.has(edge.source)) {
         visited.add(edge.source)
@@ -55,6 +57,7 @@ function getDownstream(nodeId: string, edges: FlowEdge[]): PathResult {
 
   while (queue.length > 0) {
     const current = queue.shift()!
+
     for (const edge of edges) {
       if (edge.source === current && !visited.has(edge.target)) {
         visited.add(edge.target)
@@ -71,9 +74,9 @@ function getDownstream(nodeId: string, edges: FlowEdge[]): PathResult {
 /** 构建面包屑：从 Start 到当前节点的上游路径 + 当前 + 下游到 End */
 function buildBreadcrumbs(
   nodeId: string,
-  nodes: { id: string; data: { label: string } }[],
+  nodes: { id: string, data: { label: string } }[],
   edges: FlowEdge[],
-): { id: string; label: string }[] {
+): { id: string, label: string }[] {
   const nodeMap = new Map(nodes.map((n) => [n.id, n]))
 
   // 上游路径：逆向 BFS 收集，然后反转得到 Start → current 的顺序
@@ -83,6 +86,7 @@ function buildBreadcrumbs(
 
   while (queue.length > 0) {
     const current = queue.shift()!
+
     for (const edge of edges) {
       if (edge.target === current && !visited.has(edge.source)) {
         visited.add(edge.source)
@@ -91,6 +95,7 @@ function buildBreadcrumbs(
       }
     }
   }
+
   upstream.reverse()
 
   // 下游路径：正向 BFS
@@ -100,6 +105,7 @@ function buildBreadcrumbs(
 
   while (queueDown.length > 0) {
     const current = queueDown.shift()!
+
     for (const edge of edges) {
       if (edge.source === current && !visitedDown.has(edge.target)) {
         visitedDown.add(edge.target)
@@ -111,6 +117,7 @@ function buildBreadcrumbs(
 
   // 组合：upstream → current → downstream
   const allIds = [...upstream, nodeId, ...downstream]
+
   return allIds.map((id) => ({
     id,
     label: nodeMap.get(id)?.data?.label ?? id,
@@ -150,7 +157,8 @@ export function usePathHighlight(): PathHighlight {
 
   const onNodeHover = useCallback(
     (nodeId: string | null) => {
-      if (lockedNodeId) return // 锁定时忽略悬停
+      if (lockedNodeId) { return } // 锁定时忽略悬停
+
       setHoverNodeId(nodeId)
     },
     [lockedNodeId],
@@ -161,9 +169,11 @@ export function usePathHighlight(): PathHighlight {
       if (lockedNodeId === nodeId) {
         // toggle：取消锁定
         setLockedNodeId(null)
-      } else {
+      }
+      else {
         setLockedNodeId(nodeId)
       }
+
       setHoverNodeId(null) // 清除悬停
     },
     [lockedNodeId],

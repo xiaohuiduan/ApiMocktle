@@ -108,6 +108,7 @@ export function ApiTab(props: TabsProps) {
 
       // 关闭空的新建草稿时自动丢弃（未入库，无需保留）。
       const menuData = menuRawList?.find((it) => it.id === key)
+
       if (menuData?.__isDraft && isDraftEmpty(menuData)) {
         discardDraft(key)
       }
@@ -145,9 +146,9 @@ export function ApiTab(props: TabsProps) {
                 ? 'group relative overflow-hidden rounded-full after:absolute after:size-2 after:rounded-full after:content-[""] hover:overflow-auto hover:bg-transparent hover:after:hidden'
                 : ''
               }`}
+              data-no-dnd="true" // 「关闭」按钮不允许触发拖拽。
               role="button"
               tabIndex={0}
-              data-no-dnd="true" // 「关闭」按钮不允许触发拖拽。
               onKeyDown={(ev) => {
                 if (ev.key === 'Enter' || ev.key === ' ') {
                   ev.preventDefault()

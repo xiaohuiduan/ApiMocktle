@@ -4,13 +4,15 @@ import { executeScriptCore } from './script-executor'
 // Worker 消息处理
 self.onmessage = async (e: MessageEvent<ScriptWorkerRequest>) => {
   const { type, code, context } = e.data
-  if (type !== 'execute') return
+
+  if (type !== 'execute') { return }
 
   try {
     const result = await executeScriptCore(code, context)
     const response: ScriptWorkerResponse = { type: 'result', result }
     self.postMessage(response)
-  } catch (err) {
+  }
+  catch (err) {
     const errorResult = {
       success: false,
       consoleEntries: [{ level: 'error' as const, args: [String(err)], timestamp: Date.now() }],

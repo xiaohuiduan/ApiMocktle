@@ -1,23 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Select, Collapse, Typography, Spin, Tabs } from 'antd'
+
 import { invoke } from '@tauri-apps/api/core'
-import type { PanelProps } from './shared/panelRegistry'
-import type { HttpRequestNodeData } from '../../types/flow.types'
-import type { TestAssertion, TestExtractor } from '@/types'
-import type { MockRule } from '../../types/mock.types'
+import { Collapse, Select, Spin, Tabs, Typography } from 'antd'
+
+import { MonacoEditor, type MonacoEditorRef } from '@/components/MonacoEditor/MonacoEditor'
 import { useAuth } from '@/contexts/auth'
 import { useApiMenu } from '@/hooks/useApiMenu'
+import type { TestAssertion, TestExtractor } from '@/types'
+import { serialize } from '@/utils'
+
+import type { HttpRequestNodeData } from '../../types/flow.types'
+import type { MockRule } from '../../types/mock.types'
+
 import AssertionListEditor from './shared/AssertionListEditor'
 import ExtractorListEditor from './shared/ExtractorListEditor'
 import KVEditor, { type KVPair } from './shared/KVEditor'
 import MockRuleEditor from './shared/MockRuleEditor'
-import { MonacoEditor, type MonacoEditorRef } from '@/components/MonacoEditor/MonacoEditor'
-import { serialize } from '@/utils'
+import type { PanelProps } from './shared/panelRegistry'
 
 const { Text } = Typography
 
 /** 标签后有数据时显示绿色 * */
-function LabelWithBadge({ label, hasData }: { label: string; hasData: boolean }) {
+function LabelWithBadge({ label, hasData }: { label: string, hasData: boolean }) {
   return (
     <span>
       {label}
@@ -34,11 +38,12 @@ interface RequestOverride {
   headers?: KVPair[]
   queryParams?: KVPair[]
   pathParams?: KVPair[]
-  body?: { type: string; json?: unknown }
+  body?: { type: string, json?: unknown }
 }
 
 function getOverride(override: unknown): RequestOverride {
-  if (!override || typeof override !== 'object') return {}
+  if (!override || typeof override !== 'object') { return {} }
+
   return override as RequestOverride
 }
 
@@ -52,34 +57,41 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
   const lastBodyRef = useRef<unknown>(undefined)
 
   // 加载项目环境（用于 Mock Agent 发现）
-  const [environments, setEnvironments] = useState<Array<{ name: string; agentUrl?: string }>>([])
+  const [, setEnvironments] = useState<{ name: string, agentUrl?: string }[]>([])
   useEffect(() => {
-    if (!sessionId || !projectId) return
+    if (!sessionId || !projectId) { return }
+
     const fetchEnvs = async () => {
       try {
-        const result = await invoke<{ ok: boolean; data?: { environments: Array<{ name: string; agentUrl?: string }> } }>(
+        const result = await invoke<{ ok: boolean, data?: { environments: { name: string, agentUrl?: string }[] } }>(
           'get_project_environments',
           { sessionId, projectId },
         )
+
         if (result.ok && result.data) {
           setEnvironments(result.data.environments || [])
         }
-      } catch { /* ignore */ }
+      }
+      catch { /* ignore */ }
     }
+
     fetchEnvs()
   }, [sessionId, projectId])
 
   // Sync body editor when external value changes (e.g. different API selected)
   useEffect(() => {
     const currentBody = override.body?.json
+
     if (lastBodyRef.current !== currentBody) {
       lastBodyRef.current = currentBody
       const editor = bodyEditorRef.current?.editor
+
       if (editor) {
         // 字符串类型直接显示原文，避免 serialize 再包装成 JSON 字符串
         const newVal = currentBody != null
           ? (typeof currentBody === 'string' ? currentBody : serialize(currentBody, 2))
           : ''
+
         if (editor.getValue() !== newVal) {
           editor.setValue(newVal)
         }
@@ -109,17 +121,17 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
   )
 
   const handleHeadersChange = useCallback(
-    (pairs: KVPair[]) => updateOverride({ headers: pairs.length > 0 ? pairs : undefined }),
+    (pairs: KVPair[]) => { updateOverride({ headers: pairs.length > 0 ? pairs : undefined }) },
     [updateOverride],
   )
 
   const handleQueryChange = useCallback(
-    (pairs: KVPair[]) => updateOverride({ queryParams: pairs.length > 0 ? pairs : undefined }),
+    (pairs: KVPair[]) => { updateOverride({ queryParams: pairs.length > 0 ? pairs : undefined }) },
     [updateOverride],
   )
 
   const handlePathChange = useCallback(
-    (pairs: KVPair[]) => updateOverride({ pathParams: pairs.length > 0 ? pairs : undefined }),
+    (pairs: KVPair[]) => { updateOverride({ pathParams: pairs.length > 0 ? pairs : undefined }) },
     [updateOverride],
   )
 
@@ -128,7 +140,8 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
       try {
         const parsed = value ? JSON.parse(String(value)) : undefined
         updateOverride({ body: parsed ? { type: 'json', json: parsed } : undefined })
-      } catch {
+      }
+      catch {
         // JSON 无效时保留原文
         updateOverride({ body: { type: 'json', json: String(value) } })
       }
@@ -139,12 +152,12 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
   // ====== 脚本和断言 ======
 
   const handlePreScriptChange = useCallback(
-    (value: unknown) => { onChange({ preScript: String(value || '') }) },
+    (value: unknown) => { onChange({ preScript: String(value ?? '') }) },
     [onChange],
   )
 
   const handlePostScriptChange = useCallback(
-    (value: unknown) => { onChange({ postScript: String(value || '') }) },
+    (value: unknown) => { onChange({ postScript: String(value ?? '') }) },
     [onChange],
   )
 
@@ -172,149 +185,150 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
 
   // ====== 折叠面板配置 ======
 
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- falsy 链语义（长度 0 也回退到 body）
   const hasOverride = !!(override.headers?.length || override.queryParams?.length || override.pathParams?.length || override.body)
 
   const collapseItems = [
     {
       key: 'requestOverride',
-      label: <LabelWithBadge label="请求覆盖（可选）" hasData={hasOverride} />,
+      label: <LabelWithBadge hasData={hasOverride} label="请求覆盖（可选）" />,
       children: (
         <Tabs
-          size="small"
           defaultActiveKey="query"
           items={[
             {
               key: 'query',
-              label: <LabelWithBadge label="Query" hasData={(override.queryParams?.length ?? 0) > 0} />,
+              label: <LabelWithBadge hasData={(override.queryParams?.length ?? 0) > 0} label="Query" />,
               children: (
                 <KVEditor
-                  value={override.queryParams || []}
-                  onChange={handleQueryChange}
                   namePlaceholder="参数名"
+                  value={override.queryParams ?? []}
                   valuePlaceholder="参数值（支持 {{变量}}）"
+                  onChange={handleQueryChange}
                 />
               ),
             },
             {
               key: 'header',
-              label: <LabelWithBadge label="Header" hasData={(override.headers?.length ?? 0) > 0} />,
+              label: <LabelWithBadge hasData={(override.headers?.length ?? 0) > 0} label="Header" />,
               children: (
                 <KVEditor
-                  value={override.headers || []}
-                  onChange={handleHeadersChange}
                   namePlaceholder="Header 名"
+                  value={override.headers ?? []}
                   valuePlaceholder="Header 值（支持 {{变量}}）"
+                  onChange={handleHeadersChange}
                 />
               ),
             },
             {
               key: 'path',
-              label: <LabelWithBadge label="Path" hasData={(override.pathParams?.length ?? 0) > 0} />,
+              label: <LabelWithBadge hasData={(override.pathParams?.length ?? 0) > 0} label="Path" />,
               children: (
                 <div>
-                  <Text type="secondary" style={{ display: 'block', fontSize: 11, marginBottom: 8 }}>
+                  <Text style={{ display: 'block', fontSize: 11, marginBottom: 8 }} type="secondary">
                     替换路径中的 {'{param}'} 占位符
                   </Text>
                   <KVEditor
-                    value={override.pathParams || []}
-                    onChange={handlePathChange}
                     namePlaceholder="参数名"
+                    value={override.pathParams ?? []}
                     valuePlaceholder="参数值"
+                    onChange={handlePathChange}
                   />
                 </div>
               ),
             },
             {
               key: 'body',
-              label: <LabelWithBadge label="Body" hasData={!!override.body} />,
+              label: <LabelWithBadge hasData={!!override.body} label="Body" />,
               children: (
                 <div>
-                  <Text type="secondary" style={{ display: 'block', fontSize: 11, marginBottom: 4 }}>
+                  <Text style={{ display: 'block', fontSize: 11, marginBottom: 4 }} type="secondary">
                     JSON 请求体（支持 {'{{变量}}'} 占位符）
                   </Text>
                   <MonacoEditor
                     ref={bodyEditorRef}
-                    defaultValue={override.body?.json || ''}
                     useDefaultValue
+                    defaultValue={override.body?.json ?? ''}
                     deserializeOnChange={false}
-                    onChange={handleBodyChange}
-                    language="json"
                     height="180px"
+                    language="json"
                     options={{ minimap: { enabled: false }, lineNumbers: 'on' }}
+                    onChange={handleBodyChange}
                   />
                 </div>
               ),
             },
           ]}
+          size="small"
         />
       ),
     },
     {
       key: 'preScript',
-      label: <LabelWithBadge label="前置脚本（可选）" hasData={!!data.preScript} />,
+      label: <LabelWithBadge hasData={!!data.preScript} label="前置脚本（可选）" />,
       children: (
         <div>
-          <Text type="secondary" className="block text-xs mb-2">
+          <Text className="mb-2 block text-xs" type="secondary">
             请求发送前执行的 JavaScript 脚本
           </Text>
           <MonacoEditor
-            value={data.preScript || ''}
-            onChange={handlePreScriptChange}
-            language="javascript"
             height="150px"
+            language="javascript"
             options={{ minimap: { enabled: false }, lineNumbers: 'on' }}
+            value={data.preScript ?? ''}
+            onChange={handlePreScriptChange}
           />
         </div>
       ),
     },
     {
       key: 'postScript',
-      label: <LabelWithBadge label="后置脚本（可选）" hasData={!!data.postScript} />,
+      label: <LabelWithBadge hasData={!!data.postScript} label="后置脚本（可选）" />,
       children: (
         <div>
-          <Text type="secondary" className="block text-xs mb-2">
+          <Text className="mb-2 block text-xs" type="secondary">
             请求完成后执行。可用: pm.variables.set('key', value)、pm.response.json()、pm.response.status
           </Text>
           <MonacoEditor
-            value={data.postScript || ''}
-            onChange={handlePostScriptChange}
-            language="javascript"
             height="150px"
+            language="javascript"
             options={{ minimap: { enabled: false }, lineNumbers: 'on' }}
+            value={data.postScript ?? ''}
+            onChange={handlePostScriptChange}
           />
         </div>
       ),
     },
     {
       key: 'assertions',
-      label: <LabelWithBadge label="断言（可选）" hasData={(data.assertions?.length ?? 0) > 0} />,
+      label: <LabelWithBadge hasData={(data.assertions?.length ?? 0) > 0} label="断言（可选）" />,
       children: (
         <AssertionListEditor
-          assertions={data.assertions || []}
+          assertions={data.assertions ?? []}
           onChange={handleAssertionsChange}
         />
       ),
     },
     {
       key: 'extractors',
-      label: <LabelWithBadge label="提取器（可选）" hasData={(data.extractors?.length ?? 0) > 0} />,
+      label: <LabelWithBadge hasData={(data.extractors?.length ?? 0) > 0} label="提取器（可选）" />,
       children: (
         <ExtractorListEditor
-          extractors={data.extractors || []}
+          extractors={data.extractors ?? []}
           onChange={handleExtractorsChange}
         />
       ),
     },
     {
       key: 'mockRules',
-      label: <LabelWithBadge label={`Mock 依赖（可选）${data.mockRules?.length ? ` · ${data.mockRules.length} 条` : ''}`} hasData={(data.mockRules?.length ?? 0) > 0} />,
+      label: <LabelWithBadge hasData={(data.mockRules?.length ?? 0) > 0} label={`Mock 依赖（可选）${data.mockRules?.length ? ` · ${data.mockRules.length} 条` : ''}`} />,
       children: (
         <div>
-          <Text type="secondary" className="block text-xs mb-2">
+          <Text className="mb-2 block text-xs" type="secondary">
             拦截此请求触发的 Feign/Mapper 调用，返回模拟数据
           </Text>
           <MockRuleEditor
-            rules={data.mockRules || []}
+            rules={data.mockRules ?? []}
             onChange={handleMockRulesChange}
           />
         </div>
@@ -324,36 +338,35 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
 
   return (
     <div className="space-y-4">
-      <Text type="secondary" className="block text-xs">
+      <Text className="block text-xs" type="secondary">
         HTTP 请求配置
       </Text>
 
       {/* API 菜单选择 */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           选择 API 接口
         </Text>
         <Select
-          value={data.menuItemId || undefined}
-          onChange={handleMenuItemChange}
-          options={menuOptions}
-          size="small"
-          style={{ width: '100%' }}
           showSearch
+          data-testid="http-menu-item-select"
           filterOption={(input, option) =>
-            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-          }
-          placeholder={loadingMenu ? '加载中...' : '选择 API 接口'}
+            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
           loading={loadingMenu}
           notFoundContent={loadingMenu ? <Spin size="small" /> : '暂无数据'}
-          data-testid="http-menu-item-select"
+          options={menuOptions}
+          placeholder={loadingMenu ? '加载中...' : '选择 API 接口'}
+          size="small"
+          style={{ width: '100%' }}
+          value={data.menuItemId || undefined}
+          onChange={handleMenuItemChange}
         />
       </div>
 
       {/* 其他配置项 */}
       <Collapse
-        items={collapseItems}
         defaultActiveKey={[]}
+        items={collapseItems}
         size="small"
       />
     </div>

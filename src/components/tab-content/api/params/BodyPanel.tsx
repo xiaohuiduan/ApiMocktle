@@ -1,11 +1,14 @@
-import { Button, Modal, Switch, Tag, Typography, theme } from 'antd'
 import { useMemo } from 'react'
+
+import { Button, Modal, Switch, Tag, theme, Typography } from 'antd'
+
 import { MonacoEditor } from '@/components/MonacoEditor'
-import { ParamsEditableTable } from '../components/ParamsEditableTable'
-import { DynamicVariablesHelp } from '../components/DynamicVariablesHelp'
 import { BodyType } from '@/enums'
-import { DYNAMIC_VARIABLE_DEFS } from '@/utils/dynamic-variables'
 import type { ApiRequestBody, Parameter } from '@/types'
+import { DYNAMIC_VARIABLE_DEFS } from '@/utils/dynamic-variables'
+
+import { DynamicVariablesHelp } from '../components/DynamicVariablesHelp'
+import { ParamsEditableTable } from '../components/ParamsEditableTable'
 
 /** 判断某个 body 类型是否已有内容（用于类型标签的绿标） */
 function bodyTypeHasContent(requestBody: ApiRequestBody | undefined, t: BodyType): boolean {
@@ -78,6 +81,7 @@ export function BodyPanel(props: BodyPanelProps) {
           .filter(([k]) => !k.startsWith('$'))
           .map(([k, v]) => ({ label: k, detail: v }))
       : []
+
     return [...dyn, ...users]
   }, [varMap])
 
@@ -94,9 +98,11 @@ export function BodyPanel(props: BodyPanelProps) {
       || requestBody.type === BodyType.Raw)
 
   const handleFillClick = () => {
-    if (!onFillBody) return
+    if (!onFillBody) { return }
+
     if (!bodyRawText?.trim()) {
       onFillBody()
+
       return
     }
 
@@ -110,33 +116,33 @@ export function BodyPanel(props: BodyPanelProps) {
   }
 
   if (!requestBody) {
-    return <Typography.Text type="secondary" className="px-3 pt-2">无 Body</Typography.Text>
+    return <Typography.Text className="px-3 pt-2" type="secondary">无 Body</Typography.Text>
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 px-2 pb-1.5">
+    <div className="flex h-full min-h-0 flex-col px-2 pb-1.5">
       {/* Body Type 选择器 - 固定高度 */}
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1">
             {bodyTypeOptions.map(({ n, t }) => {
               const hasContent = bodyTypeHasContent(requestBody, t)
 
-            return (
-              <Tag.CheckableTag
-                key={t}
-                checked={requestBody.type === t}
-                onChange={(checked) => {
-                  if (checked && onBodyTypeChange) {
-                    onBodyTypeChange(t)
-                  }
-                }}
-              >
-                {n}
-                {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
-              </Tag.CheckableTag>
-            )
-          })}
+              return (
+                <Tag.CheckableTag
+                  key={t}
+                  checked={requestBody.type === t}
+                  onChange={(checked) => {
+                    if (checked && onBodyTypeChange) {
+                      onBodyTypeChange(t)
+                    }
+                  }}
+                >
+                  {n}
+                  {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
+                </Tag.CheckableTag>
+              )
+            })}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {showFillButton && onFillBody && (
@@ -156,27 +162,29 @@ export function BodyPanel(props: BodyPanelProps) {
       </div>
 
       {/* Body 编辑器 - 填满剩余空间 */}
-      <div className="flex-1 min-h-0">
+      <div className="min-h-0 flex-1">
         {showBodyEditor && (
-          <div className="rounded border-solid h-full" style={{ borderWidth: 1, borderColor: token.colorBorderSecondary }}>
+          <div className="h-full rounded border-solid" style={{ borderWidth: 1, borderColor: token.colorBorderSecondary }}>
             <MonacoEditor
+              completionItems={completionItems}
+              deserializeOnChange={false}
               height="100%"
               language={
-                requestBody.type === BodyType.Xml ? 'xml'
-                  : requestBody.type === BodyType.Raw ? 'plaintext'
-                  : 'json'
+                requestBody.type === BodyType.Xml
+                  ? 'xml'
+                  : requestBody.type === BodyType.Raw
+                    ? 'plaintext'
+                    : 'json'
               }
-              deserializeOnChange={false}
+              options={{
+                readOnly: false,
+                automaticLayout: true,
+              }}
               value={bodyRawText ?? (requestBody.type === BodyType.Json ? (buildBodyExample?.() ?? '') : '')}
-              completionItems={completionItems}
               onChange={(val) => {
                 if (onBodyRawTextChange) {
                   onBodyRawTextChange(typeof val === 'string' ? val : '')
                 }
-              }}
-              options={{
-                readOnly: false,
-                automaticLayout: true,
               }}
               onMount={(editor, monaco) => {
                 monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({ noSemanticValidation: true, noSyntaxValidation: true })
@@ -188,21 +196,21 @@ export function BodyPanel(props: BodyPanelProps) {
 
         {(requestBody.type === BodyType.FormData || requestBody.type === BodyType.UrlEncoded) && (
           <div className="h-full overflow-auto">
-            <Typography.Text type="secondary" className="mb-2 block text-xs">
+            <Typography.Text className="mb-2 block text-xs" type="secondary">
               {requestBody.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
             </Typography.Text>
             <ParamsEditableTable
               showDescriptionColumn={false}
               showRequiredColumn={false}
-              varMap={varMap}
               value={requestBody.parameters}
+              varMap={varMap}
               onChange={(params) => onBodyParametersChange?.(params ?? [])}
             />
           </div>
         )}
 
         {requestBody.type === BodyType.None && (
-          <Typography.Text type="secondary" className="text-xs">无请求体</Typography.Text>
+          <Typography.Text className="text-xs" type="secondary">无请求体</Typography.Text>
         )}
       </div>
     </div>

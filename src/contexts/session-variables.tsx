@@ -1,7 +1,5 @@
 import { createContext, useCallback, useContext, useState } from 'react'
 
-import type { ProjectEnvironmentConfig } from '@/types'
-
 interface SessionVariablesContextData {
   /** 当前会话中脚本设置的变量 */
   sessionVars: Record<string, string>
@@ -21,17 +19,18 @@ export function SessionVariablesProvider(props: React.PropsWithChildren) {
   const [sessionVars, setSessionVarsState] = useState<Record<string, string>>({})
 
   const setSessionVar = useCallback((name: string, value: string) => {
-    setSessionVarsState(prev => ({ ...prev, [name]: value }))
+    setSessionVarsState((prev) => ({ ...prev, [name]: value }))
   }, [])
 
   const setSessionVars = useCallback((vars: Record<string, string>) => {
-    setSessionVarsState(prev => ({ ...prev, ...vars }))
+    setSessionVarsState((prev) => ({ ...prev, ...vars }))
   }, [])
 
   const removeSessionVar = useCallback((name: string) => {
     setSessionVarsState((prev) => {
       const next = { ...prev }
-      delete next[name]
+      Reflect.deleteProperty(next, name)
+
       return next
     })
   }, [])

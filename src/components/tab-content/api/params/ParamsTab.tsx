@@ -109,7 +109,7 @@ function InheritedParamsBar(props: {
               </Tag>
               <Typography.Text code className="truncate">{r.name}</Typography.Text>
               <Typography.Text className="truncate" type="secondary">
-                {r.value || '—'}
+                {r.value ?? '—'}
               </Typography.Text>
               <div className="flex justify-center">
                 <Switch

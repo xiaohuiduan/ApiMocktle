@@ -7,14 +7,17 @@ import { MenuItemType } from '@/enums'
  */
 export function collectFolderApis(folderId: string, menuRawList: ApiMenuData[]): ApiMenuData[] {
   const result: ApiMenuData[] = []
-  const direct = menuRawList.filter(m => m.parentId === folderId)
+  const direct = menuRawList.filter((m) => m.parentId === folderId)
+
   for (const m of direct) {
     if (m.type === MenuItemType.ApiDetail || m.type === MenuItemType.HttpRequest) {
       result.push(m)
-    } else {
+    }
+    else {
       // 子目录（文件夹）继续递归
       result.push(...collectFolderApis(m.id, menuRawList))
     }
   }
+
   return result
 }

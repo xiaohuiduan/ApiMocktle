@@ -484,11 +484,11 @@ export const initialTabItems: ApiTabItem[] = (() => {
     ...apiDirectoryData
       .filter(({ id }) => {
         return (
-          id === MenuId.示例接口 ||
-          id === MenuId.宠物店 ||
-          id === MenuId.查询宠物详情 ||
-          id === MenuId.SchemaPet ||
-          id === MenuId.引用模型
+          id === MenuId.示例接口
+          || id === MenuId.宠物店
+          || id === MenuId.查询宠物详情
+          || id === MenuId.SchemaPet
+          || id === MenuId.引用模型
         )
       })
       .map(({ id, name, type }) => {

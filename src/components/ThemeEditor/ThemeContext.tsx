@@ -1,13 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
 import { setTwoToneColor } from '@ant-design/icons'
-import { ConfigProvider, theme } from 'antd'
-import type { ThemeConfig } from 'antd'
+import { ConfigProvider, theme, type ThemeConfig } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 
 import { designStylePresets, getDensityToken, presetThemes } from './theme-data'
 import { restoreThemeSetting } from './ThemeEditor.helper'
-import type { Density, DesignStyle, ThemeSetting } from './ThemeEditor.type'
+import type { DesignStyle, ThemeSetting } from './ThemeEditor.type'
 
 const { defaultAlgorithm, darkAlgorithm } = theme
 
@@ -19,7 +18,7 @@ function getDesignStyleComponents(
   designStyle: DesignStyle,
   isDark: boolean,
 ): ThemeConfig['components'] {
-  if (designStyle === 'default') return undefined
+  if (designStyle === 'default') { return undefined }
 
   // 玻璃风格
   if (designStyle === 'glassmorphism') {
@@ -100,9 +99,6 @@ function getDesignStyleComponents(
   if (designStyle === 'neumorphism') {
     const neuBg = isDark ? '#2d3436' : '#e0e5ec'
     const neuBorder = 'transparent'
-    const neuShadow = isDark
-      ? '3px 3px 6px #1a1d1e, -3px -3px 6px #404b4e'
-      : '3px 3px 6px #b8bec7, -3px -3px 6px #ffffff'
     const neuShadowSm = isDark
       ? '2px 2px 4px #1a1d1e, -2px -2px 4px #404b4e'
       : '2px 2px 4px #b8bec7, -2px -2px 4px #ffffff'
@@ -170,10 +166,10 @@ function getDesignStyleComponents(
     const skeuoBg = isDark ? '#2a2520' : '#f5f0eb'
     const skeuoBgLight = isDark ? '#332e28' : '#faf8f5'
     const skeuoBorder = isDark ? '1px solid #4a4035' : '1px solid #c8bfb4'
-    const skeuoShadow =
-      '0 1px 3px rgba(0,0,0,0.12), 0 1px 0 rgba(255,255,255,0.5) inset'
-    const skeuoShadowPrimary =
-      '0 2px 4px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.3) inset'
+    const skeuoShadow
+      = '0 1px 3px rgba(0,0,0,0.12), 0 1px 0 rgba(255,255,255,0.5) inset'
+    const skeuoShadowPrimary
+      = '0 2px 4px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.3) inset'
 
     return {
       Button: {
@@ -239,7 +235,7 @@ function getDesignStyleComponents(
  * 这些 token 会被所有使用 antd token 的组件自动继承。
  */
 function getDesignStyleToken(designStyle: DesignStyle, isDark: boolean) {
-  if (designStyle === 'default') return {}
+  if (designStyle === 'default') { return {} }
 
   if (designStyle === 'glassmorphism') {
     return {
@@ -316,6 +312,7 @@ export function ThemeProvider(props: React.PropsWithChildren<ThemeProviderProps>
 
   const themePresetTokens = useMemo(() => {
     const preset = presetThemes[themeMode]
+
     return {
       ...preset.token,
       ...densityToken,
@@ -380,16 +377,18 @@ export function ThemeProvider(props: React.PropsWithChildren<ThemeProviderProps>
           : undefined,
     }
 
-    if (!designStyleComponents) return base
+    if (!designStyleComponents) { return base }
 
     // 深度合并：设计风格覆盖基础设置
     const merged: ThemeConfig['components'] = { ...base }
+
     for (const [component, overrides] of Object.entries(designStyleComponents)) {
       merged[component as keyof typeof merged] = {
         ...(base[component as keyof typeof base] as Record<string, unknown>),
         ...overrides,
       } as never
     }
+
     return merged
   }, [isDarkMode, token, designStyleComponents])
 

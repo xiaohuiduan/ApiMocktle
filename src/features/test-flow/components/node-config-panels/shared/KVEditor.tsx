@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
+
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Input, Typography } from 'antd'
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 
 const { Text } = Typography
 
@@ -58,10 +59,10 @@ export default function KVEditor({
       {/* 表头 */}
       {value.length > 0 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 4, paddingLeft: 2 }}>
-          <Text type="secondary" style={{ fontSize: 11, width: nameWidth, flexShrink: 0 }}>
+          <Text style={{ fontSize: 11, width: nameWidth, flexShrink: 0 }} type="secondary">
             {namePlaceholder}
           </Text>
-          <Text type="secondary" style={{ fontSize: 11, flex: 1 }}>
+          <Text style={{ fontSize: 11, flex: 1 }} type="secondary">
             {valuePlaceholder}
           </Text>
           <div style={{ width: 28 }} />
@@ -72,38 +73,38 @@ export default function KVEditor({
       {value.map((pair, index) => (
         <div key={index} style={{ display: 'flex', gap: 6, marginBottom: 4, alignItems: 'center' }}>
           <Input
-            size="small"
-            value={pair.name}
-            onChange={(e) => handleNameChange(index, e.target.value)}
             placeholder={namePlaceholder}
+            size="small"
             style={{ width: nameWidth, flexShrink: 0 }}
+            value={pair.name}
+            onChange={(e) => { handleNameChange(index, e.target.value) }}
           />
           <Input
-            size="small"
-            value={pair.value}
-            onChange={(e) => handleValueChange(index, e.target.value)}
             placeholder={valuePlaceholder}
+            size="small"
             style={{ flex: 1 }}
+            value={pair.value}
+            onChange={(e) => { handleValueChange(index, e.target.value) }}
           />
           <Button
-            type="text"
-            size="small"
             danger
             icon={<DeleteOutlined />}
-            onClick={() => handleDelete(index)}
+            size="small"
             style={{ width: 28, flexShrink: 0 }}
+            type="text"
+            onClick={() => { handleDelete(index) }}
           />
         </div>
       ))}
 
       {/* 添加按钮 */}
       <Button
-        type="dashed"
-        size="small"
-        icon={<PlusOutlined />}
-        onClick={handleAdd}
         block
+        icon={<PlusOutlined />}
+        size="small"
         style={{ marginTop: 4 }}
+        type="dashed"
+        onClick={handleAdd}
       >
         添加
       </Button>

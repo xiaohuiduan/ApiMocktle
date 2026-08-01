@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 
-import { getProxyConfig } from '@/utils/app-config'
 import type { ProxyConfig } from '@/types'
+import { getProxyConfig } from '@/utils/app-config'
 
 interface ProxyConfigContextValue {
   proxyConfig: ProxyConfig | null
@@ -10,7 +10,7 @@ interface ProxyConfigContextValue {
 
 const ProxyConfigContext = createContext<ProxyConfigContextValue>({
   proxyConfig: null,
-  refresh: () => {},
+  refresh: () => { /* noop */ },
 })
 
 export function ProxyConfigProvider({ children }: { children: React.ReactNode }) {
@@ -21,7 +21,7 @@ export function ProxyConfigProvider({ children }: { children: React.ReactNode })
     getProxyConfig().then(setProxyConfig)
   }, [refreshKey])
 
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), [])
+  const refresh = useCallback(() => { setRefreshKey((k) => k + 1) }, [])
 
   return (
     <ProxyConfigContext.Provider value={{ proxyConfig, refresh }}>

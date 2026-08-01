@@ -1,17 +1,18 @@
-import { Button, Tooltip, Space, Select, Input, Popconfirm } from 'antd'
-import { css } from '@emotion/css'
+import { Button, Popconfirm, Select, Space, Tooltip } from 'antd'
 import {
-  Play,
-  Square,
+  Download,
   LayoutGrid,
-  Undo2,
+  Play,
   Redo2,
   Save,
-  Download,
-  Upload,
-  Trash2,
   ShieldCheck,
+  Square,
+  Trash2,
+  Undo2,
+  Upload,
 } from 'lucide-react'
+
+import { css } from '@emotion/css'
 
 // ==================== Props ====================
 
@@ -37,7 +38,7 @@ export interface FlowToolbarProps {
   agentUrl: string
   onAgentUrlChange: (url: string) => void
   // 可选的环境列表（用户从系统环境配置中手动粘贴 Agent URL，不依赖环境选择）
-  environments?: Array<{ name: string; agentUrl?: string }>
+  environments?: { name: string, agentUrl?: string }[]
 }
 
 // ==================== 样式 ====================
@@ -83,8 +84,8 @@ export default function FlowToolbar({
 }: FlowToolbarProps) {
   // 从环境列表提取有 agentUrl 的地址，供快速选择
   const agentUrlOptions = environments
-    .filter(e => e.agentUrl)
-    .map(e => ({
+    .filter((e) => e.agentUrl)
+    .map((e) => ({
       value: e.agentUrl!,
       label: `${e.name} (${e.agentUrl})`,
     }))
@@ -115,12 +116,12 @@ export default function FlowToolbar({
         {/* 执行组 */}
         <Tooltip title="运行">
           <Button
-            type="primary"
-            size="small"
-            icon={<Play size={14} />}
-            onClick={onRun}
-            disabled={isRunning}
             data-testid="toolbar-run"
+            disabled={isRunning}
+            icon={<Play size={14} />}
+            size="small"
+            type="primary"
+            onClick={onRun}
           >
             运行
           </Button>
@@ -128,21 +129,21 @@ export default function FlowToolbar({
         <Tooltip title="中止">
           <Button
             danger
-            size="small"
-            icon={<Square size={14} />}
-            onClick={onAbort}
-            disabled={!isRunning}
             data-testid="toolbar-abort"
+            disabled={!isRunning}
+            icon={<Square size={14} />}
+            size="small"
+            onClick={onAbort}
           >
             中止
           </Button>
         </Tooltip>
         <Tooltip title="自动布局">
           <Button
-            size="small"
-            icon={<LayoutGrid size={14} />}
-            onClick={onAutoLayout}
             data-testid="toolbar-auto-layout"
+            icon={<LayoutGrid size={14} />}
+            size="small"
+            onClick={onAutoLayout}
           />
         </Tooltip>
 
@@ -151,31 +152,31 @@ export default function FlowToolbar({
         {/* 历史组 */}
         <Tooltip title="撤销">
           <Button
-            size="small"
-            icon={<Undo2 size={14} />}
-            onClick={onUndo}
-            disabled={!canUndo}
             data-testid="toolbar-undo"
+            disabled={!canUndo}
+            icon={<Undo2 size={14} />}
+            size="small"
+            onClick={onUndo}
           />
         </Tooltip>
         <Tooltip title="重做">
           <Button
-            size="small"
-            icon={<Redo2 size={14} />}
-            onClick={onRedo}
-            disabled={!canRedo}
             data-testid="toolbar-redo"
+            disabled={!canRedo}
+            icon={<Redo2 size={14} />}
+            size="small"
+            onClick={onRedo}
           />
         </Tooltip>
         <Tooltip title={isDirty ? '保存 (Ctrl+S)' : '已保存'}>
           <Button
+            data-testid="toolbar-save"
+            disabled={!isDirty}
+            icon={<Save size={14} />}
+            loading={isSaving}
             size="small"
             type={isDirty ? 'primary' : 'default'}
-            icon={<Save size={14} />}
             onClick={onSave}
-            disabled={!isDirty}
-            loading={isSaving}
-            data-testid="toolbar-save"
           />
         </Tooltip>
 
@@ -184,41 +185,41 @@ export default function FlowToolbar({
         {/* 文件组 */}
         <Tooltip title="导出">
           <Button
-            size="small"
-            icon={<Download size={14} />}
-            onClick={onExport}
             data-testid="toolbar-export"
+            icon={<Download size={14} />}
+            size="small"
+            onClick={onExport}
           />
         </Tooltip>
         <Tooltip title="导入">
           <Button
-            size="small"
-            icon={<Upload size={14} />}
-            onClick={onImport}
             data-testid="toolbar-import"
+            icon={<Upload size={14} />}
+            size="small"
+            onClick={onImport}
           />
         </Tooltip>
         <Tooltip title="校验流程">
           <Button
-            size="small"
-            icon={<ShieldCheck size={14} />}
-            onClick={onValidate}
             data-testid="toolbar-validate"
+            icon={<ShieldCheck size={14} />}
+            size="small"
+            onClick={onValidate}
           />
         </Tooltip>
         <Popconfirm
-          title="清空画布"
-          description="将删除所有节点和连线，且不可撤销。确定清空？"
-          okText="清空"
-          okButtonProps={{ danger: true }}
           cancelText="取消"
+          description="将删除所有节点和连线，且不可撤销。确定清空？"
+          okButtonProps={{ danger: true }}
+          okText="清空"
+          title="清空画布"
           onConfirm={onClear}
         >
           <Button
-            size="small"
             danger
-            icon={<Trash2 size={14} />}
             data-testid="toolbar-clear"
+            icon={<Trash2 size={14} />}
+            size="small"
           />
         </Popconfirm>
       </Space>
@@ -226,13 +227,13 @@ export default function FlowToolbar({
       {/* 右侧：Mock Agent 地址 */}
       <div style={{ flex: 1 }} />
       <Select
+        allowClear
+        options={agentUrlOptions}
+        placeholder="Mock Agent 地址"
         size="small"
+        style={{ minWidth: 240 }}
         value={agentUrl || undefined}
         onChange={onAgentUrlChange}
-        placeholder="Mock Agent 地址"
-        allowClear
-        style={{ minWidth: 240 }}
-        options={agentUrlOptions}
       />
     </div>
   )

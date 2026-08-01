@@ -1,4 +1,4 @@
-import { Tag, Typography, theme } from 'antd'
+import { Tag, theme, Typography } from 'antd'
 
 import type { ApiEnvironmentValue } from '@/types'
 
@@ -6,6 +6,7 @@ function getEntryValue(entry: ApiEnvironmentValue) {
   if (entry.value) {
     return { label: '已配置', value: entry.value }
   }
+
   return { label: '未配置', value: '-' }
 }
 
@@ -22,7 +23,7 @@ export function GlobalParametersNotice(props: {
     rows = [],
     overriddenNames = new Set<string>(),
     description = '运行时会自动带入这些全局参数；同名接口参数优先。',
-    normalizeName = name => name,
+    normalizeName = (name) => name,
   } = props
 
   if (rows.length === 0) {
@@ -56,7 +57,7 @@ export function GlobalParametersNotice(props: {
               }}
             >
               <Tag color={overridden ? 'default' : 'blue'}>{overridden ? '已覆盖' : '全局生效'}</Tag>
-              <Typography.Text className="truncate" code>{row.name}</Typography.Text>
+              <Typography.Text code className="truncate">{row.name}</Typography.Text>
               <Typography.Text className="break-all">{valueMeta.value}</Typography.Text>
               <Typography.Text type="secondary">{valueMeta.label}</Typography.Text>
             </div>

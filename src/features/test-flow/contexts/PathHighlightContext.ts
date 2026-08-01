@@ -10,7 +10,7 @@ export interface PathHighlightContextValue {
   onNodeHover: (nodeId: string | null) => void
   onNodeClick: (nodeId: string) => void
   onPaneClick: () => void
-  breadcrumbs: { id: string; label: string }[] | null
+  breadcrumbs: { id: string, label: string }[] | null
 }
 
 export const PathHighlightContext = createContext<PathHighlightContextValue | null>(null)

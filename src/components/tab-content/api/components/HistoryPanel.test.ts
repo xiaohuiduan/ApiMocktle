@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatTime } from './HistoryPanel'
 import { getStatusColor } from '../utils'
+
+import { formatTime } from './HistoryPanel'
 
 describe('getStatusColor (from utils)', () => {
   it('returns success for 2xx', () => {

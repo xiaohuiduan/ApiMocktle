@@ -1,17 +1,21 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { Drawer, Divider, Tag, Typography, Collapse, Button, Modal, Input, Select, Space, Spin, message } from 'antd'
-import { CheckCircle, XCircle, Clock, AlertTriangle, Play, CopyIcon } from 'lucide-react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+
 import { invoke } from '@tauri-apps/api/core'
-import { css } from '@emotion/css'
-import { useFlowStore } from '../store/useFlowStore'
+import { Button, Collapse, Divider, Drawer, Input, message, Modal, Select, Spin, Tag, Typography } from 'antd'
+import { AlertTriangle, CheckCircle, Clock, CopyIcon, Play, XCircle } from 'lucide-react'
+
+import { useAuth } from '@/contexts/auth'
+
 import { FlowEditorContext } from '../contexts/FlowEditorContext'
 import { usePathHighlightContext } from '../contexts/PathHighlightContext'
-import { useAuth } from '@/contexts/auth'
-import { FlowNodeType } from '../types/flow.types'
-import type { FlowNodeData, NodeExecStatus } from '../types/flow.types'
-import TypeHeader from './node-config-panels/TypeHeader'
+import { useFlowStore } from '../store/useFlowStore'
+import { type FlowNodeData, FlowNodeType, type NodeExecStatus } from '../types/flow.types'
+
 import BaseFields from './node-config-panels/BaseFields'
 import { getPanelComponent } from './node-config-panels/shared/panelRegistry'
+import TypeHeader from './node-config-panels/TypeHeader'
+
+import { css } from '@emotion/css'
 
 const { Text } = Typography
 
@@ -54,7 +58,7 @@ const codeBlockClass = css`
   margin: var(--ds-pad-xs) 0;
 `
 
-const STATUS_CONFIG: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
+const STATUS_CONFIG: Record<string, { color: string, icon: React.ReactNode, label: string }> = {
   passed: { color: 'success', icon: <CheckCircle size={14} />, label: '通过' },
   failed: { color: 'error', icon: <XCircle size={14} />, label: '失败' },
   error: { color: 'warning', icon: <AlertTriangle size={14} />, label: '错误' },
@@ -72,24 +76,29 @@ function extractVariables(value: unknown): string[] {
   const walk = (v: unknown) => {
     if (typeof v === 'string') {
       let match: RegExpExecArray | null
+
       while ((match = regex.exec(v)) !== null) {
         vars.add(match[1])
       }
-    } else if (Array.isArray(v)) {
+    }
+    else if (Array.isArray(v)) {
       v.forEach(walk)
-    } else if (v !== null && typeof v === 'object') {
+    }
+    else if (v !== null && typeof v === 'object') {
       Object.values(v as Record<string, unknown>).forEach(walk)
     }
   }
 
   walk(value)
+
   return Array.from(vars).sort()
 }
 
 /** 从 HttpRequest 节点数据中提取所有变量 */
 function extractNodeVariables(nodeData: Record<string, unknown>): string[] {
   const override = nodeData.requestOverride as Record<string, unknown> | undefined
-  if (!override) return []
+
+  if (!override) { return [] }
 
   const sources = [
     override.queryParams,
@@ -99,11 +108,13 @@ function extractNodeVariables(nodeData: Record<string, unknown>): string[] {
   ]
 
   const allVars = new Set<string>()
+
   for (const src of sources) {
     for (const v of extractVariables(src)) {
       allVars.add(v)
     }
   }
+
   return Array.from(allVars).sort()
 }
 
@@ -114,12 +125,15 @@ const LS_PREFIX = 'single-run-vars-'
 function loadSavedVars(nodeId: string): Record<string, string> {
   try {
     const raw = localStorage.getItem(LS_PREFIX + nodeId)
+
     return raw ? JSON.parse(raw) : {}
-  } catch { return {} }
+  }
+  catch { return {} }
 }
 
 function saveSavedVars(nodeId: string, vars: Record<string, string>) {
-  try { localStorage.setItem(LS_PREFIX + nodeId, JSON.stringify(vars)) } catch { /* ignore */ }
+  try { localStorage.setItem(LS_PREFIX + nodeId, JSON.stringify(vars)) }
+  catch { /* ignore */ }
 }
 
 // ==================== 组件 ====================
@@ -134,24 +148,28 @@ export default function NodeConfigDrawer() {
 
   const flowContext = useContext(FlowEditorContext)
   const pathHighlight = usePathHighlightContext()
-  const projectId = flowContext?.projectId || ''
+  const projectId = flowContext?.projectId ?? ''
   const { sessionId } = useAuth()
 
   // 加载项目环境
-  const [environments, setEnvironments] = useState<Array<{ name: string; agentUrl?: string; baseUrls?: Array<{ id: string; url: string }> }>>([])
+  const [environments, setEnvironments] = useState<{ name: string, agentUrl?: string, baseUrls?: { id: string, url: string }[] }[]>([])
   useEffect(() => {
-    if (!sessionId || !projectId) return
+    if (!sessionId || !projectId) { return }
+
     const fetchEnvs = async () => {
       try {
-        const result = await invoke<{ ok: boolean; data?: { environments: Array<{ name: string; agentUrl?: string; baseUrls?: Array<{ id: string; url: string }> }> } }>(
+        const result = await invoke<{ ok: boolean, data?: { environments: { name: string, agentUrl?: string, baseUrls?: { id: string, url: string }[] }[] } }>(
           'get_project_environments',
           { sessionId, projectId },
         )
+
         if (result.ok && result.data) {
           setEnvironments(result.data.environments || [])
         }
-      } catch { /* ignore */ }
+      }
+      catch { /* ignore */ }
     }
+
     fetchEnvs()
   }, [sessionId, projectId])
 
@@ -164,15 +182,18 @@ export default function NodeConfigDrawer() {
     resizingRef.current = true
     const startX = e.clientX
     const startWidth = drawerWidth
+
     const onMouseMove = (ev: MouseEvent) => {
       const newWidth = Math.max(360, Math.min(900, startWidth + (startX - ev.clientX)))
       setDrawerWidth(newWidth)
     }
+
     const onMouseUp = () => {
       resizingRef.current = false
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
     }
+
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
   }, [drawerWidth])
@@ -225,28 +246,35 @@ export default function NodeConfigDrawer() {
   const [singleRunLoading, setSingleRunLoading] = useState(false)
 
   const handleRunClick = useCallback(() => {
-    if (!nodeData) return
+    if (!nodeData) { return }
+
     const vars = extractNodeVariables(nodeData)
     const saved = selectedNodeId ? loadSavedVars(selectedNodeId) : {}
     const initial: Record<string, string> = {}
+
     for (const v of vars) {
       initial[v] = saved[v] || ''
     }
+
     setRunVarNames(vars)
     setRunVariables(initial)
+
     // 默认选第一个环境
     if (!selectedEnvName && environments.length > 0) {
       setSelectedEnvName(environments[0].name)
     }
+
     setRunModalOpen(true)
   }, [nodeData, selectedNodeId, environments, selectedEnvName])
 
   const executeSingleNode = useCallback(async (variables: Record<string, string>, envName: string) => {
-    if (!selectedNode || !nodeData) return
+    if (!selectedNode || !nodeData) { return }
 
     const menuItemId = nodeData.menuItemId as string
+
     if (!menuItemId) {
       message.error('节点未配置 API 接口')
+
       return
     }
 
@@ -256,49 +284,56 @@ export default function NodeConfigDrawer() {
     }
 
     setSingleRunLoading(true)
+
     try {
       // 从环境获取 baseUrl 和 agentUrl
-      const env = environments.find(e => e.name === envName)
-      const baseUrl = env?.baseUrls?.[0]?.url || undefined
+      const env = environments.find((e) => e.name === envName)
+      const baseUrl = env?.baseUrls?.[0]?.url ?? undefined
       const agentUrl = (env as Record<string, unknown>)?.agentUrl as string | undefined
 
       // 推送 Mock 规则（如果节点配置了）
-      const nodeMockRules = nodeData.mockRules as Array<Record<string, unknown>> | undefined
+      const nodeMockRules = nodeData.mockRules as Record<string, unknown>[] | undefined
+
       if (agentUrl && nodeMockRules && nodeMockRules.length > 0) {
         try {
           const payload = buildSingleNodeMockPayload(nodeMockRules, variables)
+
           if (payload.length > 0) {
             await invoke('push_mock_rules', { agentUrl, rules: payload })
           }
-        } catch {
+        }
+        catch {
           // Mock 推送失败不影响请求
         }
       }
 
       // 构建 requestOverride 并替换变量
       let override = nodeData.requestOverride as Record<string, unknown> | undefined
+
       if (override && Object.keys(variables).length > 0) {
         override = interpolateOverride(override, variables) as Record<string, unknown>
       }
 
-      const result = await invoke<{ ok: boolean; data?: { request: Record<string, unknown>; response: { status: number; headers: Record<string, string>; body: string; responseTime: number } }; error?: string }>(
+      const result = await invoke<{ ok: boolean, data?: { request: Record<string, unknown>, response: { status: number, headers: Record<string, string>, body: string, responseTime: number } }, error?: string }>(
         'execute_flow_node_request',
         {
           projectId,
           menuItemId,
-          requestOverride: override || null,
+          requestOverride: override ?? null,
           variables,
-          baseUrl: baseUrl || null,
+          baseUrl: baseUrl ?? null,
         },
       )
 
       // 清除 Mock 规则
       if (agentUrl) {
-        try { await invoke('clear_mock_rules', { agentUrl }) } catch { /* ignore */ }
+        try { await invoke('clear_mock_rules', { agentUrl }) }
+        catch { /* ignore */ }
       }
 
       if (!result.ok || !result.data) {
-        const errMsg = result.error || '请求失败'
+        const errMsg = result.error ?? '请求失败'
+
         // 写入节点数据
         if (selectedNodeId) {
           updateNodeData(selectedNodeId, {
@@ -307,11 +342,14 @@ export default function NodeConfigDrawer() {
             execDurationMs: 0,
           })
         }
+
         message.error(errMsg)
+
         return
       }
 
       const resp = result.data.response
+
       // 写入节点数据
       if (selectedNodeId) {
         updateNodeData(selectedNodeId, {
@@ -327,16 +365,20 @@ export default function NodeConfigDrawer() {
           },
         })
       }
-    } catch (err) {
+    }
+    catch (err) {
       const errMsg = `请求异常: ${err}`
+
       if (selectedNodeId) {
         updateNodeData(selectedNodeId, {
           execStatus: 'error' as NodeExecStatus,
           execError: errMsg,
         })
       }
+
       message.error(errMsg)
-    } finally {
+    }
+    finally {
       setSingleRunLoading(false)
     }
   }, [selectedNode, nodeData, selectedNodeId, projectId, updateNodeData])
@@ -344,13 +386,13 @@ export default function NodeConfigDrawer() {
   return (
     <>
       <Drawer
-        title="节点配置"
-        placement="right"
-        width={drawerWidth}
-        open={drawerOpen && !!selectedNode}
-        onClose={handleClose}
         data-testid="node-config-drawer"
+        open={drawerOpen && !!selectedNode}
+        placement="right"
         styles={{ body: { position: 'relative' } }}
+        title="节点配置"
+        width={drawerWidth}
+        onClose={handleClose}
       >
         {/* 左侧拖拽调整手柄 */}
         <div className={resizeHandleClass} onMouseDown={handleResizeStart} />
@@ -359,8 +401,8 @@ export default function NodeConfigDrawer() {
             {/* 路径面包屑 */}
             {pathHighlight?.breadcrumbs && pathHighlight.breadcrumbs.length > 1 && (
               <PathBreadcrumb
-                items={pathHighlight.breadcrumbs}
                 currentId={selectedNodeId!}
+                items={pathHighlight.breadcrumbs}
                 onSelect={selectNode}
               />
             )}
@@ -368,17 +410,17 @@ export default function NodeConfigDrawer() {
             {/* 节点类型头部 + 运行按钮 */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <TypeHeader
-                nodeType={selectedNode.type}
                 nodeId={selectedNode.id}
+                nodeType={selectedNode.type}
               />
               {selectedNode.type === FlowNodeType.HttpRequest && (
                 <Button
-                  type="primary"
-                  size="small"
+                  disabled={singleRunLoading}
                   icon={singleRunLoading ? <Spin size="small" /> : <Play size={12} />}
                   loading={singleRunLoading}
+                  size="small"
+                  type="primary"
                   onClick={handleRunClick}
-                  disabled={singleRunLoading}
                 >
                   {singleRunLoading ? '运行中...' : '单独运行'}
                 </Button>
@@ -389,7 +431,7 @@ export default function NodeConfigDrawer() {
 
             {/* 基础字段 */}
             <BaseFields
-              data={selectedNode.data as FlowNodeData}
+              data={selectedNode.data}
               onChange={handleBaseFieldsChange}
             />
 
@@ -398,11 +440,11 @@ export default function NodeConfigDrawer() {
               <>
                 <Divider style={{ margin: 'var(--ds-pad-md) 0' }} />
                 <ExecResultSection
-                  status={execStatus}
-                  error={execError}
                   durationMs={execDurationMs}
+                  error={execError}
                   request={execRequest}
                   response={execResponse}
+                  status={execStatus}
                 />
               </>
             )}
@@ -413,9 +455,9 @@ export default function NodeConfigDrawer() {
                 <Divider style={{ margin: 'var(--ds-pad-md) 0' }} />
                 <PanelComponent
                   key={selectedNode.id}
-                  data={selectedNode.data as FlowNodeData}
-                  onChange={handlePanelChange}
+                  data={selectedNode.data}
                   projectId={projectId}
+                  onChange={handlePanelChange}
                 />
               </>
             )}
@@ -425,37 +467,39 @@ export default function NodeConfigDrawer() {
 
       {/* 运行配置弹窗 */}
       <Modal
-        title="单独运行"
+        cancelText="取消"
+        okText="运行"
         open={runModalOpen}
-        onCancel={() => setRunModalOpen(false)}
+        title="单独运行"
+        width={480}
+        onCancel={() => { setRunModalOpen(false) }}
         onOk={() => {
           if (!selectedEnvName) {
             message.warning('请选择运行环境')
+
             return
           }
+
           setRunModalOpen(false)
           executeSingleNode(runVariables, selectedEnvName)
         }}
-        okText="运行"
-        cancelText="取消"
-        width={480}
       >
         <div className="space-y-3">
           {/* 环境选择 */}
           <div>
-            <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
+            <Text style={{ display: 'block', fontSize: 12, marginBottom: 4 }} type="secondary">
               运行环境
             </Text>
             <Select
-              size="small"
-              value={selectedEnvName || undefined}
-              onChange={setSelectedEnvName}
-              placeholder="选择运行环境"
-              style={{ width: '100%' }}
-              options={environments.map(e => ({
+              options={environments.map((e) => ({
                 value: e.name,
                 label: `${e.name}${e.baseUrls?.[0]?.url ? ` (${e.baseUrls[0].url})` : ''}`,
               }))}
+              placeholder="选择运行环境"
+              size="small"
+              style={{ width: '100%' }}
+              value={selectedEnvName || undefined}
+              onChange={setSelectedEnvName}
             />
           </div>
 
@@ -463,19 +507,19 @@ export default function NodeConfigDrawer() {
           {runVarNames.length > 0 && (
             <>
               <Divider style={{ margin: 'var(--ds-pad-sm) 0' }} />
-              <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
+              <Text style={{ display: 'block', fontSize: 12 }} type="secondary">
                 该请求包含变量，请填写：
               </Text>
               {runVarNames.map((varName) => (
                 <div key={varName}>
-                  <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 2 }}>
+                  <Text style={{ display: 'block', fontSize: 12, marginBottom: 2 }} type="secondary">
                     {`{{${varName}}}`}
                   </Text>
                   <Input
+                    placeholder={`输入 ${varName} 的值`}
                     size="small"
                     value={runVariables[varName] || ''}
-                    onChange={(e) => setRunVariables((prev) => ({ ...prev, [varName]: e.target.value }))}
-                    placeholder={`输入 ${varName} 的值`}
+                    onChange={(e) => { setRunVariables((prev) => ({ ...prev, [varName]: e.target.value })) }}
                   />
                 </div>
               ))}
@@ -494,39 +538,45 @@ function interpolateOverride(obj: unknown, variables: Record<string, string>): u
   if (typeof obj === 'string') {
     return obj.replace(/\{\{(\w+)\}\}/g, (_, key: string) => variables[key] ?? `{{${key}}}`)
   }
+
   if (Array.isArray(obj)) {
     return obj.map((item) => interpolateOverride(item, variables))
   }
+
   if (obj !== null && typeof obj === 'object') {
     const result: Record<string, unknown> = {}
+
     for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
       result[k] = interpolateOverride(v, variables)
     }
+
     return result
   }
+
   return obj
 }
 
 // ==================== Mock 规则推送辅助 ====================
 
 /** 将 HttpRequest 节点中的 mockRules 转为 Agent payload 格式并插值变量 */
-function buildSingleNodeMockPayload(rules: Array<Record<string, unknown>>, variables: Record<string, string>): Array<Record<string, unknown>> {
+function buildSingleNodeMockPayload(rules: Record<string, unknown>[], variables: Record<string, string>): Record<string, unknown>[] {
   return rules
-    .filter(r => r.enabled !== false)
-    .map(r => {
+    .filter((r) => r.enabled !== false)
+    .map((r) => {
       const template = r.responseTemplate
       const interpolated = variables && Object.keys(variables).length > 0
         ? interpolateOverride(template, variables)
         : template
+
       return {
         id: r.id,
         className: r.className,
         methodName: r.methodName,
-        paramTypes: r.paramTypes || undefined,
+        paramTypes: r.paramTypes ?? undefined,
         responseTemplate: typeof interpolated === 'string' ? interpolated : JSON.stringify(interpolated),
-        responseDelay: r.responseDelay || undefined,
-        maxTimes: r.maxTimes || undefined,
-        returnType: r.responseClassName || undefined,
+        responseDelay: r.responseDelay ?? undefined,
+        maxTimes: r.maxTimes ?? undefined,
+        returnType: r.responseClassName ?? undefined,
       }
     })
 }
@@ -552,9 +602,9 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
       label: '请求详情',
       extra: (
         <Button
-          type="text"
-          size="small"
           icon={<CopyIcon size={12} />}
+          size="small"
+          type="text"
           onClick={(e) => {
             e.stopPropagation()
             void navigator.clipboard.writeText(formatRequest(request)).then(() => {
@@ -578,9 +628,9 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
       defaultActiveKey: true,
       extra: (
         <Button
-          type="text"
-          size="small"
           icon={<CopyIcon size={12} />}
+          size="small"
+          type="text"
           onClick={(e) => {
             e.stopPropagation()
             void navigator.clipboard.writeText(formatResponse(response)).then(() => {
@@ -605,14 +655,14 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
           {config.label}
         </Tag>
         {durationMs !== undefined && (
-          <Text type="secondary" style={{ fontSize: 12 }}>{durationMs}ms</Text>
+          <Text style={{ fontSize: 12 }} type="secondary">{durationMs}ms</Text>
         )}
       </div>
 
       {/* 错误信息 */}
       {error && (
         <div className={resultBlockClass} style={{ borderColor: 'var(--ds-error-color, #fca5a5)', background: 'rgba(239, 68, 68, 0.08)', marginBottom: 'var(--ds-pad-sm)' }}>
-          <Text type="danger" style={{ fontSize: 12 }}>{error}</Text>
+          <Text style={{ fontSize: 12 }} type="danger">{error}</Text>
         </div>
       )}
 
@@ -626,11 +676,15 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
 
 function formatRequest(req: Record<string, unknown>): string {
   const parts: string[] = []
-  if (req.method) parts.push(`${req.method} ${req.url || ''}`)
+
+  if (req.method) { parts.push(`${req.method} ${req.url ?? ''}`) }
+
   parts.push('')
+
   if (req.headers && typeof req.headers === 'object') {
     parts.push('── Headers ──')
     const headers = req.headers
+
     if (Array.isArray(headers)) {
       // 后端返回的请求头是 [{name, value}, ...] 格式
       for (const h of headers) {
@@ -638,52 +692,66 @@ function formatRequest(req: Record<string, unknown>): string {
         const value = (h as Record<string, unknown>)?.value ?? ''
         parts.push(`  ${name}: ${value}`)
       }
-    } else {
+    }
+    else {
       // 响应头是 key: value 对象格式
       for (const [k, v] of Object.entries(headers as Record<string, string>)) {
         parts.push(`  ${k}: ${v}`)
       }
     }
   }
+
   if (req.body && req.body !== '(empty)' && req.body !== '') {
     parts.push('')
     parts.push('── Body ──')
+
     try {
       parts.push(typeof req.body === 'string' ? req.body : JSON.stringify(req.body, null, 2))
-    } catch {
+    }
+    catch {
       parts.push(String(req.body))
     }
   }
+
   return parts.join('\n') || '(无详情)'
 }
 
 function formatResponse(resp: Record<string, unknown>): string {
   const parts: string[] = []
+
   if (resp.status) {
     const status = resp.status as number
     const statusText = status >= 200 && status < 300 ? 'OK' : status >= 400 ? 'Error' : ''
     parts.push(`HTTP ${status} ${statusText}`)
   }
-  if (resp.duration_ms !== undefined) parts.push(`耗时: ${resp.duration_ms}ms`)
+
+  if (resp.duration_ms !== undefined) { parts.push(`耗时: ${resp.duration_ms}ms`) }
+
   parts.push('')
+
   if (resp.headers && typeof resp.headers === 'object') {
     parts.push('── Headers ──')
     const headers = resp.headers as Record<string, string>
+
     for (const [k, v] of Object.entries(headers)) {
       parts.push(`  ${k}: ${v}`)
     }
   }
+
   if (resp.body) {
     parts.push('')
     parts.push('── Body ──')
     const body = typeof resp.body === 'string' ? resp.body : JSON.stringify(resp.body, null, 2)
+
     try {
       const parsed = JSON.parse(body)
       parts.push(JSON.stringify(parsed, null, 2))
-    } catch {
+    }
+    catch {
       parts.push(body)
     }
   }
+
   return parts.join('\n') || '(无详情)'
 }
 
@@ -692,7 +760,7 @@ function formatResponse(resp: Record<string, unknown>): string {
 const COLLAPSE_THRESHOLD = 6 // 超过 6 个节点时折叠中间部分
 
 interface PathBreadcrumbProps {
-  items: { id: string; label: string }[]
+  items: { id: string, label: string }[]
   currentId: string
   onSelect: (id: string) => void
 }
@@ -700,12 +768,11 @@ interface PathBreadcrumbProps {
 function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
   const [expanded, setExpanded] = useState(false)
 
-  if (items.length <= 1) return null
+  if (items.length <= 1) { return null }
 
   const shouldCollapse = items.length > COLLAPSE_THRESHOLD && !expanded
-  const currentIdx = items.findIndex((item) => item.id === currentId)
 
-  let displayItems: Array<{ id: string; label: string; isEllipsis?: boolean }> = items
+  let displayItems: { id: string, label: string, isEllipsis?: boolean }[] = items
 
   if (shouldCollapse) {
     // 显示首尾各 2 个 + 中间折叠
@@ -719,19 +786,20 @@ function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
   }
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      gap: 2,
-      fontSize: 12,
-      color: 'var(--ds-node-text-secondary, #6b7280)',
-      padding: 'var(--ds-list-gap) 0',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 2,
+        fontSize: 12,
+        color: 'var(--ds-node-text-secondary, #6b7280)',
+        padding: 'var(--ds-list-gap) 0',
+      }}
+    >
       {displayItems.map((item, i) => {
         const isCurrent = item.id === currentId
         const isFirst = i === 0
-        const isLast = i === displayItems.length - 1
 
         return (
           <span key={item.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
@@ -740,36 +808,38 @@ function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
               <span style={{ margin: '0 4px', color: 'var(--ds-divider-color, #d1d5db)' }}>→</span>
             )}
 
-            {item.isEllipsis ? (
-              <span
-                style={{
-                  cursor: 'pointer',
-                  color: 'var(--ds-node-text-muted, #9ca3af)',
-                  padding: '0 2px',
-                }}
-                onClick={() => setExpanded(true)}
-                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--ds-highlight-selected, #3b82f6)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--ds-node-text-muted, #9ca3af)' }}
-              >
-                ⋯
-              </span>
-            ) : (
-              <span
-                style={{
-                  fontWeight: isCurrent ? 600 : 400,
-                  color: isCurrent ? 'var(--ds-highlight-selected, #3b82f6)' : 'var(--ds-node-text-secondary, #6b7280)',
-                  cursor: isCurrent ? 'default' : 'pointer',
-                  padding: '0 2px',
-                  borderRadius: 2,
-                  transition: 'color 0.15s',
-                }}
-                onClick={() => !isCurrent && onSelect(item.id)}
-                onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.color = 'var(--ds-highlight-selected, #3b82f6)' }}
-                onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.color = 'var(--ds-node-text-secondary, #6b7280)' }}
-              >
-                {isCurrent ? `[${item.label}]` : item.label}
-              </span>
-            )}
+            {item.isEllipsis
+              ? (
+                  <span
+                    style={{
+                      cursor: 'pointer',
+                      color: 'var(--ds-node-text-muted, #9ca3af)',
+                      padding: '0 2px',
+                    }}
+                    onClick={() => { setExpanded(true) }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--ds-highlight-selected, #3b82f6)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--ds-node-text-muted, #9ca3af)' }}
+                  >
+                    ⋯
+                  </span>
+                )
+              : (
+                  <span
+                    style={{
+                      fontWeight: isCurrent ? 600 : 400,
+                      color: isCurrent ? 'var(--ds-highlight-selected, #3b82f6)' : 'var(--ds-node-text-secondary, #6b7280)',
+                      cursor: isCurrent ? 'default' : 'pointer',
+                      padding: '0 2px',
+                      borderRadius: 2,
+                      transition: 'color 0.15s',
+                    }}
+                    onClick={() => { if (!isCurrent) { onSelect(item.id) } }}
+                    onMouseEnter={(e) => { if (!isCurrent) { e.currentTarget.style.color = 'var(--ds-highlight-selected, #3b82f6)' } }}
+                    onMouseLeave={(e) => { if (!isCurrent) { e.currentTarget.style.color = 'var(--ds-node-text-secondary, #6b7280)' } }}
+                  >
+                    {isCurrent ? `[${item.label}]` : item.label}
+                  </span>
+                )}
           </span>
         )
       })}

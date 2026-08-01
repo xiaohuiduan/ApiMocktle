@@ -1,5 +1,4 @@
-import { SchemaType } from '@/components/JsonSchema'
-import type { JsonSchema } from '@/components/JsonSchema'
+import { type JsonSchema, SchemaType } from '@/components/JsonSchema'
 import { buildSchemaExample } from '@/components/JsonSchema/schema-normalizer'
 import { BodyType } from '@/enums'
 import type { ApiDetails } from '@/types'
@@ -19,12 +18,15 @@ export function stripJsonComments(src: string): string {
 
     if (inString) {
       out += ch
+
       if (ch === '\\' && i + 1 < src.length) {
         out += src[i + 1]
         i += 2
         continue
       }
-      if (ch === quote) inString = false
+
+      if (ch === quote) { inString = false }
+
       i += 1
       continue
     }
@@ -38,13 +40,16 @@ export function stripJsonComments(src: string): string {
     }
 
     if (ch === '/' && src[i + 1] === '/') {
-      while (i < src.length && src[i] !== '\n') i += 1
+      while (i < src.length && src[i] !== '\n') { i += 1 }
+
       continue
     }
 
     if (ch === '/' && src[i + 1] === '*') {
       i += 2
-      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i += 1
+
+      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) { i += 1 }
+
       i += 2
       continue
     }
@@ -64,14 +69,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function stripTrailingComma(line: string): string {
   // 多行值（object/array）：逗号在整行末尾，如 "},"
   const trimmed = line.trimEnd()
-  if (trimmed.endsWith(',')) return trimmed.slice(0, -1)
+
+  if (trimmed.endsWith(',')) { return trimmed.slice(0, -1) }
 
   // 叶子值带注释：逗号在行尾注释之前，如 "value, // desc"
   const commentIdx = line.indexOf('//')
+
   if (commentIdx === -1) {
     return trimmed.replace(/,\s*$/, '')
   }
+
   const before = line.slice(0, commentIdx).trimEnd().replace(/,\s*$/, '')
+
   return `${before} ${line.slice(commentIdx)}`
 }
 
@@ -85,7 +94,8 @@ function serializeNode(schema: JsonSchema | undefined, value: unknown, level: nu
 
     for (const prop of schema.properties) {
       const name = prop.name
-      if (!name || !(name in value)) continue
+
+      if (!name || !(name in value)) { continue }
 
       const propValue = value[name]
       const serialized = serializeNode(prop, propValue, level + 1)
@@ -94,22 +104,28 @@ function serializeNode(schema: JsonSchema | undefined, value: unknown, level: nu
 
       // 多行值（object/array）：注释插在首行末尾，逗号加在整个值末尾
       const nl = serialized.indexOf('\n')
+
       if (nl === -1) {
         lines.push(`${childIndent}"${name}": ${serialized},${comment}`)
-      } else {
+      }
+      else {
         lines.push(`${childIndent}"${name}": ${serialized.slice(0, nl)}${comment}${serialized.slice(nl)},`)
       }
     }
 
-    if (lines.length === 0) return '{}'
+    if (lines.length === 0) { return '{}' }
+
     lines[lines.length - 1] = stripTrailingComma(lines[lines.length - 1])
+
     return `{\n${lines.join('\n')}\n${indent}}`
   }
 
   if (schema?.type === SchemaType.Array && Array.isArray(value)) {
     const childIndent = '  '.repeat(level + 1)
     const items = value.map((item) => serializeNode(schema.items, item, level + 1))
-    if (items.length === 0) return '[]'
+
+    if (items.length === 0) { return '[]' }
+
     return `[\n${items.map((item) => `${childIndent}${item}`).join(',\n')}\n${indent}]`
   }
 
@@ -122,8 +138,10 @@ function serializeNode(schema: JsonSchema | undefined, value: unknown, level: nu
  */
 export function buildJsoncBodyFillText(apiDetails: ApiDetails, menuRawList?: unknown): string {
   const body = apiDetails.requestBody
-  if (!body || body.type !== BodyType.Json || !body.jsonSchema) return ''
 
-  const example = buildSchemaExample(body.jsonSchema as never, menuRawList as never) as unknown
-  return serializeNode(body.jsonSchema as JsonSchema, example, 0)
+  if (!body || body.type !== BodyType.Json || !body.jsonSchema) { return '' }
+
+  const example = buildSchemaExample(body.jsonSchema as never, menuRawList as never)
+
+  return serializeNode(body.jsonSchema, example, 0)
 }

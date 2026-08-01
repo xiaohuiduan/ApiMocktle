@@ -1,19 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useCallback, useState } from 'react'
+
 import { invoke } from '@tauri-apps/api/core'
-import type {
-  TestTask,
-  TestTaskDetail,
-  TestStep,
-  TestFolder,
-  CreateTestTaskPayload,
-  UpdateTestTaskPayload,
-  CreateTestFolderPayload,
-  UpdateTestFolderPayload,
-  CreateTestStepPayload,
-  UpdateTestStepPayload,
-  TestExecution,
-  TestExecutionDetail,
-} from '@/types'
+
+import type { CreateTestStepPayload, CreateTestTaskPayload, TestExecution, TestExecutionDetail, TestFolder, TestStep, TestTask, TestTaskDetail, UpdateTestStepPayload, UpdateTestTaskPayload } from '@/types'
 
 interface ApiResult<T> {
   ok: boolean
@@ -29,18 +18,23 @@ export function useTestTask(projectId: string) {
   const fetchTasks = useCallback(async () => {
     setLoading(true)
     setError(null)
+
     try {
       const result = await invoke<ApiResult<TestTask[]>>('list_test_tasks', {
         projectId,
       })
+
       if (result.ok && result.data) {
         setTasks(result.data)
-      } else {
-        setError(result.error || 'Failed to fetch tasks')
       }
-    } catch (err) {
+      else {
+        setError(result.error ?? 'Failed to fetch tasks')
+      }
+    }
+    catch (err) {
       setError(String(err))
-    } finally {
+    }
+    finally {
       setLoading(false)
     }
   }, [projectId])
@@ -50,15 +44,21 @@ export function useTestTask(projectId: string) {
       const result = await invoke<ApiResult<TestTask>>('create_test_task', {
         payload: { ...payload, projectId },
       })
+
       if (result.ok && result.data) {
         setTasks((prev) => [result.data!, ...prev])
+
         return result.data
-      } else {
-        setError(result.error || 'Failed to create task')
+      }
+      else {
+        setError(result.error ?? 'Failed to create task')
+
         return null
       }
-    } catch (err) {
+    }
+    catch (err) {
       setError(String(err))
+
       return null
     }
   }, [projectId])
@@ -69,15 +69,21 @@ export function useTestTask(projectId: string) {
         taskId,
         payload,
       })
+
       if (result.ok && result.data) {
         setTasks((prev) => prev.map((t) => (t.id === taskId ? result.data! : t)))
+
         return result.data
-      } else {
-        setError(result.error || 'Failed to update task')
+      }
+      else {
+        setError(result.error ?? 'Failed to update task')
+
         return null
       }
-    } catch (err) {
+    }
+    catch (err) {
       setError(String(err))
+
       return null
     }
   }, [])
@@ -87,15 +93,21 @@ export function useTestTask(projectId: string) {
       const result = await invoke<ApiResult<null>>('delete_test_task', {
         taskId,
       })
+
       if (result.ok) {
         setTasks((prev) => prev.filter((t) => t.id !== taskId))
+
         return true
-      } else {
-        setError(result.error || 'Failed to delete task')
+      }
+      else {
+        setError(result.error ?? 'Failed to delete task')
+
         return false
       }
-    } catch (err) {
+    }
+    catch (err) {
       setError(String(err))
+
       return false
     }
   }, [])
@@ -106,15 +118,21 @@ export function useTestTask(projectId: string) {
         taskId,
         folderId,
       })
+
       if (result.ok && result.data) {
         setTasks((prev) => prev.map((t) => (t.id === taskId ? result.data! : t)))
+
         return result.data
-      } else {
-        setError(result.error || 'Failed to move task')
+      }
+      else {
+        setError(result.error ?? 'Failed to move task')
+
         return null
       }
-    } catch (err) {
+    }
+    catch (err) {
       setError(String(err))
+
       return null
     }
   }, [])
@@ -138,16 +156,20 @@ export function useTestFolders(projectId: string) {
 
   const fetchFolders = useCallback(async () => {
     setLoading(true)
+
     try {
       const result = await invoke<ApiResult<TestFolder[]>>('list_test_folders', {
         projectId,
       })
+
       if (result.ok && result.data) {
         setFolders(result.data)
       }
-    } catch (err) {
+    }
+    catch (err) {
       console.error('Failed to fetch folders:', err)
-    } finally {
+    }
+    finally {
       setLoading(false)
     }
   }, [projectId])
@@ -157,13 +179,18 @@ export function useTestFolders(projectId: string) {
       const result = await invoke<ApiResult<TestFolder>>('create_test_folder', {
         payload: { projectId, name },
       })
+
       if (result.ok && result.data) {
         setFolders((prev) => [...prev, result.data!])
+
         return result.data
       }
+
       return null
-    } catch (err) {
+    }
+    catch (err) {
       console.error('Failed to create folder:', err)
+
       return null
     }
   }, [projectId])
@@ -174,13 +201,18 @@ export function useTestFolders(projectId: string) {
         folderId,
         payload: { name },
       })
+
       if (result.ok && result.data) {
         setFolders((prev) => prev.map((f) => (f.id === folderId ? result.data! : f)))
+
         return result.data
       }
+
       return null
-    } catch (err) {
+    }
+    catch (err) {
       console.error('Failed to rename folder:', err)
+
       return null
     }
   }, [])
@@ -190,13 +222,18 @@ export function useTestFolders(projectId: string) {
       const result = await invoke<ApiResult<null>>('delete_test_folder', {
         folderId,
       })
+
       if (result.ok) {
         setFolders((prev) => prev.filter((f) => f.id !== folderId))
+
         return true
       }
+
       return false
-    } catch (err) {
+    }
+    catch (err) {
       console.error('Failed to delete folder:', err)
+
       return false
     }
   }, [])
@@ -217,21 +254,27 @@ export function useTestTaskDetail(taskId: string | null) {
   const [error, setError] = useState<string | null>(null)
 
   const fetchTaskDetail = useCallback(async () => {
-    if (!taskId) return
+    if (!taskId) { return }
+
     setLoading(true)
     setError(null)
+
     try {
       const result = await invoke<ApiResult<TestTaskDetail>>('get_test_task', {
         taskId,
       })
+
       if (result.ok && result.data) {
         setTaskDetail(result.data)
-      } else {
-        setError(result.error || 'Failed to fetch task detail')
       }
-    } catch (err) {
+      else {
+        setError(result.error ?? 'Failed to fetch task detail')
+      }
+    }
+    catch (err) {
       setError(String(err))
-    } finally {
+    }
+    finally {
       setLoading(false)
     }
   }, [taskId])
@@ -241,21 +284,28 @@ export function useTestTaskDetail(taskId: string | null) {
       const result = await invoke<ApiResult<TestStep>>('create_test_step', {
         payload: { ...payload, taskId },
       })
+
       if (result.ok && result.data) {
         setTaskDetail((prev) => {
-          if (!prev) return prev
+          if (!prev) { return prev }
+
           return {
             ...prev,
             steps: [...prev.steps, result.data!],
           }
         })
+
         return result.data
-      } else {
-        setError(result.error || 'Failed to add step')
+      }
+      else {
+        setError(result.error ?? 'Failed to add step')
+
         return null
       }
-    } catch (err) {
+    }
+    catch (err) {
       setError(String(err))
+
       return null
     }
   }, [taskId])
@@ -266,21 +316,28 @@ export function useTestTaskDetail(taskId: string | null) {
         stepId,
         payload,
       })
+
       if (result.ok && result.data) {
         setTaskDetail((prev) => {
-          if (!prev) return prev
+          if (!prev) { return prev }
+
           return {
             ...prev,
             steps: prev.steps.map((s) => (s.id === stepId ? result.data! : s)),
           }
         })
+
         return result.data
-      } else {
-        setError(result.error || 'Failed to update step')
+      }
+      else {
+        setError(result.error ?? 'Failed to update step')
+
         return null
       }
-    } catch (err) {
+    }
+    catch (err) {
       setError(String(err))
+
       return null
     }
   }, [])
@@ -290,48 +347,64 @@ export function useTestTaskDetail(taskId: string | null) {
       const result = await invoke<ApiResult<null>>('delete_test_step', {
         stepId,
       })
+
       if (result.ok) {
         setTaskDetail((prev) => {
-          if (!prev) return prev
+          if (!prev) { return prev }
+
           return {
             ...prev,
             steps: prev.steps.filter((s) => s.id !== stepId),
           }
         })
+
         return true
-      } else {
-        setError(result.error || 'Failed to delete step')
+      }
+      else {
+        setError(result.error ?? 'Failed to delete step')
+
         return false
       }
-    } catch (err) {
+    }
+    catch (err) {
       setError(String(err))
+
       return false
     }
   }, [])
 
   const reorderSteps = useCallback(async (stepIds: string[]): Promise<boolean> => {
-    if (!taskId) return false
+    if (!taskId) { return false }
+
     try {
       const result = await invoke<ApiResult<null>>('reorder_test_steps', {
         taskId,
         payload: { stepIds },
       })
+
       if (result.ok) {
         setTaskDetail((prev) => {
-          if (!prev) return prev
+          if (!prev) { return prev }
+
           const stepMap = new Map(prev.steps.map((s) => [s.id, s]))
           const reordered = stepIds
             .map((id) => stepMap.get(id))
             .filter(Boolean) as TestStep[]
+
           return { ...prev, steps: reordered }
         })
+
         return true
-      } else {
-        setError(result.error || 'Failed to reorder steps')
+      }
+      else {
+        setError(result.error ?? 'Failed to reorder steps')
+
         return false
       }
-    } catch (err) {
+    }
+    catch (err) {
       setError(String(err))
+
       return false
     }
   }, [taskId])
@@ -353,23 +426,29 @@ export function useTestExecutions(taskId: string | null) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchExecutions = useCallback(async (limit: number = 20) => {
-    if (!taskId) return
+  const fetchExecutions = useCallback(async (limit = 20) => {
+    if (!taskId) { return }
+
     setLoading(true)
     setError(null)
+
     try {
       const result = await invoke<ApiResult<TestExecution[]>>('list_test_executions', {
         taskId,
         limit,
       })
+
       if (result.ok && result.data) {
         setExecutions(result.data)
-      } else {
-        setError(result.error || 'Failed to fetch executions')
       }
-    } catch (err) {
+      else {
+        setError(result.error ?? 'Failed to fetch executions')
+      }
+    }
+    catch (err) {
       setError(String(err))
-    } finally {
+    }
+    finally {
       setLoading(false)
     }
   }, [taskId])
@@ -379,14 +458,19 @@ export function useTestExecutions(taskId: string | null) {
       const result = await invoke<ApiResult<TestExecutionDetail>>('get_test_execution_detail', {
         executionId,
       })
+
       if (result.ok && result.data) {
         return result.data
-      } else {
-        setError(result.error || 'Failed to fetch execution detail')
+      }
+      else {
+        setError(result.error ?? 'Failed to fetch execution detail')
+
         return null
       }
-    } catch (err) {
+    }
+    catch (err) {
       setError(String(err))
+
       return null
     }
   }, [])
@@ -396,15 +480,21 @@ export function useTestExecutions(taskId: string | null) {
       const result = await invoke<ApiResult<null>>('delete_test_execution', {
         executionId,
       })
+
       if (result.ok) {
         setExecutions((prev) => prev.filter((e) => e.id !== executionId))
+
         return true
-      } else {
-        setError(result.error || 'Failed to delete execution')
+      }
+      else {
+        setError(result.error ?? 'Failed to delete execution')
+
         return false
       }
-    } catch (err) {
+    }
+    catch (err) {
       setError(String(err))
+
       return false
     }
   }, [])

@@ -1,27 +1,31 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+
 import {
-  ReactFlow,
-  ReactFlowProvider,
   Background,
-  MiniMap,
-  Controls,
-  useReactFlow,
-  reconnectEdge,
-  MarkerType,
   type Connection,
-  type Node,
-  type IsValidConnection,
+  Controls,
   type Edge,
+  type IsValidConnection,
+  MarkerType,
+  MiniMap,
+  type Node,
+  ReactFlow,
   type ReactFlowInstance,
+  ReactFlowProvider,
+  reconnectEdge,
+  useReactFlow,
 } from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
-import { useFlowStore } from '../store/useFlowStore'
-import { getNodeTypes, getDefaultNodeData } from '../nodes/nodeRegistry'
-import { FlowNodeType, type FlowNode, type FlowEdge } from '../types/flow.types'
-import { NODE_TYPE_COLORS } from '../nodes/nodeColors'
+
+import { useDesignStyle } from '@/hooks/useDesignStyle'
+
 import { FlowInstanceContext, globalFlowInstanceRef } from '../contexts/FlowInstanceContext'
 import { usePathHighlightContext } from '../contexts/PathHighlightContext'
-import { useDesignStyle } from '@/hooks/useDesignStyle'
+import { NODE_TYPE_COLORS } from '../nodes/nodeColors'
+import { getDefaultNodeData, getNodeTypes } from '../nodes/nodeRegistry'
+import { useFlowStore } from '../store/useFlowStore'
+import { type FlowEdge, type FlowNode, FlowNodeType } from '../types/flow.types'
+
+import '@xyflow/react/dist/style.css'
 
 /** 读取 html 元素上的 CSS 变量值 */
 function getCssVar(name: string, fallback: string): string {
@@ -42,7 +46,11 @@ function FlowCanvasInner() {
   useEffect(() => {
     flowInstanceRef.current = reactFlow
     globalFlowInstanceRef.current = reactFlow
-    return () => { flowInstanceRef.current = null; globalFlowInstanceRef.current = null }
+
+    return () => {
+      flowInstanceRef.current = null
+      globalFlowInstanceRef.current = null
+    }
   }, [reactFlow, flowInstanceRef])
   const nodes = useFlowStore((s) => s.nodes)
   const edges = useFlowStore((s) => s.edges)
@@ -64,13 +72,16 @@ function FlowCanvasInner() {
   const downstreamEdgeIds = pathHighlight?.downstreamEdgeIds ?? new Set<string>()
   const activeNodeId = pathHighlight?.activeNodeId ?? null
   const isLocked = pathHighlight?.isLocked ?? false
-  const onNodeHover = pathHighlight?.onNodeHover ?? (() => {})
-  const onNodePathClick = pathHighlight?.onNodeClick ?? (() => {})
-  const onPanePathClick = pathHighlight?.onPaneClick ?? (() => {})
+  const onNodeHover = pathHighlight?.onNodeHover ?? (() => { /* noop */ })
+  const onNodePathClick = pathHighlight?.onNodeClick ?? (() => { /* noop */ })
+  const onPanePathClick = pathHighlight?.onPaneClick ?? (() => { /* noop */ })
 
   // 右键菜单状态
   const [contextMenu, setContextMenu] = useState<{
-    x: number; y: number; type: 'node' | 'edge'; id: string
+    x: number
+    y: number
+    type: 'node' | 'edge'
+    id: string
   } | null>(null)
 
   // 节点类型映射，使用 useMemo 避免重渲染
@@ -79,6 +90,7 @@ function FlowCanvasInner() {
   // 边默认配置：平滑折线（自动绕过节点）+ 方向箭头
   const defaultEdgeOptions = useMemo(() => {
     const edgeColor = getCssVar('--ds-edge-color', '#94a3b8')
+
     return {
       type: 'smoothstep' as const,
       style: { strokeWidth: 2, stroke: edgeColor },
@@ -88,35 +100,43 @@ function FlowCanvasInner() {
   }, [designStyle])
 
   // 节点的 handle 标签映射（用于连线标注）
-  const nodeHandleLabels: Record<string, Record<string, { label: string; color: string }>> = useMemo(() => {
-    const map: Record<string, Record<string, { label: string; color: string }>> = {}
+  const nodeHandleLabels: Record<string, Record<string, { label: string, color: string }>> = useMemo(() => {
+    const map: Record<string, Record<string, { label: string, color: string }>> = {}
     const primaryColor = getCssVar('--ds-primary-color', '#3b82f6')
     const mutedColor = getCssVar('--ds-node-text-muted', '#9ca3af')
     const successColor = getCssVar('--ds-success-color', '#22c55e')
     const errorColor = getCssVar('--ds-error-color', '#ef4444')
     const loopColor = NODE_TYPE_COLORS[FlowNodeType.Loop]
+
     for (const node of nodes) {
       const d = node.data as Record<string, unknown>
+
       if (node.type === 'condition') {
-        const conditions = d.conditions as Array<{ id: string; label: string }> | undefined
+        const conditions = d.conditions as { id: string, label: string }[] | undefined
+
         if (conditions && conditions.length > 0) {
-          const handles: Record<string, { label: string; color: string }> = {}
-          for (const c of conditions) handles[c.id] = { label: c.label, color: primaryColor }
-          handles['default'] = { label: (d.defaultLabel as string) || '默认', color: mutedColor }
+          const handles: Record<string, { label: string, color: string }> = {}
+
+          for (const c of conditions) { handles[c.id] = { label: c.label, color: primaryColor } }
+
+          handles.default = { label: (d.defaultLabel as string) || '默认', color: mutedColor }
           map[node.id] = handles
-        } else {
+        }
+        else {
           map[node.id] = {
-            'true': { label: '符合', color: successColor },
-            'false': { label: '不符合', color: errorColor },
+            true: { label: '符合', color: successColor },
+            false: { label: '不符合', color: errorColor },
           }
         }
-      } else if (node.type === 'loop') {
+      }
+      else if (node.type === 'loop') {
         map[node.id] = {
-          'out': { label: '出口', color: mutedColor },
-          'loop': { label: '循环体', color: loopColor },
+          out: { label: '出口', color: mutedColor },
+          loop: { label: '循环体', color: loopColor },
         }
       }
     }
+
     return map
   }, [nodes, designStyle])
 
@@ -141,23 +161,26 @@ function FlowCanvasInner() {
         edgeColor = isSelected ? selectedColor : upstreamColor
         edgeWidth = isSelected ? 3 : 2.5
         edgeAnimated = isLocked
-      } else if (isDownstream) {
+      }
+      else if (isDownstream) {
         edgeColor = isSelected ? selectedColor : downstreamColor
         edgeWidth = isSelected ? 3 : 2.5
         edgeAnimated = isLocked
-      } else if (activeNodeId) {
-        const handleInfo = nodeHandleLabels[e.source]?.[e.sourceHandle || '']
+      }
+      else if (activeNodeId) {
+        const handleInfo = nodeHandleLabels[e.source]?.[e.sourceHandle ?? '']
         edgeColor = handleInfo?.color || defaultEdge
         edgeOpacity = '0.15'
-      } else {
-        const handleInfo = nodeHandleLabels[e.source]?.[e.sourceHandle || '']
+      }
+      else {
+        const handleInfo = nodeHandleLabels[e.source]?.[e.sourceHandle ?? '']
         edgeColor = isSelected ? selectedColor : handleInfo?.color || defaultEdge
         edgeWidth = isSelected ? 3 : 2
       }
 
       return {
         ...e,
-        label: (nodeHandleLabels[e.source]?.[e.sourceHandle || ''])?.label || e.label,
+        label: (nodeHandleLabels[e.source]?.[e.sourceHandle ?? ''])?.label || e.label,
         style: {
           strokeWidth: edgeWidth,
           stroke: edgeColor,
@@ -169,27 +192,32 @@ function FlowCanvasInner() {
       }
     })
   },
-    [edges, selectedEdgeId, nodeHandleLabels, activeNodeId, upstreamEdgeIds, downstreamEdgeIds, isLocked, designStyle],
+  [edges, selectedEdgeId, nodeHandleLabels, activeNodeId, upstreamEdgeIds, downstreamEdgeIds, isLocked, designStyle],
   )
 
   // 节点注入选中状态 + 路径高亮 className
   const nodesWithSelection = useMemo(() =>
     nodes.map((n) => {
       let className = ''
+
       if (activeNodeId) {
         if (n.id === activeNodeId) {
           className = 'path-highlight-current'
-        } else if (upstreamNodeIds.has(n.id)) {
+        }
+        else if (upstreamNodeIds.has(n.id)) {
           className = isLocked ? 'path-highlight-upstream' : 'path-highlight-upstream path-preview'
-        } else if (downstreamNodeIds.has(n.id)) {
+        }
+        else if (downstreamNodeIds.has(n.id)) {
           className = isLocked ? 'path-highlight-downstream' : 'path-highlight-downstream path-preview'
-        } else {
+        }
+        else {
           className = 'path-dimmed'
         }
       }
+
       return { ...n, selected: n.id === selectedNodeId, className }
     }),
-    [nodes, selectedNodeId, activeNodeId, upstreamNodeIds, downstreamNodeIds, isLocked],
+  [nodes, selectedNodeId, activeNodeId, upstreamNodeIds, downstreamNodeIds, isLocked],
   )
 
   // 右键菜单处理
@@ -217,12 +245,15 @@ function FlowCanvasInner() {
   }, [selectNode, onPanePathClick])
 
   const handleDeleteFromMenu = useCallback(() => {
-    if (!contextMenu) return
+    if (!contextMenu) { return }
+
     if (contextMenu.type === 'node') {
       deleteNodes([contextMenu.id])
-    } else {
+    }
+    else {
       deleteEdge(contextMenu.id)
     }
+
     setContextMenu(null)
   }, [contextMenu, deleteNodes, deleteEdge])
 
@@ -230,13 +261,15 @@ function FlowCanvasInner() {
   const isValidConnection: IsValidConnection<FlowEdge> = useCallback(
     (edge: Connection | FlowEdge) => {
       const connection = edge as Connection
-      if (connection.source === connection.target) return false
+
+      if (connection.source === connection.target) { return false }
 
       const sourceNode = useFlowStore.getState().nodes.find((n) => n.id === connection.source)
       const targetNode = useFlowStore.getState().nodes.find((n) => n.id === connection.target)
 
-      if (sourceNode?.type === FlowNodeType.End) return false
-      if (targetNode?.type === FlowNodeType.Start) return false
+      if (sourceNode?.type === FlowNodeType.End) { return false }
+
+      if (targetNode?.type === FlowNodeType.Start) { return false }
 
       return true
     },
@@ -301,20 +334,25 @@ function FlowCanvasInner() {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         // 如果焦点在输入框中则不处理
         const target = e.target as HTMLElement
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) { return }
 
         const { selectedEdgeId: eid, selectedNodeId: nid } = useFlowStore.getState()
+
         if (eid) {
           e.preventDefault()
           deleteEdge(eid)
-        } else if (nid) {
+        }
+        else if (nid) {
           e.preventDefault()
           useFlowStore.getState().deleteNodes([nid])
         }
       }
     }
+
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+
+    return () => { window.removeEventListener('keydown', handleKeyDown) }
   }, [deleteEdge])
 
   // ==================== 用鼠标事件模拟拖拽（绕过 Tauri WebView2 HTML5 拖拽 API 兼容问题） ====================
@@ -324,15 +362,18 @@ function FlowCanvasInner() {
   // 监听全局 mouseup：如果 palette 设置了 __DRAG_NODE_TYPE__，则在画布中创建节点
   useEffect(() => {
     const el = canvasRef.current
-    if (!el) return
+
+    if (!el) { return }
 
     const handleMouseUp = (e: MouseEvent) => {
       const draggingType = (window as any).__DRAG_NODE_TYPE__ as string | undefined
-      delete (window as any).__DRAG_NODE_TYPE__  // 读取后立即清理，防止重复放置
-      if (!draggingType) return
+      delete (window as any).__DRAG_NODE_TYPE__ // 读取后立即清理，防止重复放置
+
+      if (!draggingType) { return }
 
       // 检查鼠标是否在画布区域内
       const r = el.getBoundingClientRect()
+
       if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) {
         return
       }
@@ -351,19 +392,20 @@ function FlowCanvasInner() {
     }
 
     window.addEventListener('mouseup', handleMouseUp)
-    return () => window.removeEventListener('mouseup', handleMouseUp)
+
+    return () => { window.removeEventListener('mouseup', handleMouseUp) }
   }, [screenToFlowPosition, addNode])
 
   return (
     <div
       ref={canvasRef}
+      data-testid="flow-canvas"
       style={{
         width: '100%',
         height: '100%',
         // 画布背景跟随设计风格（玻璃/拟物/新拟态各有专属背景与渐变素材）
         background: 'var(--ds-canvas-bg, #fafafa)',
       }}
-      data-testid="flow-canvas"
     >
       {/* 节点高亮样式 */}
       <style>{`
@@ -444,39 +486,44 @@ function FlowCanvasInner() {
           opacity: 0.15 !important;
           transition: opacity 0.2s ease;
         }
-      `}</style>
+      `}
+      </style>
       <ReactFlow
-        nodes={nodesWithSelection}
-        edges={edgesWithSelection}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onReconnect={onReconnect}
-        nodeTypes={nodeTypes}
-        defaultEdgeOptions={defaultEdgeOptions}
-        isValidConnection={isValidConnection}
-        onNodeClick={onNodeClick}
-        onNodeMouseEnter={onNodeMouseEnter}
-        onNodeMouseLeave={onNodeMouseLeave}
-        onPaneClick={handlePaneClick}
-        onEdgeClick={onEdgeClick}
-        onEdgeDoubleClick={onEdgeDoubleClick}
-        onNodeContextMenu={handleNodeContextMenu}
-        onEdgeContextMenu={handleEdgeContextMenu}
         edgesReconnectable
         fitView
+        defaultEdgeOptions={defaultEdgeOptions}
+        edges={edgesWithSelection}
+        isValidConnection={isValidConnection}
+        nodeTypes={nodeTypes}
+        nodes={nodesWithSelection}
+        onConnect={onConnect}
+        onEdgeClick={onEdgeClick}
+        onEdgeContextMenu={handleEdgeContextMenu}
+        onEdgeDoubleClick={onEdgeDoubleClick}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        onNodeContextMenu={handleNodeContextMenu}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
+        onNodesChange={onNodesChange}
+        onPaneClick={handlePaneClick}
+        onReconnect={onReconnect}
       >
-        <Background gap={16} size={1} color="var(--ds-canvas-dot, rgba(0, 0, 0, 0.08))" />
+        <Background color="var(--ds-canvas-dot, rgba(0, 0, 0, 0.08))" gap={16} size={1} />
         <MiniMap
-          style={{ background: 'var(--ds-panel-bg, #fafafa)' }}
           maskColor="var(--ds-bg-overlay, rgba(0, 0, 0, 0.2))"
           nodeColor={(node) => {
-            if (!activeNodeId) return getCssVar('--ds-node-border-color', '#ddd')
-            if (node.id === activeNodeId) return getCssVar('--ds-highlight-selected', '#3b82f6')
-            if (upstreamNodeIds.has(node.id)) return getCssVar('--ds-highlight-upstream', '#f59e0b')
-            if (downstreamNodeIds.has(node.id)) return getCssVar('--ds-highlight-downstream', '#10b981')
+            if (!activeNodeId) { return getCssVar('--ds-node-border-color', '#ddd') }
+
+            if (node.id === activeNodeId) { return getCssVar('--ds-highlight-selected', '#3b82f6') }
+
+            if (upstreamNodeIds.has(node.id)) { return getCssVar('--ds-highlight-upstream', '#f59e0b') }
+
+            if (downstreamNodeIds.has(node.id)) { return getCssVar('--ds-highlight-downstream', '#10b981') }
+
             return getCssVar('--ds-node-border-color', '#ddd')
           }}
+          style={{ background: 'var(--ds-panel-bg, #fafafa)' }}
         />
         <Controls />
       </ReactFlow>
@@ -496,7 +543,7 @@ function FlowCanvasInner() {
             padding: '4px 0',
             minWidth: 140,
           }}
-          onContextMenu={(e) => e.preventDefault()}
+          onContextMenu={(e) => { e.preventDefault() }}
         >
           <div
             style={{

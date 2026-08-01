@@ -1,8 +1,11 @@
 import { useCallback } from 'react'
-import { Radio, Select, Input, Typography, Button, Space } from 'antd'
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Input, Radio, Select, Typography } from 'antd'
+
+import type { ConditionBranch, ConditionNodeData } from '../../types/flow.types'
+
 import type { PanelProps } from './shared/panelRegistry'
-import type { ConditionNodeData, ConditionBranch } from '../../types/flow.types'
 import { useDraft } from './shared/useDraft'
 
 const { Text } = Typography
@@ -73,7 +76,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
 
   // 添加新条件分支
   const handleAddCondition = useCallback(() => {
-    const conditions = data.conditions || []
+    const conditions = data.conditions ?? []
     const newId = `cond-${Date.now()}`
     onChange({
       conditions: [...conditions, { id: newId, expression: '', label: `分支 ${conditions.length + 1}` }],
@@ -83,7 +86,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
   // 删除条件分支
   const handleRemoveCondition = useCallback(
     (index: number) => {
-      const conditions = data.conditions || []
+      const conditions = data.conditions ?? []
       onChange({
         conditions: conditions.filter((_, i) => i !== index),
       })
@@ -94,7 +97,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
   // 更新条件分支
   const handleConditionChange = useCallback(
     (index: number, field: keyof ConditionBranch, value: string) => {
-      const conditions = data.conditions || []
+      const conditions = data.conditions ?? []
       onChange({
         conditions: conditions.map((c, i) => i === index ? { ...c, [field]: value } : c),
       })
@@ -119,20 +122,20 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
 
   return (
     <div className="space-y-4">
-      <Text type="secondary" className="block text-xs">
+      <Text className="block text-xs" type="secondary">
         条件配置
       </Text>
 
       {/* 条件类型 */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           条件类型
         </Text>
         <Radio.Group
+          data-testid="condition-type"
+          size="small"
           value={data.conditionType}
           onChange={handleConditionTypeChange}
-          size="small"
-          data-testid="condition-type"
         >
           {CONDITION_TYPE_OPTIONS.map((option) => (
             <Radio.Button key={option.value} value={option.value}>
@@ -145,19 +148,19 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
       {/* 表达式（conditionType=expression 时显示） */}
       {data.conditionType === 'expression' && (
         <div>
-          <Text type="secondary" className="block text-xs mb-1">
+          <Text className="mb-1 block text-xs" type="secondary">
             JavaScript 表达式
           </Text>
           <Input.TextArea
-            value={expressionDraft}
-            onChange={(e) => {
-              setExpressionDraft(e.target.value)
-            }}
-            onBlur={commitExpression}
+            data-testid="condition-expression"
             placeholder="例如: variables.token && variables.count > 0"
             rows={3}
             size="small"
-            data-testid="condition-expression"
+            value={expressionDraft}
+            onBlur={commitExpression}
+            onChange={(e) => {
+              setExpressionDraft(e.target.value)
+            }}
           />
         </div>
       )}
@@ -165,18 +168,18 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
       {/* 状态码（conditionType=status_code 时显示） */}
       {data.conditionType === 'status_code' && (
         <div>
-          <Text type="secondary" className="block text-xs mb-1">
+          <Text className="mb-1 block text-xs" type="secondary">
             预期状态码
           </Text>
           <Input
+            data-testid="condition-status-code"
+            placeholder="例如: 200、201、404"
+            size="small"
             value={expressionDraft}
+            onBlur={commitExpression}
             onChange={(e) => {
               setExpressionDraft(e.target.value)
             }}
-            onBlur={commitExpression}
-            placeholder="例如: 200、201、404"
-            size="small"
-            data-testid="condition-status-code"
           />
         </div>
       )}
@@ -184,18 +187,18 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
       {/* 变量名（conditionType=variable_check 时显示） */}
       {showOperator && (
         <div>
-          <Text type="secondary" className="block text-xs mb-1">
+          <Text className="mb-1 block text-xs" type="secondary">
             变量名
           </Text>
           <Input
+            data-testid="condition-variable-name"
+            placeholder="例如: token"
+            size="small"
             value={variableNameDraft}
+            onBlur={commitVariableName}
             onChange={(e) => {
               setVariableNameDraft(e.target.value)
             }}
-            onBlur={commitVariableName}
-            placeholder="例如: token"
-            size="small"
-            data-testid="condition-variable-name"
           />
         </div>
       )}
@@ -203,16 +206,16 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
       {/* 操作符（conditionType=variable_check 时显示） */}
       {showOperator && (
         <div>
-          <Text type="secondary" className="block text-xs mb-1">
+          <Text className="mb-1 block text-xs" type="secondary">
             操作符
           </Text>
           <Select
-            value={data.operator}
-            onChange={handleOperatorChange}
+            data-testid="condition-operator"
             options={OPERATOR_OPTIONS}
             size="small"
             style={{ width: '100%' }}
-            data-testid="condition-operator"
+            value={data.operator}
+            onChange={handleOperatorChange}
           />
         </div>
       )}
@@ -220,101 +223,103 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
       {/* 比较值（operator != exists 时显示） */}
       {showCompareValue && (
         <div>
-          <Text type="secondary" className="block text-xs mb-1">
+          <Text className="mb-1 block text-xs" type="secondary">
             比较值
           </Text>
           <Input
+            data-testid="condition-compare-value"
+            placeholder="期望值"
+            size="small"
             value={compareValueDraft}
+            onBlur={commitCompareValue}
             onChange={(e) => {
               setCompareValueDraft(e.target.value)
             }}
-            onBlur={commitCompareValue}
-            placeholder="期望值"
-            size="small"
-            data-testid="condition-compare-value"
           />
         </div>
       )}
 
       {/* ==================== 多分支编辑器 ==================== */}
-      <div className="mt-4 pt-4 border-t border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <Text type="secondary" className="text-xs">
+      <div className="mt-4 border-t border-gray-200 pt-4">
+        <div className="mb-3 flex items-center justify-between">
+          <Text className="text-xs" type="secondary">
             多条件分支（可选）
           </Text>
           {(!data.conditions || data.conditions.length < 8) && (
             <Button
-              type="dashed"
-              size="small"
-              icon={<PlusOutlined />}
-              onClick={handleAddCondition}
               data-testid="condition-add-branch"
+              icon={<PlusOutlined />}
+              size="small"
+              type="dashed"
+              onClick={handleAddCondition}
             >
               添加分支
             </Button>
           )}
         </div>
 
-        {isMultiBranchMode ? (
-          <div className="space-y-3">
-            {/* 条件分支列表 */}
-            {data.conditions!.map((condition, index) => (
-              <div
-                key={condition.id}
-                className="p-3 border border-[color:var(--ds-node-border-color,#e5e7eb)] rounded-md space-y-2 bg-[color:var(--ds-node-bg-elevated,#f9fafb)]"
-              >
-                <div className="flex items-center justify-between">
-                  <Text strong className="text-xs">
-                    分支 {index + 1}
+        {isMultiBranchMode
+          ? (
+              <div className="space-y-3">
+                {/* 条件分支列表 */}
+                {data.conditions!.map((condition, index) => (
+                  <div
+                    key={condition.id}
+                    className="space-y-2 rounded-md border border-[color:var(--ds-node-border-color,#e5e7eb)] bg-[color:var(--ds-node-bg-elevated,#f9fafb)] p-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <Text strong className="text-xs">
+                        分支 {index + 1}
+                      </Text>
+                      <Button
+                        danger
+                        data-testid={`condition-remove-branch-${index}`}
+                        icon={<DeleteOutlined />}
+                        size="small"
+                        type="text"
+                        onClick={() => { handleRemoveCondition(index) }}
+                      />
+                    </div>
+
+                    <Input
+                      data-testid={`condition-branch-label-${index}`}
+                      placeholder="分支标签（如：状态码200）"
+                      size="small"
+                      value={condition.label}
+                      onChange={(e) => { handleConditionChange(index, 'label', e.target.value) }}
+                    />
+
+                    <Input.TextArea
+                      data-testid={`condition-branch-expression-${index}`}
+                      placeholder="条件表达式（如：variables.status === '200'）"
+                      rows={2}
+                      size="small"
+                      value={condition.expression}
+                      onChange={(e) => { handleConditionChange(index, 'expression', e.target.value) }}
+                    />
+                  </div>
+                ))}
+
+                {/* 默认分支 */}
+                <div className="rounded-md border border-dashed border-[color:var(--ds-node-border-color,#d1d5db)] bg-[color:var(--ds-node-bg,#f3f4f6)] p-3">
+                  <Text className="mb-2 block text-xs" type="secondary">
+                    默认分支（当所有条件都不满足时）
                   </Text>
-                  <Button
-                    type="text"
-                    danger
+                  <Input
+                    data-testid="condition-default-label"
+                    placeholder="默认分支标签"
                     size="small"
-                    icon={<DeleteOutlined />}
-                    onClick={() => handleRemoveCondition(index)}
-                    data-testid={`condition-remove-branch-${index}`}
+                    value={data.defaultLabel ?? 'default'}
+                    onChange={(e) => { handleDefaultLabelChange(e) }}
                   />
                 </div>
-
-                <Input
-                  value={condition.label}
-                  onChange={(e) => handleConditionChange(index, 'label', e.target.value)}
-                  size="small"
-                  placeholder="分支标签（如：状态码200）"
-                  data-testid={`condition-branch-label-${index}`}
-                />
-
-                <Input.TextArea
-                  value={condition.expression}
-                  onChange={(e) => handleConditionChange(index, 'expression', e.target.value)}
-                  size="small"
-                  placeholder="条件表达式（如：variables.status === '200'）"
-                  rows={2}
-                  data-testid={`condition-branch-expression-${index}`}
-                />
               </div>
-            ))}
-
-            {/* 默认分支 */}
-            <div className="p-3 border border-dashed border-[color:var(--ds-node-border-color,#d1d5db)] rounded-md bg-[color:var(--ds-node-bg,#f3f4f6)]">
-              <Text type="secondary" className="block text-xs mb-2">
-                默认分支（当所有条件都不满足时）
+            )
+          : (
+              <Text className="text-xs italic" type="secondary">
+                添加条件分支以支持多分支判断，否则使用简单的 true/false 双分支
               </Text>
-              <Input
-                value={data.defaultLabel || 'default'}
-                onChange={(e) => handleDefaultLabelChange(e)}
-                size="small"
-                placeholder="默认分支标签"
-                data-testid="condition-default-label"
-              />
-            </div>
-          </div>
-        ) : (
-          <Text type="secondary" className="text-xs italic">
-            添加条件分支以支持多分支判断，否则使用简单的 true/false 双分支
-          </Text>
-        )}
+            )}
       </div>
     </div>
   )

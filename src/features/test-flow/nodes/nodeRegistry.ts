@@ -1,14 +1,15 @@
-import { FlowNodeType, type FlowNodeData } from '../types/flow.types'
-import StartNode from './StartNode'
+import { type FlowNodeData, FlowNodeType } from '../types/flow.types'
+
+import AssertNode from './AssertNode'
+import ConditionNode from './ConditionNode'
 import EndNode from './EndNode'
 import HttpRequestNode from './HttpRequestNode'
-import ConditionNode from './ConditionNode'
 import LoopNode from './LoopNode'
 import ParallelNode from './ParallelNode'
-import WaitNode from './WaitNode'
-import SubFlowNode from './SubFlowNode'
 import SetVariableNode from './SetVariableNode'
-import AssertNode from './AssertNode'
+import StartNode from './StartNode'
+import SubFlowNode from './SubFlowNode'
+import WaitNode from './WaitNode'
 
 // ==================== 注册表条目 ====================
 
@@ -156,9 +157,11 @@ export const nodeRegistry: Record<string, NodeRegistryEntry> = {
  */
 export function getNodeTypes(): Record<string, React.ComponentType<any>> {
   const types: Record<string, React.ComponentType<any>> = {}
+
   for (const [key, entry] of Object.entries(nodeRegistry)) {
     types[key] = entry.component
   }
+
   return types
 }
 
@@ -167,5 +170,6 @@ export function getNodeTypes(): Record<string, React.ComponentType<any>> {
  */
 export function getDefaultNodeData(type: FlowNodeType): Partial<FlowNodeData> {
   const entry = nodeRegistry[type]
+
   return entry ? { ...entry.defaultData } : { label: 'Unknown', enabled: true }
 }

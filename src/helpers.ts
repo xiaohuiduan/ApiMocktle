@@ -1,6 +1,6 @@
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { CatalogType, ContentType, MenuItemType } from '@/enums'
-import { UnsafeAny } from '@/types'
+import type { UnsafeAny } from '@/types'
 
 export function getCatalogType(type: MenuItemType): CatalogType {
   if (
@@ -162,25 +162,30 @@ export function findChildrenById(arr: ApiMenuData[], id: ApiMenuData['id']): Api
  */
 function normalizeMenuSearchQuery(raw: string): string {
   const t = raw.trim()
+
   if (!t) {
     return t
   }
+
   try {
     if (/^https?:\/\//i.test(t)) {
       const u = new URL(t)
       const withSearch = `${u.pathname}${u.search}`
+
       return withSearch.endsWith('?') ? withSearch.slice(0, -1) : withSearch
     }
   }
   catch {
     /* 非合法 URL，按原文搜索 */
   }
+
   return t
 }
 
 /** 接口管理侧栏搜索：名称、路径、HTTP 方法（不区分大小写）。 */
 export function menuItemMatchesSearch(item: ApiMenuData, rawQuery: string): boolean {
   const q = normalizeMenuSearchQuery(rawQuery)
+
   if (!q) {
     return true
   }
@@ -194,15 +199,18 @@ export function menuItemMatchesSearch(item: ApiMenuData, rawQuery: string): bool
   }
 
   const path = item.data?.path
+
   if (path) {
     const pathNorm = path.startsWith('/') ? path : `/${path}`
     const qNorm = q.startsWith('/') ? q : `/${q}`
+
     if (pathNorm.toLowerCase().includes(qNorm.toLowerCase())) {
       return true
     }
   }
 
   const method = item.data?.method
+
   if (method && q.length <= 12 && method.toLowerCase() === q.toLowerCase()) {
     return true
   }
@@ -218,6 +226,7 @@ export function filterMenuItemsBySearch(
   menuSearchWord: string,
 ): ApiMenuData[] {
   const q = menuSearchWord.trim()
+
   if (!q) {
     return menuRawList
   }
@@ -229,8 +238,10 @@ export function filterMenuItemsBySearch(
     if (!menuItemMatchesSearch(item, q)) {
       continue
     }
+
     matches.add(item.id)
     let pid = item.parentId
+
     while (pid) {
       matches.add(pid)
       pid = byId.get(pid)?.parentId

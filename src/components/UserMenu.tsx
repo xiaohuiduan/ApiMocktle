@@ -1,8 +1,8 @@
 import { useState } from 'react'
-
-import { Button, Dropdown, Form, Input, Modal, message } from 'antd'
-import { KeyIcon, LogOutIcon, UserCircle2Icon } from 'lucide-react'
 import { useNavigate } from 'react-router'
+
+import { Button, Dropdown, Form, Input, message, Modal } from 'antd'
+import { KeyIcon, LogOutIcon, UserCircle2Icon } from 'lucide-react'
 
 import { useAuth } from '@/contexts/auth'
 
@@ -21,9 +21,12 @@ export function UserMenu({ showUsername = true }: UserMenuProps) {
   const handleChangePassword = async (v: { oldPassword: string, newPassword: string, confirmPassword: string }) => {
     if (v.newPassword !== v.confirmPassword) {
       message.error('两次新密码不一致')
+
       return
     }
+
     setPwdSubmitting(true)
+
     try {
       await changePassword(v.oldPassword, v.newPassword)
       message.success('密码修改成功')
@@ -38,7 +41,7 @@ export function UserMenu({ showUsername = true }: UserMenuProps) {
     }
   }
 
-  if (!user) return null
+  if (!user) { return null }
 
   return (
     <>
@@ -53,8 +56,10 @@ export function UserMenu({ showUsername = true }: UserMenuProps) {
             { key: 'logout', label: '退出登录', icon: <LogOutIcon size={16} /> },
           ],
           onClick: ({ key }) => {
-            if (key === 'projects') navigate('/projects')
-            if (key === 'changePassword') setPwdOpen(true)
+            if (key === 'projects') { navigate('/projects') }
+
+            if (key === 'changePassword') { setPwdOpen(true) }
+
             if (key === 'logout') {
               void logout().finally(() => {
                 void navigate('/login', { replace: true })
@@ -63,20 +68,20 @@ export function UserMenu({ showUsername = true }: UserMenuProps) {
           },
         }}
       >
-        <Button size="small" type="text" icon={<UserCircle2Icon size={16} />}>
+        <Button icon={<UserCircle2Icon size={16} />} size="small" type="text">
           {showUsername && user.username}
         </Button>
       </Dropdown>
 
       <Modal
-        title="修改密码"
+        destroyOnClose
+        footer={null}
         open={pwdOpen}
+        title="修改密码"
         onCancel={() => {
           setPwdOpen(false)
           pwdForm.resetFields()
         }}
-        footer={null}
-        destroyOnClose
       >
         <Form form={pwdForm} layout="vertical" onFinish={(v) => void handleChangePassword(v)}>
           <Form.Item label="旧密码" name="oldPassword" rules={[{ required: true, message: '请输入旧密码' }]}>

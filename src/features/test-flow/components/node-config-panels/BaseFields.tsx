@@ -1,6 +1,9 @@
 import { useCallback } from 'react'
-import { Input, Switch, Space, Typography } from 'antd'
+
+import { Input, Space, Switch, Typography } from 'antd'
+
 import type { FlowNodeData } from '../../types/flow.types'
+
 import { useDraft } from './shared/useDraft'
 
 const { Text } = Typography
@@ -43,47 +46,47 @@ export default function BaseFields({ data, onChange }: BaseFieldsProps) {
     <div className="space-y-4">
       {/* 标签编辑 */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           标签
         </Text>
         <Input
+          data-testid="node-label-input"
+          placeholder="节点标签"
           value={labelDraft}
+          onBlur={commitLabel}
           onChange={(e) => {
             setLabelDraft(e.target.value)
           }}
-          onBlur={commitLabel}
-          placeholder="节点标签"
-          data-testid="node-label-input"
         />
       </div>
 
       {/* 描述编辑 */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           描述（可选）
         </Text>
         <Input.TextArea
+          data-testid="node-description-input"
+          placeholder="节点描述"
+          rows={2}
           value={descDraft}
+          onBlur={commitDesc}
           onChange={(e) => {
             setDescDraft(e.target.value)
           }}
-          onBlur={commitDesc}
-          placeholder="节点描述"
-          rows={2}
-          data-testid="node-description-input"
         />
       </div>
 
       {/* 启用/禁用开关 */}
       <div>
         <Space>
-          <Text type="secondary" className="text-xs">
+          <Text className="text-xs" type="secondary">
             启用状态
           </Text>
           <Switch
             checked={data.enabled ?? true}
-            onChange={handleEnabledChange}
             data-testid="node-enabled-switch"
+            onChange={handleEnabledChange}
           />
         </Space>
       </div>

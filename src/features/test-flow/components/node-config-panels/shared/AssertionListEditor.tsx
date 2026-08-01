@@ -1,6 +1,8 @@
 import { useCallback } from 'react'
-import { Button, Select, Input, Space, Typography } from 'antd'
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Input, Select, Space, Typography } from 'antd'
+
 import type { TestAssertion } from '@/types'
 
 const { Text } = Typography
@@ -60,7 +62,8 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
   const handleUpdate = useCallback(
     (index: number, field: keyof TestAssertion, value: any) => {
       const newAssertions = assertions.map((assertion, i) => {
-        if (i !== index) return assertion
+        if (i !== index) { return assertion }
+
         return { ...assertion, [field]: value }
       })
       onChange(newAssertions)
@@ -86,96 +89,98 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Text type="secondary" className="text-xs">
+        <Text className="text-xs" type="secondary">
           断言列表
         </Text>
         <Button
-          type="dashed"
-          size="small"
           icon={<PlusOutlined />}
+          size="small"
+          type="dashed"
           onClick={handleAdd}
         >
           添加断言
         </Button>
       </div>
 
-      {assertions.length === 0 ? (
-        <Text type="secondary" className="text-xs italic">
-          暂无断言
-        </Text>
-      ) : (
-        <div className="space-y-2">
-          {assertions.map((assertion, index) => (
-            <div
-              key={index}
-              className="p-2 border border-[color:var(--ds-node-border-color,#e5e7eb)] rounded-md space-y-2 bg-[color:var(--ds-node-bg-elevated,#f9fafb)]"
-            >
-              {/* 第一行：类型、路径 */}
-              <Space.Compact block>
-                <Select
-                  value={assertion.type}
-                  onChange={(value) => handleUpdate(index, 'type', value)}
-                  options={ASSERTION_TYPE_OPTIONS}
-                  size="small"
-                  style={{ width: '40%' }}
-                  placeholder="断言类型"
-                />
-                {shouldShowPath(assertion.type) && (
-                  <Input
-                    value={assertion.path || ''}
-                    onChange={(e) => handleUpdate(index, 'path', e.target.value)}
-                    size="small"
-                    placeholder="data.token"
-                    style={{ width: '60%' }}
-                  />
-                )}
-                {shouldShowName(assertion.type) && (
-                  <Input
-                    value={assertion.name || ''}
-                    onChange={(e) => handleUpdate(index, 'name', e.target.value)}
-                    size="small"
-                    placeholder="Content-Type"
-                    style={{ width: '60%' }}
-                  />
-                )}
-              </Space.Compact>
+      {assertions.length === 0
+        ? (
+            <Text className="text-xs italic" type="secondary">
+              暂无断言
+            </Text>
+          )
+        : (
+            <div className="space-y-2">
+              {assertions.map((assertion, index) => (
+                <div
+                  key={index}
+                  className="space-y-2 rounded-md border border-[color:var(--ds-node-border-color,#e5e7eb)] bg-[color:var(--ds-node-bg-elevated,#f9fafb)] p-2"
+                >
+                  {/* 第一行：类型、路径 */}
+                  <Space.Compact block>
+                    <Select
+                      options={ASSERTION_TYPE_OPTIONS}
+                      placeholder="断言类型"
+                      size="small"
+                      style={{ width: '40%' }}
+                      value={assertion.type}
+                      onChange={(value) => { handleUpdate(index, 'type', value) }}
+                    />
+                    {shouldShowPath(assertion.type) && (
+                      <Input
+                        placeholder="data.token"
+                        size="small"
+                        style={{ width: '60%' }}
+                        value={assertion.path ?? ''}
+                        onChange={(e) => { handleUpdate(index, 'path', e.target.value) }}
+                      />
+                    )}
+                    {shouldShowName(assertion.type) && (
+                      <Input
+                        placeholder="Content-Type"
+                        size="small"
+                        style={{ width: '60%' }}
+                        value={assertion.name ?? ''}
+                        onChange={(e) => { handleUpdate(index, 'name', e.target.value) }}
+                      />
+                    )}
+                  </Space.Compact>
 
-              {/* 第二行：操作符、期望值、删除按钮 */}
-              <Space.Compact block>
-                <Select
-                  value={assertion.operator}
-                  onChange={(value) => handleUpdate(index, 'operator', value)}
-                  options={OPERATOR_OPTIONS}
-                  size="small"
-                  style={{ width: '35%' }}
-                  placeholder="操作符"
-                />
-                {shouldShowExpected(assertion.operator) && (
-                  <Input
-                    value={
-                      assertion.expected !== undefined
-                        ? String(assertion.expected)
-                        : ''
-                    }
-                    onChange={(e) => handleUpdate(index, 'expected', e.target.value)}
-                    size="small"
-                    placeholder="期望值"
-                    style={{ width: '55%' }}
-                  />
-                )}
-                <Button
-                  type="text"
-                  danger
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  onClick={() => handleDelete(index)}
-                  style={{ width: '10%' }}
-                />
-              </Space.Compact>
+                  {/* 第二行：操作符、期望值、删除按钮 */}
+                  <Space.Compact block>
+                    <Select
+                      options={OPERATOR_OPTIONS}
+                      placeholder="操作符"
+                      size="small"
+                      style={{ width: '35%' }}
+                      value={assertion.operator}
+                      onChange={(value) => { handleUpdate(index, 'operator', value) }}
+                    />
+                    {shouldShowExpected(assertion.operator) && (
+                      <Input
+                        placeholder="期望值"
+                        size="small"
+                        style={{ width: '55%' }}
+                        value={
+                          assertion.expected !== undefined
+                            ? String(assertion.expected)
+                            : ''
+                        }
+                        onChange={(e) => { handleUpdate(index, 'expected', e.target.value) }}
+                      />
+                    )}
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      size="small"
+                      style={{ width: '10%' }}
+                      type="text"
+                      onClick={() => { handleDelete(index) }}
+                    />
+                  </Space.Compact>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
     </div>
   )
 }

@@ -1,7 +1,10 @@
 import { useCallback } from 'react'
-import { Radio, InputNumber, Input, Typography } from 'antd'
-import type { PanelProps } from './shared/panelRegistry'
+
+import { Input, InputNumber, Radio, Typography } from 'antd'
+
 import type { WaitNodeData } from '../../types/flow.types'
+
+import type { PanelProps } from './shared/panelRegistry'
 import { useDraft } from './shared/useDraft'
 
 const { Text } = Typography
@@ -44,7 +47,7 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
   // 更新固定等待时间
   const handleDurationChange = useCallback(
     (value: number | null) => {
-      onChange({ durationMs: value || undefined })
+      onChange({ durationMs: value ?? undefined })
     },
     [onChange],
   )
@@ -52,7 +55,7 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
   // 更新轮询间隔
   const handlePollIntervalChange = useCallback(
     (value: number | null) => {
-      onChange({ pollIntervalMs: value || undefined })
+      onChange({ pollIntervalMs: value ?? undefined })
     },
     [onChange],
   )
@@ -60,27 +63,27 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
   // 更新最大等待时间
   const handleMaxWaitChange = useCallback(
     (value: number | null) => {
-      onChange({ maxWaitMs: value || undefined })
+      onChange({ maxWaitMs: value ?? undefined })
     },
     [onChange],
   )
 
   return (
     <div className="space-y-4">
-      <Text type="secondary" className="block text-xs">
+      <Text className="block text-xs" type="secondary">
         等待配置
       </Text>
 
       {/* 等待类型 */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           等待类型
         </Text>
         <Radio.Group
+          data-testid="wait-type"
+          size="small"
           value={data.waitType}
           onChange={handleWaitTypeChange}
-          size="small"
-          data-testid="wait-type"
         >
           {WAIT_TYPE_OPTIONS.map((option) => (
             <Radio.Button key={option.value} value={option.value}>
@@ -93,17 +96,17 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
       {/* 固定等待时间（waitType=fixed 时显示） */}
       {data.waitType === 'fixed' && (
         <div>
-          <Text type="secondary" className="block text-xs mb-1">
+          <Text className="mb-1 block text-xs" type="secondary">
             等待时间（毫秒）
           </Text>
           <InputNumber
-            value={data.durationMs}
-            onChange={handleDurationChange}
+            data-testid="wait-duration"
             min={0}
+            placeholder="例如: 1000"
             size="small"
             style={{ width: '100%' }}
-            placeholder="例如: 1000"
-            data-testid="wait-duration"
+            value={data.durationMs}
+            onChange={handleDurationChange}
           />
         </div>
       )}
@@ -111,18 +114,18 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
       {/* 变量名（waitType=variable 时显示） */}
       {data.waitType === 'variable' && (
         <div>
-          <Text type="secondary" className="block text-xs mb-1">
+          <Text className="mb-1 block text-xs" type="secondary">
             变量名（存放毫秒值）
           </Text>
           <Input
+            data-testid="wait-variable"
+            placeholder="例如: waitTime"
+            size="small"
             value={variableDraft}
+            onBlur={commitVariable}
             onChange={(e) => {
               setVariableDraft(e.target.value)
             }}
-            onBlur={commitVariable}
-            placeholder="例如: waitTime"
-            size="small"
-            data-testid="wait-variable"
           />
         </div>
       )}
@@ -131,49 +134,49 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
       {data.waitType === 'condition' && (
         <>
           <div>
-            <Text type="secondary" className="block text-xs mb-1">
+            <Text className="mb-1 block text-xs" type="secondary">
               轮询条件（为真时结束等待）
             </Text>
             <Input.TextArea
-              value={conditionDraft}
-              onChange={(e) => {
-                setConditionDraft(e.target.value)
-              }}
-              onBlur={commitCondition}
+              data-testid="wait-condition"
               placeholder="例如: variables.status === 'ready'"
               rows={2}
               size="small"
-              data-testid="wait-condition"
+              value={conditionDraft}
+              onBlur={commitCondition}
+              onChange={(e) => {
+                setConditionDraft(e.target.value)
+              }}
             />
           </div>
 
           <div>
-            <Text type="secondary" className="block text-xs mb-1">
+            <Text className="mb-1 block text-xs" type="secondary">
               轮询间隔（毫秒）
             </Text>
             <InputNumber
-              value={data.pollIntervalMs}
-              onChange={handlePollIntervalChange}
+              data-testid="wait-poll-interval"
               min={100}
+              placeholder="例如: 1000"
               size="small"
               style={{ width: '100%' }}
-              placeholder="例如: 1000"
-              data-testid="wait-poll-interval"
+              value={data.pollIntervalMs}
+              onChange={handlePollIntervalChange}
             />
           </div>
 
           <div>
-            <Text type="secondary" className="block text-xs mb-1">
+            <Text className="mb-1 block text-xs" type="secondary">
               最大等待时间（毫秒）
             </Text>
             <InputNumber
-              value={data.maxWaitMs}
-              onChange={handleMaxWaitChange}
+              data-testid="wait-max-wait"
               min={0}
+              placeholder="例如: 30000"
               size="small"
               style={{ width: '100%' }}
-              placeholder="例如: 30000"
-              data-testid="wait-max-wait"
+              value={data.maxWaitMs}
+              onChange={handleMaxWaitChange}
             />
           </div>
         </>

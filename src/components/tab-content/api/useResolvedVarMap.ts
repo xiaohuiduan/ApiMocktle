@@ -34,23 +34,28 @@ export function buildVarMaps(input: VarMapInput): ResolvedVarMaps {
   } = input
 
   const varMap = new Map<string, string>()
+
   for (const v of [...globalVariables, ...envVariables]) {
-    if (v.name && v.value != null) varMap.set(v.name, v.value)
+    if (v.name && v.value != null) { varMap.set(v.name, v.value) }
   }
+
   // 会话变量覆盖环境变量（最高优先级）
   for (const [k, v] of Object.entries(sessionVars)) {
     varMap.set(k, v)
   }
 
   const globalsMap: Record<string, string> = {}
+
   for (const v of globalVariables) {
-    if (v.name && v.value != null) globalsMap[v.name] = v.value
+    if (v.name && v.value != null) { globalsMap[v.name] = v.value }
   }
 
   const envMap: Record<string, string> = {}
+
   for (const v of envVariables) {
-    if (v.name && v.value != null) envMap[v.name] = v.value
+    if (v.name && v.value != null) { envMap[v.name] = v.value }
   }
+
   // 会话变量合并到 envMap
   Object.assign(envMap, sessionVars)
 
@@ -64,6 +69,7 @@ export function makeResolveVars(varMap: Map<string, string>): (val: string) => s
     let resolved = resolveDynamicVariables(s)
     // 2. 用户变量（{{name}}），未命中保留原样
     resolved = resolved.replace(/\{\{(\w+)\}\}/g, (_, name) => varMap.get(name) ?? `{{${name}}}`)
+
     return resolved
   }
 }
@@ -72,6 +78,7 @@ export function makeResolveVars(varMap: Map<string, string>): (val: string) => s
 export function useResolvedVarMap(input: VarMapInput): ResolvedVarMaps & { resolveVars: (val: string) => string } {
   return useMemo(() => {
     const maps = buildVarMaps(input)
+
     return { ...maps, resolveVars: makeResolveVars(maps.varMap) }
   }, [input.globalVariables, input.envVariables, input.sessionVars])
 }

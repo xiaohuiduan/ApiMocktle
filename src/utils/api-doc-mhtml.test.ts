@@ -11,9 +11,9 @@ import {
 } from './api-doc-mhtml'
 
 function makeApiDetail(opts?: {
-  id?: string,
-  name?: string,
-  dataOverrides?: Record<string, unknown>,
+  id?: string
+  name?: string
+  dataOverrides?: Record<string, unknown>
 }): ExportApi {
   const { id = 'api-1', name = 'Test API', dataOverrides = {} } = opts ?? {}
 

@@ -21,10 +21,10 @@ export function useApiRequestRunner() {
     menuItemId: string | undefined,
     url: string,
     method: string,
-    headers: Array<{ name: string, value: string }>,
+    headers: { name: string, value: string }[],
     body: string,
     contentType?: string,
-    formDataFiles?: Array<{ name: string, path: string }>,
+    formDataFiles?: { name: string, path: string }[],
     insecureSkipVerify?: boolean,
     timeoutMs?: number,
   ): Promise<ApiRunResult | undefined> => {
@@ -32,6 +32,7 @@ export function useApiRequestRunner() {
       const msg = '当前不在项目页面，无法运行请求'
       messageApi.error(msg)
       setError(msg)
+
       return
     }
 
@@ -48,6 +49,7 @@ export function useApiRequestRunner() {
 
       // Attach proxy config if configured
       const pc = proxyConfig
+
       if (pc && pc.proxyType !== 'none') {
         (payload.payload as Record<string, unknown>).proxyConfig = { ...pc }
       }
@@ -67,11 +69,12 @@ export function useApiRequestRunner() {
           responseJson: historyResponse,
           statusCode: apiResult.status,
           durationMs: apiResult.durationMs,
-        }).catch(() => {})
+        }).catch(() => { /* noop */ })
       }
 
       return apiResult
-    } catch (err) {
+    }
+    catch (err) {
       const msg = err instanceof Error ? err.message : '运行失败'
       messageApi.error({ content: msg, duration: 4 })
       setError(msg)
@@ -83,17 +86,20 @@ export function useApiRequestRunner() {
         const bodyParams = isFormData && body
           ? body.split('&').filter(Boolean).map((p) => {
               const [name, ...rest] = p.split('=')
+
               return { name: decodeURIComponent(name), value: decodeURIComponent(rest.join('=')) }
             })
           : []
         // 从 URL 中解析 query 参数
-        let queryFromUrl: Array<{ name: string, value: string }> = []
+        const queryFromUrl: { name: string, value: string }[] = []
+
         try {
           const urlObj = new URL(url)
           urlObj.searchParams.forEach((value, name) => {
             queryFromUrl.push({ name, value })
           })
-        } catch { /* url 可能不完整，忽略 */ }
+        }
+        catch { /* url 可能不完整，忽略 */ }
 
         const errorResult: ApiRunResult = {
           url,
@@ -102,7 +108,7 @@ export function useApiRequestRunner() {
           statusText: msg,
           durationMs: 0,
           contentType,
-          requestHeaders: headers.map(h => ({ name: h.name, value: h.value })),
+          requestHeaders: headers.map((h) => ({ name: h.name, value: h.value })),
           requestQuery: queryFromUrl,
           requestCookie: [],
           requestBodyParameters: bodyParams,
@@ -123,11 +129,12 @@ export function useApiRequestRunner() {
           responseJson: errorResult,
           statusCode: 0,
           durationMs: 0,
-        }).catch(() => {})
+        }).catch(() => { /* noop */ })
       }
 
       return undefined
-    } finally {
+    }
+    finally {
       setRunning(false)
     }
   }, [messageApi, projectId, sessionId, proxyConfig])

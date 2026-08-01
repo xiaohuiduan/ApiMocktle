@@ -1,9 +1,13 @@
 import { useCallback } from 'react'
+
 import { Collapse, Typography } from 'antd'
-import type { PanelProps } from './shared/panelRegistry'
-import type { AssertNodeData } from '../../types/flow.types'
-import VariableAssertionListEditor, { type VariableAssertion } from './shared/VariableAssertionListEditor'
+
 import { MonacoEditor } from '@/components/MonacoEditor/MonacoEditor'
+
+import type { AssertNodeData } from '../../types/flow.types'
+
+import type { PanelProps } from './shared/panelRegistry'
+import VariableAssertionListEditor, { type VariableAssertion } from './shared/VariableAssertionListEditor'
 
 const { Text } = Typography
 
@@ -21,7 +25,7 @@ export default function AssertNodePanel({ data, onChange }: PanelProps<AssertNod
   // 更新脚本断言
   const handleScriptChange = useCallback(
     (value: unknown) => {
-      onChange({ script: String(value || '') })
+      onChange({ script: String(value ?? '') })
     },
     [onChange],
   )
@@ -42,21 +46,21 @@ export default function AssertNodePanel({ data, onChange }: PanelProps<AssertNod
       label: '脚本断言（高级）',
       children: (
         <div>
-          <Text type="secondary" className="block text-xs mb-2">
+          <Text className="mb-2 block text-xs" type="secondary">
             使用 pm.test() / pm.expect() 编写自定义断言，可访问 variables 对象
           </Text>
           <MonacoEditor
-            value={data.script || ''}
-            onChange={handleScriptChange}
-            language="javascript"
             height="180px"
+            language="javascript"
             options={{
               minimap: { enabled: false },
               lineNumbers: 'on',
               folding: true,
             }}
+            value={data.script ?? ''}
+            onChange={handleScriptChange}
           />
-          <Text type="secondary" className="block text-xs mt-2" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }}>
+          <Text className="mt-2 block text-xs" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} type="secondary">
             示例: pm.test('token已获取', () =&gt; {'{'} pm.expect(variables.token).toBeDefined() {'}'})
           </Text>
         </div>
@@ -66,10 +70,10 @@ export default function AssertNodePanel({ data, onChange }: PanelProps<AssertNod
 
   return (
     <div className="space-y-4">
-      <Text type="secondary" className="block text-xs">
+      <Text className="block text-xs" type="secondary">
         断言验证（检查变量值）
       </Text>
-      <Collapse items={collapseItems} defaultActiveKey={['variableAssertions']} size="small" />
+      <Collapse defaultActiveKey={['variableAssertions']} items={collapseItems} size="small" />
     </div>
   )
 }

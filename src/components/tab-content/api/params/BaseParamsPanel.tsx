@@ -1,6 +1,6 @@
 import { Switch, Tag, theme, Typography } from 'antd'
 
-import type { ApiEnvironmentValue, ApiDetails, Parameter, ProjectEnvironmentConfig } from '@/types'
+import type { ApiDetails, ApiEnvironmentValue, Parameter, ProjectEnvironmentConfig } from '@/types'
 
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
 
@@ -11,7 +11,7 @@ import { ParamsEditableTable } from '../components/ParamsEditableTable'
 function InheritedParamsBar(props: {
   globalRows?: ApiEnvironmentValue[]
   envRows?: ApiEnvironmentValue[]
-  localParams?: { name?: string; enable?: boolean }[]
+  localParams?: { name?: string, enable?: boolean }[]
   sourceLabel: string
   disabledNames?: Set<string>
   onToggle: (name: string, enabled: boolean) => void
@@ -19,32 +19,35 @@ function InheritedParamsBar(props: {
   const { token } = theme.useToken()
   const { globalRows, envRows, localParams, sourceLabel, disabledNames, onToggle } = props
 
-  const localNames = new Set((localParams ?? []).map(p => p.name).filter(Boolean))
+  const localNames = new Set((localParams ?? []).map((p) => p.name).filter(Boolean))
 
-  const allRows: { name: string; value?: string; enable?: boolean; source: 'global' | 'env' }[] = []
+  const allRows: { name: string, value?: string, enable?: boolean, source: 'global' | 'env' }[] = []
+
   for (const g of (globalRows ?? [])) {
-    if (g.name && !allRows.some(r => r.name === g.name)) {
+    if (g.name && !allRows.some((r) => r.name === g.name)) {
       allRows.push({ name: g.name, value: g.value, enable: g.enable, source: 'global' })
     }
   }
+
   for (const e of (envRows ?? [])) {
-    if (e.name && !allRows.some(r => r.name === e.name)) {
+    if (e.name && !allRows.some((r) => r.name === e.name)) {
       // env overrides global by replacing it
-      const existing = allRows.findIndex(r => r.name === e.name)
-      if (existing >= 0) allRows[existing] = { name: e.name, value: e.value, enable: e.enable, source: 'env' }
-      else allRows.push({ name: e.name, value: e.value, enable: e.enable, source: 'env' })
+      const existing = allRows.findIndex((r) => r.name === e.name)
+
+      if (existing >= 0) { allRows[existing] = { name: e.name, value: e.value, enable: e.enable, source: 'env' } }
+      else { allRows.push({ name: e.name, value: e.value, enable: e.enable, source: 'env' }) }
     }
   }
 
-  if (allRows.length === 0) return null
+  if (allRows.length === 0) { return null }
 
   return (
     <div
-      className="mb-1 rounded-lg border px-2 py-1.5 min-w-0 overflow-hidden"
+      className="mb-1 min-w-0 overflow-hidden rounded-lg border px-2 py-1.5"
       style={{ borderColor: token.colorBorderSecondary, backgroundColor: token.colorFillQuaternary }}
     >
       <Typography.Text strong>{sourceLabel}</Typography.Text>
-      <Typography.Paragraph type="secondary" className="!mb-1 mt-0.5">
+      <Typography.Paragraph className="!mb-1 mt-0.5" type="secondary">
         这些参数来自全局/环境配置，同名接口参数优先。
       </Typography.Paragraph>
       <div className="grid gap-1.5">
@@ -67,8 +70,8 @@ function InheritedParamsBar(props: {
                 {overridden ? ' (已覆盖)' : ''}
               </Tag>
               <Typography.Text code className="truncate">{r.name}</Typography.Text>
-              <Typography.Text type="secondary" className="truncate">
-                {r.value || '—'}
+              <Typography.Text className="truncate" type="secondary">
+                {r.value ?? '—'}
               </Typography.Text>
               <div className="flex justify-center">
                 <Switch
@@ -95,7 +98,7 @@ interface BaseParamsPanelProps {
   globalParameters?: ProjectEnvironmentConfig['globalParameters']
   envParameters?: ProjectEnvironmentConfig['globalParameters']
   varMap?: Map<string, string>
-  disabledInheritedNames?: { query: Set<string>; header: Set<string>; cookie: Set<string> }
+  disabledInheritedNames?: { query: Set<string>, header: Set<string>, cookie: Set<string> }
   onToggleInheritedParam?: (section: 'query' | 'header' | 'cookie', name: string, enabled: boolean) => void
   exampleColumnTitle?: string
   showPathParams?: boolean
@@ -122,8 +125,10 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
     switch (type) {
       case 'query':
         return parameters?.query
+
       case 'header':
         return parameters?.header
+
       case 'cookie':
         return parameters?.cookie
     }
@@ -133,8 +138,10 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
     switch (type) {
       case 'query':
         return globalParameters?.query
+
       case 'header':
         return globalParameters?.header
+
       case 'cookie':
         return globalParameters?.cookie
     }
@@ -144,8 +151,10 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
     switch (type) {
       case 'query':
         return envParameters?.query
+
       case 'header':
         return envParameters?.header
+
       case 'cookie':
         return envParameters?.cookie
     }
@@ -155,8 +164,10 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
     switch (type) {
       case 'query':
         return '当前全局/环境 Query 参数'
+
       case 'header':
         return '当前全局/环境 Header 参数'
+
       case 'cookie':
         return '当前全局/环境 Cookie 参数'
     }
@@ -164,37 +175,41 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
 
   const handleChange = (newParams: Parameter[] | undefined) => {
     const updated = { ...parameters }
+
     switch (type) {
       case 'query':
         updated.query = newParams
         break
+
       case 'header':
         updated.header = newParams
         break
+
       case 'cookie':
         updated.cookie = newParams
         break
     }
+
     onChange?.(updated)
   }
 
   return (
     <div className={type === 'query' ? '' : 'pt-2'}>
       <InheritedParamsBar
-        globalRows={getGlobalParamsByType()}
+        disabledNames={disabledInheritedNames?.[type]}
         envRows={getEnvParamsByType()}
+        globalRows={getGlobalParamsByType()}
         localParams={getParamsByType()}
         sourceLabel={getSourceLabel()}
-        disabledNames={disabledInheritedNames?.[type]}
         onToggle={(name, enabled) => onToggleInheritedParam?.(type, name, enabled)}
       />
 
       <ParamsEditableTable
+        exampleColumnTitle={exampleColumnTitle}
         showDescriptionColumn={false}
         showRequiredColumn={false}
-        varMap={varMap}
-        exampleColumnTitle={exampleColumnTitle}
         value={getParamsByType()}
+        varMap={varMap}
         onChange={handleChange}
       />
 
@@ -205,10 +220,10 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
           </div>
           <ParamsEditableTable
             isPathParamsTable
+            exampleColumnTitle={exampleColumnTitle}
+            removable={false}
             showDescriptionColumn={false}
             showRequiredColumn={false}
-            removable={false}
-            exampleColumnTitle={exampleColumnTitle}
             value={parameters.path}
             onChange={(path) => {
               onChange?.({ ...parameters, path })

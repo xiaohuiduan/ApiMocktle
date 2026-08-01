@@ -1,13 +1,13 @@
 import { useEffect } from 'react'
 
-import { Form, theme } from 'antd'
+import { Form } from 'antd'
 
-import { defaultThemeSetting } from './theme-data'
+import { DensityPicker } from './DensityPicker'
 import { DesignStylePicker } from './DesignStylePicker'
+import { defaultThemeSetting } from './theme-data'
 import { storeThemeSetting } from './ThemeEditor.helper'
 import type { ThemeSetting } from './ThemeEditor.type'
 import { ThemePicker } from './ThemePicker'
-import { DensityPicker } from './DensityPicker'
 
 interface ThemeEditorProps {
   value?: ThemeSetting
@@ -19,8 +19,6 @@ interface ThemeEditorProps {
  * 主题编辑器。
  */
 export function ThemeEditor(props: ThemeEditorProps) {
-  const { token } = theme.useToken()
-
   const { value, onChange, autoSaveId } = props
 
   const [form] = Form.useForm<ThemeSetting>()

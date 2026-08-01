@@ -3,7 +3,7 @@ import { forwardRef } from 'react'
 import { theme } from 'antd'
 
 import { useStyles } from '@/hooks/useStyle'
-import { UnsafeAny } from '@/types'
+import type { UnsafeAny } from '@/types'
 
 import { css } from '@emotion/css'
 

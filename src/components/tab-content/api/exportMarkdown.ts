@@ -22,16 +22,19 @@ export interface ExportResponse {
 }
 
 function mdTable(headers: ExportHeader[] | undefined): string {
-  if (!headers || headers.length === 0) return '_无_'
+  if (!headers || headers.length === 0) { return '_无_' }
+
   const rows = headers
-    .filter(h => h.name)
-    .map(h => `| ${h.name} | ${String(h.value ?? '').replace(/\|/g, '\\|')} |`)
+    .filter((h) => h.name)
+    .map((h) => `| ${h.name} | ${String(h.value ?? '').replace(/\|/g, '\\|')} |`)
     .join('\n')
+
   return `| 名称 | 值 |\n| --- | --- |\n${rows}`
 }
 
 function codeBlock(text: string | undefined, lang = ''): string {
-  if (text == null || text === '') return '_无_'
+  if (text == null || text === '') { return '_无_' }
+
   return `\`\`\`${lang}\n${text}\n\`\`\``
 }
 
@@ -39,6 +42,7 @@ function codeBlock(text: string | undefined, lang = ''): string {
 export function buildMarkdownReport(request: ExportRequest, response: ExportResponse): string {
   const method = (request.method ?? 'GET').toUpperCase()
   const status = response.status ?? 0
+
   return `# 接口请求报告
 
 ## 概览
@@ -50,7 +54,7 @@ export function buildMarkdownReport(request: ExportRequest, response: ExportResp
 ## 请求头
 ${mdTable(request.headers)}
 
-${request.query && request.query.length ? `## Query 参数\n${mdTable(request.query)}\n` : ''}
+${request.query?.length ? `## Query 参数\n${mdTable(request.query)}\n` : ''}
 ## 请求体
 ${codeBlock(request.body, guessLang(request.contentType))}
 
@@ -63,11 +67,16 @@ ${codeBlock(response.body ?? undefined, guessLang(response.contentType))}
 }
 
 function guessLang(contentType?: string): string {
-  if (!contentType) return 'json'
-  if (contentType.includes('xml')) return 'xml'
-  if (contentType.includes('html')) return 'html'
-  if (contentType.includes('json')) return 'json'
-  if (contentType.includes('text/plain')) return 'text'
+  if (!contentType) { return 'json' }
+
+  if (contentType.includes('xml')) { return 'xml' }
+
+  if (contentType.includes('html')) { return 'html' }
+
+  if (contentType.includes('json')) { return 'json' }
+
+  if (contentType.includes('text/plain')) { return 'text' }
+
   return 'json'
 }
 
@@ -83,7 +92,8 @@ export function downloadText(filename: string, text: string): void {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-  } catch {
+  }
+  catch {
     // 忽略下载失败
   }
 }

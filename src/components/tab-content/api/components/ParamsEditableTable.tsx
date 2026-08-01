@@ -1,7 +1,7 @@
 import { CloseCircleFilled } from '@ant-design/icons'
+import { open } from '@tauri-apps/plugin-dialog'
 import { Button, Input, Popconfirm, Select, Switch, theme, Tooltip } from 'antd'
 import { PlusCircleIcon, TrashIcon, XCircleIcon } from 'lucide-react'
-import { open } from '@tauri-apps/plugin-dialog'
 import { nanoid } from 'nanoid'
 
 import { EditableTable, type EditableTableProps } from '@/components/EditableTable'
@@ -174,7 +174,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
             render: (required: boolean, record: Parameter, ridx: number) => {
               return (
                 <ParamsEditableCell>
-                  <div className="flex items-center justify-center size-full">
+                  <div className="flex size-full items-center justify-center">
                     <Switch
                       checked={!!required}
                       size="small"
@@ -189,7 +189,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
           },
         ]
       : []),
-    {title: exampleColumnTitle,
+    { title: exampleColumnTitle,
       dataIndex: 'example',
       width: 180,
       render: (exampleVal, record, ridx) => {
@@ -247,20 +247,23 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
           return (
             <ParamsEditableCell>
               <div className="flex items-center gap-1">
-                <span className="text-xs text-[color:var(--color-text-secondary,#667085)] truncate max-w-[100px]" title={record.filePath}>
+                <span className="max-w-[100px] truncate text-xs text-[color:var(--color-text-secondary,#667085)]" title={record.filePath}>
                   {record.filePath ? record.filePath.split(/[/\\]/).pop() : '未选择'}
                 </span>
                 <Button
                   size="small"
                   type="link"
-                  onClick={async () => {
-                    const selected = await open({
-                      multiple: false,
-                      directory: false,
-                    })
-                    if (selected) {
-                      handleChange(ridx, { filePath: selected as string })
-                    }
+                  onClick={() => {
+                    void (async () => {
+                      const selected = await open({
+                        multiple: false,
+                        directory: false,
+                      })
+
+                      if (selected) {
+                        handleChange(ridx, { filePath: selected })
+                      }
+                    })()
                   }}
                 >
                   选择文件
@@ -323,7 +326,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
       render: (_, record, ridx) => {
         return (
           <ParamsEditableCell>
-            <div className="flex items-center justify-center size-full">
+            <div className="flex size-full items-center justify-center">
               <Switch
                 checked={record.enable !== false}
                 size="small"
@@ -344,20 +347,20 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
           return (
             <div className="flex justify-center p-1 text-xs">
               <Popconfirm
-                title="删除该参数？"
-                okText="删除"
-                okButtonProps={{ danger: true }}
                 cancelText="取消"
+                okButtonProps={{ danger: true }}
+                okText="删除"
+                title="删除该参数？"
                 onConfirm={() => {
                   onChange?.(value?.filter((_, i) => i !== idx))
                 }}
               >
                 <Button
+                  danger
+                  aria-label="删除参数"
+                  icon={<TrashIcon size={13} />}
                   size="small"
                   type="text"
-                  danger
-                  icon={<TrashIcon size={13} />}
-                  aria-label="删除参数"
                 />
               </Popconfirm>
             </div>
@@ -373,9 +376,9 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
         <div className="flex">
           <Button
             icon={<PlusCircleIcon size={13} />}
-            onClick={handleAddRow}
             size="small"
             type="dashed"
+            onClick={handleAddRow}
           >
             添加参数
           </Button>

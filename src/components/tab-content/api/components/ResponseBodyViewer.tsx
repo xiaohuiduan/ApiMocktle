@@ -30,19 +30,28 @@ const FORMAT_SIZE_LIMIT = 200 * 1024
 const IMAGE_CONTENT_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp', 'image/x-icon', 'image/avif']
 
 function detectLanguage(contentType?: string): string {
-  if (!contentType) return 'plaintext'
+  if (!contentType) { return 'plaintext' }
+
   const ct = contentType.toLowerCase()
-  if (ct.includes('json')) return 'json'
-  if (ct.includes('html')) return 'html'
-  if (ct.includes('xml')) return 'xml'
-  if (ct.includes('javascript')) return 'javascript'
-  if (ct.includes('css')) return 'css'
+
+  if (ct.includes('json')) { return 'json' }
+
+  if (ct.includes('html')) { return 'html' }
+
+  if (ct.includes('xml')) { return 'xml' }
+
+  if (ct.includes('javascript')) { return 'javascript' }
+
+  if (ct.includes('css')) { return 'css' }
+
   return 'plaintext'
 }
 
 function calcBodySize(body: string): string {
   const bytes = new Blob([body]).size
-  if (bytes < 1024) return `${bytes}B`
+
+  if (bytes < 1024) { return `${bytes}B` }
+
   return `${(bytes / 1024).toFixed(1)}KB`
 }
 
@@ -77,11 +86,13 @@ function extFromContentType(contentType?: string): string {
     'audio/wav': 'wav',
     'video/mp4': 'mp4',
   }
+
   return map[ct] ?? 'bin'
 }
 
 function isImageContentType(contentType?: string): boolean {
   const ct = contentType?.toLowerCase().split(';')[0]?.trim() ?? ''
+
   return IMAGE_CONTENT_TYPES.includes(ct) || ct.startsWith('image/')
 }
 
@@ -109,7 +120,8 @@ export function ResponseBodyViewer({
   }))
 
   const formatted = useMemo(() => {
-    if (!isJson) return null
+    if (!isJson) { return null }
+
     return tryFormatJson(body)
   }, [body, isJson])
 
@@ -130,7 +142,8 @@ export function ResponseBodyViewer({
     : undefined
 
   const handleSaveBinary = async () => {
-    if (!bodyBase64) return
+    if (!bodyBase64) { return }
+
     try {
       const ext = extFromContentType(contentType)
       const urlName = fileName?.split('?')[0]?.split('/').pop() ?? ''
@@ -139,7 +152,9 @@ export function ResponseBodyViewer({
         defaultPath: baseName,
         filters: [{ name: '文件', extensions: [ext] }],
       })
-      if (!filePath) return
+
+      if (!filePath) { return }
+
       await invoke('save_response_file', { path: filePath, dataBase64: bodyBase64 })
       message.success('文件已保存')
     }
@@ -150,32 +165,35 @@ export function ResponseBodyViewer({
 
   if (isBinary) {
     const sizeText = `${(bodySizeBytes / 1024).toFixed(1)}KB (${bodySizeBytes} 字节)`
+
     return (
-      <div className="flex flex-col h-full min-h-0">
-        <div className="mb-2 flex items-center justify-between gap-3 flex-shrink-0">
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="mb-2 flex shrink-0 items-center justify-between gap-3">
+          <Typography.Text style={{ fontSize: token.fontSizeSM }} type="secondary">
             二进制响应 {contentType ? `(${contentType.split(';')[0].trim()})` : ''}{sizeText && ` · ${sizeText}`}
           </Typography.Text>
-          <Button size="small" icon={<DownloadIcon size={14} />} onClick={() => void handleSaveBinary()}>
+          <Button icon={<DownloadIcon size={14} />} size="small" onClick={() => void handleSaveBinary()}>
             保存到本地
           </Button>
         </div>
         <div className={styles.editorContainer}>
           {isImage && imageSrc
             ? (
-                <div className="flex-1 min-h-0 overflow-auto flex items-start justify-center p-4"
+                <div
+                  className="flex min-h-0 flex-1 items-start justify-center overflow-auto p-4"
                   style={{ backgroundColor: token.colorFillQuaternary }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  { }
                   <img
-                    src={imageSrc}
                     alt="响应图片"
+                    src={imageSrc}
                     style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                   />
                 </div>
               )
             : (
-                <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-2"
+                <div
+                  className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2"
                   style={{ color: token.colorTextTertiary }}
                 >
                   {isSvg
@@ -192,13 +210,16 @@ export function ResponseBodyViewer({
   const language = detectLanguage(contentType)
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col">
       {/* 按钮行已移到 ResultViewer 的 tabBarExtraContent，这里只保留提示信息 */}
       {isJson && isLarge && (
-        <div className="mb-1 flex items-center gap-2 flex-shrink-0">
+        <div className="mb-1 flex shrink-0 items-center gap-2">
           {!showFormatted && formatted && (
             <Typography.Text style={{ fontSize: token.fontSizeSM, color: token.colorTextTertiary }}>
-              响应体 {calcBodySize(body)}，已显示原始数据，
+              响应体
+              {' '}
+              {calcBodySize(body)}
+              ，已显示原始数据，
               <a onClick={handleToggle}>强制格式化</a>
             </Typography.Text>
           )}
@@ -213,8 +234,8 @@ export function ResponseBodyViewer({
         <MonacoEditor
           height="100%"
           language={language}
-          value={displayBody}
           options={{ readOnly: true, lineNumbers: 'on', minimap: { enabled: false }, scrollBeyondLastLine: false }}
+          value={displayBody}
         />
       </div>
     </div>

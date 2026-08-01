@@ -5,7 +5,7 @@ import { useStyles } from '@/hooks/useStyle'
 
 import { columnHeight, INDENT, KEY_ITEMS, KEY_PROPERTIES, SchemaType, SEPARATOR } from './constants'
 import { useJsonSchemaContext } from './JsonSchema.context'
-import type { ArraySchema, ObjectSchema } from './JsonSchema.type'
+import type { ArraySchema } from './JsonSchema.type'
 import { JsonSchemaNodeRow, type JsonSchemaNodeRowProps } from './JsonSchemaNodeRow'
 import { JsonSchemaNodeWrapper } from './JsonSchemaNodeWrapper'
 import { getNodeLevelInfo, getRefJsonSchema } from './utils'
@@ -96,7 +96,8 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
       const shouldExpand = !!expandedKeys?.includes(fieldPathKey)
 
       if (value.type === SchemaType.Object) {
-        const objectValue = value as ObjectSchema
+        const objectValue = value
+
         return (
           <>
             {!restProps.fromRef && <JsonSchemaNodeRow {...rowProps} />}
@@ -159,7 +160,8 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
       }
 
       if (value.type === SchemaType.Array) {
-        const arrayValue = value as ArraySchema
+        const arrayValue = value
+
         return (
           <>
             <JsonSchemaNodeRow {...rowProps} />

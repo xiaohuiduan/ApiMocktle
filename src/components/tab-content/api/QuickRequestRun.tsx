@@ -1,74 +1,83 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useEvent } from 'react-use-event-hook'
-import { useProxyConfig } from '@/contexts/proxy-config'
 
 import {
   Button,
   Input,
+  message,
   Select,
   Space,
   Switch,
   Tabs,
   Tag,
+  theme,
   Tooltip,
   Typography,
-  message,
-  theme,
 } from 'antd'
-import { ClockIcon, CopyIcon, PlayIcon, PencilIcon } from 'lucide-react'
+import { ClockIcon, CopyIcon, PencilIcon, PlayIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
+import type { ApiMenuData } from '@/components/ApiMenu/ApiMenu.type'
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
-import type { ApiMenuData } from '@/components/ApiMenu/ApiMenu.type'
 import { buildSchemaExample } from '@/components/JsonSchema/schema-normalizer'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { isDraftEmpty } from '@/contexts/menu-drafts'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
-import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { useMenuTabContext, useMenuTabHelpers } from '@/contexts/menu-tab-settings'
-import { useCtrlSave } from '@/hooks/useCtrlSave'
+import { useProxyConfig } from '@/contexts/proxy-config'
+import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { BodyType, MenuItemType, ParamType } from '@/enums'
-import type { ApiDetails, RunTabInfo, Parameter } from '@/types'
+import { useCtrlSave } from '@/hooks/useCtrlSave'
+import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
+import { type ApiDetails, type RunTabInfo, type ScriptConsoleEntry, type ScriptTestResult } from '@/types'
 
-import { useApiRequestRunner } from './useApiRequestRunner'
-import { buildRequest } from './buildRequest'
-import { generateCurl } from './curl'
-import { buildJsoncBodyFillText } from './bodyJsonc'
-import { useResolvedVarMap } from './useResolvedVarMap'
+import { HistoryPanel, type RequestHistoryItem } from './components/HistoryPanel'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
-import { HistoryPanel, type RequestHistoryItem } from './components/HistoryPanel'
-import { executeScript } from './scripts'
-import { QueryParamsPanel } from './params/QueryParamsPanel'
-import { HeadersParamsPanel } from './params/HeadersParamsPanel'
-import { CookieParamsPanel } from './params/CookieParamsPanel'
 import { BodyPanel } from './params/BodyPanel'
+import { CookieParamsPanel } from './params/CookieParamsPanel'
+import { HeadersParamsPanel } from './params/HeadersParamsPanel'
+import { QueryParamsPanel } from './params/QueryParamsPanel'
 import { ScriptsPanel } from './params/ScriptsPanel'
-import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
-import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
+import { buildJsoncBodyFillText } from './bodyJsonc'
+import { buildRequest } from './buildRequest'
+import { generateCurl } from './curl'
 import { parseHistoryParams } from './historyUtils'
+import { executeScript } from './scripts'
+import { useApiRequestRunner } from './useApiRequestRunner'
+import { useResolvedVarMap } from './useResolvedVarMap'
 
 function buildBodyExample(apiDetails: ApiDetails, menuRawList?: unknown): string {
   const body = apiDetails.requestBody
-  if (!body || body.type === BodyType.None) return ''
+
+  if (!body || body.type === BodyType.None) { return '' }
+
   if (body.jsonSchema) {
     const example = buildSchemaExample(body.jsonSchema as never, menuRawList as never)
+
     return JSON.stringify(example, null, 2)
   }
-  if (body.rawText?.trim()) return body.rawText
+
+  if (body.rawText?.trim()) { return body.rawText }
+
   return ''
 }
 
 function buildBodyFillText(apiDetails: ApiDetails, menuRawList?: unknown): string {
   const body = apiDetails.requestBody
-  if (!body || body.type === BodyType.None) return ''
+
+  if (!body || body.type === BodyType.None) { return '' }
+
   if (body.jsonSchema) {
     const example = buildSchemaExample(body.jsonSchema as never, menuRawList as never)
+
     return JSON.stringify(example, null, 2)
   }
-  if (body.rawText?.trim()) return body.rawText
+
+  if (body.rawText?.trim()) { return body.rawText }
+
   return JSON.stringify({}, null, 2)
 }
 
@@ -94,20 +103,24 @@ function createEmptyApiDetails(): ApiDetails {
 }
 
 function mergeParams(
-  globalValues: { name: string; value?: string; enable?: boolean }[],
-  envValues: { name: string; value?: string; enable?: boolean }[],
-  localParams: { name?: string; enable?: boolean; example?: unknown }[],
-): { name: string; enable?: boolean; example?: unknown }[] {
-  const map = new Map<string, { name: string; enable?: boolean; example?: unknown }>()
+  globalValues: { name: string, value?: string, enable?: boolean }[],
+  envValues: { name: string, value?: string, enable?: boolean }[],
+  localParams: { name?: string, enable?: boolean, example?: unknown }[],
+): { name: string, enable?: boolean, example?: unknown }[] {
+  const map = new Map<string, { name: string, enable?: boolean, example?: unknown }>()
+
   for (const g of globalValues) {
-    if (g.name) map.set(g.name, { name: g.name, enable: g.enable, example: g.value })
+    if (g.name) { map.set(g.name, { name: g.name, enable: g.enable, example: g.value }) }
   }
+
   for (const e of envValues) {
-    if (e.name) map.set(e.name, { name: e.name, enable: e.enable, example: e.value })
+    if (e.name) { map.set(e.name, { name: e.name, enable: e.enable, example: e.value }) }
   }
+
   for (const l of localParams) {
-    if (l.name) map.set(l.name, { name: l.name, enable: l.enable, example: l.example })
+    if (l.name) { map.set(l.name, { name: l.name, enable: l.enable, example: l.example }) }
   }
+
   return Array.from(map.values())
 }
 
@@ -146,7 +159,8 @@ export function QuickRequestRun() {
   }, [dbMenuRawList, tabData.key])
 
   const [workCopy, setWorkCopy] = useState<ApiDetails>(() => {
-    if (savedData) return JSON.parse(JSON.stringify(savedData)) as ApiDetails
+    if (savedData) { return JSON.parse(JSON.stringify(savedData)) as ApiDetails }
+
     return createEmptyApiDetails()
   })
 
@@ -179,7 +193,9 @@ export function QuickRequestRun() {
   // 智能默认参数 tab：POST/PUT/PATCH 默认 Body，其余默认 Params（与 RunTab 一致）
   const getDefaultActiveTab = useCallback(() => {
     const method = workCopy?.method?.toUpperCase()
-    if (['POST', 'PUT', 'PATCH'].includes(method ?? '')) return 'body'
+
+    if (['POST', 'PUT', 'PATCH'].includes(method ?? '')) { return 'body' }
+
     return 'params'
   }, [workCopy?.method])
 
@@ -194,36 +210,40 @@ export function QuickRequestRun() {
 
   // 各 section 内容指示（有内容时 tab 显示 *，与 RunTab 视觉一致）
   const hasParamsContent = useMemo(
-    () => (workCopy?.parameters?.query ?? []).some(p => p.name && p.enable !== false),
+    () => (workCopy?.parameters?.query ?? []).some((p) => p.name && p.enable !== false),
     [workCopy?.parameters?.query],
   )
   const hasHeadersContent = useMemo(
-    () => (workCopy?.parameters?.header ?? []).some(p => p.name && p.enable !== false),
+    () => (workCopy?.parameters?.header ?? []).some((p) => p.name && p.enable !== false),
     [workCopy?.parameters?.header],
   )
   const hasCookieContent = useMemo(
-    () => (workCopy?.parameters?.cookie ?? []).some(p => p.name && p.enable !== false),
+    () => (workCopy?.parameters?.cookie ?? []).some((p) => p.name && p.enable !== false),
     [workCopy?.parameters?.cookie],
   )
   const hasBodyContent = useMemo(() => {
     const body = workCopy?.requestBody
-    if (!body || body.type === BodyType.None) return false
+
+    if (!body || body.type === BodyType.None) { return false }
+
     if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
-      return (body.parameters ?? []).some(p => p.name && p.enable !== false)
+      return (body.parameters ?? []).some((p) => p.name && p.enable !== false)
     }
+
     if (body.type === BodyType.Json) {
       return !!((body.jsonSchema as { properties?: unknown[] })?.properties?.length)
         || !!(body.rawText?.trim())
     }
+
     return !!(body.rawText?.trim())
   }, [workCopy?.requestBody])
   const hasScriptsContent = useMemo(
-    () => !!(workCopy?.preScript?.trim() || workCopy?.postScript?.trim()),
+    () => !!(workCopy?.preScript?.trim() ?? workCopy?.postScript?.trim()),
     [workCopy?.preScript, workCopy?.postScript],
   )
 
   // Tab Label 组件（带绿色 * 标识）
-  const TabLabel = ({ children, hasContent }: { children: React.ReactNode; hasContent: boolean }) => (
+  const TabLabel = ({ children, hasContent }: { children: React.ReactNode, hasContent: boolean }) => (
     <span>
       {children}
       {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 4 }}>*</span>}
@@ -237,7 +257,7 @@ export function QuickRequestRun() {
     }
   }, [savedData?.id, isCreating])
 
-  const { run, running, result, error, resetResult } = useApiRequestRunner()
+  const { run, running, result, error } = useApiRequestRunner()
 
   // ---- 草稿持久化 ----
   const buildRunTabInfo = useCallback((data: ApiDetails): RunTabInfo => ({
@@ -250,7 +270,8 @@ export function QuickRequestRun() {
   }), [])
 
   const buildMenuData = useCallback((data: ApiDetails): ApiMenuData => {
-    const menuName = data.name || '快捷请求'
+    const menuName = data.name ?? '快捷请求'
+
     return {
       id: tabData.key,
       name: menuName,
@@ -272,6 +293,7 @@ export function QuickRequestRun() {
       }
 
       saveDraft(draftItem, true)
+
       return
     }
 
@@ -287,7 +309,7 @@ export function QuickRequestRun() {
 
   // 将当前编辑内容升级为数据库正式记录（运行 / 保存时调用），并清除对应草稿。
   const persistToDb = useEvent(async () => {
-    const menuName = workCopy.name || '快捷请求'
+    const menuName = workCopy.name ?? '快捷请求'
     const runTabInfo = buildRunTabInfo(workCopy)
 
     if (isCreating) {
@@ -310,13 +332,14 @@ export function QuickRequestRun() {
 
   // 编辑防抖写草稿（~500ms）。
   useEffect(() => {
-    const timer = setTimeout(() => persistDraft(), 500)
-    return () => clearTimeout(timer)
+    const timer = setTimeout(() => { persistDraft() }, 500)
+
+    return () => { clearTimeout(timer) }
   }, [workCopy, persistDraft])
 
   // 组件卸载（切换 tab/项目）时强制 flush，避免丢失未保存编辑。
   useEffect(() => {
-    return () => persistDraft()
+    return () => { persistDraft() }
   }, [persistDraft])
 
   const { proxyConfig } = useProxyConfig()
@@ -339,12 +362,12 @@ export function QuickRequestRun() {
       ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map((p) => ({
         name: p.name,
         enable: p.enable,
-        example: p.value as string,
+        example: p.value!,
       })),
       ...envParams.body.map((p) => ({
         name: p.name,
         enable: p.enable,
-        example: p.value as string,
+        example: p.value!,
       })),
       ...(workCopy.requestBody?.parameters ?? []).map((p) => ({
         name: p.name,
@@ -394,6 +417,7 @@ export function QuickRequestRun() {
     if (workCopy.preScript?.trim()) {
       setPreScriptConsole([])
       setPreScriptTests([])
+
       try {
         const preResult = await executeScript(workCopy.preScript, {
           environment: sessionVars,
@@ -412,17 +436,20 @@ export function QuickRequestRun() {
 
         // 应用变量变更到 headers
         for (const [key, value] of Object.entries(preResult.variableDeltas)) {
-          headers.forEach(h => {
+          headers.forEach((h) => {
             h.value = h.value.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value)
           })
         }
 
         if (!preResult.success) {
           messageApi.error(`前置脚本执行失败: ${preResult.error}`)
+
           return
         }
-      } catch (err) {
+      }
+      catch (err) {
         messageApi.error(`前置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
+
         return
       }
     }
@@ -433,6 +460,7 @@ export function QuickRequestRun() {
     if (workCopy.postScript?.trim() && runResult) {
       setPostScriptConsole([])
       setPostScriptTests([])
+
       try {
         const postResult = await executeScript(workCopy.postScript, {
           environment: sessionVars,
@@ -459,7 +487,8 @@ export function QuickRequestRun() {
         if (!postResult.success) {
           messageApi.error(`后置脚本执行失败: ${postResult.error}`)
         }
-      } catch (err) {
+      }
+      catch (err) {
         messageApi.error(`后置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
       }
     }
@@ -468,10 +497,12 @@ export function QuickRequestRun() {
     if (workCopy.path?.trim()) {
       try {
         await persistToDb()
+
         if (isCreating) {
           messageApi.success('运行后已保存为快捷请求')
         }
-      } catch {
+      }
+      catch {
         // 自动保存失败不打断运行结果展示
       }
     }
@@ -479,12 +510,15 @@ export function QuickRequestRun() {
 
   const handleSave = async () => {
     setSaving(true)
+
     try {
       await persistToDb()
       messageApi.success('保存成功')
-    } catch {
+    }
+    catch {
       messageApi.error('保存失败')
-    } finally {
+    }
+    finally {
       setSaving(false)
     }
   }
@@ -504,6 +538,7 @@ export function QuickRequestRun() {
           cookie: parsed.cookie,
         },
       }
+
       if (item.requestJson.body && next.requestBody) {
         next.requestBody = {
           ...next.requestBody,
@@ -511,13 +546,14 @@ export function QuickRequestRun() {
           rawText: item.requestJson.body,
         }
       }
+
       return next
     })
     setHistoryOpen(false)
     messageApi.success('已回填历史请求')
   }
 
-  useCtrlSave(handleSave, activeTabKey === tabData.key)
+  useCtrlSave(() => { void handleSave() }, activeTabKey === tabData.key)
 
   const handleFillBody = () => {
     const text = fillWithComments
@@ -529,13 +565,14 @@ export function QuickRequestRun() {
   const handleTitleConfirm = async () => {
     const newName = titleDraft.trim() || '快捷请求'
     setEditingTitle(false)
-    setWorkCopy(prev => ({ ...prev, name: newName }))
+    setWorkCopy((prev) => ({ ...prev, name: newName }))
+
     if (!isCreating) {
       await updateMenuItem({
         id: tabData.key,
         name: newName,
         data: { ...workCopy, name: newName },
-      }).catch(() => {})
+      }).catch(() => { /* noop */ })
     }
   }
 
@@ -546,41 +583,41 @@ export function QuickRequestRun() {
   return (
     <div className="flex h-full flex-col overflow-hidden" style={{ minWidth: 0, maxWidth: '100%' }}>
       {/* 标题栏 */}
-      <div className="flex items-center gap-2 px-3 py-1.5 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+      <div className="flex min-w-0 items-center gap-2 px-3 py-1.5" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
         {editingTitle
           ? (
-            <>
-              <Input
-                size="small"
-                value={titleDraft}
-                onChange={e => setTitleDraft(e.target.value)}
-                onPressEnter={() => void handleTitleConfirm()}
-                className="max-w-[300px]"
-                autoFocus
-              />
-              <Button size="small" type="primary" onClick={() => void handleTitleConfirm()}>确认</Button>
-              <Button size="small" onClick={handleTitleCancel}>取消</Button>
-            </>
-          )
+              <>
+                <Input
+                  autoFocus
+                  className="max-w-[300px]"
+                  size="small"
+                  value={titleDraft}
+                  onChange={(e) => { setTitleDraft(e.target.value) }}
+                  onPressEnter={() => void handleTitleConfirm()}
+                />
+                <Button size="small" type="primary" onClick={() => void handleTitleConfirm()}>确认</Button>
+                <Button size="small" onClick={handleTitleCancel}>取消</Button>
+              </>
+            )
           : (
-            <>
-              <Typography.Text strong className="text-sm">{workCopy.name || '快捷请求'}</Typography.Text>
-              <Button
-                type="text"
-                size="small"
-                icon={<PencilIcon size={14} />}
-                onClick={() => { setTitleDraft(workCopy.name || '快捷请求'); setEditingTitle(true) }}
-              />
-            </>
-          )}
+              <>
+                <Typography.Text strong className="text-sm">{workCopy.name ?? '快捷请求'}</Typography.Text>
+                <Button
+                  icon={<PencilIcon size={14} />}
+                  size="small"
+                  type="text"
+                  onClick={() => { setTitleDraft(workCopy.name ?? '快捷请求'); setEditingTitle(true) }}
+                />
+              </>
+            )}
       </div>
       {/* URL 行 */}
-      <div className="flex items-center gap-2 px-3 py-2 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+      <div className="flex min-w-0 items-center gap-2 px-3 py-2" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
         <Select
           className="shrink-0"
-          style={{ minWidth: 90 }}
           options={methodOptions}
           popupMatchSelectWidth={false}
+          style={{ minWidth: 90 }}
           value={workCopy.method ?? DEFAULT_METHOD}
           onChange={(method) => {
             setWorkCopy((prev) => ({ ...prev, method }))
@@ -588,7 +625,7 @@ export function QuickRequestRun() {
         />
 
         <div
-          className="flex items-center rounded border px-2 min-w-0"
+          className="flex min-w-0 items-center rounded border px-2"
           style={{
             backgroundColor: token.colorFillQuaternary,
             borderColor: token.colorBorderSecondary,
@@ -604,20 +641,20 @@ export function QuickRequestRun() {
             </span>
           )}
           <Input
-            variant="borderless"
-            className="flex-1 min-w-0"
+            className="min-w-0 flex-1"
             placeholder={envBaseUrl ? '输入路径（如 /users）或完整 URL' : '输入完整 URL，如 https://api.example.com/users'}
             title={envBaseUrl
               ? '两种输入方式：\n1. 输入相对路径（如 /users），请求时自动拼接环境 baseUrl；\n2. 输入完整 URL（以 http:// 或 https:// 开头），请求直接使用该地址，不再拼接环境 baseUrl。'
               : '请输入完整 URL，如 https://api.example.com/users'}
             value={workCopy.path ?? ''}
+            variant="borderless"
             onChange={(e) => {
               setWorkCopy((prev) => ({ ...prev, path: e.target.value }))
             }}
           />
           {/^https?:\/\//i.test(workCopy.path ?? '') && envBaseUrl && (
             <Tooltip title="已输入完整 URL，请求将直接使用该地址，不再拼接环境 baseUrl">
-              <span className="ml-1 shrink-0 text-xs select-none" style={{ color: token.colorWarning }}>
+              <span className="ml-1 shrink-0 select-none text-xs" style={{ color: token.colorWarning }}>
                 完整 URL
               </span>
             </Tooltip>
@@ -626,31 +663,31 @@ export function QuickRequestRun() {
 
         {proxyInfo && (
           <Tooltip title={`代理: ${proxyInfo.tooltip}`}>
-            <Tag color="blue" className="shrink-0">{proxyInfo.label} 代理</Tag>
+            <Tag className="shrink-0" color="blue">{proxyInfo.label} 代理</Tag>
           </Tooltip>
         )}
 
         {/^https:\/\//i.test(workCopy.path ?? '') && (
           <Tooltip title={insecureSkipVerify ? 'HTTPS 证书验证已关闭，不推荐用于生产环境' : '开启后将验证 HTTPS 证书，关闭可调试自签名证书接口'}>
-            <label className="shrink-0 flex items-center gap-1.5 cursor-pointer" style={{ userSelect: 'none' }}>
+            <label className="flex shrink-0 cursor-pointer items-center gap-1.5" style={{ userSelect: 'none' }}>
               <span className="text-xs" style={{ color: insecureSkipVerify ? 'var(--ant-color-warning)' : 'var(--ant-color-success)' }}>
                 SSL
               </span>
               <Switch
-                size="small"
                 checked={!insecureSkipVerify}
-                onChange={(v) => setInsecureSkipVerify(!v)}
+                size="small"
+                onChange={(v) => { setInsecureSkipVerify(!v) }}
               />
             </label>
           </Tooltip>
         )}
 
         <Space.Compact className="shrink-0">
-          <Button icon={<ClockIcon size={14} />} title="历史记录" disabled={isCreating} onClick={() => setHistoryOpen(true)} />
+          <Button disabled={isCreating} icon={<ClockIcon size={14} />} title="历史记录" onClick={() => { setHistoryOpen(true) }} />
           <Button
+            icon={<PlayIcon size={14} />}
             loading={running}
             type="primary"
-            icon={<PlayIcon size={14} />}
             onClick={() => void handleRun()}
           >
             运行
@@ -666,23 +703,23 @@ export function QuickRequestRun() {
 
       {/* 参数编辑区 */}
       <ResponsePanel
-        paramsArea={
+        autoSaveId="quick-request-run"
+        hasResult={!!(result ?? error)}
+        paramsArea={(
           <Tabs
-            animated={false}
-            className="min-w-0 h-full"
-            tabBarStyle={{ paddingLeft: 12, marginBottom: 0 }}
             activeKey={activeParamsTab}
-            onChange={setActiveParamsTab}
+            animated={false}
+            className="h-full min-w-0"
             items={[
               {
                 key: 'params',
                 label: <TabLabel hasContent={hasParamsContent}>Params</TabLabel>,
                 children: (
-                  <div className="px-2 min-w-0 overflow-hidden">
+                  <div className="min-w-0 overflow-hidden px-2">
                     <QueryParamsPanel
-                      varMap={varMap}
                       value={workCopy.parameters}
-                      onChange={(parameters) => setWorkCopy((prev) => ({ ...prev, parameters }))}
+                      varMap={varMap}
+                      onChange={(parameters) => { setWorkCopy((prev) => ({ ...prev, parameters })) }}
                     />
                   </div>
                 ),
@@ -691,11 +728,11 @@ export function QuickRequestRun() {
                 key: 'headers',
                 label: <TabLabel hasContent={hasHeadersContent}>Headers</TabLabel>,
                 children: (
-                  <div className="px-2 min-w-0 overflow-hidden">
+                  <div className="min-w-0 overflow-hidden px-2">
                     <HeadersParamsPanel
-                      varMap={varMap}
                       value={workCopy.parameters}
-                      onChange={(parameters) => setWorkCopy((prev) => ({ ...prev, parameters }))}
+                      varMap={varMap}
+                      onChange={(parameters) => { setWorkCopy((prev) => ({ ...prev, parameters })) }}
                     />
                   </div>
                 ),
@@ -704,11 +741,11 @@ export function QuickRequestRun() {
                 key: 'cookie',
                 label: <TabLabel hasContent={hasCookieContent}>Cookie</TabLabel>,
                 children: (
-                  <div className="px-2 min-w-0 overflow-hidden">
+                  <div className="min-w-0 overflow-hidden px-2">
                     <CookieParamsPanel
-                      varMap={varMap}
                       value={workCopy.parameters}
-                      onChange={(parameters) => setWorkCopy((prev) => ({ ...prev, parameters }))}
+                      varMap={varMap}
+                      onChange={(parameters) => { setWorkCopy((prev) => ({ ...prev, parameters })) }}
                     />
                   </div>
                 ),
@@ -718,8 +755,18 @@ export function QuickRequestRun() {
                 label: <TabLabel hasContent={hasBodyContent}>Body</TabLabel>,
                 children: (
                   <BodyPanel
-                    requestBody={workCopy.requestBody}
                     bodyRawText={bodyRawText ?? workCopy.requestBody?.rawText}
+                    buildBodyExample={() => buildBodyExample(workCopy, menuRawList)}
+                    fillWithComments={fillWithComments}
+                    requestBody={workCopy.requestBody}
+                    varMap={varMap}
+                    onBodyParametersChange={(parameters) => {
+                      setWorkCopy((prev) => ({
+                        ...prev,
+                        requestBody: { ...(prev.requestBody ?? { type: BodyType.None }), parameters: parameters },
+                      }))
+                    }}
+                    onBodyRawTextChange={(text) => { setBodyRawText(text) }}
                     onBodyTypeChange={(type) => {
                       const oldType = workCopy.requestBody?.type
 
@@ -737,16 +784,8 @@ export function QuickRequestRun() {
                         requestBody: { ...(prev.requestBody ?? { type: BodyType.None }), type },
                       }))
                     }}
-                    onBodyRawTextChange={(text) => setBodyRawText(text)}
-                    onBodyParametersChange={(parameters) => setWorkCopy((prev) => ({
-                      ...prev,
-                      requestBody: { ...(prev.requestBody || { type: BodyType.None }), parameters: parameters as Parameter[] },
-                    }))}
                     onFillBody={handleFillBody}
-                    fillWithComments={fillWithComments}
                     onFillWithCommentsChange={setFillWithComments}
-                    buildBodyExample={() => buildBodyExample(workCopy, menuRawList)}
-                    varMap={varMap}
                   />
                 ),
               },
@@ -756,27 +795,25 @@ export function QuickRequestRun() {
                 children: (
                   <div className="px-3 pb-3">
                     <ScriptsPanel
-                      preScript={workCopy.preScript}
                       postScript={workCopy.postScript}
-                      onPreScriptChange={(value) => setWorkCopy((prev) => ({ ...prev, preScript: value }))}
-                      onPostScriptChange={(value) => setWorkCopy((prev) => ({ ...prev, postScript: value }))}
-                      preScriptConsole={preScriptConsole}
-                      preScriptTests={preScriptTests}
                       postScriptConsole={postScriptConsole}
                       postScriptTests={postScriptTests}
+                      preScript={workCopy.preScript}
+                      preScriptConsole={preScriptConsole}
+                      preScriptTests={preScriptTests}
+                      onPostScriptChange={(value) => { setWorkCopy((prev) => ({ ...prev, postScript: value })) }}
+                      onPreScriptChange={(value) => { setWorkCopy((prev) => ({ ...prev, preScript: value })) }}
                     />
                   </div>
                 ),
               },
             ]}
+            tabBarStyle={{ paddingLeft: 12, marginBottom: 0 }}
+            onChange={setActiveParamsTab}
           />
-        }
-        resultArea={
+        )}
+        resultArea={(
           <ResultViewer
-            result={result}
-            error={error}
-            onRetry={handleRun}
-            menuItemId={isCreating ? undefined : tabData.key}
             curlContent={(() => {
               const curlEnvParams = currentEnv?.parameters ?? { header: [], cookie: [], query: [], body: [] }
               const base = envBaseUrl.replace(/\/$/, '')
@@ -809,28 +846,29 @@ export function QuickRequestRun() {
                       type: workCopy.requestBody.type,
                       rawText: bodyRawText ?? workCopy.requestBody.rawText,
                       parameters: [
-                        ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map((p) => ({ name: p.name, enable: p.enable, example: p.value as string })),
-                        ...curlEnvParams.body.map((p) => ({ name: p.name, enable: p.enable, example: p.value as string })),
+                        ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map((p) => ({ name: p.name, enable: p.enable, example: p.value! })),
+                        ...curlEnvParams.body.map((p) => ({ name: p.name, enable: p.enable, example: p.value! })),
                         ...(workCopy.requestBody.parameters ?? []),
                       ],
                     }
                   : undefined,
               })
+
               return (
                 <div className="flex flex-col gap-3">
                   <div>
                     <div className="mb-1 flex items-center justify-between">
                       <Typography.Text strong className="text-xs">Windows</Typography.Text>
                       <Button
-                        type="text"
-                        size="small"
                         icon={<CopyIcon size={12} />}
+                        size="small"
+                        type="text"
                         onClick={() => {
                           void navigator.clipboard.writeText(windows).then(() => message.success('已复制'))
                         }}
                       />
                     </div>
-                    <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                    <pre className="m-0 overflow-auto rounded p-2 text-xs" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                       {windows}
                     </pre>
                   </div>
@@ -838,33 +876,35 @@ export function QuickRequestRun() {
                     <div className="mb-1 flex items-center justify-between">
                       <Typography.Text strong className="text-xs">Linux / macOS</Typography.Text>
                       <Button
-                        type="text"
-                        size="small"
                         icon={<CopyIcon size={12} />}
+                        size="small"
+                        type="text"
                         onClick={() => {
                           void navigator.clipboard.writeText(linux).then(() => message.success('已复制'))
                         }}
                       />
                     </div>
-                    <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                    <pre className="m-0 overflow-auto rounded p-2 text-xs" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                       {linux}
                     </pre>
                   </div>
                 </div>
               )
             })()}
+            error={error}
+            menuItemId={isCreating ? undefined : tabData.key}
+            result={result}
+            onRetry={() => { void handleRun() }}
           />
-        }
-        hasResult={!!(result || error)}
-        autoSaveId="quick-request-run"
+        )}
       />
 
       {!isCreating && (
         <HistoryPanel
           menuItemId={tabData.key}
           open={historyOpen}
-          onClose={() => setHistoryOpen(false)}
           onApply={handleApplyHistory}
+          onClose={() => { setHistoryOpen(false) }}
         />
       )}
     </div>

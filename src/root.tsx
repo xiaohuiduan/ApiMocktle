@@ -1,7 +1,7 @@
 import { Outlet, useLocation } from 'react-router'
 
-import { ThemeProviderClient } from '@/components/ThemeEditor'
 import { ProjectTabBar } from '@/components/ProjectTabBar'
+import { ThemeProviderClient } from '@/components/ThemeEditor'
 import { GlobalContextProvider } from '@/contexts/global'
 
 export default function Root() {

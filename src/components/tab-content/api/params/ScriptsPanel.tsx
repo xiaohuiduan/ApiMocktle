@@ -1,5 +1,6 @@
-import { ScriptTab } from '../scripts'
 import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
+
+import { ScriptTab } from '../scripts'
 
 interface ScriptsPanelProps {
   preScript?: string
@@ -25,16 +26,16 @@ export function ScriptsPanel(props: ScriptsPanelProps) {
   } = props
 
   return (
-    <div className="px-2 pb-1.5 h-full">
+    <div className="h-full px-2 pb-1.5">
       <ScriptTab
-        preScript={preScript}
         postScript={postScript}
-        onPreScriptChange={onPreScriptChange}
-        onPostScriptChange={onPostScriptChange}
-        preScriptConsole={preScriptConsole}
-        preScriptTests={preScriptTests}
         postScriptConsole={postScriptConsole}
         postScriptTests={postScriptTests}
+        preScript={preScript}
+        preScriptConsole={preScriptConsole}
+        preScriptTests={preScriptTests}
+        onPostScriptChange={onPostScriptChange}
+        onPreScriptChange={onPreScriptChange}
       />
     </div>
   )

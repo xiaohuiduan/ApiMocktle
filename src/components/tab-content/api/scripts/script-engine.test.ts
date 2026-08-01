@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { executeScriptCore } from './script-executor'
+
 import type { PmContext } from './pm-types'
+import { executeScriptCore } from './script-executor'
 
 function makeContext(overrides?: Partial<PmContext>): PmContext {
   return {
@@ -239,8 +240,8 @@ describe('executeScript', () => {
 
     expect(result.success).toBe(true)
     expect(result.headerDeltas).toBeDefined()
-    expect(result.headerDeltas!.find(h => h.name === 'Authorization')).toEqual({ name: 'Authorization', value: 'Bearer token123' })
-    expect(result.headerDeltas!.find(h => h.name === 'Content-Type')).toEqual({ name: 'Content-Type', value: 'text/plain' })
+    expect(result.headerDeltas!.find((h) => h.name === 'Authorization')).toEqual({ name: 'Authorization', value: 'Bearer token123' })
+    expect(result.headerDeltas!.find((h) => h.name === 'Content-Type')).toEqual({ name: 'Content-Type', value: 'text/plain' })
   })
 
   // Async support
@@ -351,7 +352,7 @@ describe('executeScript', () => {
     expect(result.success).toBe(true)
     expect(result.variableDeltas.timestamp).toBe('1234567890')
     expect(result.headerDeltas).toBeDefined()
-    expect(result.headerDeltas!.find(h => h.name === 'X-Sign')).toEqual({ name: 'X-Sign', value: 'mock_md5_sign' })
+    expect(result.headerDeltas!.find((h) => h.name === 'X-Sign')).toEqual({ name: 'X-Sign', value: 'mock_md5_sign' })
   })
 
   // Integration: post-script extracts token

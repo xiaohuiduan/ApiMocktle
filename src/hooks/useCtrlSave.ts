@@ -7,7 +7,8 @@ import { useEffect } from 'react'
  */
 export function useCtrlSave(handler: () => void, active = true) {
   useEffect(() => {
-    if (!active) return
+    if (!active) { return }
+
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
@@ -15,7 +16,9 @@ export function useCtrlSave(handler: () => void, active = true) {
         handler()
       }
     }
+
     window.addEventListener('keydown', onKeyDown, true)
+
     return () => {
       window.removeEventListener('keydown', onKeyDown, true)
     }

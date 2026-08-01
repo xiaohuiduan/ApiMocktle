@@ -9,7 +9,7 @@ interface DensityPickerProps {
 }
 
 /** 每档密度的预览卡片示意参数：行高与行间距，直观反映紧凑程度 */
-const densityPreview: Record<Density, { rowHeight: number; rowGap: number; fontScale: number }> = {
+const densityPreview: Record<Density, { rowHeight: number, rowGap: number, fontScale: number }> = {
   compact: { rowHeight: 10, rowGap: 3, fontScale: 0.82 },
   standard: { rowHeight: 14, rowGap: 6, fontScale: 1 },
   loose: { rowHeight: 20, rowGap: 10, fontScale: 1.08 },

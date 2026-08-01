@@ -60,7 +60,7 @@ export const defaultSchemaTypeConfig = {
     text: '引用模型',
     varColor: '--color-purple-6',
   },
-} as const satisfies Record<SchemaType, { text: string; label?: string; varColor: string }>
+} as const satisfies Record<SchemaType, { text: string, label?: string, varColor: string }>
 
 export const defaultFieldData: JsonSchema = {
   name: '',

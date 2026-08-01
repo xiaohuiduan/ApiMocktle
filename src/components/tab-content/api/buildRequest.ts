@@ -1,5 +1,6 @@
 import { BodyType } from '@/enums'
 import type { ApiDetails } from '@/types'
+
 import { stripJsonComments } from './bodyJsonc'
 
 export interface BuildRequestParam {
@@ -39,10 +40,10 @@ export interface BuildRequestContext {
 export interface BuildRequestResult {
   url: string
   method: string
-  headers: Array<{ name: string; value: string }>
+  headers: { name: string, value: string }[]
   bodyText: string
   contentType: string | undefined
-  formDataFiles: Array<{ name: string; path: string }> | undefined
+  formDataFiles: { name: string, path: string }[] | undefined
   insecureSkipVerify: boolean
 }
 
@@ -68,19 +69,20 @@ export function buildRequest(ctx: BuildRequestContext): BuildRequestResult {
     : base ? `${base}${resolvedPath}` : resolvedPath
 
   const queryStr = query
-    .filter(p => p.name && p.enable !== false)
-    .map(p => `${encodeURIComponent(p.name as string)}=${encodeURIComponent(resolveVars(toText(p.example)))}`)
+    .filter((p) => p.name && p.enable !== false)
+    .map((p) => `${encodeURIComponent(p.name!)}=${encodeURIComponent(resolveVars(toText(p.example)))}`)
     .join('&')
   const url = queryStr ? `${fullPath}${fullPath.includes('?') ? '&' : '?'}${queryStr}` : fullPath
 
   // ===== Header（含 Cookie 序列化）=====
   const headers = header
-    .filter(h => h.name && h.enable !== false)
-    .map(h => ({ name: h.name as string, value: resolveVars(toText(h.example)) }))
+    .filter((h) => h.name && h.enable !== false)
+    .map((h) => ({ name: h.name!, value: resolveVars(toText(h.example)) }))
 
   const cookiePairs = cookie
-    .filter(c => c.name && c.enable !== false)
-    .map(c => `${encodeURIComponent(c.name as string)}=${encodeURIComponent(resolveVars(toText(c.example)))}`)
+    .filter((c) => c.name && c.enable !== false)
+    .map((c) => `${encodeURIComponent(c.name!)}=${encodeURIComponent(resolveVars(toText(c.example)))}`)
+
   if (cookiePairs.length > 0) {
     headers.push({ name: 'Cookie', value: cookiePairs.join('; ') })
   }
@@ -88,32 +90,38 @@ export function buildRequest(ctx: BuildRequestContext): BuildRequestResult {
   // ===== Body =====
   let bodyText = ''
   let contentType: string | undefined
-  let formDataFiles: Array<{ name: string; path: string }> | undefined
+  let formDataFiles: { name: string, path: string }[] | undefined
 
   if (body && body.type !== BodyType.None) {
     if (body.type === BodyType.Json || body.type === BodyType.Xml || body.type === BodyType.Raw) {
       const raw = body.rawText ?? buildBodyExample(apiDetails, menuRawList)
       // JSON 允许编辑器内写注释，发送前剥离，保证服务器收到标准 JSON
       bodyText = body.type === BodyType.Json ? stripJsonComments(resolveVars(raw)) : resolveVars(raw)
-      contentType = body.type === BodyType.Xml ? 'application/xml'
-        : body.type === BodyType.Raw ? 'text/plain'
-        : 'application/json'
-    } else if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
-      const textParams: Array<{ name: string; example: string }> = []
-      const fileParams: Array<{ name: string; path: string }> = []
+      contentType = body.type === BodyType.Xml
+        ? 'application/xml'
+        : body.type === BodyType.Raw
+          ? 'text/plain'
+          : 'application/json'
+    }
+    else if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
+      const textParams: { name: string, example: string }[] = []
+      const fileParams: { name: string, path: string }[] = []
 
       for (const p of body.parameters ?? []) {
-        if (!p.name || p.enable === false) continue
+        if (!p.name || p.enable === false) { continue }
+
         if (p.type === 'file') {
           const filePath = p.filePath
-          if (filePath) fileParams.push({ name: p.name, path: filePath })
-        } else {
+
+          if (filePath) { fileParams.push({ name: p.name, path: filePath }) }
+        }
+        else {
           textParams.push({ name: p.name, example: resolveVars(toText(p.example)) })
         }
       }
 
       bodyText = textParams
-        .map(p => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.example)}`)
+        .map((p) => `${encodeURIComponent(p.name)}=${encodeURIComponent(p.example)}`)
         .join('&')
       contentType = body.type === BodyType.FormData ? 'multipart/form-data' : 'application/x-www-form-urlencoded'
       formDataFiles = fileParams.length > 0 ? fileParams : undefined

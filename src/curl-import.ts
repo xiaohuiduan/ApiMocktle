@@ -1,17 +1,17 @@
 import { nanoid } from 'nanoid'
 
 import type { ApiMenuData } from '@/components/ApiMenu'
-import { SchemaType, type JsonSchema } from '@/components/JsonSchema'
+import { type JsonSchema, SchemaType } from '@/components/JsonSchema'
 import {
   buildExtraQueryPairs,
+  type CurlParseState,
   extractHeaders,
   looksLikeUrlEncodedBody,
+  type NameValuePair,
   parseAmpersandPairs,
   parseCookiePairs,
   parseCurlCommand,
   parseFormPairs,
-  type CurlParseState,
-  type NameValuePair,
 } from '@/curl-import-parser'
 import { ApiStatus, BodyType, HttpMethod, MenuItemType, ParamType } from '@/enums'
 import type { ApiDetails, Parameter } from '@/types'
@@ -181,6 +181,7 @@ function buildApiMethod(state: CurlParseState, hasBody: boolean) {
 
 function buildApiName(method: HttpMethod, url: URL) {
   const pathName = url.pathname === '/' ? url.host : url.pathname
+
   return `${method} ${pathName}`
 }
 

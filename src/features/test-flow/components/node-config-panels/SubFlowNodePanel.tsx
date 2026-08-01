@@ -1,8 +1,12 @@
 import { useCallback } from 'react'
-import { Select, Switch, Space, Typography, Spin } from 'antd'
-import type { PanelProps } from './shared/panelRegistry'
-import type { SubFlowNodeData } from '../../types/flow.types'
+
+import { Select, Space, Spin, Switch, Typography } from 'antd'
+
 import { useTestTasks } from '@/hooks/useTestTasks'
+
+import type { SubFlowNodeData } from '../../types/flow.types'
+
+import type { PanelProps } from './shared/panelRegistry'
 
 const { Text } = Typography
 
@@ -40,49 +44,48 @@ export default function SubFlowNodePanel({ data, onChange, projectId }: PanelPro
   const taskOptions = tasks
     .filter((task) => task.id !== undefined)
     .map((task) => ({
-      value: task.id!,
+      value: task.id,
       label: task.name || `任务 ${task.id}`,
     }))
 
   return (
     <div className="space-y-4">
-      <Text type="secondary" className="block text-xs">
+      <Text className="block text-xs" type="secondary">
         子流程配置
       </Text>
 
       {/* 目标任务选择 */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           选择目标测试任务
         </Text>
         <Select
-          value={data.targetTaskId || undefined}
-          onChange={handleTargetTaskChange}
-          options={taskOptions}
-          size="small"
-          style={{ width: '100%' }}
           showSearch
+          data-testid="subflow-target-task"
           filterOption={(input, option) =>
-            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-          }
-          placeholder={loadingTasks ? '加载中...' : '选择测试任务'}
+            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
           loading={loadingTasks}
           notFoundContent={loadingTasks ? <Spin size="small" /> : '暂无数据'}
-          data-testid="subflow-target-task"
+          options={taskOptions}
+          placeholder={loadingTasks ? '加载中...' : '选择测试任务'}
+          size="small"
+          style={{ width: '100%' }}
+          value={data.targetTaskId || undefined}
+          onChange={handleTargetTaskChange}
         />
       </div>
 
       {/* 传递变量开关 */}
       <div>
         <Space>
-          <Text type="secondary" className="text-xs">
+          <Text className="text-xs" type="secondary">
             传递当前变量到子流程
           </Text>
           <Switch
             checked={data.passVariables ?? false}
-            onChange={handlePassVariablesChange}
-            size="small"
             data-testid="subflow-pass-variables"
+            size="small"
+            onChange={handlePassVariablesChange}
           />
         </Space>
       </div>
@@ -90,14 +93,14 @@ export default function SubFlowNodePanel({ data, onChange, projectId }: PanelPro
       {/* 合并变量开关 */}
       <div>
         <Space>
-          <Text type="secondary" className="text-xs">
+          <Text className="text-xs" type="secondary">
             合并子流程结果变量
           </Text>
           <Switch
             checked={data.mergeVariables ?? false}
-            onChange={handleMergeVariablesChange}
-            size="small"
             data-testid="subflow-merge-variables"
+            size="small"
+            onChange={handleMergeVariablesChange}
           />
         </Space>
       </div>

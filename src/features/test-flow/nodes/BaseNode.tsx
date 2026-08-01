@@ -1,23 +1,28 @@
 import { memo } from 'react'
+
 import { Handle, Position } from '@xyflow/react'
 import { theme } from 'antd'
-import { css, cx } from '@emotion/css'
 import {
-  Play,
   CircleStop,
-  Globe,
   GitBranch,
+  Globe,
+  type LucideIcon,
+  Play,
   Repeat,
+  ShieldCheck,
   Split,
   Timer,
-  Workflow,
   Variable,
-  ShieldCheck,
-  type LucideIcon,
+  Workflow,
 } from 'lucide-react'
+
 import { useDesignStyle } from '@/hooks/useDesignStyle'
-import { FlowNodeType, type NodeExecStatus, type HandleSpec } from '../types/flow.types'
+
+import { FlowNodeType, type HandleSpec, type NodeExecStatus } from '../types/flow.types'
+
 import { NODE_TYPE_COLORS } from './nodeColors'
+
+import { css, cx } from '@emotion/css'
 
 // ==================== 节点类型颜色映射（单源：nodes/nodeColors.ts） ====================
 
@@ -177,7 +182,7 @@ const dsSkeuoNode = css`
 
 // ==================== 辅助函数 ====================
 
-function normalizeHandle(spec: HandleSpec): { id: string; label?: string; color?: string } {
+function normalizeHandle(spec: HandleSpec): { id: string, label?: string, color?: string } {
   return typeof spec === 'string' ? { id: spec } : spec
 }
 
@@ -223,18 +228,18 @@ function BaseNodeInner({
         : ''
 
   return (
-    <div className={cx(nodeClass, styleClass)} style={minWidth ? { minWidth } : undefined} data-testid={`node-${type}`} data-exec-status={execStatus || 'idle'}>
+    <div className={cx(nodeClass, styleClass)} data-exec-status={execStatus ?? 'idle'} data-testid={`node-${type}`} style={minWidth ? { minWidth } : undefined}>
       {/* 左侧彩色边框 */}
       <div
         className={borderClass}
-        style={{ backgroundColor: color }}
         data-testid="node-border"
+        style={{ backgroundColor: color }}
       />
 
       {/* 内容区 */}
       <div className={contentClass}>
         <div className={headerClass}>
-          <Icon size={16} color={color} className={iconClass} data-testid="node-icon" />
+          <Icon className={iconClass} color={color} data-testid="node-icon" size={16} />
           <span className={labelClass} data-testid="node-label">
             {label}
           </span>
@@ -255,12 +260,12 @@ function BaseNodeInner({
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}
-            title={execError || execStatus}
+            title={execError ?? execStatus}
           >
             {execStatus === 'passed' && execDurationMs !== undefined && `${execDurationMs}ms`}
             {execStatus === 'passed' && !execDurationMs && execError}
-            {(execStatus === 'failed' || execStatus === 'error') && (execError || '执行失败')}
-            {execStatus === 'skipped' && (execError || '已跳过（无详细原因）')}
+            {(execStatus === 'failed' || execStatus === 'error') && (execError ?? '执行失败')}
+            {execStatus === 'skipped' && (execError ?? '已跳过（无详细原因）')}
             {execStatus === 'running' && '执行中...'}
           </span>
         )}
@@ -270,8 +275,8 @@ function BaseNodeInner({
       {execStatus && execStatus !== 'idle' && (
         <span
           className={badgeClass}
-          style={{ backgroundColor: STATUS_COLORS[execStatus] }}
           data-testid="node-status-badge"
+          style={{ backgroundColor: STATUS_COLORS[execStatus] }}
         >
           {STATUS_LABELS[execStatus]}
         </span>
@@ -281,13 +286,14 @@ function BaseNodeInner({
       {inputHandles.map((spec, index) => {
         const h = normalizeHandle(spec)
         const leftPercent = ((index + 1) / (inputHandles.length + 1)) * 100
+
         return (
           <div key={h.id} style={{ position: 'absolute', top: 0, left: `${leftPercent}%`, transform: 'translateX(-50%)' }}>
             <Handle
-              type="target"
-              position={Position.Top}
-              id={h.id}
               data-testid={`handle-in-${h.id}`}
+              id={h.id}
+              position={Position.Top}
+              type="target"
             />
             {h.label && (
               <span
@@ -305,20 +311,21 @@ function BaseNodeInner({
       {outputHandles.map((spec, index) => {
         const h = normalizeHandle(spec)
         const leftPercent = ((index + 1) / (outputHandles.length + 1)) * 100
+
         return (
           <div key={h.id} style={{ position: 'absolute', bottom: 0, left: `${leftPercent}%`, transform: 'translateX(-50%)' }}>
             <Handle
-              type="source"
-              position={Position.Bottom}
-              id={h.id}
-              style={h.color ? { background: h.color, border: `2px solid ${h.color}` } : undefined}
               data-testid={`handle-out-${h.id}`}
+              id={h.id}
+              position={Position.Bottom}
+              style={h.color ? { background: h.color, border: `2px solid ${h.color}` } : undefined}
+              type="source"
             />
             {h.label && (
               <span
                 className={`${handleLabelClass} ${handleLabelRightClass}`}
-                style={h.color ? { color: h.color, fontWeight: 600 } : undefined}
                 data-testid={`handle-label-out-${h.id}`}
+                style={h.color ? { color: h.color, fontWeight: 600 } : undefined}
               >
                 {h.label}
               </span>

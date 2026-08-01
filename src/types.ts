@@ -126,7 +126,7 @@ export interface RuntimeRequestConfig {
 export interface SavedRequestConfig {
   url: string
   method: string
-  headers: Array<{ name: string, value: string }>
+  headers: { name: string, value: string }[]
   body: string
   contentType?: string
   runtimeParamsState?: RuntimeRequestConfig
@@ -261,7 +261,7 @@ export interface ScriptExecutionResult {
   /** 变量变更（pm.env.set / pm.globals.set） */
   variableDeltas: Record<string, string>
   /** 前置脚本修改的 headers */
-  headerDeltas?: Array<{ name: string; value: string }>
+  headerDeltas?: { name: string, value: string }[]
   /** 前置脚本修改的 URL */
   urlDelta?: string
   /** 前置脚本修改的 body */

@@ -1,7 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
+import { api } from '@/api-client'
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { normalizeMenuRawList } from '@/components/JsonSchema/schema-normalizer'
+import { useAuth } from '@/contexts/auth'
+import {
+  mergeDraftsIntoList,
+  removeDraftById,
+  upsertDraft,
+} from '@/contexts/menu-drafts'
+import { useProjectTabsContext } from '@/contexts/project-tabs'
+import { CatalogType, MenuItemType } from '@/enums'
 import {
   createGlobalParameters,
   EMPTY_PROJECT_ENVIRONMENT_CONFIG,
@@ -14,15 +23,6 @@ import type {
   RecycleData,
   RecycleDataItem,
 } from '@/types'
-import { api } from '@/api-client'
-import { CatalogType, MenuItemType } from '@/enums'
-import { useAuth } from '@/contexts/auth'
-import {
-  mergeDraftsIntoList,
-  removeDraftById,
-  upsertDraft,
-} from '@/contexts/menu-drafts'
-import { useProjectTabsContext } from '@/contexts/project-tabs'
 
 interface MenuHelpers {
   addMenuItem: (menuData: ApiMenuData) => void
@@ -108,7 +108,7 @@ interface RawRecycleDataItem {
   id: string
   catalogType: string
   deletedItemJson: ApiMenuData
-  creatorJson: { id: string; username: string }
+  creatorJson: { id: string, username: string }
   expiresAt: number
 }
 
@@ -147,7 +147,8 @@ function normalizeRecycleData(raw: unknown): RecycleData {
 
   for (const item of list) {
     const ct = MENU_ITEM_TYPE_TO_CATALOG[item.catalogType]
-    if (!ct) continue
+
+    if (!ct) { continue }
 
     const days = Math.ceil((item.expiresAt - Date.now()) / (1000 * 60 * 60 * 24))
     const expiredAt = `${Math.max(0, days)}天`
@@ -261,13 +262,15 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
   }, [activeProjectId, dbMenuRawList, draftsTick])
 
   const saveDraft = useCallback((menuData: ApiMenuData, isNew: boolean) => {
-    if (!activeProjectId) return
+    if (!activeProjectId) { return }
+
     upsertDraft(activeProjectId, menuData, isNew)
     setDraftsTick((t) => t + 1)
   }, [activeProjectId])
 
   const discardDraft = useCallback((id: string) => {
-    if (!activeProjectId) return
+    if (!activeProjectId) { return }
+
     removeDraftById(activeProjectId, id)
     setDraftsTick((t) => t + 1)
   }, [activeProjectId])
@@ -275,7 +278,8 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
   // ----- Setters 包装器（写入 ProjectTabsContext） -----
   const setCurrentProjectEnvironmentId = useCallback(
     (value: string | undefined | ((prev: string | undefined) => string | undefined)) => {
-      if (!activeProjectId) return
+      if (!activeProjectId) { return }
+
       updateProjectHelpersState(activeProjectId, (prev) => ({
         ...prev,
         currentProjectEnvironmentId:
@@ -289,7 +293,8 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
 
   const setMenuSearchWord = useCallback(
     (value: string | undefined | ((prev: string | undefined) => string | undefined)) => {
-      if (!activeProjectId) return
+      if (!activeProjectId) { return }
+
       updateProjectHelpersState(activeProjectId, (prev) => ({
         ...prev,
         menuSearchWord:
@@ -303,7 +308,8 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
 
   const setApiDetailDisplay = useCallback(
     (value: 'name' | 'path' | ((prev: 'name' | 'path') => 'name' | 'path')) => {
-      if (!activeProjectId) return
+      if (!activeProjectId) { return }
+
       updateProjectHelpersState(activeProjectId, (prev) => ({
         ...prev,
         apiDetailDisplay:
@@ -398,7 +404,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
 
   // ----- Environment ID fallback -----
   useEffect(() => {
-    if (!activeProjectId) return
+    if (!activeProjectId) { return }
 
     if (currentProjectEnvironmentId) {
       const exists = projectEnvironments.some(({ id }) => id === currentProjectEnvironmentId)
@@ -412,7 +418,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
 
     const fallbackId = projectEnvironments.at(0)?.id
 
-    if (fallbackId === undefined && currentProjectEnvironmentId === undefined) return
+    if (fallbackId === undefined && currentProjectEnvironmentId === undefined) { return }
 
     if (fallbackId !== currentProjectEnvironmentId) {
       setCurrentProjectEnvironmentId(fallbackId)

@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-
-import { Button, Dropdown, Input, theme, Typography, type MenuProps } from 'antd'
-import { CheckIcon, ChevronDownIcon, FolderIcon } from 'lucide-react'
 import { useNavigate } from 'react-router'
 
-import { useAuth } from '@/contexts/auth'
-import { useProjectTabsContext } from '@/contexts/project-tabs'
+import { Button, Dropdown, Input, type MenuProps, theme, Typography } from 'antd'
+import { CheckIcon, ChevronDownIcon, FolderIcon } from 'lucide-react'
+
 import {
   ApiRequestError,
-  requestProjects,
   type ProjectItem,
+  requestProjects,
 } from '@/components/projects/project-api'
+import { useAuth } from '@/contexts/auth'
+import { useProjectTabsContext } from '@/contexts/project-tabs'
 
 type DropdownItem = Required<MenuProps>['items'][number]
 const roleText: Record<ProjectItem['role'], string> = {
@@ -36,6 +36,7 @@ export function ProjectQuickSwitch() {
     if (!sessionId) {
       setProjects([])
       setError(undefined)
+
       return
     }
 
@@ -59,6 +60,7 @@ export function ProjectQuickSwitch() {
 
         if (error instanceof ApiRequestError && error.status === 401) {
           navigate('/login', { replace: true })
+
           return
         }
 
@@ -82,7 +84,9 @@ export function ProjectQuickSwitch() {
 
   const filteredProjects = useMemo(() => {
     const keyword = searchText.trim().toLowerCase()
-    if (!keyword) return projects
+
+    if (!keyword) { return projects }
+
     return projects.filter((p) => p.name.toLowerCase().includes(keyword))
   }, [projects, searchText])
 
@@ -137,22 +141,22 @@ export function ProjectQuickSwitch() {
 
   return (
     <Dropdown
-      trigger={['click']}
-      menu={{ items }}
       dropdownRender={(menu) => (
         <div>
           <div className="px-2 py-1.5">
             <Input
-              size="small"
               allowClear
               placeholder="搜索项目"
+              size="small"
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              onChange={(e) => { setSearchText(e.target.value) }}
             />
           </div>
           <div className="max-h-[320px] overflow-auto">{menu}</div>
         </div>
       )}
+      menu={{ items }}
+      trigger={['click']}
     >
       <Button
         className="min-w-[160px] justify-between"
@@ -171,7 +175,7 @@ export function ProjectQuickSwitch() {
           >
             {getProjectMark(currentProject?.name ?? '项')}
           </span>
-          <Typography.Text ellipsis className="max-w-[120px] !mb-0">
+          <Typography.Text ellipsis className="!mb-0 max-w-[120px]">
             {currentProject?.name ?? '快速切换项目'}
           </Typography.Text>
         </span>

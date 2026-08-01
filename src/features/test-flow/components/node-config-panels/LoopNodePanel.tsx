@@ -1,7 +1,10 @@
 import { useCallback } from 'react'
-import { Radio, InputNumber, Input, Typography, Switch } from 'antd'
-import type { PanelProps } from './shared/panelRegistry'
+
+import { Input, InputNumber, Radio, Switch, Typography } from 'antd'
+
 import type { LoopNodeData } from '../../types/flow.types'
+
+import type { PanelProps } from './shared/panelRegistry'
 import { useDraft } from './shared/useDraft'
 
 const { Text } = Typography
@@ -60,7 +63,7 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
   // 更新最大迭代次数
   const handleMaxIterationsChange = useCallback(
     (value: number | null) => {
-      onChange({ maxIterations: value || 100 })
+      onChange({ maxIterations: value ?? 100 })
     },
     [onChange],
   )
@@ -75,20 +78,20 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
 
   return (
     <div className="space-y-4">
-      <Text type="secondary" className="block text-xs">
+      <Text className="block text-xs" type="secondary">
         循环配置
       </Text>
 
       {/* 循环类型 */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           循环类型
         </Text>
         <Radio.Group
+          data-testid="loop-type"
+          size="small"
           value={data.loopType}
           onChange={handleLoopTypeChange}
-          size="small"
-          data-testid="loop-type"
         >
           {LOOP_TYPE_OPTIONS.map((option) => (
             <Radio.Button key={option.value} value={option.value}>
@@ -101,20 +104,20 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
       {/* 循环次数（loopType=count 时显示） */}
       {data.loopType === 'count' && (
         <div>
-          <Text type="secondary" className="block text-xs mb-1">
+          <Text className="mb-1 block text-xs" type="secondary">
             循环次数
           </Text>
           <Input
+            data-testid="loop-count"
+            placeholder="例如: 5 或 {{maxRetries}}"
+            size="small"
             value={countDraft}
+            onBlur={commitCount}
             onChange={(e) => {
               setCountDraft(e.target.value)
             }}
-            onBlur={commitCount}
-            placeholder="例如: 5 或 {{maxRetries}}"
-            size="small"
-            data-testid="loop-count"
           />
-          <Text type="secondary" className="block text-xs mt-1">
+          <Text className="mt-1 block text-xs" type="secondary">
             支持固定数字或 {'{{变量}}'} 表达式
           </Text>
         </div>
@@ -123,19 +126,19 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
       {/* while 表达式（loopType=while 时显示） */}
       {data.loopType === 'while' && (
         <div>
-          <Text type="secondary" className="block text-xs mb-1">
+          <Text className="mb-1 block text-xs" type="secondary">
             循环条件（为假时停止）
           </Text>
           <Input.TextArea
-            value={whileDraft}
-            onChange={(e) => {
-              setWhileDraft(e.target.value)
-            }}
-            onBlur={commitWhile}
+            data-testid="loop-while-expression"
             placeholder="例如: variables.retryCount < 3"
             rows={2}
             size="small"
-            data-testid="loop-while-expression"
+            value={whileDraft}
+            onBlur={commitWhile}
+            onChange={(e) => {
+              setWhileDraft(e.target.value)
+            }}
           />
         </div>
       )}
@@ -143,18 +146,18 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
       {/* 集合变量（loopType=for_each 时显示） */}
       {data.loopType === 'for_each' && (
         <div>
-          <Text type="secondary" className="block text-xs mb-1">
+          <Text className="mb-1 block text-xs" type="secondary">
             集合变量名（存放数组）
           </Text>
           <Input
+            data-testid="loop-collection-variable"
+            placeholder="例如: items"
+            size="small"
             value={collectionDraft}
+            onBlur={commitCollection}
             onChange={(e) => {
               setCollectionDraft(e.target.value)
             }}
-            onBlur={commitCollection}
-            placeholder="例如: items"
-            size="small"
-            data-testid="loop-collection-variable"
           />
         </div>
       )}
@@ -162,48 +165,48 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
       {/* 迭代变量名（仅 for_each 时显示） */}
       {data.loopType === 'for_each' && (
         <div>
-          <Text type="secondary" className="block text-xs mb-1">
+          <Text className="mb-1 block text-xs" type="secondary">
             迭代变量名（每轮当前元素的变量名）
           </Text>
           <Input
+            data-testid="loop-iterator-variable"
+            placeholder="默认 item，用 {{item}} 引用当前元素"
+            size="small"
             value={iteratorDraft}
+            onBlur={commitIterator}
             onChange={(e) => {
               setIteratorDraft(e.target.value)
             }}
-            onBlur={commitIterator}
-            placeholder="默认 item，用 {{item}} 引用当前元素"
-            size="small"
-            data-testid="loop-iterator-variable"
           />
         </div>
       )}
 
       {/* 最大迭代次数（始终显示） */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           最大迭代次数（安全限制）
         </Text>
         <InputNumber
-          value={data.maxIterations || 100}
-          onChange={handleMaxIterationsChange}
-          min={1}
+          data-testid="loop-max-iterations"
           max={10000}
+          min={1}
           size="small"
           style={{ width: '100%' }}
-          data-testid="loop-max-iterations"
+          value={data.maxIterations ?? 100}
+          onChange={handleMaxIterationsChange}
         />
       </div>
 
       {/* 失败策略 */}
       <div className="flex items-center justify-between">
-        <Text type="secondary" className="text-xs">
+        <Text className="text-xs" type="secondary">
           循环体失败时中断
         </Text>
         <Switch
-          size="small"
           checked={data.breakOnFailure !== false}
-          onChange={handleBreakOnFailureChange}
           data-testid="loop-break-on-failure"
+          size="small"
+          onChange={handleBreakOnFailureChange}
         />
       </div>
     </div>

@@ -7,8 +7,8 @@ import { nanoid } from 'nanoid'
 import { IconText } from '@/components/IconText'
 import { JsonSchemaCard } from '@/components/JsonSchemaCard'
 import { ModalNewResponse } from '@/components/tab-content/api/ModalNewResponse'
-import { useStyles } from '@/hooks/useStyle'
 import { useGlobalContext } from '@/contexts/global'
+import { useStyles } from '@/hooks/useStyle'
 import type { ApiDetails } from '@/types'
 
 import { css } from '@emotion/css'
@@ -18,11 +18,12 @@ function ResponseSchemaEditor({ idx }: { idx: number }) {
     <Form.Item noStyle shouldUpdate>
       {(form) => {
         const jsonSchema = form.getFieldValue(['responses', idx, 'jsonSchema'])
+
         return (
           <JsonSchemaCard
             editorProps={{ defaultExpandAll: true }}
             value={jsonSchema}
-            onChange={(val) => form.setFieldValue(['responses', idx, 'jsonSchema'], val)}
+            onChange={(val) => { form.setFieldValue(['responses', idx, 'jsonSchema'], val) }}
           />
         )
       }}

@@ -1,7 +1,7 @@
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { MenuItemType } from '@/enums'
 
-import { KEY_ITEMS, KEY_PROPERTIES, SchemaType } from './constants'
+import { SchemaType } from './constants'
 import type { JsonSchema } from './JsonSchema.type'
 
 // ─── 归一化（外部格式 → 内部格式）──────────────────────────────────────────────
@@ -14,7 +14,7 @@ import type { JsonSchema } from './JsonSchema.type'
  * - 递归处理所有嵌套节点
  */
 export function normalizeJsonSchema(schema: unknown, parentRequired?: string[]): unknown {
-  if (!schema || typeof schema !== 'object') return schema
+  if (!schema || typeof schema !== 'object') { return schema }
 
   const s = schema as Record<string, unknown>
 
@@ -35,10 +35,13 @@ export function normalizeJsonSchema(schema: unknown, parentRequired?: string[]):
     const propsArray = Object.entries(propsObj).map(([name, def]) => {
       const normalized = normalizeJsonSchema(def, reqList) as Record<string, unknown>
       const isRequired = reqList.includes(name)
+
       return { name, ...normalized, ...(isRequired && !normalized.required ? { required: true } : {}) }
     })
     const result: Record<string, unknown> = { ...s, properties: propsArray }
-    if (s.required) delete result.required // 已提取到各字段的 required 属性
+
+    if (s.required) { delete result.required } // 已提取到各字段的 required 属性
+
     return result
   }
 
@@ -49,7 +52,9 @@ export function normalizeJsonSchema(schema: unknown, parentRequired?: string[]):
       ...s,
       properties: (s.properties as unknown[]).map((prop) => normalizeJsonSchema(prop, reqList)),
     }
-    if (s.required) delete result.required
+
+    if (s.required) { delete result.required }
+
     return result
   }
 
@@ -74,14 +79,16 @@ export function normalizeJsonSchema(schema: unknown, parentRequired?: string[]):
  * - 收集 `required: true` 的字段名，重组 `required[]`
  */
 export function denormalizeJsonSchema(schema: unknown): unknown {
-  if (!schema || typeof schema !== 'object') return schema
+  if (!schema || typeof schema !== 'object') { return schema }
 
   const s = schema as Record<string, unknown>
 
   // $ref 引用直接透传
   if (s.type === SchemaType.Refer && typeof s.$ref === 'string') {
     const result: Record<string, unknown> = { $ref: s.$ref }
-    if (s.description) result.description = s.description
+
+    if (s.description) { result.description = s.description }
+
     return result
   }
 
@@ -89,17 +96,23 @@ export function denormalizeJsonSchema(schema: unknown): unknown {
   if (s.type === 'object' && Array.isArray(s.properties)) {
     const propsObj: Record<string, unknown> = {}
     const requiredList: string[] = []
-    ;(s.properties as Array<Record<string, unknown>>).forEach((prop) => {
+    ;(s.properties as Record<string, unknown>[]).forEach((prop) => {
       const { name, required, ...rest } = prop
+
       if (name) {
         propsObj[name as string] = denormalizeJsonSchema(rest)
-        if (required) requiredList.push(name as string)
+
+        if (required) { requiredList.push(name as string) }
       }
     })
     const result: Record<string, unknown> = { type: 'object', properties: propsObj }
-    if (requiredList.length > 0) result.required = requiredList
-    if (s.description) result.description = s.description
-    if (s.title) result.title = s.title
+
+    if (requiredList.length > 0) { result.required = requiredList }
+
+    if (s.description) { result.description = s.description }
+
+    if (s.title) { result.title = s.title }
+
     return result
   }
 
@@ -110,24 +123,34 @@ export function denormalizeJsonSchema(schema: unknown): unknown {
 
   // 叶子节点
   const result: Record<string, unknown> = {}
-  if (s.type) result.type = s.type
-  if (s.description) result.description = s.description
-  if (s.title) result.title = s.title
-  if (s.enum) result.enum = s.enum
-  if (s.format) result.format = s.format
-  if (s.minimum !== undefined) result.minimum = s.minimum
-  if (s.maximum !== undefined) result.maximum = s.maximum
-  if (s.default !== undefined) result.default = s.default
-  if (s.example !== undefined) result.example = s.example
+
+  if (s.type) { result.type = s.type }
+
+  if (s.description) { result.description = s.description }
+
+  if (s.title) { result.title = s.title }
+
+  if (s.enum) { result.enum = s.enum }
+
+  if (s.format) { result.format = s.format }
+
+  if (s.minimum !== undefined) { result.minimum = s.minimum }
+
+  if (s.maximum !== undefined) { result.maximum = s.maximum }
+
+  if (s.default !== undefined) { result.default = s.default }
+
+  if (s.example !== undefined) { result.example = s.example }
+
   return result
 }
 
 // ─── 遍历 ApiDetails 中的所有 schema 并归一化 ──────────────────────────────────
 
 interface HasJsonSchema { jsonSchema?: unknown }
-interface HasParameters { parameters?: { query?: unknown[]; path?: unknown[]; header?: unknown[]; cookie?: unknown[] } }
-interface HasRequestBody { requestBody?: { jsonSchema?: unknown; type?: string } }
-interface HasResponses { responses?: Array<{ jsonSchema?: unknown }> }
+
+interface HasRequestBody { requestBody?: { jsonSchema?: unknown, type?: string } }
+interface HasResponses { responses?: { jsonSchema?: unknown }[] }
 interface HasData { data?: HasJsonSchema }
 
 type NormalizableItem = HasJsonSchema & HasRequestBody & HasResponses & HasData
@@ -137,14 +160,16 @@ type NormalizableItem = HasJsonSchema & HasRequestBody & HasResponses & HasData
  */
 export function normalizeMenuRawList(menuRawList: unknown[]): unknown[] {
   return menuRawList.map((item) => {
-    const menuItem = item as Record<string, unknown> & { type?: string; data?: Record<string, unknown> }
-    if (!menuItem.data) return item
+    const menuItem = item as Record<string, unknown> & { type?: string, data?: Record<string, unknown> }
+
+    if (!menuItem.data) { return item }
 
     // apiSchema 数据模型：data.jsonSchema
     if (menuItem.type === MenuItemType.ApiSchema || menuItem.type === MenuItemType.ApiSchemaFolder) {
       const data = menuItem.data as HasJsonSchema
+
       if (data.jsonSchema) {
-        data.jsonSchema = normalizeJsonSchema(data.jsonSchema) as HasJsonSchema['jsonSchema']
+        data.jsonSchema = normalizeJsonSchema(data.jsonSchema)
       }
     }
 
@@ -161,6 +186,7 @@ export function normalizeMenuRawList(menuRawList: unknown[]): unknown[] {
           if (resp.jsonSchema) {
             return { ...resp, jsonSchema: normalizeJsonSchema(resp.jsonSchema) }
           }
+
           return resp
         })
       }
@@ -183,6 +209,7 @@ export interface SchemaFieldRow {
 
 function extractRefName(ref: string): string {
   const parts = ref.split('/')
+
   return parts[parts.length - 1] || ref
 }
 
@@ -192,8 +219,11 @@ function resolveRef(
   visited?: Set<string>,
 ): JsonSchema {
   const visitedSet = visited ?? new Set<string>()
-  if (schema.type !== SchemaType.Refer) return schema
-  if (visitedSet.has(schema.$ref)) return schema
+
+  if (schema.type !== SchemaType.Refer) { return schema }
+
+  if (visitedSet.has(schema.$ref)) { return schema }
+
   visitedSet.add(schema.$ref)
 
   const name = extractRefName(schema.$ref)
@@ -201,10 +231,12 @@ function resolveRef(
     (item) => item.name === name && item.type === MenuItemType.ApiSchema,
   )
   const resolved = menuData?.type === MenuItemType.ApiSchema ? menuData.data?.jsonSchema : undefined
-  if (!resolved) return schema
+
+  if (!resolved) { return schema }
 
   if (resolved.type === SchemaType.Object && Array.isArray(resolved.properties)) {
     visitedSet.add(schema.$ref)
+
     return {
       ...resolved,
       name: schema.name ?? resolved.name,
@@ -217,12 +249,16 @@ function resolveRef(
 }
 
 export function getTypeLabel(node?: JsonSchema): string {
-  if (!node) return 'unknown'
+  if (!node) { return 'unknown' }
+
   if (node.type === SchemaType.Array) {
     const itemType = getTypeLabel(node.items)
+
     return `array<${itemType}>`
   }
-  if (node.type === SchemaType.Refer) return extractRefName(node.$ref)
+
+  if (node.type === SchemaType.Refer) { return extractRefName(node.$ref) }
+
   return node.type ?? 'unknown'
 }
 
@@ -231,25 +267,29 @@ export function buildSchemaRows(
   menuRawList?: ApiMenuData[],
   options?: { resolveRefs?: boolean },
 ): SchemaFieldRow[] {
-  if (!schema) return []
+  if (!schema) { return [] }
 
   const shouldResolve = options?.resolveRefs !== false
 
   if (shouldResolve && schema.type === SchemaType.Refer && menuRawList) {
     const resolved = resolveRef(schema, menuRawList)
+
     if (resolved.type !== SchemaType.Refer) {
       return buildSchemaRows(resolved, menuRawList, options)
     }
-    return [{
-      key: 'ref-root',
-      name: extractRefName(schema.$ref),
-      typeLabel: `→ ${extractRefName(schema.$ref)}`,
-      description: '引用模型未找到',
-      depth: 0,
-    }]
+
+    return [
+      {
+        key: 'ref-root',
+        name: extractRefName(schema.$ref),
+        typeLabel: `→ ${extractRefName(schema.$ref)}`,
+        description: '引用模型未找到',
+        depth: 0,
+      },
+    ]
   }
 
-  if (schema.type !== SchemaType.Object || !Array.isArray(schema.properties)) return []
+  if (schema.type !== SchemaType.Object || !Array.isArray(schema.properties)) { return [] }
 
   const rows: SchemaFieldRow[] = []
 
@@ -273,6 +313,7 @@ export function buildSchemaRows(
 
       if (field.type === SchemaType.Array) {
         const items = field.items
+
         if (items.type === SchemaType.Object && Array.isArray(items.properties)) {
           walk(items.properties, depth + 1)
         }
@@ -280,10 +321,13 @@ export function buildSchemaRows(
 
       if (shouldResolve && field.type === SchemaType.Refer && menuRawList) {
         const resolved = resolveRef(field, menuRawList)
+
         if (resolved.type === SchemaType.Object && Array.isArray(resolved.properties)) {
           walk(resolved.properties, depth + 1)
-        } else if (resolved.type === SchemaType.Array) {
+        }
+        else if (resolved.type === SchemaType.Array) {
           const items = resolved.items
+
           if (items.type === SchemaType.Object && Array.isArray(items.properties)) {
             walk(items.properties, depth + 1)
           }
@@ -293,6 +337,7 @@ export function buildSchemaRows(
   }
 
   walk(schema.properties, 0)
+
   return rows
 }
 
@@ -302,30 +347,40 @@ export function buildSchemaExample(
   schema?: JsonSchema,
   menuRawList?: ApiMenuData[],
 ): unknown {
-  if (!schema) return {}
+  if (!schema) { return {} }
 
   if (schema.type === SchemaType.Refer && menuRawList) {
     const resolved = resolveRef(schema, menuRawList)
-    if (resolved.type !== SchemaType.Refer) return buildSchemaExample(resolved, menuRawList)
+
+    if (resolved.type !== SchemaType.Refer) { return buildSchemaExample(resolved, menuRawList) }
+
     return { $ref: extractRefName(schema.$ref) }
   }
 
   switch (schema.type) {
     case SchemaType.String: return schema.example ?? 'string'
+
     case SchemaType.Integer: return schema.example ?? 0
+
     case SchemaType.Number: return schema.example ?? 0
+
     case SchemaType.Boolean: return true
+
     case SchemaType.Null: return null
+
     case SchemaType.Array:
       return [buildSchemaExample(schema.items, menuRawList)]
+
     case SchemaType.Object: {
       const output: Record<string, unknown> = {}
       schema.properties?.forEach((field, index) => {
         const fieldName = field.name ?? `field_${index + 1}`
         output[fieldName] = buildSchemaExample(field, menuRawList)
       })
+
       return output
     }
+
     default: return {}
   }
 }
@@ -345,24 +400,29 @@ export function inferSchemaFromExample(json: unknown): JsonSchema {
   if (json === null) {
     return { type: SchemaType.Null }
   }
+
   if (typeof json === 'string') {
     return { type: SchemaType.String, example: json }
   }
+
   if (typeof json === 'number') {
     return {
       type: Number.isInteger(json) ? SchemaType.Integer : SchemaType.Number,
       example: json,
     }
   }
+
   if (typeof json === 'boolean') {
     return { type: SchemaType.Boolean, example: json }
   }
+
   if (Array.isArray(json)) {
     return {
       type: SchemaType.Array,
       items: json.length > 0 ? inferSchemaFromExample(json[0]) : { type: SchemaType.String },
     }
   }
+
   if (typeof json === 'object') {
     return {
       type: SchemaType.Object,
@@ -373,5 +433,6 @@ export function inferSchemaFromExample(json: unknown): JsonSchema {
       })),
     }
   }
+
   return { type: SchemaType.Any }
 }

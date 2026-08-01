@@ -1,6 +1,6 @@
-import { Input, Popover, Tag, theme, Tooltip } from 'antd'
-import type { InputRef } from 'antd'
 import { useCallback, useMemo, useRef, useState } from 'react'
+
+import { Input, type InputRef, Popover, Tag, theme, Tooltip } from 'antd'
 
 import { DYNAMIC_VARIABLE_DEFS } from '@/utils/dynamic-variables'
 
@@ -26,9 +26,11 @@ function extractVarNames(text: string): string[] {
   const names: string[] = []
   let match: RegExpExecArray | null
   VAR_REGEX.lastIndex = 0
+
   while ((match = VAR_REGEX.exec(text)) !== null) {
-    if (!names.includes(match[1])) names.push(match[1])
+    if (!names.includes(match[1])) { names.push(match[1]) }
   }
+
   return names
 }
 
@@ -63,7 +65,8 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
 
   /** 匹配补全项：动态变量 + 已定义用户变量（最多 10 个） */
   const matchingItems = useMemo(() => {
-    if (!showDropdown) return []
+    if (!showDropdown) { return [] }
+
     const filter = dropdownFilter.toLowerCase()
 
     const dyn = dynamicItems.filter((it) => {
@@ -94,12 +97,15 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
 
       if (lastOpen >= 0) {
         const afterOpen = textBefore.slice(lastOpen + 2)
+
         if (!afterOpen.includes('}}')) {
           setDropdownFilter(afterOpen)
           setShowDropdown(true)
+
           return
         }
       }
+
       setShowDropdown(false)
     },
     [onChange],
@@ -127,26 +133,20 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
   return (
     // Popover 通过 portal 渲染补全列表，避免被表格单元格 overflow:hidden 裁剪
     <Popover
-      open={showDropdown && matchingItems.length > 0}
-      placement="bottomLeft"
       arrow={false}
-      styles={{ body: { padding: 0, maxHeight: 240, overflowY: 'auto' } }}
-      onOpenChange={(v) => {
-        if (!v) setShowDropdown(false)
-      }}
       content={(
-        <div className="py-1 min-w-[200px]">
+        <div className="min-w-[200px] py-1">
           {matchingItems.map((it) => (
             <div
               key={it.label}
               className="cursor-pointer px-3 py-1.5 text-sm"
               style={{ color: token.colorText }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = token.colorFillTertiary }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '' }}
               onMouseDown={(e) => {
                 e.preventDefault()
                 selectVariable(it.label)
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = token.colorFillTertiary }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '' }}
             >
               <span className="font-medium" style={{ color: it.isDynamic ? token.colorPrimary : token.colorText }}>
                 {it.label}
@@ -158,6 +158,12 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
           ))}
         </div>
       )}
+      open={showDropdown && matchingItems.length > 0}
+      placement="bottomLeft"
+      styles={{ body: { padding: 0, maxHeight: 240, overflowY: 'auto' } }}
+      onOpenChange={(v) => {
+        if (!v) { setShowDropdown(false) }
+      }}
     >
       <div className="relative" style={{ minWidth: 0 }}>
         <Input
@@ -169,7 +175,7 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
           variant="borderless"
           onChange={handleChange}
           onKeyDown={(ev) => {
-            if (showDropdown && ev.key === 'Escape') setShowDropdown(false)
+            if (showDropdown && ev.key === 'Escape') { setShowDropdown(false) }
           }}
         />
 

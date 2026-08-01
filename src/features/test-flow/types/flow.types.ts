@@ -1,6 +1,8 @@
-import type { Node, Edge, Connection } from '@xyflow/react'
+import type { Connection, Edge, Node } from '@xyflow/react'
+
 import type { TestAssertion, TestExtractor } from '@/types'
-import type { MockRule, MockCallLog } from './mock.types'
+
+import type { MockCallLog, MockRule } from './mock.types'
 
 // ==================== 节点类型枚举 ====================
 
@@ -50,21 +52,23 @@ export interface BaseNodeData {
 
 // ==================== Handle 规范类型 ====================
 
-export type HandleSpec = string | { id: string; label?: string; color?: string }
+export type HandleSpec = string | { id: string, label?: string, color?: string }
 
 // ==================== 条件分支类型 ====================
 
 export interface ConditionBranch {
-  id: string           // 唯一 handle ID，如 'cond-0', 'cond-1'
-  expression: string   // JavaScript 表达式
-  label: string        // 显示标签，如 'Status 200', 'Has Token'
+  id: string // 唯一 handle ID，如 'cond-0', 'cond-1'
+  expression: string // JavaScript 表达式
+  label: string // 显示标签，如 'Status 200', 'Has Token'
 }
 
-// ==================== 各节点类型数据 ====================
-
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- 标记类型，仅用于区分联合成员
 export interface StartNodeData extends BaseNodeData {}
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- 标记类型，仅用于区分联合成员
 export interface EndNodeData extends BaseNodeData {}
+
+// ==================== 各节点类型数据 ====================
 
 export interface HttpRequestNodeData extends BaseNodeData {
   menuItemId: string // reference to existing API menu item
@@ -119,11 +123,11 @@ export interface SubFlowNodeData extends BaseNodeData {
 }
 
 export interface SetVariableNodeData extends BaseNodeData {
-  assignments: Array<{
+  assignments: {
     variable: string
     operator: '=' | '+=' | '-='
     value: string // literal or {{expression}}
-  }>
+  }[]
 }
 
 export interface AssertNodeData extends BaseNodeData {
@@ -157,7 +161,7 @@ export type FlowConnection = Connection
 export interface FlowGraph {
   nodes: FlowNode[]
   edges: FlowEdge[]
-  viewport?: { x: number; y: number; zoom: number }
+  viewport?: { x: number, y: number, zoom: number }
 }
 
 // ==================== 执行计划类型 ====================
@@ -167,11 +171,11 @@ export interface ExecutionStep {
   type: FlowNodeType
   data: FlowNodeData
   next?: ExecutionStep // for sequential nodes
-  branches?: Array<{
+  branches?: {
     // for Condition, Parallel
     label: string
     steps: ExecutionStep
-  }>
+  }[]
   loopBody?: ExecutionStep // for Loop nodes
   afterLoop?: ExecutionStep // loop continuation
 }
@@ -197,18 +201,18 @@ export interface NodeResult {
   status: NodeExecStatus
   requestJson?: Record<string, unknown>
   responseJson?: Record<string, unknown>
-  assertionResults?: Array<{
+  assertionResults?: {
     assertion: TestAssertion
     passed: boolean
     actual?: unknown
     error?: string
-  }>
-  extractorResults?: Array<{
+  }[]
+  extractorResults?: {
     extractor: TestExtractor
     success: boolean
     value?: string
     error?: string
-  }>
+  }[]
   variableDeltas?: Record<string, string>
   mockCallLogs?: MockCallLog[]
   durationMs: number
@@ -217,9 +221,7 @@ export interface NodeResult {
 
 // ==================== 变量作用域 ====================
 
-export interface VariableScopeLayer {
-  [key: string]: string
-}
+export type VariableScopeLayer = Record<string, string>
 
 // ==================== 节点配置 ====================
 

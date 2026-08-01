@@ -1,4 +1,5 @@
 import { BodyType } from '@/enums'
+
 import { stripJsonComments } from './bodyJsonc'
 
 export interface CurlParam {
@@ -38,7 +39,7 @@ function enabledParams(params: CurlParam[] | undefined): CurlParam[] {
 
 /** 单引号包裹并转义（linux/macOS 风格；与原有实现保持一致，Windows 也输出同一命令） */
 function quoteSingle(s: string): string {
-  return `'${s.replace(/'/g, `'\\''`)}'`
+  return `'${s.replace(/'/g, '\'\\\'\'')}'`
 }
 
 /** 双引号包裹 URL（URL 中不应含引号，这里做基本转义防御） */
@@ -47,8 +48,10 @@ function quoteDouble(s: string): string {
 }
 
 function contentTypeForBody(type: BodyType): string {
-  if (type === BodyType.Xml) return 'application/xml'
-  if (type === BodyType.Raw) return 'text/plain'
+  if (type === BodyType.Xml) { return 'application/xml' }
+
+  if (type === BodyType.Raw) { return 'text/plain' }
+
   return 'application/json'
 }
 
@@ -70,9 +73,10 @@ export function generateCurl(input: CurlInput): CurlOutput {
   const cookie = enabledParams(input.cookie)
 
   let url = input.url
+
   if (query.length > 0) {
     const queryStr = query
-      .map((q) => `${encodeURIComponent(q.name as string)}=${encodeURIComponent(toText(q.example))}`)
+      .map((q) => `${encodeURIComponent(q.name!)}=${encodeURIComponent(toText(q.example))}`)
       .join('&')
     url += `${url.includes('?') ? '&' : '?'}${queryStr}`
   }
@@ -85,7 +89,7 @@ export function generateCurl(input: CurlInput): CurlOutput {
 
   if (cookie.length > 0) {
     const cookieStr = cookie
-      .map((c) => `${encodeURIComponent(c.name as string)}=${encodeURIComponent(toText(c.example))}`)
+      .map((c) => `${encodeURIComponent(c.name!)}=${encodeURIComponent(toText(c.example))}`)
       .join('; ')
     args.push('-b', quoteSingle(cookieStr))
   }
@@ -99,19 +103,24 @@ export function generateCurl(input: CurlInput): CurlOutput {
     const payload = bodyType === BodyType.Json
       ? stripJsonComments(raw ?? '').trim()
       : (raw ?? '').trim()
+
     if (payload) {
       args.push('-H', quoteSingle(`Content-Type: ${contentTypeForBody(bodyType)}`))
       args.push('-d', quoteSingle(payload))
     }
-  } else if (bodyType === BodyType.UrlEncoded) {
+  }
+  else if (bodyType === BodyType.UrlEncoded) {
     const pairs = enabledParams(body?.parameters)
-      .map((p) => `${encodeURIComponent(p.name as string)}=${encodeURIComponent(toText(p.example))}`)
+      .map((p) => `${encodeURIComponent(p.name!)}=${encodeURIComponent(toText(p.example))}`)
+
     if (pairs.length > 0) {
       args.push('-H', quoteSingle('Content-Type: application/x-www-form-urlencoded'))
       args.push('-d', quoteSingle(pairs.join('&')))
     }
-  } else if (bodyType === BodyType.FormData) {
+  }
+  else if (bodyType === BodyType.FormData) {
     const fields = enabledParams(body?.parameters)
+
     if (fields.length > 0) {
       for (const f of fields) {
         args.push('-F', quoteSingle(`${f.name}=${toText(f.example)}`))
@@ -121,5 +130,6 @@ export function generateCurl(input: CurlInput): CurlOutput {
 
   args.push(quoteDouble(url))
   const cmd = args.join(' ')
+
   return { windows: cmd, linux: cmd }
 }

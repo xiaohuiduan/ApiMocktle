@@ -3,22 +3,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router'
 
-import { Button, Checkbox, Drawer, List, Modal, Space, Spin, Table, Tag, Typography, message, theme } from 'antd'
+import { Button, Checkbox, Drawer, List, Modal, Spin, Table, Tag, theme, Typography } from 'antd'
 
 import { api } from '@/api-client'
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { useAuth } from '@/contexts/auth'
 import type { ApiRunResult } from '@/types'
 
-import { ResponseBodyViewer } from './ResponseBodyViewer'
-import { MarkdownDiffView } from './MarkdownDiffView'
 import { buildMarkdownReport, downloadText } from '../exportMarkdown'
 import { calcBodySize, detectLanguage, getStatusColor, headerTableColumns } from '../utils'
+
+import { MarkdownDiffView } from './MarkdownDiffView'
+import { ResponseBodyViewer } from './ResponseBodyViewer'
 
 export interface RequestHistoryItem {
   id: string
   menuItemId: string
-  requestJson: { url: string, method: string, headers: Array<{ name: string, value: string }>, body: string, contentType?: string }
+  requestJson: { url: string, method: string, headers: { name: string, value: string }[], body: string, contentType?: string }
   responseJson: ApiRunResult
   statusCode: number
   durationMs: number
@@ -35,8 +36,10 @@ interface HistoryPanelProps {
 export function formatTime(iso: string) {
   try {
     const d = new Date(iso)
+
     return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  } catch {
+  }
+  catch {
     return iso
   }
 }
@@ -52,20 +55,24 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
   const [diffOpen, setDiffOpen] = useState(false)
 
   const toggleCompare = (id: string) => {
-    setCompareIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev.slice(-1), id]))
+    setCompareIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev.slice(-1), id]))
   }
 
-  const selectedItem = useMemo(() => items.find(i => i.id === selectedId), [items, selectedId])
+  const selectedItem = useMemo(() => items.find((i) => i.id === selectedId), [items, selectedId])
 
   const loadHistory = useCallback(async () => {
-    if (!sessionId || !projectId) return
+    if (!sessionId || !projectId) { return }
+
     setLoading(true)
+
     try {
       const list = await api<RequestHistoryItem[]>('list_request_history', { sessionId, projectId, menuItemId })
       setItems(list)
-    } catch {
+    }
+    catch {
       // ignore
-    } finally {
+    }
+    finally {
       setLoading(false)
     }
   }, [sessionId, projectId, menuItemId])
@@ -88,10 +95,10 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
   }), [])
 
   const result = selectedItem?.responseJson
-  const reqJson = selectedItem?.requestJson as { url?: string, method?: string, headers?: Array<{ name: string, value: string }>, body?: string, contentType?: string } | undefined
+  const reqJson = selectedItem?.requestJson as { url?: string, method?: string, headers?: { name: string, value: string }[], body?: string, contentType?: string } | undefined
 
   // 优先用 responseJson 中的，回退到 requestJson
-  const effectiveRequestBodyText = result?.requestBodyText ?? (reqJson?.body ? reqJson.body : undefined)
+  const effectiveRequestBodyText = result?.requestBodyText ?? (reqJson?.body ?? undefined)
   const effectiveContentType = result?.contentType ?? reqJson?.contentType
   const effectiveRequestHeaders = (result?.requestHeaders && result.requestHeaders.length > 0)
     ? result.requestHeaders
@@ -100,21 +107,24 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
     ? result.requestQuery
     : (() => {
         try {
-          if (!result?.url) return undefined
-          const params: Array<{ name: string, value: string }> = []
+          if (!result?.url) { return undefined }
+
+          const params: { name: string, value: string }[] = []
           new URL(result.url).searchParams.forEach((value, name) => params.push({ name, value }))
+
           return params.length > 0 ? params : undefined
-        } catch { return undefined }
+        }
+        catch { return undefined }
       })()
 
   return (
     <Drawer
-      title="历史记录"
-      placement="right"
-      width="60%"
       open={open}
-      onClose={onClose}
+      placement="right"
       styles={{ body: { padding: 0, display: 'flex', overflow: 'hidden' } }}
+      title="历史记录"
+      width="60%"
+      onClose={onClose}
     >
       {/* 左侧列表 */}
       <div className="flex shrink-0 flex-col" style={{ width: 220, borderRight: `1px solid ${token.colorBorderSecondary}` }}>
@@ -124,22 +134,25 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
         </div>
         <div className="flex items-center gap-2 px-[var(--ds-pad-md)] pb-[var(--ds-pad-sm)]">
           <Button
+            disabled={!selectedId || !onApply}
             size="small"
             type="primary"
-            disabled={!selectedId || !onApply}
             onClick={() => {
-              const item = items.find(i => i.id === selectedId)
-              if (item) onApply?.(item)
+              const item = items.find((i) => i.id === selectedId)
+
+              if (item) { onApply?.(item) }
             }}
           >
             回填
           </Button>
           <Button
-            size="small"
             disabled={!selectedId}
+            size="small"
             onClick={() => {
-              const item = items.find(i => i.id === selectedId)
-              if (!item) return
+              const item = items.find((i) => i.id === selectedId)
+
+              if (!item) { return }
+
               const r = item.responseJson
               const req = item.requestJson
               const md = buildMarkdownReport(
@@ -148,149 +161,160 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
               )
               downloadText(`接口报告-${r.status}-${Date.now()}.md`, md)
             }}
-          >导出 Markdown</Button>
-          <Button size="small" type="primary" disabled={compareIds.length !== 2} onClick={() => setDiffOpen(true)}>对比</Button>
+          >导出 Markdown
+          </Button>
+          <Button disabled={compareIds.length !== 2} size="small" type="primary" onClick={() => { setDiffOpen(true) }}>对比</Button>
         </div>
         <div className="flex-1 overflow-auto">
           <Spin spinning={loading}>
-            {items.length === 0 ? (
-              <div className="px-[var(--ds-pad-md)] py-[var(--ds-pad-lg)] text-center">
-                <Typography.Text type="secondary" className="text-xs">暂无历史记录</Typography.Text>
-              </div>
-            ) : (
-              <List
-                size="small"
-                dataSource={items}
-                renderItem={(item) => (
-                  <div
-                    className="cursor-pointer px-[var(--ds-pad-md)] py-[var(--ds-pad-sm)] transition-colors"
-                    onClick={() => setSelectedId(item.id)}
-                    style={{
-                      backgroundColor: selectedId === item.id ? token.colorPrimaryBg : undefined,
-                      borderLeft: selectedId === item.id ? `2px solid ${token.colorPrimary}` : '2px solid transparent',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (selectedId !== item.id) e.currentTarget.style.backgroundColor = token.colorFillTertiary
-                    }}
-                    onMouseLeave={(e) => {
-                      if (selectedId !== item.id) e.currentTarget.style.backgroundColor = ''
-                    }}
-                  >
-                    <Checkbox
-                      className="mt-0.5"
-                      checked={compareIds.includes(item.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => toggleCompare(item.id)}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <Tag color={getStatusColor(item.statusCode)} className="!m-0" style={{ fontSize: 11, lineHeight: '16px', padding: '0 4px' }}>
-                          {item.statusCode || 'ERR'}
-                        </Tag>
-                        <Typography.Text className="text-xs font-medium">{item.requestJson.method}</Typography.Text>
-                        <Typography.Text type="secondary" className="text-[11px]">{item.durationMs}ms</Typography.Text>
-                      </div>
-                      <Typography.Text type="secondary" className="mt-0.5 block truncate text-[11px]" title={item.requestJson.url}>
-                        {item.requestJson.url}
-                      </Typography.Text>
-                      <Typography.Text type="secondary" className="block text-[10px]">{formatTime(item.createdAt)}</Typography.Text>
-                    </div>
+            {items.length === 0
+              ? (
+                  <div className="px-[var(--ds-pad-md)] py-[var(--ds-pad-lg)] text-center">
+                    <Typography.Text className="text-xs" type="secondary">暂无历史记录</Typography.Text>
                   </div>
+                )
+              : (
+                  <List
+                    dataSource={items}
+                    renderItem={(item) => (
+                      <div
+                        className="cursor-pointer px-[var(--ds-pad-md)] py-[var(--ds-pad-sm)] transition-colors"
+                        style={{
+                          backgroundColor: selectedId === item.id ? token.colorPrimaryBg : undefined,
+                          borderLeft: selectedId === item.id ? `2px solid ${token.colorPrimary}` : '2px solid transparent',
+                        }}
+                        onClick={() => { setSelectedId(item.id) }}
+                        onMouseEnter={(e) => {
+                          if (selectedId !== item.id) { e.currentTarget.style.backgroundColor = token.colorFillTertiary }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (selectedId !== item.id) { e.currentTarget.style.backgroundColor = '' }
+                        }}
+                      >
+                        <Checkbox
+                          checked={compareIds.includes(item.id)}
+                          className="mt-0.5"
+                          onChange={() => { toggleCompare(item.id) }}
+                          onClick={(e) => { e.stopPropagation() }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <Tag className="!m-0" color={getStatusColor(item.statusCode)} style={{ fontSize: 11, lineHeight: '16px', padding: '0 4px' }}>
+                              {item.statusCode || 'ERR'}
+                            </Tag>
+                            <Typography.Text className="text-xs font-medium">{item.requestJson.method}</Typography.Text>
+                            <Typography.Text className="text-[11px]" type="secondary">{item.durationMs}ms</Typography.Text>
+                          </div>
+                          <Typography.Text className="mt-0.5 block truncate text-[11px]" title={item.requestJson.url} type="secondary">
+                            {item.requestJson.url}
+                          </Typography.Text>
+                          <Typography.Text className="block text-[10px]" type="secondary">{formatTime(item.createdAt)}</Typography.Text>
+                        </div>
+                      </div>
+                    )}
+                    size="small"
+                  />
                 )}
-              />
-            )}
           </Spin>
         </div>
       </div>
 
       {/* 右侧详情 */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {!selectedItem ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Typography.Text type="secondary">点击左侧记录查看详情</Typography.Text>
-          </div>
-        ) : (
-          <div className="flex flex-1 flex-col overflow-auto p-[var(--ds-pad-lg)]">
-            {/* 请求摘要 */}
-            <div className="mb-4 flex items-center gap-2">
-              <Tag color={getStatusColor(result?.status ?? 0)}>{result?.status ?? 'ERR'} {result?.statusText ?? ''}</Tag>
-              <Typography.Text strong>{result?.method?.toUpperCase()}</Typography.Text>
-              <Typography.Text type="secondary" className="text-xs">{result?.durationMs}ms{result?.body ? ` | ${calcBodySize(result.body)}` : ''}</Typography.Text>
-            </div>
+        {!selectedItem
+          ? (
+              <div className="flex flex-1 items-center justify-center">
+                <Typography.Text type="secondary">点击左侧记录查看详情</Typography.Text>
+              </div>
+            )
+          : (
+              <div className="flex flex-1 flex-col overflow-auto p-[var(--ds-pad-lg)]">
+                {/* 请求摘要 */}
+                <div className="mb-4 flex items-center gap-2">
+                  <Tag color={getStatusColor(result?.status ?? 0)}>{result?.status ?? 'ERR'} {result?.statusText ?? ''}</Tag>
+                  <Typography.Text strong>{result?.method?.toUpperCase()}</Typography.Text>
+                  <Typography.Text className="text-xs" type="secondary">{result?.durationMs}ms{result?.body ? ` | ${calcBodySize(result.body)}` : ''}</Typography.Text>
+                </div>
 
-            {/* 请求区 */}
-            <Typography.Text strong className="mb-2 block text-sm">请求</Typography.Text>
-            <div className="mb-4 rounded p-2 text-xs" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace', wordBreak: 'break-all' }}>
-              <span className="font-medium opacity-60">URL: </span>{result?.url ?? '-'}
-            </div>
+                {/* 请求区 */}
+                <Typography.Text strong className="mb-2 block text-sm">请求</Typography.Text>
+                <div className="mb-4 rounded p-2 text-xs" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                  <span className="font-medium opacity-60">URL: </span>
+                  {result?.url ?? '-'}
+                </div>
 
-            {effectiveRequestHeaders && (
-              <div className="mb-3">
-                <Typography.Text type="secondary" className="mb-1 block text-xs">请求头 ({effectiveRequestHeaders.length})</Typography.Text>
-                <Table size="small" dataSource={effectiveRequestHeaders} columns={headerTableColumns} pagination={false} rowKey="name" />
+                {effectiveRequestHeaders && (
+                  <div className="mb-3">
+                    <Typography.Text className="mb-1 block text-xs" type="secondary">请求头 ({effectiveRequestHeaders.length})</Typography.Text>
+                    <Table columns={headerTableColumns} dataSource={effectiveRequestHeaders} pagination={false} rowKey="name" size="small" />
+                  </div>
+                )}
+
+                {effectiveRequestQuery && (
+                  <div className="mb-3">
+                    <Typography.Text className="mb-1 block text-xs" type="secondary">Query 参数 ({effectiveRequestQuery.length})</Typography.Text>
+                    <Table columns={headerTableColumns} dataSource={effectiveRequestQuery} pagination={false} rowKey="name" size="small" />
+                  </div>
+                )}
+
+                {effectiveRequestBodyText && (
+                  <div className="mb-3" style={{ height: 200 }}>
+                    <Typography.Text className="mb-1 block text-xs" type="secondary">请求体</Typography.Text>
+                    <MonacoEditor height="100%" language={detectLanguage(effectiveContentType)} options={monacoOptions} value={effectiveRequestBodyText} />
+                  </div>
+                )}
+
+                {result?.requestBodyParameters && result.requestBodyParameters.length > 0 && (
+                  <div className="mb-3">
+                    <Typography.Text className="mb-1 block text-xs" type="secondary">请求体参数 ({result.requestBodyParameters.length})</Typography.Text>
+                    <Table columns={headerTableColumns} dataSource={result.requestBodyParameters} pagination={false} rowKey="name" size="small" />
+                  </div>
+                )}
+
+                {/* 响应区 */}
+                <Typography.Text strong className="my-2 block text-sm">响应</Typography.Text>
+
+                {result?.headers && result.headers.length > 0 && (
+                  <div className="mb-3">
+                    <Typography.Text className="mb-1 block text-xs" type="secondary">响应头 ({result.headers.length})</Typography.Text>
+                    <Table columns={headerTableColumns} dataSource={result.headers} pagination={false} rowKey="name" size="small" />
+                  </div>
+                )}
+
+                {result?.body != null
+                  ? (
+                      <div className="flex-1" style={{ minHeight: 300 }}>
+                        <ResponseBodyViewer body={result.body} contentType={result.contentType} />
+                      </div>
+                    )
+                  : (
+                      <Typography.Text className="text-xs" type="secondary">无响应体</Typography.Text>
+                    )}
               </div>
             )}
-
-            {effectiveRequestQuery && (
-              <div className="mb-3">
-                <Typography.Text type="secondary" className="mb-1 block text-xs">Query 参数 ({effectiveRequestQuery.length})</Typography.Text>
-                <Table size="small" dataSource={effectiveRequestQuery} columns={headerTableColumns} pagination={false} rowKey="name" />
-              </div>
-            )}
-
-            {effectiveRequestBodyText && (
-              <div className="mb-3" style={{ height: 200 }}>
-                <Typography.Text type="secondary" className="mb-1 block text-xs">请求体</Typography.Text>
-                <MonacoEditor height="100%" language={detectLanguage(effectiveContentType)} value={effectiveRequestBodyText} options={monacoOptions} />
-              </div>
-            )}
-
-            {result?.requestBodyParameters && result.requestBodyParameters.length > 0 && (
-              <div className="mb-3">
-                <Typography.Text type="secondary" className="mb-1 block text-xs">请求体参数 ({result.requestBodyParameters.length})</Typography.Text>
-                <Table size="small" dataSource={result.requestBodyParameters} columns={headerTableColumns} pagination={false} rowKey="name" />
-              </div>
-            )}
-
-            {/* 响应区 */}
-            <Typography.Text strong className="mb-2 mt-2 block text-sm">响应</Typography.Text>
-
-            {result?.headers && result.headers.length > 0 && (
-              <div className="mb-3">
-                <Typography.Text type="secondary" className="mb-1 block text-xs">响应头 ({result.headers.length})</Typography.Text>
-                <Table size="small" dataSource={result.headers} columns={headerTableColumns} pagination={false} rowKey="name" />
-              </div>
-            )}
-
-            {result?.body != null ? (
-              <div className="flex-1" style={{ minHeight: 300 }}>
-                <ResponseBodyViewer body={result.body} contentType={result.contentType} />
-              </div>
-            ) : (
-              <Typography.Text type="secondary" className="text-xs">无响应体</Typography.Text>
-            )}
-          </div>
-        )}
       </div>
 
       <Modal
-        title="历史记录对比"
-        open={diffOpen}
         footer={null}
-        onCancel={() => setDiffOpen(false)}
+        open={diffOpen}
+        title="历史记录对比"
         width={900}
+        onCancel={() => { setDiffOpen(false) }}
       >
         {(() => {
           const pair = compareIds
-            .map(id => items.find(i => i.id === id))
+            .map((id) => items.find((i) => i.id === id))
             .filter((i): i is RequestHistoryItem => Boolean(i))
-          if (pair.length !== 2) return null
+
+          if (pair.length !== 2) { return null }
+
           const [left, right] = pair
+
           return (
             <MarkdownDiffView
               leftText={left.responseJson.body ?? ''}
-              rightText={right.responseJson.body ?? ''}
               leftTitle={`${left.requestJson.method} ${left.requestJson.url}`}
+              rightText={right.responseJson.body ?? ''}
               rightTitle={`${right.requestJson.method} ${right.requestJson.url}`}
             />
           )

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { BodyType } from '@/enums'
-import { generateCurl, type CurlInput } from './curl'
+
+import { type CurlInput, generateCurl } from './curl'
 
 function buildInput(overrides: Partial<CurlInput> = {}): CurlInput {
   return {
@@ -53,7 +54,7 @@ describe('generateCurl', () => {
         { name: 'X-Disabled', example: 'no', enable: false },
       ],
     }))
-    expect(linux).toBe(`curl -X GET -H 'X-Token: abc' "https://echo.apifox.com/post"`)
+    expect(linux).toBe('curl -X GET -H \'X-Token: abc\' "https://echo.apifox.com/post"')
   })
 
   it('cookie 输出 -b（URL 编码后拼接）', () => {
@@ -64,7 +65,7 @@ describe('generateCurl', () => {
         { name: 'off', example: 'x', enable: false },
       ],
     }))
-    expect(linux).toBe(`curl -X GET -b 'sid=abc; lang=zh' "https://echo.apifox.com/post"`)
+    expect(linux).toBe('curl -X GET -b \'sid=abc; lang=zh\' "https://echo.apifox.com/post"')
   })
 
   it('POST json：有 rawText 时输出 Content-Type 和 -d', () => {
@@ -75,7 +76,7 @@ describe('generateCurl', () => {
         rawText: '{"d":"string","dd":{"sdfsdafas":"string"}}',
       },
     }))
-    expect(linux).toBe(`curl -X POST -H 'Content-Type: application/json' -d '{"d":"string","dd":{"sdfsdafas":"string"}}' "https://echo.apifox.com/post"`)
+    expect(linux).toBe('curl -X POST -H \'Content-Type: application/json\' -d \'{"d":"string","dd":{"sdfsdafas":"string"}}\' "https://echo.apifox.com/post"')
   })
 
   it('POST json：rawText 为空时完全不带 body 参数（不生成 schema 示例）', () => {
@@ -110,7 +111,7 @@ describe('generateCurl', () => {
         ],
       },
     }))
-    expect(linux).toBe(`curl -X POST -F 'username=turtle' -F 'avatar=me.png' "https://echo.apifox.com/post"`)
+    expect(linux).toBe('curl -X POST -F \'username=turtle\' -F \'avatar=me.png\' "https://echo.apifox.com/post"')
   })
 
   it('POST form-data：字段全禁用或为空时不输出 -F', () => {
@@ -146,7 +147,7 @@ describe('generateCurl', () => {
         ],
       },
     }))
-    expect(linux).toBe(`curl -X POST -H 'Content-Type: application/x-www-form-urlencoded' -d 'a=1&b=2' "https://echo.apifox.com/post"`)
+    expect(linux).toBe('curl -X POST -H \'Content-Type: application/x-www-form-urlencoded\' -d \'a=1&b=2\' "https://echo.apifox.com/post"')
   })
 
   it('POST url-encoded：无字段时不输出 -d', () => {
@@ -162,7 +163,7 @@ describe('generateCurl', () => {
       method: 'POST',
       body: { type: BodyType.Xml, rawText: '<a>1</a>' },
     }))
-    expect(linux).toBe(`curl -X POST -H 'Content-Type: application/xml' -d '<a>1</a>' "https://echo.apifox.com/post"`)
+    expect(linux).toBe('curl -X POST -H \'Content-Type: application/xml\' -d \'<a>1</a>\' "https://echo.apifox.com/post"')
   })
 
   it('POST raw：rawText 有内容时输出 -d 与 Content-Type', () => {
@@ -170,7 +171,7 @@ describe('generateCurl', () => {
       method: 'POST',
       body: { type: BodyType.Raw, rawText: 'plain text' },
     }))
-    expect(linux).toBe(`curl -X POST -H 'Content-Type: text/plain' -d 'plain text' "https://echo.apifox.com/post"`)
+    expect(linux).toBe('curl -X POST -H \'Content-Type: text/plain\' -d \'plain text\' "https://echo.apifox.com/post"')
   })
 
   it('body type 为 none：不带任何 body 参数', () => {
@@ -197,9 +198,9 @@ describe('generateCurl', () => {
   it('-d 内容含单引号时正确转义', () => {
     const { linux } = generateCurl(buildInput({
       method: 'POST',
-      body: { type: BodyType.Raw, rawText: "it's" },
+      body: { type: BodyType.Raw, rawText: 'it\'s' },
     }))
-    expect(linux).toBe(`curl -X POST -H 'Content-Type: text/plain' -d 'it'\\''s' "https://echo.apifox.com/post"`)
+    expect(linux).toBe('curl -X POST -H \'Content-Type: text/plain\' -d \'it\'\\\'\'s\' "https://echo.apifox.com/post"')
   })
 
   it('-F 内容含特殊字符时原样输出（不做 URL 编码，与 curl 行为一致）', () => {
@@ -210,7 +211,7 @@ describe('generateCurl', () => {
         parameters: [{ name: 'name', example: 'a b&c' }],
       },
     }))
-    expect(linux).toBe(`curl -X POST -F 'name=a b&c' "https://echo.apifox.com/post"`)
+    expect(linux).toBe('curl -X POST -F \'name=a b&c\' "https://echo.apifox.com/post"')
   })
 
   it('method 小写时转大写', () => {
@@ -235,7 +236,7 @@ describe('generateCurl', () => {
         parameters: [{ name: 'name', example: 'turtle' }],
       },
     }))
-    expect(linux).toBe(`curl -X POST -H 'X-Token: abc' -b 'sid=s1' -F 'name=turtle' "https://example.com/api/form?page=2"`)
+    expect(linux).toBe('curl -X POST -H \'X-Token: abc\' -b \'sid=s1\' -F \'name=turtle\' "https://example.com/api/form?page=2"')
   })
 
   it('windows 与 linux 输出一致', () => {

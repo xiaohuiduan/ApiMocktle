@@ -32,7 +32,7 @@ describe('stripJsonComments', () => {
   })
 
   it('保留单引号字符串内部的斜杠', () => {
-    expect(stripJsonComments("{'s': 'https://x.com'}")).toBe("{'s': 'https://x.com'}")
+    expect(stripJsonComments('{\'s\': \'https://x.com\'}')).toBe('{\'s\': \'https://x.com\'}')
   })
 
   it('无注释时原样返回', () => {
@@ -86,9 +86,7 @@ describe('buildJsoncBodyFillText', () => {
             name: 'profile',
             type: SchemaType.Object,
             description: '个人资料',
-            properties: [
-              { name: 'bio', type: SchemaType.String, description: '简介' },
-            ],
+            properties: [{ name: 'bio', type: SchemaType.String, description: '简介' }],
           },
         ],
       },
@@ -125,9 +123,7 @@ describe('buildJsoncBodyFillText', () => {
       type: BodyType.Json,
       jsonSchema: {
         type: SchemaType.Object,
-        properties: [
-          { name: 'a', type: SchemaType.String, description: '第一行\n第二行' },
-        ],
+        properties: [{ name: 'a', type: SchemaType.String, description: '第一行\n第二行' }],
       },
     })
 
@@ -146,9 +142,7 @@ describe('buildJsoncBodyFillText', () => {
           {
             name: 'profile',
             type: SchemaType.Object,
-            properties: [
-              { name: 'bio', type: SchemaType.String, description: '简介' },
-            ],
+            properties: [{ name: 'bio', type: SchemaType.String, description: '简介' }],
           },
         ],
       },

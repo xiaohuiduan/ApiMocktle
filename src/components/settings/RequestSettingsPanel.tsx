@@ -47,7 +47,7 @@ export function RequestSettingsPanel() {
 
   // 超时自动保存（防抖）
   useEffect(() => {
-    if (!configLoaded) return
+    if (!configLoaded) { return }
 
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
@@ -60,7 +60,7 @@ export function RequestSettingsPanel() {
   }, [timeoutSeconds, configLoaded, save])
 
   const refreshCookieCount = useCallback(() => {
-    if (!sessionId) return
+    if (!sessionId) { return }
 
     api<number>('get_cookie_jar_count', { sessionId }).then(setCookieCount).catch(() => { /* 忽略 */ })
   }, [sessionId])
@@ -70,7 +70,7 @@ export function RequestSettingsPanel() {
   }, [refreshCookieCount])
 
   const handleClearCookies = () => {
-    if (!sessionId) return
+    if (!sessionId) { return }
 
     Modal.confirm({
       title: '清空 Cookie',

@@ -1,23 +1,22 @@
-import { useState, useCallback, useEffect } from 'react'
-import { theme } from 'antd'
-import { css } from '@emotion/css'
+import { useCallback, useEffect, useState } from 'react'
+
 import {
-  Play,
   CircleStop,
-  Globe,
   GitBranch,
+  Globe,
+  type LucideIcon,
+  Play,
   Repeat,
+  ShieldCheck,
   Split,
   Timer,
   Variable,
-  ShieldCheck,
-  type LucideIcon,
 } from 'lucide-react'
-import { FlowNodeType, NODE_TYPE_LABELS } from '../types/flow.types'
-import { useFlowStore } from '../store/useFlowStore'
-import { getDefaultNodeData } from '../nodes/nodeRegistry'
+
 import { NODE_TYPE_COLORS } from '../nodes/nodeColors'
-import type { FlowNode } from '../types/flow.types'
+import { FlowNodeType, NODE_TYPE_LABELS } from '../types/flow.types'
+
+import { css } from '@emotion/css'
 
 // ==================== 节点定义 ====================
 
@@ -121,9 +120,8 @@ const cardDescClass = css`
 // ==================== 组件 ====================
 
 export default function NodePalette() {
-  const { token } = theme.useToken()
   const [draggingType, setDraggingType] = useState<FlowNodeType | null>(null)
-  const [ghostPos, setGhostPos] = useState({ x: 0, y: 0 })
+  const [, setGhostPos] = useState({ x: 0, y: 0 })
 
   // 鼠标事件模拟拖拽（绕过 Tauri WebView2 对 HTML5 拖拽 API 的兼容问题）
   const handleMouseDown = useCallback((e: React.MouseEvent, nodeType: FlowNodeType) => {
@@ -138,12 +136,15 @@ export default function NodePalette() {
         setGhostPos({ x: e.clientX, y: e.clientY })
       }
     }
+
     const handleMouseUp = () => {
       setDraggingType(null)
       // 注意：不清除 __DRAG_NODE_TYPE__，由 FlowCanvas 读取后负责清理
     }
+
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
+
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
@@ -157,24 +158,25 @@ export default function NodePalette() {
         {PALETTE_NODES.map((item) => {
           const Icon = item.icon
           const isDragging = draggingType === item.type
+
           return (
             <div
               key={item.type}
               className={cardClass}
+              data-node-type={item.type}
+              data-testid={`palette-node-${item.type}`}
               style={{
                 opacity: isDragging ? 0.5 : 1,
                 border: isDragging ? '2px solid var(--ds-primary-color, #1677ff)' : undefined,
               }}
-              onMouseDown={(e) => handleMouseDown(e, item.type)}
-              data-node-type={item.type}
-              data-testid={`palette-node-${item.type}`}
+              onMouseDown={(e) => { handleMouseDown(e, item.type) }}
             >
               <div
                 className={colorBarClass}
                 style={{ backgroundColor: item.color }}
               />
               <div className={cardContentClass}>
-                <Icon size={16} color={item.color} />
+                <Icon color={item.color} size={16} />
                 <div className={cardTextClass}>
                   <span className={cardLabelClass}>{item.label}</span>
                   <span className={cardDescClass}>{item.description}</span>

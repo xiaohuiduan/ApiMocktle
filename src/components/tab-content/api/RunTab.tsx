@@ -1,57 +1,52 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useProxyConfig } from '@/contexts/proxy-config'
+import { useParams } from 'react-router'
 
 import {
   Button,
   Input,
   InputNumber,
+  message,
   Modal,
   Select,
   Space,
   Switch,
   Tabs,
   Tag,
+  theme,
   Tooltip,
   Typography,
-  message,
-  theme,
 } from 'antd'
 import { ClockIcon, CopyIcon, PlayIcon, RotateCcwIcon, SaveIcon } from 'lucide-react'
 
-import { useParams } from 'react-router'
 import { api } from '@/api-client'
-import { useAuth } from '@/contexts/auth'
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
-import { useApiSubTabContext } from './Api'
 import { buildSchemaExample } from '@/components/JsonSchema/schema-normalizer'
-import { MonacoEditor } from '@/components/MonacoEditor'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
+import { useAuth } from '@/contexts/auth'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
+import { useProxyConfig } from '@/contexts/proxy-config'
 import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { BodyType, ParamType } from '@/enums'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
-import type { ApiDetails, ApiRequestBody, ApiRunResult, RunTabInfo, SavedRequestConfig, Parameter } from '@/types'
+import { type ApiDetails, type ApiRequestBody, type ApiRunResult, type RunTabInfo, type SavedRequestConfig, type ScriptConsoleEntry, type ScriptTestResult } from '@/types'
 
-import { ParamsEditableTable } from './components/ParamsEditableTable'
-import { ParamsTab } from './params/ParamsTab'
-import { QueryParamsPanel } from './params/QueryParamsPanel'
-import { HeadersParamsPanel } from './params/HeadersParamsPanel'
-import { CookieParamsPanel } from './params/CookieParamsPanel'
-import { BodyPanel } from './params/BodyPanel'
-import { ScriptsPanel } from './params/ScriptsPanel'
-import { useApiRequestRunner } from './useApiRequestRunner'
-import { buildRequest } from './buildRequest'
-import { generateCurl } from './curl'
-import { buildJsoncBodyFillText } from './bodyJsonc'
-import { useResolvedVarMap, buildVarMaps, makeResolveVars } from './useResolvedVarMap'
+import { HistoryPanel, type RequestHistoryItem } from './components/HistoryPanel'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
-import { HistoryPanel, type RequestHistoryItem } from './components/HistoryPanel'
-import { ScriptTab, executeScript } from './scripts'
-import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
+import { BodyPanel } from './params/BodyPanel'
+import { CookieParamsPanel } from './params/CookieParamsPanel'
+import { HeadersParamsPanel } from './params/HeadersParamsPanel'
+import { QueryParamsPanel } from './params/QueryParamsPanel'
+import { ScriptsPanel } from './params/ScriptsPanel'
+import { buildJsoncBodyFillText } from './bodyJsonc'
+import { buildRequest } from './buildRequest'
+import { generateCurl } from './curl'
 import { parseHistoryParams } from './historyUtils'
+import { executeScript } from './scripts'
+import { useApiRequestRunner } from './useApiRequestRunner'
+import { buildVarMaps, makeResolveVars, useResolvedVarMap } from './useResolvedVarMap'
 
 const STORAGE_PREFIX = 'run_tab_'
 
@@ -62,6 +57,7 @@ function cloneApiDetails(source: ApiDetails): ApiDetails {
 function mergeRunTabInfo(docValue: ApiDetails, runTabInfo: RunTabInfo): ApiDetails {
   const base = cloneApiDetails(docValue)
   const hasBodyChanges = runTabInfo.bodyType !== undefined || runTabInfo.bodyParameters !== undefined || runTabInfo.bodyRawText !== undefined
+
   return {
     ...base,
     parameters: runTabInfo.parameters ?? base.parameters,
@@ -79,59 +75,63 @@ function mergeRunTabInfo(docValue: ApiDetails, runTabInfo: RunTabInfo): ApiDetai
 
 function buildBodyExample(apiDetails: ApiDetails, menuRawList?: unknown): string {
   const body = apiDetails.requestBody
-  if (!body || body.type === BodyType.None) return ''
+
+  if (!body || body.type === BodyType.None) { return '' }
+
   if (body.jsonSchema) {
     const example = buildSchemaExample(body.jsonSchema as never, menuRawList as never)
+
     return JSON.stringify(example, null, 2)
   }
-  if (body.rawText?.trim()) return body.rawText
+
+  if (body.rawText?.trim()) { return body.rawText }
+
   return ''
 }
 
 function buildBodyFillText(apiDetails: ApiDetails, menuRawList?: unknown): string {
   const body = apiDetails.requestBody
-  if (!body || body.type === BodyType.None) return ''
+
+  if (!body || body.type === BodyType.None) { return '' }
+
   if (body.jsonSchema) {
     const example = buildSchemaExample(body.jsonSchema as never, menuRawList as never)
+
     return JSON.stringify(example, null, 2)
   }
-  if (body.rawText?.trim()) return body.rawText
+
+  if (body.rawText?.trim()) { return body.rawText }
+
   return JSON.stringify({}, null, 2)
 }
 
 function mergeParams(
-  globalValues: { name: string; value?: string; enable?: boolean }[],
-  envValues: { name: string; value?: string; enable?: boolean }[],
-  localParams: { name?: string; enable?: boolean; example?: unknown }[],
+  globalValues: { name: string, value?: string, enable?: boolean }[],
+  envValues: { name: string, value?: string, enable?: boolean }[],
+  localParams: { name?: string, enable?: boolean, example?: unknown }[],
   disabledNames?: Set<string>,
-): { name: string; enable?: boolean; example?: unknown }[] {
-  const map = new Map<string, { name: string; enable?: boolean; example?: unknown }>()
+): { name: string, enable?: boolean, example?: unknown }[] {
+  const map = new Map<string, { name: string, enable?: boolean, example?: unknown }>()
+
   for (const g of globalValues) {
-    if (g.name && !disabledNames?.has(g.name)) map.set(g.name, { name: g.name, enable: g.enable, example: g.value })
+    if (g.name && !disabledNames?.has(g.name)) { map.set(g.name, { name: g.name, enable: g.enable, example: g.value }) }
   }
+
   for (const e of envValues) {
-    if (e.name && !disabledNames?.has(e.name)) map.set(e.name, { name: e.name, enable: e.enable, example: e.value })
+    if (e.name && !disabledNames?.has(e.name)) { map.set(e.name, { name: e.name, enable: e.enable, example: e.value }) }
   }
+
   for (const l of localParams) {
-    if (l.name) map.set(l.name, { name: l.name, enable: l.enable, example: l.example })
+    if (l.name) { map.set(l.name, { name: l.name, enable: l.enable, example: l.example }) }
   }
+
   return Array.from(map.values())
 }
-
-const bodyTypeOptions = [
-  { n: 'none', t: BodyType.None },
-  { n: 'form-data', t: BodyType.FormData },
-  { n: 'url-encoded', t: BodyType.UrlEncoded },
-  { n: 'json', t: BodyType.Json },
-  { n: 'xml', t: BodyType.Xml },
-  { n: 'raw', t: BodyType.Raw },
-  { n: 'binary', t: BodyType.Binary },
-]
 
 export function RunTab() {
   const { token } = theme.useToken()
   const { tabData } = useTabContentContext()
-  const subTabKey = useApiSubTabContext()
+
   const { messageApi } = useGlobalContext()
   const {
     menuRawList,
@@ -148,6 +148,7 @@ export function RunTab() {
 
   const { menuApiItem, docValue, savedRunTabInfo } = useMemo(() => {
     const item = menuRawList?.find(({ id }) => id === tabData.key)
+
     return {
       menuApiItem: item,
       docValue: item?.data as ApiDetails | undefined,
@@ -169,19 +170,24 @@ export function RunTab() {
 
   // 保存原始文档定义的 ref（用于一键复原）
   const originalDocRef = useRef<ApiDetails | undefined>(undefined)
+
   if (docValue && (!originalDocRef.current || originalDocRef.current.id !== docValue.id)) {
     originalDocRef.current = cloneApiDetails(docValue)
   }
 
   // 缓存待解析的历史数据
-  const pendingHistoryRef = useRef<{ requestJson: SavedRequestConfig; responseJson: ApiRunResult } | null>(null)
+  const pendingHistoryRef = useRef<{ requestJson: SavedRequestConfig, responseJson: ApiRunResult } | null>(null)
 
   const [workCopy, setWorkCopy] = useState<ApiDetails | undefined>(() => {
-    if (!docValue) return undefined
+    if (!docValue) { return undefined }
+
     try {
       const saved = localStorage.getItem(storageKey)
-      if (saved) return JSON.parse(saved) as ApiDetails
-    } catch { /* ignore */ }
+
+      if (saved) { return JSON.parse(saved) as ApiDetails }
+    }
+    catch { /* ignore */ }
+
     return cloneApiDetails(docValue)
   })
 
@@ -189,6 +195,7 @@ export function RunTab() {
   // 请求超时（秒）；undefined 表示跟随全局默认
   const [timeoutSeconds, setTimeoutSeconds] = useState<number | undefined>(() => {
     const ms = savedRunTabInfo?.timeoutMs
+
     return ms ? Math.round(ms / 1000) : undefined
   })
 
@@ -208,9 +215,11 @@ export function RunTab() {
   // 智能默认 tab：根据 HTTP 方法选择
   const getDefaultActiveTab = useCallback(() => {
     const method = workCopy?.method?.toUpperCase()
+
     if (['POST', 'PUT', 'PATCH'].includes(method ?? '')) {
       return 'body'
     }
+
     return 'params'
   }, [workCopy?.method])
 
@@ -228,15 +237,17 @@ export function RunTab() {
   const [preScriptTests, setPreScriptTests] = useState<ScriptTestResult[]>([])
   const [postScriptConsole, setPostScriptConsole] = useState<ScriptConsoleEntry[]>([])
   const [postScriptTests, setPostScriptTests] = useState<ScriptTestResult[]>([])
-  const [preScriptRunning, setPreScriptRunning] = useState(false)
-  const [postScriptRunning, setPostScriptRunning] = useState(false)
+  const [, setPreScriptRunning] = useState(false)
+  const [, setPostScriptRunning] = useState(false)
 
   // 用数据库表列的 updatedAt 追踪文档版本（data_json 内部 updatedAt 不会随保存变化）
   const docVersionRef = useRef((menuApiItem as { updatedAt?: string } | undefined)?.updatedAt)
 
   useEffect(() => {
-    if (!docValue) return
+    if (!docValue) { return }
+
     const menuUpdatedAt = (menuApiItem as { updatedAt?: string } | undefined)?.updatedAt
+
     // 文档有更新时，重新从文档初始化 workCopy
     if (menuUpdatedAt && menuUpdatedAt !== docVersionRef.current) {
       docVersionRef.current = menuUpdatedAt
@@ -244,18 +255,25 @@ export function RunTab() {
       const merged = savedRunTabInfo ? mergeRunTabInfo(docValue, savedRunTabInfo) : cloneApiDetails(docValue)
       setWorkCopy(merged)
       resetResult()
+
       return
     }
+
     // 首次加载：有本地副本则恢复，否则从文档初始化（合并 runTabInfo）
     if (docVersionRef.current === undefined) {
       docVersionRef.current = menuUpdatedAt
+
       try {
         const saved = localStorage.getItem(`${STORAGE_PREFIX}${docValue.id}`)
+
         if (saved) {
           setWorkCopy(JSON.parse(saved) as ApiDetails)
+
           return
         }
-      } catch { /* ignore */ }
+      }
+      catch { /* ignore */ }
+
       const merged = savedRunTabInfo ? mergeRunTabInfo(docValue, savedRunTabInfo) : cloneApiDetails(docValue)
       setWorkCopy(merged)
       resetResult()
@@ -263,8 +281,10 @@ export function RunTab() {
   }, [(menuApiItem as { updatedAt?: string } | undefined)?.updatedAt])
 
   const persist = useCallback((copy: ApiDetails) => {
-    if (!copy?.id) return
-    try { localStorage.setItem(`${STORAGE_PREFIX}${copy.id}`, JSON.stringify(copy)) } catch { /* ignore */ }
+    if (!copy?.id) { return }
+
+    try { localStorage.setItem(`${STORAGE_PREFIX}${copy.id}`, JSON.stringify(copy)) }
+    catch { /* ignore */ }
   }, [])
 
   // 当前环境
@@ -274,7 +294,8 @@ export function RunTab() {
   }, [currentProjectEnvironmentId, projectEnvironments, projectEnvironmentConfig?.environments])
 
   const envBaseUrl = useMemo(() => {
-    if (!currentEnv) return ''
+    if (!currentEnv) { return '' }
+
     return getPrimaryEnvironmentUrl(currentEnv)
   }, [currentEnv])
 
@@ -287,7 +308,7 @@ export function RunTab() {
 
   // 一键复原
   const handleReset = () => {
-    if (!originalDocRef.current) return
+    if (!originalDocRef.current) { return }
 
     const hasSavedRunTab = savedRunTabInfo && Object.keys(savedRunTabInfo).length > 0
 
@@ -298,8 +319,9 @@ export function RunTab() {
         content: '确定要放弃所有临时修改，恢复为文档定义的原始值吗？',
         okText: '确认复原',
         cancelText: '取消',
-        onOk: () => doReset('define'),
+        onOk: () => { doReset('define') },
       })
+
       return
     }
 
@@ -307,8 +329,8 @@ export function RunTab() {
       title: '一键复原',
       content: '请选择复原来源：',
       footer: (
-        <div className="flex justify-end gap-2 mt-4">
-          <Button onClick={() => modal.destroy()}>关闭</Button>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button onClick={() => { modal.destroy() }}>关闭</Button>
           <Button onClick={() => { modal.destroy(); doReset('define') }}>复原到文档定义</Button>
           <Button type="primary" onClick={() => { modal.destroy(); doReset('saved') }}>复原到保存点</Button>
         </div>
@@ -321,12 +343,14 @@ export function RunTab() {
 
   const doReset = (source: 'define' | 'saved') => {
     bodyTextsRef.current = {}
+
     if (source === 'saved' && savedRunTabInfo) {
       // 复原到最新保存的运行时信息
       const merged = mergeRunTabInfo(originalDocRef.current!, savedRunTabInfo)
       setWorkCopy(merged)
       messageApi.success('已复原到上次保存点')
-    } else {
+    }
+    else {
       // 复原到文档定义
       const fresh = cloneApiDetails(originalDocRef.current!)
       setWorkCopy(fresh)
@@ -335,22 +359,28 @@ export function RunTab() {
 
     resetResult()
     pendingHistoryRef.current = null
-    try { localStorage.removeItem(storageKey) } catch { /* ignore */ }
+
+    try { localStorage.removeItem(storageKey) }
+    catch { /* ignore */ }
+
     setTimeoutSeconds(undefined)
-    setResetCounter(c => c + 1)
+    setResetCounter((c) => c + 1)
   }
 
   // 从数据库加载最近一次运行结果和请求参数
   const prevLoadedKeyRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!tabData.key || !projectId || !sessionId) return
+    if (!tabData.key || !projectId || !sessionId) { return }
+
     // 防止重复请求（同一个 tabData.key 只加载一次）
-    if (prevLoadedKeyRef.current === tabData.key) return
+    if (prevLoadedKeyRef.current === tabData.key) { return }
+
     prevLoadedKeyRef.current = tabData.key
 
     const loadLastResult = async () => {
       try {
-        const list = await api<Array<{ requestJson: SavedRequestConfig; responseJson: ApiRunResult }>>('list_request_history', { sessionId, projectId, menuItemId: tabData.key })
+        const list = await api<{ requestJson: SavedRequestConfig, responseJson: ApiRunResult }[]>('list_request_history', { sessionId, projectId, menuItemId: tabData.key })
+
         if (list.length > 0) {
           const last = list[0]
           // 恢复结果展示
@@ -358,18 +388,20 @@ export function RunTab() {
 
           // 缓存历史数据，等待 workCopy 可用后解析参数
           pendingHistoryRef.current = last
-          setHistoryLoaded(c => c + 1)
+          setHistoryLoaded((c) => c + 1)
 
           // Body 会在下面的 useEffect 中通过 pendingHistoryRef 恢复
         }
-      } catch { /* ignore */ }
+      }
+      catch { /* ignore */ }
     }
+
     void loadLastResult()
   }, [tabData.key, projectId, sessionId, setResult])
 
   // 当 workCopy 可用时，恢复历史参数（直接写入 workCopy）
   useEffect(() => {
-    if (!workCopy || !pendingHistoryRef.current) return
+    if (!workCopy || !pendingHistoryRef.current) { return }
 
     const last = pendingHistoryRef.current
     const parsed = parseHistoryParams(
@@ -403,7 +435,7 @@ export function RunTab() {
 
   // 运行
   const handleRun = async () => {
-    if (!workCopy) return
+    if (!workCopy) { return }
 
     // 收集环境变量用于 {{var}} 替换
     // 统一构建变量映射（global < env < sessionVars）
@@ -414,12 +446,12 @@ export function RunTab() {
     })
     const resolveVars = makeResolveVars(varMap)
 
-
     // ====== 前置脚本执行 ======
     if (workCopy.preScript?.trim()) {
       setPreScriptRunning(true)
       setPreScriptConsole([])
       setPreScriptTests([])
+
       try {
         const preResult = await executeScript(workCopy.preScript, {
           environment: envMap,
@@ -429,8 +461,8 @@ export function RunTab() {
             url: workCopy.path ?? '/',
             method: workCopy.method ?? 'GET',
             headers: (workCopy.parameters?.header ?? [])
-              .filter(h => h.name && h.enable !== false)
-              .map(h => ({ name: h.name!, value: String(h.example ?? '') })),
+              .filter((h) => h.name && h.enable !== false)
+              .map((h) => ({ name: h.name!, value: String(h.example ?? '') })),
             body: workCopy.requestBody?.rawText ?? '',
           },
         })
@@ -446,13 +478,17 @@ export function RunTab() {
         if (!preResult.success) {
           setPreScriptRunning(false)
           messageApi.error(`前置脚本执行失败: ${preResult.error}`)
+
           return
         }
-      } catch (err) {
+      }
+      catch (err) {
         setPreScriptRunning(false)
         messageApi.error(`前置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
+
         return
       }
+
       setPreScriptRunning(false)
     }
 
@@ -460,8 +496,8 @@ export function RunTab() {
 
     // 统一通过共享核心构建请求（URL/Query/Header/Cookie/Body），避免与 QuickRequestRun 重复
     const allBodyParams: { name?: string, enable?: boolean, example?: string, type?: string, filePath?: string }[] = [
-      ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map((p) => ({ name: p.name, enable: p.enable, example: p.value as string })),
-      ...envParams.body.map((p) => ({ name: p.name, enable: p.enable, example: p.value as string })),
+      ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map((p) => ({ name: p.name, enable: p.enable, example: p.value! })),
+      ...envParams.body.map((p) => ({ name: p.name, enable: p.enable, example: p.value! })),
       ...(workCopy.requestBody?.parameters ?? []).map((p) => ({
         name: p.name,
         enable: p.enable,
@@ -476,18 +512,18 @@ export function RunTab() {
       baseUrl: envBaseUrl,
       path: workCopy.path,
       query: mergeParams(
-        (projectEnvironmentConfig?.globalParameters?.query ?? []).filter(p => p.enable !== false),
-        envParams.query.filter(p => p.enable !== false),
+        (projectEnvironmentConfig?.globalParameters?.query ?? []).filter((p) => p.enable !== false),
+        envParams.query.filter((p) => p.enable !== false),
         workCopy.parameters?.query ?? [],
       ),
       header: mergeParams(
-        (projectEnvironmentConfig?.globalParameters?.header ?? []).filter(p => p.enable !== false),
-        envParams.header.filter(p => p.enable !== false),
+        (projectEnvironmentConfig?.globalParameters?.header ?? []).filter((p) => p.enable !== false),
+        envParams.header.filter((p) => p.enable !== false),
         workCopy.parameters?.header ?? [],
       ),
       cookie: mergeParams(
-        (projectEnvironmentConfig?.globalParameters?.cookie ?? []).filter(p => p.enable !== false),
-        envParams.cookie.filter(p => p.enable !== false),
+        (projectEnvironmentConfig?.globalParameters?.cookie ?? []).filter((p) => p.enable !== false),
+        envParams.cookie.filter((p) => p.enable !== false),
         workCopy.parameters?.cookie ?? [],
       ),
       body: workCopy.requestBody
@@ -512,6 +548,7 @@ export function RunTab() {
       setPostScriptRunning(true)
       setPostScriptConsole([])
       setPostScriptTests([])
+
       try {
         const postResult = await executeScript(workCopy.postScript, {
           environment: envMap,
@@ -538,16 +575,19 @@ export function RunTab() {
         if (!postResult.success) {
           messageApi.error(`后置脚本执行失败: ${postResult.error}`)
         }
-      } catch (err) {
+      }
+      catch (err) {
         messageApi.error(`后置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
       }
+
       setPostScriptRunning(false)
     }
   }
 
   // 一键填充 Body
   const handleFillBody = () => {
-    if (!workCopy) return
+    if (!workCopy) { return }
+
     const text = fillWithComments
       ? buildJsoncBodyFillText(workCopy, menuRawList)
       : buildBodyFillText(workCopy, menuRawList)
@@ -560,7 +600,7 @@ export function RunTab() {
   }
 
   const handleSaveToDoc = async () => {
-    if (!docValue || !workCopy) return
+    if (!docValue || !workCopy) { return }
 
     const name = menuApiItem?.name ?? docValue.name
     const runTabInfo: RunTabInfo = {
@@ -589,7 +629,7 @@ export function RunTab() {
   }
 
   const handleApplyHistory = (item: RequestHistoryItem) => {
-    if (!workCopy) return
+    if (!workCopy) { return }
 
     const parsed = parseHistoryParams(item.requestJson.headers ?? [], item.requestJson.url ?? '')
     const next: ApiDetails = {
@@ -618,47 +658,44 @@ export function RunTab() {
     messageApi.success('已回填历史请求')
   }
 
-
   // 判断是否显示 JSON 输入框
-  const showBodyEditor = workCopy?.requestBody
-    && (workCopy.requestBody.type === BodyType.Json
-      || workCopy.requestBody.type === BodyType.Xml
-      || workCopy.requestBody.type === BodyType.Raw
-      || workCopy.requestBody.type === BodyType.Binary)
 
   // 判断各 tab 是否有内容（用于显示绿色 * 标识）
   const hasParamsContent = useMemo(() => {
-    return (workCopy?.parameters?.query ?? []).some(p => p.name && p.enable !== false)
+    return (workCopy?.parameters?.query ?? []).some((p) => p.name && p.enable !== false)
   }, [workCopy?.parameters?.query])
 
   const hasHeadersContent = useMemo(() => {
-    return (workCopy?.parameters?.header ?? []).some(p => p.name && p.enable !== false)
+    return (workCopy?.parameters?.header ?? []).some((p) => p.name && p.enable !== false)
   }, [workCopy?.parameters?.header])
 
   const hasCookieContent = useMemo(() => {
-    return (workCopy?.parameters?.cookie ?? []).some(p => p.name && p.enable !== false)
+    return (workCopy?.parameters?.cookie ?? []).some((p) => p.name && p.enable !== false)
   }, [workCopy?.parameters?.cookie])
 
   const hasBodyContent = useMemo(() => {
     const body = workCopy?.requestBody
-    if (!body || body.type === BodyType.None) return false
+
+    if (!body || body.type === BodyType.None) { return false }
 
     if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
-      return (body.parameters ?? []).some(p => p.name && p.enable !== false)
+      return (body.parameters ?? []).some((p) => p.name && p.enable !== false)
     }
+
     if (body.type === BodyType.Json) {
       return !!((body.jsonSchema as { properties?: unknown[] })?.properties?.length)
         || !!(body.rawText?.trim())
     }
+
     return !!(body.rawText?.trim())
   }, [workCopy?.requestBody])
 
   const hasScriptsContent = useMemo(() => {
-    return !!(workCopy?.preScript?.trim() || workCopy?.postScript?.trim())
+    return !!(workCopy?.preScript?.trim() ?? workCopy?.postScript?.trim())
   }, [workCopy?.preScript, workCopy?.postScript])
 
   // Tab Label 组件（带绿色 * 标识）
-  const TabLabel = ({ children, hasContent }: { children: React.ReactNode; hasContent: boolean }) => {
+  const TabLabel = ({ children, hasContent }: { children: React.ReactNode, hasContent: boolean }) => {
     return (
       <span>
         {children}
@@ -669,10 +706,12 @@ export function RunTab() {
 
   // cURL
   const curlCommands = useMemo(() => {
-    if (!workCopy) return { windows: '', linux: '' }
+    if (!workCopy) { return { windows: '', linux: '' } }
+
     const resolvedUrl = envBaseUrl
       ? `${envBaseUrl.replace(/\/$/, '')}${workCopy.path ?? '/'}`
       : workCopy.path ?? '/'
+
     return generateCurl({
       method: workCopy.method ?? 'GET',
       url: resolvedUrl,
@@ -695,17 +734,17 @@ export function RunTab() {
       label: <span style={{ color: `var(${color})`, fontWeight: 700 }}>{method}</span>,
     })), [])
 
-  if (!docValue || !workCopy) return null
+  if (!docValue || !workCopy) { return null }
 
   return (
     <div className="flex h-full flex-col overflow-hidden" style={{ minWidth: 0, maxWidth: '100%' }}>
       {/* URL 行 */}
-      <div className="flex items-center gap-2 px-2 py-1 min-w-0" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
+      <div className="flex min-w-0 items-center gap-2 px-2 py-1" style={{ borderBottom: `1px solid ${token.colorBorderSecondary}` }}>
         <Select
           className="shrink-0"
-          style={{ minWidth: 90 }}
           options={methodOptions}
           popupMatchSelectWidth={false}
+          style={{ minWidth: 90 }}
           value={workCopy.method ?? 'GET'}
           onChange={(method) => {
             const next = { ...workCopy, method }
@@ -715,7 +754,7 @@ export function RunTab() {
         />
 
         <div
-          className="flex items-center rounded border px-2 min-w-0"
+          className="flex min-w-0 items-center rounded border px-2"
           style={{
             backgroundColor: token.colorFillQuaternary,
             borderColor: token.colorBorderSecondary,
@@ -726,7 +765,7 @@ export function RunTab() {
           {envBaseUrl && !/^https?:\/\//i.test(workCopy.path ?? '')
             ? (
                 <span
-                  className="mr-0 shrink-0 text-xs select-none"
+                  className="mr-0 shrink-0 select-none text-xs"
                   style={{ color: token.colorTextQuaternary }}
                 >
                   {envBaseUrl.replace(/\/$/, '')}
@@ -734,10 +773,10 @@ export function RunTab() {
               )
             : null}
           <Input
-            variant="borderless"
-            className="flex-1 min-w-0"
+            className="min-w-0 flex-1"
             style={{ paddingLeft: envBaseUrl ? 0 : 8 }}
             value={workCopy.path ?? ''}
+            variant="borderless"
             onChange={(e) => {
               const next = { ...workCopy, path: e.target.value }
               setWorkCopy(next)
@@ -748,20 +787,20 @@ export function RunTab() {
 
         {proxyInfo && (
           <Tooltip title={`代理: ${proxyInfo.tooltip}`}>
-            <Tag color="blue" className="shrink-0">{proxyInfo.label} 代理</Tag>
+            <Tag className="shrink-0" color="blue">{proxyInfo.label} 代理</Tag>
           </Tooltip>
         )}
 
         {(/^https:\/\//i.test(workCopy.path ?? '') || /^https:\/\//i.test(envBaseUrl)) && (
           <Tooltip title={insecureSkipVerify ? 'HTTPS 证书验证已关闭，不推荐用于生产环境' : '开启后将验证 HTTPS 证书，关闭可调试自签名证书接口'}>
-            <label className="shrink-0 flex items-center gap-1.5 cursor-pointer" style={{ userSelect: 'none' }}>
+            <label className="flex shrink-0 cursor-pointer items-center gap-1.5" style={{ userSelect: 'none' }}>
               <span className="text-xs" style={{ color: insecureSkipVerify ? 'var(--ant-color-warning)' : 'var(--ant-color-success)' }}>
                 SSL
               </span>
               <Switch
-                size="small"
                 checked={!insecureSkipVerify}
-                onChange={(v) => setInsecureSkipVerify(!v)}
+                size="small"
+                onChange={(v) => { setInsecureSkipVerify(!v) }}
               />
             </label>
           </Tooltip>
@@ -769,29 +808,29 @@ export function RunTab() {
 
         <Tooltip title="请求超时（秒），留空使用全局默认，0 表示不限时">
           <InputNumber
-            className="shrink-0"
-            size="small"
-            min={0}
-            max={3600}
-            placeholder="超时"
             addonAfter="秒"
-            value={timeoutSeconds}
-            onChange={(v) => setTimeoutSeconds(v == null ? undefined : Number(v))}
+            className="shrink-0"
+            max={3600}
+            min={0}
+            placeholder="超时"
+            size="small"
             style={{ width: 110 }}
+            value={timeoutSeconds}
+            onChange={(v) => { setTimeoutSeconds(v == null ? undefined : Number(v)) }}
           />
         </Tooltip>
 
         <Space className="shrink-0" style={{ marginLeft: 'auto' }}>
-          <Button icon={<ClockIcon size={14} />} title="历史记录" onClick={() => setHistoryOpen(true)} />
+          <Button icon={<ClockIcon size={14} />} title="历史记录" onClick={() => { setHistoryOpen(true) }} />
           <Button
             icon={<SaveIcon size={14} />}
             title="保存到文档"
             onClick={() => void handleSaveToDoc()}
           />
           <Button
+            icon={<PlayIcon size={14} />}
             loading={running}
             type="primary"
-            icon={<PlayIcon size={14} />}
             onClick={() => void handleRun()}
           >
             运行
@@ -806,25 +845,25 @@ export function RunTab() {
       </div>
 
       <ResponsePanel
-        paramsArea={
+        autoSaveId={`run-tab-${docValue.id}`}
+        hasResult={!!(result ?? error)}
+        paramsArea={(
           <Tabs
             key={`run-tabs-${resetCounter}`}
-            animated={false}
-            className="min-w-0 h-full"
-            tabBarStyle={{ paddingLeft: 8, marginBottom: 0 }}
             activeKey={activeParamsTab}
-            onChange={setActiveParamsTab}
+            animated={false}
+            className="h-full min-w-0"
             items={[
               {
                 key: 'params',
                 label: <TabLabel hasContent={hasParamsContent}>Params</TabLabel>,
                 children: (
-                  <div className="px-2 min-w-0 overflow-hidden">
+                  <div className="min-w-0 overflow-hidden px-2">
                     <QueryParamsPanel
                       key={`params-tab-${resetCounter}`}
-                      value={workCopy.parameters}
-                      globalParameters={projectEnvironmentConfig?.globalParameters}
                       envParameters={currentEnv?.parameters}
+                      globalParameters={projectEnvironmentConfig?.globalParameters}
+                      value={workCopy.parameters}
                       varMap={varMap}
                       onChange={(parameters) => {
                         const next = { ...workCopy, parameters }
@@ -839,12 +878,12 @@ export function RunTab() {
                 key: 'headers',
                 label: <TabLabel hasContent={hasHeadersContent}>Headers</TabLabel>,
                 children: (
-                  <div className="px-2 min-w-0 overflow-hidden">
+                  <div className="min-w-0 overflow-hidden px-2">
                     <HeadersParamsPanel
                       key={`headers-tab-${resetCounter}`}
-                      value={workCopy.parameters}
-                      globalParameters={projectEnvironmentConfig?.globalParameters}
                       envParameters={currentEnv?.parameters}
+                      globalParameters={projectEnvironmentConfig?.globalParameters}
+                      value={workCopy.parameters}
                       varMap={varMap}
                       onChange={(parameters) => {
                         const next = { ...workCopy, parameters }
@@ -859,12 +898,12 @@ export function RunTab() {
                 key: 'cookie',
                 label: <TabLabel hasContent={hasCookieContent}>Cookie</TabLabel>,
                 children: (
-                  <div className="px-2 min-w-0 overflow-hidden">
+                  <div className="min-w-0 overflow-hidden px-2">
                     <CookieParamsPanel
                       key={`cookie-tab-${resetCounter}`}
-                      value={workCopy.parameters}
-                      globalParameters={projectEnvironmentConfig?.globalParameters}
                       envParameters={currentEnv?.parameters}
+                      globalParameters={projectEnvironmentConfig?.globalParameters}
+                      value={workCopy.parameters}
                       varMap={varMap}
                       onChange={(parameters) => {
                         const next = { ...workCopy, parameters }
@@ -881,8 +920,27 @@ export function RunTab() {
                 children: (
                   <BodyPanel
                     key={`body-tab-${resetCounter}`}
-                    requestBody={workCopy.requestBody}
                     bodyRawText={workCopy.requestBody?.rawText}
+                    buildBodyExample={() => buildBodyExample(workCopy, menuRawList)}
+                    fillWithComments={fillWithComments}
+                    requestBody={workCopy.requestBody}
+                    varMap={varMap}
+                    onBodyParametersChange={(parameters) => {
+                      const next = {
+                        ...workCopy,
+                        requestBody: { ...workCopy.requestBody!, parameters },
+                      }
+                      setWorkCopy(next)
+                      persist(next)
+                    }}
+                    onBodyRawTextChange={(text) => {
+                      const next = {
+                        ...workCopy,
+                        requestBody: { ...workCopy.requestBody!, rawText: text },
+                      }
+                      setWorkCopy(next)
+                      persist(next)
+                    }}
                     onBodyTypeChange={(type) => {
                       const oldType = workCopy.requestBody?.type
                       const oldText = workCopy.requestBody?.rawText
@@ -903,27 +961,8 @@ export function RunTab() {
                       setWorkCopy(next)
                       persist(next)
                     }}
-                    onBodyRawTextChange={(text) => {
-                      const next = {
-                        ...workCopy,
-                        requestBody: { ...workCopy.requestBody!, rawText: text },
-                      }
-                      setWorkCopy(next)
-                      persist(next)
-                    }}
-                    onBodyParametersChange={(parameters) => {
-                      const next = {
-                        ...workCopy,
-                        requestBody: { ...workCopy.requestBody!, parameters },
-                      }
-                      setWorkCopy(next)
-                      persist(next)
-                    }}
                     onFillBody={handleFillBody}
-                    fillWithComments={fillWithComments}
                     onFillWithCommentsChange={setFillWithComments}
-                    buildBodyExample={() => buildBodyExample(workCopy, menuRawList)}
-                    varMap={varMap}
                   />
                 ),
               },
@@ -933,49 +972,47 @@ export function RunTab() {
                 children: (
                   <ScriptsPanel
                     key={`scripts-tab-${resetCounter}`}
-                    preScript={workCopy.preScript}
                     postScript={workCopy.postScript}
-                    onPreScriptChange={(value) => {
-                      const next = { ...workCopy, preScript: value }
-                      setWorkCopy(next)
-                      persist(next)
-                    }}
+                    postScriptConsole={postScriptConsole}
+                    postScriptTests={postScriptTests}
+                    preScript={workCopy.preScript}
+                    preScriptConsole={preScriptConsole}
+                    preScriptTests={preScriptTests}
                     onPostScriptChange={(value) => {
                       const next = { ...workCopy, postScript: value }
                       setWorkCopy(next)
                       persist(next)
                     }}
-                    preScriptConsole={preScriptConsole}
-                    preScriptTests={preScriptTests}
-                    postScriptConsole={postScriptConsole}
-                    postScriptTests={postScriptTests}
+                    onPreScriptChange={(value) => {
+                      const next = { ...workCopy, preScript: value }
+                      setWorkCopy(next)
+                      persist(next)
+                    }}
                   />
                 ),
               },
             ]}
+            tabBarStyle={{ paddingLeft: 8, marginBottom: 0 }}
+            onChange={setActiveParamsTab}
           />
-        }
-        resultArea={
+        )}
+        resultArea={(
           <ResultViewer
-            result={result}
-            error={error}
-            onRetry={handleRun}
-            menuItemId={tabData.key}
-            curlContent={
+            curlContent={(
               <div className="flex flex-col gap-3">
                 <div>
                   <div className="mb-1 flex items-center justify-between">
                     <Typography.Text strong className="text-xs">Windows</Typography.Text>
                     <Button
-                      type="text"
-                      size="small"
                       icon={<CopyIcon size={12} />}
+                      size="small"
+                      type="text"
                       onClick={() => {
                         void navigator.clipboard.writeText(curlCommands.windows).then(() => message.success('已复制'))
                       }}
                     />
                   </div>
-                  <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                  <pre className="m-0 overflow-auto rounded p-2 text-xs" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                     {curlCommands.windows}
                   </pre>
                 </div>
@@ -983,31 +1020,33 @@ export function RunTab() {
                   <div className="mb-1 flex items-center justify-between">
                     <Typography.Text strong className="text-xs">Linux / macOS</Typography.Text>
                     <Button
-                      type="text"
-                      size="small"
                       icon={<CopyIcon size={12} />}
+                      size="small"
+                      type="text"
                       onClick={() => {
                         void navigator.clipboard.writeText(curlCommands.linux).then(() => message.success('已复制'))
                       }}
                     />
                   </div>
-                  <pre className="m-0 rounded p-2 text-xs overflow-auto" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                  <pre className="m-0 overflow-auto rounded p-2 text-xs" style={{ backgroundColor: token.colorFillTertiary, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                     {curlCommands.linux}
                   </pre>
                 </div>
               </div>
-            }
+            )}
+            error={error}
+            menuItemId={tabData.key}
+            result={result}
+            onRetry={() => { void handleRun() }}
           />
-        }
-        hasResult={!!(result || error)}
-        autoSaveId={`run-tab-${docValue.id}`}
+        )}
       />
 
       <HistoryPanel
         menuItemId={tabData.key}
         open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
         onApply={handleApplyHistory}
+        onClose={() => { setHistoryOpen(false) }}
       />
     </div>
   )

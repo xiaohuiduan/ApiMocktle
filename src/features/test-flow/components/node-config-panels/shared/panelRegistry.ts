@@ -1,13 +1,12 @@
-import { FlowNodeType } from '../../../types/flow.types'
-import type { FlowNodeData } from '../../../types/flow.types'
-import ParallelNodePanel from '../ParallelNodePanel'
-import ConditionNodePanel from '../ConditionNodePanel'
-import WaitNodePanel from '../WaitNodePanel'
-import LoopNodePanel from '../LoopNodePanel'
-import SetVariableNodePanel from '../SetVariableNodePanel'
+import { type FlowNodeData, FlowNodeType } from '../../../types/flow.types'
 import AssertNodePanel from '../AssertNodePanel'
+import ConditionNodePanel from '../ConditionNodePanel'
 import HttpRequestNodePanel from '../HttpRequestNodePanel'
+import LoopNodePanel from '../LoopNodePanel'
+import ParallelNodePanel from '../ParallelNodePanel'
+import SetVariableNodePanel from '../SetVariableNodePanel'
 import SubFlowNodePanel from '../SubFlowNodePanel'
+import WaitNodePanel from '../WaitNodePanel'
 
 // ==================== 面板组件 Props 类型 ====================
 
@@ -42,7 +41,7 @@ export const panelRegistry: Partial<Record<FlowNodeType, PanelComponent>> = {
 // ==================== 获取面板组件 ====================
 
 export function getPanelComponent(nodeType: FlowNodeType): PanelComponent | null {
-  return panelRegistry[nodeType] || null
+  return panelRegistry[nodeType] ?? null
 }
 
 // ==================== 注册面板组件（用于后续扩展） ====================

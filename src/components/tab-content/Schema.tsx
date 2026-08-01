@@ -11,9 +11,9 @@ import { JsonSchemaCard } from '@/components/JsonSchemaCard'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
-import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { initialCreateApiSchemaData } from '@/data/remote'
 import { MenuItemType } from '@/enums'
+import { useCtrlSave } from '@/hooks/useCtrlSave'
 import type { ApiSchema } from '@/types'
 
 type ApiSchemaForm = ApiSchema & { name?: ApiMenuData['name'] }
@@ -31,7 +31,7 @@ export function Schema() {
   const [schemaName, setSchemaName] = useState<ApiMenuData['name']>()
   const initialLoadKey = useRef<string | undefined>()
 
-  useCtrlSave(() => form.submit())
+  useCtrlSave(() => { form.submit() })
 
   const isCreating = tabData.data?.tabStatus === PageTabStatus.Create
 
@@ -55,8 +55,9 @@ export function Schema() {
   }, [menuRawList, isCreating, tabData.key])
 
   useEffect(() => {
-    if (initialLoadKey.current === tabData.key) return
-    if (!fieldsValue) return
+    if (initialLoadKey.current === tabData.key) { return }
+
+    if (!fieldsValue) { return }
 
     initialLoadKey.current = tabData.key
     setSchemaName(fieldsValue.name)
@@ -68,41 +69,44 @@ export function Schema() {
     <div className="p-tabContent">
       <Form
         form={form}
-        onFinish={async (values) => {
-          const menuName = values.name ?? '未命名数据模型'
+        onFinish={(values) => {
+          void (async () => {
+            const menuName = values.name ?? '未命名数据模型'
 
-          if (isCreating) {
-            const menuItemId = nanoid(6)
+            if (isCreating) {
+              const menuItemId = nanoid(6)
 
-            addMenuItem({
-              id: menuItemId,
-              name: menuName,
-              type: MenuItemType.ApiSchema,
-              data: values,
-            })
-
-            addTabItem(
-              {
-                key: menuItemId,
-                label: menuName,
-                contentType: MenuItemType.ApiSchema,
-              },
-              { replaceTab: tabData.key },
-            )
-            messageApi.success('保存成功')
-          }
-          else {
-            try {
-              await updateMenuItem({
-                id: tabData.key,
+              addMenuItem({
+                id: menuItemId,
                 name: menuName,
+                type: MenuItemType.ApiSchema,
                 data: values,
               })
+
+              addTabItem(
+                {
+                  key: menuItemId,
+                  label: menuName,
+                  contentType: MenuItemType.ApiSchema,
+                },
+                { replaceTab: tabData.key },
+              )
               messageApi.success('保存成功')
-            } catch (err) {
-              messageApi.error((err as Error).message || '保存失败，请检查权限')
             }
-          }
+            else {
+              try {
+                await updateMenuItem({
+                  id: tabData.key,
+                  name: menuName,
+                  data: values,
+                })
+                messageApi.success('保存成功')
+              }
+              catch (err) {
+                messageApi.error((err as Error).message || '保存失败，请检查权限')
+              }
+            }
+          })()
         }}
         onValuesChange={(changedValues: ApiSchemaForm) => {
           if (changedValues.name) {

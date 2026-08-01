@@ -1,29 +1,27 @@
 import { useMemo, useRef, useState } from 'react'
+import {
+  type ImperativePanelHandle,
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+} from 'react-resizable-panels'
 
 import { Viewer } from '@bytemd/react'
 import { Button, Card, Select, type SelectProps, Space, Tabs, theme, Tooltip } from 'antd'
 import dayjs from 'dayjs'
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
-import {
-  Panel,
-  PanelGroup,
-  PanelResizeHandle,
-  type ImperativePanelHandle,
-} from 'react-resizable-panels'
 
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
+import { buildSchemaExample, buildSchemaRows, denormalizeJsonSchema, type SchemaFieldRow } from '@/components/JsonSchema/schema-normalizer'
 import { ApiRemoveButton } from '@/components/tab-content/api/ApiRemoveButton'
 import { API_STATUS_CONFIG, HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
-import { useStyles } from '@/hooks/useStyle'
 import { BodyType } from '@/enums'
-import type { JsonSchema } from '@/components/JsonSchema'
-import { buildSchemaExample, buildSchemaRows, denormalizeJsonSchema, type SchemaFieldRow } from '@/components/JsonSchema/schema-normalizer'
+import { useStyles } from '@/hooks/useStyle'
 import type { ApiDetails, Parameter } from '@/types'
 
 import { css } from '@emotion/css'
-
 
 const statusOptions: SelectProps['options'] = Object.entries(API_STATUS_CONFIG).map(
   ([method, { text, color }]) => {
@@ -148,10 +146,11 @@ function stringifyParameterExample(example: Parameter['example']): string {
 
 function buildQueryStringForCopy(params?: Parameter[]): string {
   const queryText = (params ?? [])
-    .filter(param => param.enable !== false && param.name)
+    .filter((param) => param.enable !== false && param.name)
     .map((param) => {
       const key = encodeURIComponent(param.name ?? '')
       const value = encodeURIComponent(stringifyParameterExample(param.example))
+
       return `${key}=${value}`
     })
     .join('&')
@@ -191,18 +190,18 @@ function SchemaLayout({ leftPanel, rightPanel, autoSaveId }: SchemaLayoutProps) 
       )}
 
       <PanelGroup
+        autoSaveId={autoSaveId}
         className="schema-layout"
         direction="horizontal"
-        autoSaveId={autoSaveId}
       >
         <Panel
-          className="schema-panel"
+          ref={leftPanelRef}
           collapsible
+          className="schema-panel"
           defaultSize={58}
           minSize={15}
-          onCollapse={() => setIsLeftCollapsed(true)}
-          onExpand={() => setIsLeftCollapsed(false)}
-          ref={leftPanelRef}
+          onCollapse={() => { setIsLeftCollapsed(true) }}
+          onExpand={() => { setIsLeftCollapsed(false) }}
         >
           {leftPanel}
         </Panel>
@@ -210,13 +209,13 @@ function SchemaLayout({ leftPanel, rightPanel, autoSaveId }: SchemaLayoutProps) 
         <PanelResizeHandle className="schema-resize-handle" />
 
         <Panel
-          className="schema-panel"
+          ref={rightPanelRef}
           collapsible
+          className="schema-panel"
           defaultSize={42}
           minSize={15}
-          onCollapse={() => setIsRightCollapsed(true)}
-          onExpand={() => setIsRightCollapsed(false)}
-          ref={rightPanelRef}
+          onCollapse={() => { setIsRightCollapsed(true) }}
+          onExpand={() => { setIsRightCollapsed(false) }}
         >
           {rightPanel}
         </Panel>
@@ -432,7 +431,7 @@ export function ApiDoc() {
             borderBottom: `1px solid ${token.colorBorderSecondary}`,
           },
 
-          'th': {
+          th: {
             position: 'sticky',
             top: 0,
             zIndex: 1,
@@ -448,7 +447,7 @@ export function ApiDoc() {
             width: '100%',
           },
 
-          'td': {
+          td: {
             minWidth: 0,
           },
         },
@@ -658,8 +657,10 @@ export function ApiDoc() {
                         onClick={() => {
                           if (!queryStringForCopy) {
                             messageApi.warning('暂无可复制的 Query 参数')
+
                             return
                           }
+
                           void navigator.clipboard.writeText(queryStringForCopy).then(() => {
                             messageApi.success('Query 参数已复制')
                           })
@@ -720,7 +721,7 @@ export function ApiDoc() {
                     </div>
                     <SchemaLayout
                       autoSaveId="api-doc-req-body"
-                      leftPanel={
+                      leftPanel={(
                         <>
                           <div className="schema-sub-title">
                             <span>参数结构</span>
@@ -728,8 +729,8 @@ export function ApiDoc() {
                           </div>
                           <SchemaFieldTable rows={requestSchemaRows} />
                         </>
-                      }
-                      rightPanel={
+                      )}
+                      rightPanel={(
                         <>
                           <div className="schema-sub-title">
                             <span>示例</span>
@@ -757,7 +758,7 @@ export function ApiDoc() {
                             {JSON.stringify(requestSchemaExample ?? displayRequestSchema, null, 2)}
                           </pre>
                         </>
-                      }
+                      )}
                     />
                   </div>
                 )}
@@ -802,7 +803,7 @@ export function ApiDoc() {
                         </div>
                         <SchemaLayout
                           autoSaveId={`api-doc-res-body-${res.id}`}
-                          leftPanel={
+                          leftPanel={(
                             <>
                               <div className="schema-sub-title">
                                 <span>参数结构</span>
@@ -810,8 +811,8 @@ export function ApiDoc() {
                               </div>
                               <SchemaFieldTable rows={resSchemaRows} />
                             </>
-                          }
-                          rightPanel={
+                          )}
+                          rightPanel={(
                             <>
                               <div className="schema-sub-title">
                                 <span>示例</span>
@@ -839,7 +840,7 @@ export function ApiDoc() {
                                 {JSON.stringify(resSchemaExample ?? displayResSchema, null, 2)}
                               </pre>
                             </>
-                          }
+                          )}
                         />
                       </div>
                     )}

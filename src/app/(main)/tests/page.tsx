@@ -1,15 +1,16 @@
-import { useEffect, useState, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router'
-import { Table, Button, Space, Tag, Modal, Form, Input, Switch, message, Popconfirm, Empty, Menu, Dropdown, Tooltip } from 'antd'
-import {
-  PlusOutlined, EditOutlined, DeleteOutlined,
-  FolderOutlined, FolderAddOutlined, MoreOutlined,
-} from '@ant-design/icons'
+import { useEffect, useMemo, useState } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import { useNavigate, useParams } from 'react-router'
+
+import {
+  DeleteOutlined,
+  EditOutlined, FolderAddOutlined, FolderOutlined, MoreOutlined,
+  PlusOutlined } from '@ant-design/icons'
+import { Button, Dropdown, Empty, Form, Input, message, Modal, Popconfirm, Space, Switch, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 
-import { useTestTask, useTestFolders } from '@/hooks/useTestTask'
-import type { TestTask, TestFolder, CreateTestTaskPayload, UpdateTestTaskPayload } from '@/types'
+import { useTestFolders, useTestTask } from '@/hooks/useTestTask'
+import type { CreateTestTaskPayload, TestFolder, TestTask, UpdateTestTaskPayload } from '@/types'
 
 const ALL_KEY = '__all__'
 const DEFAULT_KEY = '__default__'
@@ -20,10 +21,10 @@ export default function TestTaskListPage() {
 
   const {
     tasks, loading: tasksLoading, fetchTasks, createTask, updateTask, deleteTask, moveTaskToFolder,
-  } = useTestTask(projectId || '')
+  } = useTestTask(projectId ?? '')
   const {
     folders, fetchFolders, createFolder, renameFolder, deleteFolder,
-  } = useTestFolders(projectId || '')
+  } = useTestFolders(projectId ?? '')
 
   const [selectedFolderKey, setSelectedFolderKey] = useState<string>(ALL_KEY)
 
@@ -48,7 +49,7 @@ export default function TestTaskListPage() {
   // Build sidebar menu items
   const menuItems = useMemo(() => {
     const defaultCount = tasks.filter((t) => !t.folderId).length
-    const items: { key: string; label: string; count: number; icon?: React.ReactNode }[] = [
+    const items: { key: string, label: string, count: number, icon?: React.ReactNode }[] = [
       { key: ALL_KEY, label: '全部任务', count: tasks.length },
       { key: DEFAULT_KEY, label: '默认', count: defaultCount },
     ]
@@ -59,13 +60,16 @@ export default function TestTaskListPage() {
         count: tasks.filter((t) => t.folderId === f.id).length,
       })
     })
+
     return items
   }, [tasks, folders])
 
   // Filter tasks by selected folder
   const filteredTasks = useMemo(() => {
-    if (selectedFolderKey === ALL_KEY) return tasks
-    if (selectedFolderKey === DEFAULT_KEY) return tasks.filter((t) => !t.folderId)
+    if (selectedFolderKey === ALL_KEY) { return tasks }
+
+    if (selectedFolderKey === DEFAULT_KEY) { return tasks.filter((t) => !t.folderId) }
+
     return tasks.filter((t) => t.folderId === selectedFolderKey)
   }, [tasks, selectedFolderKey])
 
@@ -76,17 +80,19 @@ export default function TestTaskListPage() {
       const payload: CreateTestTaskPayload = {
         projectId: projectId!,
         name: values.name,
-        description: values.description || '',
+        description: values.description ?? '',
         failFast: values.failFast ?? true,
         folderId: selectedFolderKey === ALL_KEY || selectedFolderKey === DEFAULT_KEY ? null : selectedFolderKey,
       }
       const task = await createTask(payload)
+
       if (task) {
         message.success('测试任务创建成功')
         setCreateModalOpen(false)
         createForm.resetFields()
       }
-    } catch {
+    }
+    catch {
       // validation error
     }
   }
@@ -102,41 +108,49 @@ export default function TestTaskListPage() {
   }
 
   const handleEdit = async () => {
-    if (!editingTask) return
+    if (!editingTask) { return }
+
     try {
       const values = await editForm.validateFields()
       const payload: UpdateTestTaskPayload = {
         name: values.name,
-        description: values.description || '',
+        description: values.description ?? '',
         failFast: values.failFast ?? true,
       }
       const updated = await updateTask(editingTask.id, payload)
+
       if (updated) {
         message.success('任务信息已更新')
         setEditModalOpen(false)
         setEditingTask(null)
         editForm.resetFields()
       }
-    } catch {
+    }
+    catch {
       // validation error
     }
   }
 
   const handleDelete = async (taskId: string) => {
     const success = await deleteTask(taskId)
-    if (success) message.success('删除成功')
+
+    if (success) { message.success('删除成功') }
   }
 
   // ===== Folder CRUD =====
   const handleAddFolder = async () => {
     const name = prompt('请输入文件夹名称')
-    if (!name?.trim()) return
+
+    if (!name?.trim()) { return }
+
     const folder = await createFolder(name.trim())
-    if (folder) message.success('文件夹已创建')
+
+    if (folder) { message.success('文件夹已创建') }
   }
 
   const handleRenameFolder = async (folderId: string) => {
-    if (!editingFolderName.trim()) return
+    if (!editingFolderName.trim()) { return }
+
     await renameFolder(folderId, editingFolderName.trim())
     setEditingFolderId(null)
     setEditingFolderName('')
@@ -144,20 +158,23 @@ export default function TestTaskListPage() {
 
   const handleDeleteFolder = async (folderId: string) => {
     const ok = await deleteFolder(folderId)
+
     if (ok) {
       message.success('文件夹已删除，其中的任务已移回默认')
-      if (selectedFolderKey === folderId) setSelectedFolderKey(ALL_KEY)
+
+      if (selectedFolderKey === folderId) { setSelectedFolderKey(ALL_KEY) }
     }
   }
 
   const handleMoveToFolder = async (taskId: string, folderId: string | null) => {
     const result = await moveTaskToFolder(taskId, folderId)
-    if (result) message.success('已移动')
+
+    if (result) { message.success('已移动') }
   }
 
   // ===== Status Tag =====
   const getStatusTag = (status: TestTask['status']) => {
-    const statusMap: Record<TestTask['status'], { color: string; text: string }> = {
+    const statusMap: Record<TestTask['status'], { color: string, text: string }> = {
       idle: { color: 'default', text: '待执行' },
       running: { color: 'processing', text: '执行中' },
       passed: { color: 'success', text: '通过' },
@@ -165,6 +182,7 @@ export default function TestTaskListPage() {
       aborted: { color: 'warning', text: '已中止' },
     }
     const { color, text } = statusMap[status] || { color: 'default', text: status }
+
     return <Tag color={color}>{text}</Tag>
   }
 
@@ -174,6 +192,7 @@ export default function TestTaskListPage() {
       { key: '__default__', label: '默认' },
       ...folders.map((f) => ({ key: f.id, label: f.name })),
     ]
+
     return {
       items,
       onClick: ({ key }: { key: string }) => {
@@ -188,7 +207,7 @@ export default function TestTaskListPage() {
       dataIndex: 'name',
       key: 'name',
       render: (text, record) => (
-        <a onClick={() => navigate(`/projects/${projectId}/tests/${record.id}`)}>
+        <a onClick={() => { void navigate(`/projects/${projectId}/tests/${record.id}`) }}>
           {text}
         </a>
       ),
@@ -218,25 +237,25 @@ export default function TestTaskListPage() {
       render: (_, record) => (
         <Space size="small">
           <Button
-            type="link"
-            size="small"
             icon={<EditOutlined />}
-            onClick={() => openEditModal(record)}
+            size="small"
+            type="link"
+            onClick={() => { openEditModal(record) }}
           >
             编辑
           </Button>
           <Dropdown menu={getMoveMenuItems(record)} trigger={['click']}>
-            <Button type="link" size="small" icon={<FolderOutlined />}>
+            <Button icon={<FolderOutlined />} size="small" type="link">
               移动
             </Button>
           </Dropdown>
           <Popconfirm
-            title="确定要删除这个测试任务吗？"
-            onConfirm={() => handleDelete(record.id)}
-            okText="确定"
             cancelText="取消"
+            okText="确定"
+            title="确定要删除这个测试任务吗？"
+            onConfirm={() => { void handleDelete(record.id) }}
           >
-            <Button type="link" danger size="small" icon={<DeleteOutlined />}>
+            <Button danger icon={<DeleteOutlined />} size="small" type="link">
               删除
             </Button>
           </Popconfirm>
@@ -275,25 +294,28 @@ export default function TestTaskListPage() {
 
   // Compute dynamic title based on selected folder
   const pageTitle = useMemo(() => {
-    if (selectedFolderKey === ALL_KEY) return '自动化测试'
-    if (selectedFolderKey === DEFAULT_KEY) return '默认'
+    if (selectedFolderKey === ALL_KEY) { return '自动化测试' }
+
+    if (selectedFolderKey === DEFAULT_KEY) { return '默认' }
+
     const folder = folders.find((f) => f.id === selectedFolderKey)
-    return folder?.name || '自动化测试'
+
+    return folder?.name ?? '自动化测试'
   }, [selectedFolderKey, folders])
 
   return (
     <div className="flex h-full">
-      <PanelGroup direction="horizontal" autoSaveId="tests-folder-sidebar">
+      <PanelGroup autoSaveId="tests-folder-sidebar" direction="horizontal">
         {/* Left: Folder sidebar */}
-        <Panel defaultSize={20} minSize={15} maxSize={35}>
-          <div className="h-full border-r border-[color:var(--ds-panel-border,#f0f0f0)] bg-[color:var(--ds-panel-bg,#fafafa)] flex flex-col">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--ds-divider-color,#e5e7eb)]">
+        <Panel defaultSize={20} maxSize={35} minSize={15}>
+          <div className="flex h-full flex-col border-r border-[color:var(--ds-panel-border,#f0f0f0)] bg-[color:var(--ds-panel-bg,#fafafa)]">
+            <div className="flex items-center justify-between border-b border-[color:var(--ds-divider-color,#e5e7eb)] px-3 py-2">
               <span className="text-xs font-medium text-[color:var(--ds-node-text-secondary,#6b7280)]">文件夹</span>
               <Button
-                type="text"
-                size="small"
                 icon={<FolderAddOutlined />}
-                onClick={handleAddFolder}
+                size="small"
+                type="text"
+                onClick={() => { void handleAddFolder() }}
               />
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -301,10 +323,11 @@ export default function TestTaskListPage() {
                 const isFolder = item.key !== ALL_KEY && item.key !== DEFAULT_KEY
                 const isEditing = editingFolderId === item.key
                 const isSelected = selectedFolderKey === item.key
+
                 return (
                   <div
                     key={item.key}
-                    className={`group flex items-center justify-between px-3 py-1.5 cursor-pointer text-sm transition-colors ${
+                    className={`group flex cursor-pointer items-center justify-between px-3 py-1.5 text-sm transition-colors ${
                       isSelected ? 'font-medium' : 'hover:bg-[color:var(--ds-bg-elevated,#f8fafc)]'
                     }`}
                     style={{
@@ -312,44 +335,50 @@ export default function TestTaskListPage() {
                       color: isSelected ? '#fff' : 'var(--ds-node-text-primary, #1f2937)',
                     }}
                     onClick={() => {
-                      if (!isEditing) setSelectedFolderKey(item.key)
+                      if (!isEditing) { setSelectedFolderKey(item.key) }
                     }}
                   >
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      {isFolder ? (
-                        <FolderOutlined style={{ color: 'var(--ds-warning-color, #f59e0b)' }} className="text-xs shrink-0" />
-                      ) : item.key === ALL_KEY ? (
-                        <span className="text-xs shrink-0">📋</span>
-                      ) : (
-                        <FolderOutlined style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} className="text-xs shrink-0" />
-                      )}
-                      {isEditing ? (
-                        <Input
-                          size="small"
-                          value={editingFolderName}
-                          onChange={(e) => setEditingFolderName(e.target.value)}
-                          onPressEnter={() => handleRenameFolder(item.key)}
-                          onBlur={() => handleRenameFolder(item.key)}
-                          onClick={(e) => e.stopPropagation()}
-                          autoFocus
-                          className="text-xs"
-                        />
-                      ) : (
-                        <Tooltip title={item.label} placement="right" mouseEnterDelay={0.5}>
-                          <span className="truncate">{item.label}</span>
-                        </Tooltip>
-                      )}
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      {isFolder
+                        ? (
+                            <FolderOutlined className="shrink-0 text-xs" style={{ color: 'var(--ds-warning-color, #f59e0b)' }} />
+                          )
+                        : item.key === ALL_KEY
+                          ? (
+                              <span className="shrink-0 text-xs">📋</span>
+                            )
+                          : (
+                              <FolderOutlined className="shrink-0 text-xs" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} />
+                            )}
+                      {isEditing
+                        ? (
+                            <Input
+                              autoFocus
+                              className="text-xs"
+                              size="small"
+                              value={editingFolderName}
+                              onBlur={() => { void handleRenameFolder(item.key) }}
+                              onChange={(e) => { setEditingFolderName(e.target.value) }}
+                              onClick={(e) => { e.stopPropagation() }}
+                              onPressEnter={() => { void handleRenameFolder(item.key) }}
+                            />
+                          )
+                        : (
+                            <Tooltip mouseEnterDelay={0.5} placement="right" title={item.label}>
+                              <span className="truncate">{item.label}</span>
+                            </Tooltip>
+                          )}
                     </div>
                     <div className="flex items-center gap-1">
                       <span className="text-[10px] text-[color:var(--ds-node-text-muted,#9ca3af)]">{item.count}</span>
                       {isFolder && !isEditing && (
                         <Dropdown menu={getFolderMenuItems(folders.find((f) => f.id === item.key)!)} trigger={['click']}>
                           <Button
-                            type="text"
-                            size="small"
+                            className="!h-4 !w-4 !text-[10px] opacity-0 group-hover:opacity-100"
                             icon={<MoreOutlined />}
-                            className="opacity-0 group-hover:opacity-100 !w-4 !h-4 !text-[10px]"
-                            onClick={(e) => e.stopPropagation()}
+                            size="small"
+                            type="text"
+                            onClick={(e) => { e.stopPropagation() }}
                           />
                         </Dropdown>
                       )}
@@ -361,83 +390,85 @@ export default function TestTaskListPage() {
           </div>
         </Panel>
 
-        <PanelResizeHandle className="w-px bg-[color:var(--ds-divider-color,#e5e7eb)] hover:bg-[color:var(--ds-highlight-selected,#3b82f6)] transition-colors" />
+        <PanelResizeHandle className="w-px bg-[color:var(--ds-divider-color,#e5e7eb)] transition-colors hover:bg-[color:var(--ds-highlight-selected,#3b82f6)]" />
 
         {/* Right: Task table */}
         <Panel>
-          <div className="h-full p-6 overflow-auto">
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{pageTitle}</h1>
-          <Space>
-            <Button
-              icon={<FolderAddOutlined />}
-              onClick={handleAddFolder}
-            >
-              新建文件夹
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setCreateModalOpen(true)}
-            >
-              创建测试任务
-            </Button>
-          </Space>
-        </div>
+          <div className="h-full overflow-auto p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h1 className="text-2xl font-bold">{pageTitle}</h1>
+              <Space>
+                <Button
+                  icon={<FolderAddOutlined />}
+                  onClick={() => { void handleAddFolder() }}
+                >
+                  新建文件夹
+                </Button>
+                <Button
+                  icon={<PlusOutlined />}
+                  type="primary"
+                  onClick={() => { setCreateModalOpen(true) }}
+                >
+                  创建测试任务
+                </Button>
+              </Space>
+            </div>
 
-        {filteredTasks.length === 0 && !tasksLoading ? (
-          <Empty
-            description="暂无测试任务"
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-          >
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setCreateModalOpen(true)}
-            >
-              创建第一个测试任务
-            </Button>
-          </Empty>
-        ) : (
-          <Table
-            columns={columns}
-            dataSource={filteredTasks}
-            rowKey="id"
-            loading={tasksLoading}
-          />
-        )}
+            {filteredTasks.length === 0 && !tasksLoading
+              ? (
+                  <Empty
+                    description="暂无测试任务"
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  >
+                    <Button
+                      icon={<PlusOutlined />}
+                      type="primary"
+                      onClick={() => { setCreateModalOpen(true) }}
+                    >
+                      创建第一个测试任务
+                    </Button>
+                  </Empty>
+                )
+              : (
+                  <Table
+                    columns={columns}
+                    dataSource={filteredTasks}
+                    loading={tasksLoading}
+                    rowKey="id"
+                  />
+                )}
           </div>
         </Panel>
       </PanelGroup>
 
       {/* Create Modal */}
       <Modal
-        title="创建测试任务"
+        cancelText="取消"
+        okText="创建"
         open={createModalOpen}
-        onOk={handleCreate}
+        title="创建测试任务"
         onCancel={() => {
           setCreateModalOpen(false)
           createForm.resetFields()
         }}
-        okText="创建"
-        cancelText="取消"
+        onOk={() => { void handleCreate() }}
       >
         <Form
           form={createForm}
-          layout="vertical"
           initialValues={{ failFast: true }}
+          layout="vertical"
         >
           <Form.Item
-            name="name"
             label="任务名称"
+            name="name"
             rules={[{ required: true, message: '请输入任务名称' }]}
           >
             <Input placeholder="请输入任务名称" />
           </Form.Item>
-          <Form.Item name="description" label="描述">
+          <Form.Item label="描述" name="description">
             <Input.TextArea placeholder="请输入任务描述" rows={3} />
           </Form.Item>
-          <Form.Item name="failFast" label="失败即停" valuePropName="checked">
+          <Form.Item label="失败即停" name="failFast" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
@@ -445,29 +476,29 @@ export default function TestTaskListPage() {
 
       {/* Edit Modal */}
       <Modal
-        title="编辑测试任务"
+        cancelText="取消"
+        okText="保存"
         open={editModalOpen}
-        onOk={handleEdit}
+        title="编辑测试任务"
         onCancel={() => {
           setEditModalOpen(false)
           setEditingTask(null)
           editForm.resetFields()
         }}
-        okText="保存"
-        cancelText="取消"
+        onOk={() => { void handleEdit() }}
       >
         <Form form={editForm} layout="vertical">
           <Form.Item
-            name="name"
             label="任务名称"
+            name="name"
             rules={[{ required: true, message: '请输入任务名称' }]}
           >
             <Input placeholder="请输入任务名称" />
           </Form.Item>
-          <Form.Item name="description" label="描述">
+          <Form.Item label="描述" name="description">
             <Input.TextArea placeholder="请输入任务描述" rows={3} />
           </Form.Item>
-          <Form.Item name="failFast" label="失败即停" valuePropName="checked">
+          <Form.Item label="失败即停" name="failFast" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>

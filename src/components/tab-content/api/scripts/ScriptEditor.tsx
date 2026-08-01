@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 
-import { Badge, Button, Collapse, Empty, message, Modal, Tabs, Tag, Typography, theme } from 'antd'
-import { CheckCircleIcon, XCircleIcon, AlertTriangleIcon, InfoIcon, HelpCircleIcon, CopyIcon } from 'lucide-react'
+import { Badge, Button, Empty, message, Modal, Tabs, theme, Typography } from 'antd'
+import { AlertTriangleIcon, CheckCircleIcon, CopyIcon, HelpCircleIcon, InfoIcon, XCircleIcon } from 'lucide-react'
 
 import { MonacoEditor } from '@/components/MonacoEditor'
 import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
@@ -24,7 +24,7 @@ function ConsolePanel({ entries }: { entries: ScriptConsoleEntry[] }) {
   const { token } = theme.useToken()
 
   if (entries.length === 0) {
-    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无输出" className="py-4" />
+    return <Empty className="py-4" description="暂无输出" image={Empty.PRESENTED_IMAGE_SIMPLE} />
   }
 
   const iconMap = {
@@ -46,10 +46,10 @@ function ConsolePanel({ entries }: { entries: ScriptConsoleEntry[] }) {
       {entries.slice(0, MAX_CONSOLE_ENTRIES).map((entry, i) => (
         <div key={i} className="flex items-start gap-1.5 px-3 py-0.5 hover:bg-black/[.03] dark:hover:bg-white/[.03]">
           {iconMap[entry.level]}
-          <span className="opacity-50 shrink-0">
+          <span className="shrink-0 opacity-50">
             {new Date(entry.timestamp).toLocaleTimeString('zh-CN', { hour12: false })}
           </span>
-          <span style={{ color: colorMap[entry.level] }} className="break-all">
+          <span className="break-all" style={{ color: colorMap[entry.level] }}>
             {entry.args.join(' ')}
           </span>
         </div>
@@ -67,34 +67,38 @@ function TestResultsPanel({ results }: { results: ScriptTestResult[] }) {
   const { token } = theme.useToken()
 
   if (results.length === 0) {
-    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无测试结果" className="py-4" />
+    return <Empty className="py-4" description="暂无测试结果" image={Empty.PRESENTED_IMAGE_SIMPLE} />
   }
 
-  const passed = results.filter(r => r.passed).length
+  const passed = results.filter((r) => r.passed).length
   const failed = results.length - passed
 
   return (
     <div className="max-h-[200px] overflow-auto text-xs">
-      <div className="flex items-center gap-3 px-3 py-1.5 border-b" style={{ borderColor: token.colorBorderSecondary }}>
+      <div className="flex items-center gap-3 border-b px-3 py-1.5" style={{ borderColor: token.colorBorderSecondary }}>
         <span style={{ color: token.colorSuccess }}>
-          <CheckCircleIcon size={12} className="inline mr-1" />
-          通过 {passed}
+          <CheckCircleIcon className="mr-1 inline" size={12} />
+          通过
+          {' '}
+          {passed}
         </span>
         {failed > 0 && (
           <span style={{ color: token.colorError }}>
-            <XCircleIcon size={12} className="inline mr-1" />
-            失败 {failed}
+            <XCircleIcon className="mr-1 inline" size={12} />
+            失败
+            {' '}
+            {failed}
           </span>
         )}
       </div>
       {results.map((r, i) => (
-        <div key={i} className="flex items-start gap-2 px-3 py-1 border-b last:border-b-0" style={{ borderColor: token.colorBorderSecondary }}>
+        <div key={i} className="flex items-start gap-2 border-b px-3 py-1 last:border-b-0" style={{ borderColor: token.colorBorderSecondary }}>
           {r.passed
-            ? <CheckCircleIcon size={14} className="shrink-0 mt-0.5" style={{ color: token.colorSuccess }} />
-            : <XCircleIcon size={14} className="shrink-0 mt-0.5" style={{ color: token.colorError }} />}
+            ? <CheckCircleIcon className="mt-0.5 shrink-0" size={14} style={{ color: token.colorSuccess }} />
+            : <XCircleIcon className="mt-0.5 shrink-0" size={14} style={{ color: token.colorError }} />}
           <div>
             <div>{r.name}</div>
-            {r.error && <div style={{ color: token.colorError }} className="mt-0.5">{r.error}</div>}
+            {r.error && <div className="mt-0.5" style={{ color: token.colorError }}>{r.error}</div>}
           </div>
         </div>
       ))}
@@ -290,25 +294,26 @@ const HELP_ITEMS = [
   },
 ]
 
-function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function HelpModal({ open, onClose }: { open: boolean, onClose: () => void }) {
   const [messageApi, contextHolder] = message.useMessage()
 
   const handleCopyPrompt = async () => {
     try {
       await navigator.clipboard.writeText(AI_PROMPT)
       messageApi.success('已复制到剪贴板，粘贴给 AI 即可')
-    } catch {
+    }
+    catch {
       messageApi.error('复制失败，请手动复制')
     }
   }
 
   return (
     <Modal
-      title="脚本使用说明"
-      open={open}
-      onCancel={onClose}
       footer={null}
+      open={open}
+      title="脚本使用说明"
       width={640}
+      onCancel={onClose}
     >
       {contextHolder}
       <div className="max-h-[60vh] overflow-auto">
@@ -316,21 +321,25 @@ function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           <div className="flex items-center justify-between">
             <div>
               <Typography.Text strong>需要 AI 帮你写脚本？</Typography.Text>
-              <Typography.Text type="secondary" className="block text-xs mt-0.5">
+              <Typography.Text className="mt-0.5 block text-xs" type="secondary">
                 复制下方 Prompt 给 AI，再描述你的需求即可生成代码
               </Typography.Text>
             </div>
             <Button
-              type="primary"
               icon={<CopyIcon size={14} />}
+              type="primary"
               onClick={() => void handleCopyPrompt()}
             >
               复制 Prompt
             </Button>
           </div>
         </div>
-        <Typography.Paragraph type="secondary" className="mb-4">
-          在脚本中使用 <code>pm</code> 对象操作变量、修改请求、读取响应、运行断言。
+        <Typography.Paragraph className="mb-4" type="secondary">
+          在脚本中使用
+          {' '}
+          <code>pm</code>
+          {' '}
+          对象操作变量、修改请求、读取响应、运行断言。
         </Typography.Paragraph>
         {HELP_ITEMS.map((group) => (
           <div key={group.category} className="mb-4">
@@ -359,8 +368,8 @@ export function ScriptEditor(props: ScriptEditorProps) {
   const { token } = theme.useToken()
   const [helpOpen, setHelpOpen] = useState(false)
 
-  const failedTestCount = testResults.filter(r => !r.passed).length
-  const errorCount = consoleEntries.filter(e => e.level === 'error').length
+  const failedTestCount = testResults.filter((r) => !r.passed).length
+  const errorCount = consoleEntries.filter((e) => e.level === 'error').length
 
   const handleEditorMount = useCallback((editor: unknown, monaco: unknown) => {
     const m = monaco as {
@@ -377,7 +386,7 @@ export function ScriptEditor(props: ScriptEditorProps) {
     <span>
       Console
       {errorCount > 0 && (
-        <Badge count={errorCount} size="small" className="ml-1" />
+        <Badge className="ml-1" count={errorCount} size="small" />
       )}
     </span>
   ), [errorCount])
@@ -386,7 +395,7 @@ export function ScriptEditor(props: ScriptEditorProps) {
     <span>
       测试结果
       {failedTestCount > 0 && (
-        <Badge count={failedTestCount} size="small" className="ml-1" />
+        <Badge className="ml-1" count={failedTestCount} size="small" />
       )}
     </span>
   ), [failedTestCount])
@@ -394,25 +403,23 @@ export function ScriptEditor(props: ScriptEditorProps) {
   const hasOutput = consoleEntries.length > 0 || testResults.length > 0
 
   return (
-    <div className="flex flex-col min-h-0">
+    <div className="flex min-h-0 flex-col">
       <div className="mb-1 flex items-center justify-between">
         <div />
         <Button
-          type="link"
-          size="small"
           icon={<HelpCircleIcon size={14} />}
-          onClick={() => setHelpOpen(true)}
+          size="small"
+          type="link"
+          onClick={() => { setHelpOpen(true) }}
         >
           使用说明
         </Button>
       </div>
       <div className="flex flex-col rounded border" style={{ borderColor: token.colorBorderSecondary, height: 200 }}>
         <MonacoEditor
+          deserializeOnChange={false}
           height="100%"
           language={language}
-          value={value ?? ''}
-          onChange={(val) => onChange?.(typeof val === 'string' ? val : '')}
-          deserializeOnChange={false}
           options={{
             readOnly: false,
             minimap: { enabled: false },
@@ -422,15 +429,16 @@ export function ScriptEditor(props: ScriptEditorProps) {
             scrollBeyondLastLine: false,
             automaticLayout: true,
           }}
+          value={value ?? ''}
+          onChange={(val) => onChange?.(typeof val === 'string' ? val : '')}
           onMount={handleEditorMount}
         />
       </div>
 
       {hasOutput && (
-        <div className="mt-1.5 rounded border overflow-hidden" style={{ borderColor: token.colorBorderSecondary }}>
+        <div className="mt-1.5 overflow-hidden rounded border" style={{ borderColor: token.colorBorderSecondary }}>
           <Tabs
             animated={false}
-            size="small"
             className="script-output-tabs"
             items={[
               {
@@ -444,11 +452,12 @@ export function ScriptEditor(props: ScriptEditorProps) {
                 children: <TestResultsPanel results={testResults} />,
               },
             ]}
+            size="small"
           />
         </div>
       )}
 
-      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <HelpModal open={helpOpen} onClose={() => { setHelpOpen(false) }} />
     </div>
   )
 }

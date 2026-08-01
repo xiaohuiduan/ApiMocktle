@@ -6,8 +6,8 @@ import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { SelectorCatalog } from '@/components/SelectorCatalog'
 import { ROOT_CATALOG } from '@/configs/static'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
-import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { MenuItemType } from '@/enums'
+import { useCtrlSave } from '@/hooks/useCtrlSave'
 import type { ApiFolder } from '@/types'
 
 export function FolderSetting() {
@@ -16,7 +16,7 @@ export function FolderSetting() {
 
   const [form] = Form.useForm<ApiFolder>()
 
-  useCtrlSave(() => form.submit())
+  useCtrlSave(() => { form.submit() })
 
   const apiFolder = useMemo(() => {
     if (menuRawList) {

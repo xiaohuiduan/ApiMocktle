@@ -36,7 +36,7 @@ export function useHelpers() {
 
   const createApiDetails = (
     payload?: Partial<ApiTabItem>,
-    config?: { autoActive?: boolean; replaceTab?: ApiTabItem['key'] }
+    config?: { autoActive?: boolean, replaceTab?: ApiTabItem['key'] },
   ) => {
     const { newLabel } = API_MENU_CONFIG[CatalogType.Http]
     // 用同一个 id 作为 tab key / 草稿 id / 将来入库的 DB id，保证全程一致。
@@ -59,13 +59,13 @@ export function useHelpers() {
         contentType: MenuItemType.ApiDetail,
         data: { tabStatus: PageTabStatus.Create },
       },
-      { autoActive: true, ...config }
+      { autoActive: true, ...config },
     )
   }
 
   const createApiRequest = (
     payload?: Partial<ApiTabItem>,
-    config?: { autoActive?: boolean; replaceTab?: ApiTabItem['key'] }
+    config?: { autoActive?: boolean, replaceTab?: ApiTabItem['key'] },
   ) => {
     const { newLabel } = API_MENU_CONFIG[CatalogType.Request]
     // 用同一个 id 作为 tab key / 草稿 id / 将来入库的 DB id，保证全程一致。
@@ -88,13 +88,13 @@ export function useHelpers() {
         contentType: MenuItemType.HttpRequest,
         data: { tabStatus: PageTabStatus.Create },
       },
-      { autoActive: true, ...config }
+      { autoActive: true, ...config },
     )
   }
 
   const createDoc = (
     payload?: Partial<ApiTabItem>,
-    config?: { autoActive?: boolean; replaceTab?: ApiTabItem['key'] }
+    config?: { autoActive?: boolean, replaceTab?: ApiTabItem['key'] },
   ) => {
     addTabItem(
       {
@@ -104,13 +104,13 @@ export function useHelpers() {
         contentType: MenuItemType.Doc,
         data: { tabStatus: PageTabStatus.Create },
       },
-      config
+      config,
     )
   }
 
   const createApiSchema = (
     payload?: Partial<ApiTabItem>,
-    config?: { autoActive?: boolean; replaceTab?: ApiTabItem['key'] }
+    config?: { autoActive?: boolean, replaceTab?: ApiTabItem['key'] },
   ) => {
     const { newLabel } = API_MENU_CONFIG[CatalogType.Schema]
 
@@ -122,7 +122,7 @@ export function useHelpers() {
         contentType: MenuItemType.ApiSchema,
         data: { tabStatus: PageTabStatus.Create },
       },
-      config
+      config,
     )
   }
 

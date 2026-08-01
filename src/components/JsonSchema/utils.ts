@@ -9,7 +9,7 @@ import type { FieldPath, JsonSchema } from './JsonSchema.type'
  * 递归处理所有嵌套节点。
  */
 export function normalizeJsonSchema(schema: unknown): unknown {
-  if (!schema || typeof schema !== 'object') return schema
+  if (!schema || typeof schema !== 'object') { return schema }
 
   const s = schema as Record<string, unknown>
 
@@ -25,6 +25,7 @@ export function normalizeJsonSchema(schema: unknown): unknown {
       name,
       ...(normalizeJsonSchema(def) as Record<string, unknown>),
     }))
+
     return { ...s, properties: propsArray }
   }
 
@@ -60,7 +61,7 @@ export function normalizeJsonSchema(schema: unknown): unknown {
 export function getAllExpandedKeys(
   jsonSchema: JsonSchema,
   path: FieldPath[] = [],
-  keys: string[] = []
+  keys: string[] = [],
 ): string[] {
   if (jsonSchema.type === SchemaType.Object) {
     if (keys.length === 0) {
@@ -74,11 +75,13 @@ export function getAllExpandedKeys(
         getAllExpandedKeys(js, newPath, keys)
       })
     }
-  } else if (jsonSchema.type === SchemaType.Array) {
+  }
+  else if (jsonSchema.type === SchemaType.Array) {
     const newPath = [...path, KEY_ITEMS]
     keys.push(newPath.join(SEPARATOR))
     getAllExpandedKeys(jsonSchema.items, newPath, keys)
-  } else if (jsonSchema.type === SchemaType.Refer) {
+  }
+  else if (jsonSchema.type === SchemaType.Refer) {
     // $ref 引用节点也需要默认展开
     if (keys.length === 0) {
       keys.push('')
@@ -91,9 +94,9 @@ export function getAllExpandedKeys(
 /**
  * 根据 Schema 中字段的路径，获取到该字段的层级。
  */
-export function getNodeLevelInfo(fieldPath: FieldPath[]): { level: number; indentWidth: number } {
+export function getNodeLevelInfo(fieldPath: FieldPath[]): { level: number, indentWidth: number } {
   const level = fieldPath.filter(
-    (pathName) => pathName === KEY_PROPERTIES || pathName === KEY_ITEMS
+    (pathName) => pathName === KEY_PROPERTIES || pathName === KEY_ITEMS,
   ).length
 
   const indentWidth = level * INDENT
@@ -103,21 +106,22 @@ export function getNodeLevelInfo(fieldPath: FieldPath[]): { level: number; inden
 
 function extractRefName(ref: string): string {
   const parts = ref.split('/')
+
   return parts[parts.length - 1] || ref
 }
 
 export function getRefJsonSchema(
   menuRawList: ApiMenuData[],
-  refName: string
+  refName: string,
 ): JsonSchema | undefined {
   const name = extractRefName(refName)
 
   const menuData = menuRawList.find(
-    (item) => item.name === name && item.type === MenuItemType.ApiSchema
+    (item) => item.name === name && item.type === MenuItemType.ApiSchema,
   )
 
-  const jsonSchema =
-    menuData?.type === MenuItemType.ApiSchema ? menuData.data?.jsonSchema : undefined
+  const jsonSchema
+    = menuData?.type === MenuItemType.ApiSchema ? menuData.data?.jsonSchema : undefined
 
   return jsonSchema
 }
@@ -134,7 +138,7 @@ function isRefSchema(schema: JsonSchema | Record<string, unknown>): boolean {
 export function resolveRefSchema(
   jsonSchema: JsonSchema,
   menuRawList: ApiMenuData[],
-  visited: Set<string> = new Set(),
+  visited = new Set<string>(),
 ): JsonSchema {
   if (isRefSchema(jsonSchema)) {
     const refName = (jsonSchema as unknown as Record<string, unknown>).$ref as string

@@ -1,13 +1,13 @@
 import { useMemo } from 'react'
 
+import { show } from '@ebay/nice-modal-react'
 import { Button, theme } from 'antd'
 import { SettingsIcon } from 'lucide-react'
-import { show } from '@ebay/nice-modal-react'
 
 import { IconLogo } from '@/components/icons/IconLogo'
-import { UserMenu } from '@/components/UserMenu'
 import { ModalSettings } from '@/components/modals/ModalSettings'
 import { SessionVariablesPanel } from '@/components/SessionVariablesPanel'
+import { UserMenu } from '@/components/UserMenu'
 import { useDesignStyle } from '@/hooks/useDesignStyle'
 
 import { NavMenu } from './NavMenu'
@@ -26,6 +26,7 @@ export function SideNav() {
         boxShadow: 'var(--ds-shadow-sm)',
       }
     }
+
     if (isNeumorphism) {
       return {
         backgroundColor: 'var(--ds-bg-surface)',
@@ -33,6 +34,7 @@ export function SideNav() {
         borderRight: 'none',
       }
     }
+
     if (isSkeuomorphism) {
       return {
         backgroundColor: 'var(--ds-bg-surface)',
@@ -41,6 +43,7 @@ export function SideNav() {
         boxShadow: 'var(--ds-shadow-sm)',
       }
     }
+
     return {}
   }, [isGlassStyle, isNeumorphism, isSkeuomorphism])
 
@@ -53,6 +56,7 @@ export function SideNav() {
         WebkitBackdropFilter: 'blur(8px)',
       }
     }
+
     if (isNeumorphism) {
       return {
         color: token.colorText,
@@ -60,6 +64,7 @@ export function SideNav() {
         border: 'none',
       }
     }
+
     if (isSkeuomorphism) {
       return {
         color: token.colorText,
@@ -67,6 +72,7 @@ export function SideNav() {
         boxShadow: 'var(--ds-shadow-sm)',
       }
     }
+
     return { color: token.colorText, border: `1px solid ${token.colorBorder}` }
   }, [isGlassStyle, isNeumorphism, isSkeuomorphism, token])
 
@@ -86,11 +92,11 @@ export function SideNav() {
         <SessionVariablesPanel />
         <UserMenu showUsername={false} />
         <Button
-          type="text"
-          size="small"
           icon={<SettingsIcon size={16} />}
-          onClick={() => void show(ModalSettings)}
+          size="small"
           title="全局设置"
+          type="text"
+          onClick={() => void show(ModalSettings)}
         />
       </div>
     </div>

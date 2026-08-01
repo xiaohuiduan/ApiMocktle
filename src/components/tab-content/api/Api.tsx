@@ -11,6 +11,7 @@ import { ApiDocEditing } from './ApiDocEditing'
 import { RunTab } from './RunTab'
 
 const ApiSubTabContext = createContext<string>('doc')
+
 export const useApiSubTabContext = () => useContext(ApiSubTabContext)
 
 export function Api() {
@@ -78,12 +79,12 @@ export function Api() {
             : (
                 <div className="flex h-full overflow-hidden">
                   <Tabs
-                    animated={false}
-                    className="api-details-tabs flex-1 min-w-0"
-                    defaultActiveKey="doc"
                     activeKey={activeKey}
-                    onChange={setActiveKey}
+                    animated={false}
+                    className="api-details-tabs min-w-0 flex-1"
+                    defaultActiveKey="doc"
                     items={apiTabItems}
+                    onChange={setActiveKey}
                   />
                 </div>
               )}

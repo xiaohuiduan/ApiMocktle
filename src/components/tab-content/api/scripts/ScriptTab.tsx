@@ -33,10 +33,10 @@ export function ScriptTab(props: ScriptTabProps) {
           label: '前置脚本',
           children: (
             <ScriptEditor
-              value={preScript}
-              onChange={onPreScriptChange}
               consoleEntries={preScriptConsole}
               testResults={preScriptTests}
+              value={preScript}
+              onChange={onPreScriptChange}
             />
           ),
         },
@@ -45,10 +45,10 @@ export function ScriptTab(props: ScriptTabProps) {
           label: '后置脚本',
           children: (
             <ScriptEditor
-              value={postScript}
-              onChange={onPostScriptChange}
               consoleEntries={postScriptConsole}
               testResults={postScriptTests}
+              value={postScript}
+              onChange={onPostScriptChange}
             />
           ),
         },

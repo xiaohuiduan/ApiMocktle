@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { Button, Space, Typography, theme } from 'antd'
+import { Button, Space, theme, Typography } from 'antd'
 import {
   AlertTriangleIcon,
   ChevronDownIcon,
@@ -41,8 +41,8 @@ export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
 
   return (
     <div
-      role="alert"
       className="flex flex-col rounded-lg p-4"
+      role="alert"
       style={{
         border: `1px solid ${token.colorErrorBorder}`,
         borderLeft: `4px solid ${token.colorError}`,
@@ -50,9 +50,9 @@ export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
       }}
     >
       {/* 标题栏：图标 + 请求失败 */}
-      <div className="flex items-center gap-2 mb-2">
+      <div className="mb-2 flex items-center gap-2">
         <span style={{ color: token.colorError }}>
-          {errorIconMap[errorInfo.errorType] || <AlertTriangleIcon size={18} />}
+          {errorIconMap[errorInfo.errorType] ?? <AlertTriangleIcon size={18} />}
         </span>
         <Typography.Text
           strong
@@ -72,15 +72,15 @@ export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
 
       {/* 修复建议 */}
       {errorInfo.suggestion && (
-        <div className="mt-3 ml-[26px]">
-          <Typography.Text className="block text-sm font-medium mb-1" style={{ color: token.colorTextSecondary }}>
+        <div className="ml-[26px] mt-3">
+          <Typography.Text className="mb-1 block text-sm font-medium" style={{ color: token.colorTextSecondary }}>
             建议排查方向
           </Typography.Text>
           <div className="flex flex-col gap-1">
             {errorInfo.suggestion.split('\n').filter(Boolean).map((line, i) => (
               <Space key={i} size={8}>
                 <span
-                  className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+                  className="inline-block size-1.5 shrink-0 rounded-full"
                   style={{ backgroundColor: token.colorError }}
                 />
                 <Typography.Text className="text-sm">{line}</Typography.Text>
@@ -92,19 +92,19 @@ export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
 
       {/* 技术详情（可展开） */}
       {errorInfo.errorDetail && (
-        <div className="mt-3 ml-[26px]">
+        <div className="ml-[26px] mt-3">
           <button
-            type="button"
-            onClick={() => setShowDetail(v => !v)}
-            className="flex items-center gap-1 text-sm cursor-pointer border-0 bg-transparent p-0"
+            className="flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-sm"
             style={{ color: token.colorTextTertiary }}
+            type="button"
+            onClick={() => { setShowDetail((v) => !v) }}
           >
             {showDetail ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
             技术详情
           </button>
           {showDetail && (
             <pre
-              className="mt-2 rounded p-2 text-xs overflow-auto leading-relaxed"
+              className="mt-2 overflow-auto rounded p-2 text-xs leading-relaxed"
               style={{
                 backgroundColor: token.colorBgContainer,
                 border: `1px solid ${token.colorBorderSecondary}`,
@@ -123,10 +123,10 @@ export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
 
       {/* 重试按钮 */}
       {onRetry && (
-        <div className="mt-4 ml-[26px]">
+        <div className="ml-[26px] mt-4">
           <Button
-            size="small"
             icon={<RefreshCwIcon size={14} />}
+            size="small"
             onClick={onRetry}
           >
             重试

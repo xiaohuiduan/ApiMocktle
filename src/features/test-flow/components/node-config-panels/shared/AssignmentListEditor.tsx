@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
-import { Button, Select, Input, Space, Typography } from 'antd'
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Input, Select, Space, Typography } from 'antd'
 
 const { Text } = Typography
 
@@ -53,7 +54,8 @@ export default function AssignmentListEditor({ assignments, onChange }: Assignme
   const handleUpdate = useCallback(
     (index: number, field: keyof Assignment, value: any) => {
       const newAssignments = assignments.map((assignment, i) => {
-        if (i !== index) return assignment
+        if (i !== index) { return assignment }
+
         return { ...assignment, [field]: value }
       })
       onChange(newAssignments)
@@ -64,65 +66,67 @@ export default function AssignmentListEditor({ assignments, onChange }: Assignme
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Text type="secondary" className="text-xs">
+        <Text className="text-xs" type="secondary">
           变量赋值列表
         </Text>
         <Button
-          type="dashed"
-          size="small"
           icon={<PlusOutlined />}
+          size="small"
+          type="dashed"
           onClick={handleAdd}
         >
           添加赋值
         </Button>
       </div>
 
-      {assignments.length === 0 ? (
-        <Text type="secondary" className="text-xs italic">
-          暂无赋值
-        </Text>
-      ) : (
-        <div className="space-y-2">
-          {assignments.map((assignment, index) => (
-            <div
-              key={index}
-              className="p-2 border border-[color:var(--ds-node-border-color,#e5e7eb)] rounded-md bg-[color:var(--ds-node-bg-elevated,#f9fafb)]"
-            >
-              <Space.Compact block>
-                <Input
-                  value={assignment.variable}
-                  onChange={(e) => handleUpdate(index, 'variable', e.target.value)}
-                  size="small"
-                  placeholder="变量名"
-                  style={{ width: '35%' }}
-                />
-                <Select
-                  value={assignment.operator}
-                  onChange={(value) => handleUpdate(index, 'operator', value)}
-                  options={OPERATOR_OPTIONS}
-                  size="small"
-                  style={{ width: '15%' }}
-                />
-                <Input
-                  value={assignment.value}
-                  onChange={(e) => handleUpdate(index, 'value', e.target.value)}
-                  size="small"
-                  placeholder="值或 {{表达式}}"
-                  style={{ width: '40%' }}
-                />
-                <Button
-                  type="text"
-                  danger
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  onClick={() => handleDelete(index)}
-                  style={{ width: '10%' }}
-                />
-              </Space.Compact>
+      {assignments.length === 0
+        ? (
+            <Text className="text-xs italic" type="secondary">
+              暂无赋值
+            </Text>
+          )
+        : (
+            <div className="space-y-2">
+              {assignments.map((assignment, index) => (
+                <div
+                  key={index}
+                  className="rounded-md border border-[color:var(--ds-node-border-color,#e5e7eb)] bg-[color:var(--ds-node-bg-elevated,#f9fafb)] p-2"
+                >
+                  <Space.Compact block>
+                    <Input
+                      placeholder="变量名"
+                      size="small"
+                      style={{ width: '35%' }}
+                      value={assignment.variable}
+                      onChange={(e) => { handleUpdate(index, 'variable', e.target.value) }}
+                    />
+                    <Select
+                      options={OPERATOR_OPTIONS}
+                      size="small"
+                      style={{ width: '15%' }}
+                      value={assignment.operator}
+                      onChange={(value) => { handleUpdate(index, 'operator', value) }}
+                    />
+                    <Input
+                      placeholder="值或 {{表达式}}"
+                      size="small"
+                      style={{ width: '40%' }}
+                      value={assignment.value}
+                      onChange={(e) => { handleUpdate(index, 'value', e.target.value) }}
+                    />
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      size="small"
+                      style={{ width: '10%' }}
+                      type="text"
+                      onClick={() => { handleDelete(index) }}
+                    />
+                  </Space.Compact>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
     </div>
   )
 }

@@ -6,13 +6,13 @@ import { theme } from 'antd'
 import { produce } from 'immer'
 import { get, set } from 'lodash-es'
 
-import { css } from '@emotion/css'
-
 import { columnHeight, defaultFieldData, KEY_ITEMS, KEY_PROPERTIES, SchemaType } from './constants'
 import { JsonSchemaContextProvider } from './JsonSchema.context'
 import type { ArraySchema, ColumnType, FieldPath, JsonSchema } from './JsonSchema.type'
 import { JsonSchemaNode, type JsonSchemaNodeProps } from './JsonSchemaNode'
 import { getAllExpandedKeys } from './utils'
+
+import { css } from '@emotion/css'
 
 export interface JsonSchemaEditorProps extends Pick<JsonSchemaNodeProps, 'value' | 'onChange'> {
   defaultExpandAll?: boolean

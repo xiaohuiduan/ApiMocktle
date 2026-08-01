@@ -116,7 +116,7 @@ export const HTTP_CODE_CONFIG = {
     text: '网关超时',
     desc: '当服务器充当网关时无法及时获取响应时，发送此错误响应',
   },
-} as const satisfies Record<number, { value: number; text: string; desc: string }>
+} as const satisfies Record<number, { value: number, text: string, desc: string }>
 
 export const API_STATUS_CONFIG = {
   [ApiStatus.Designing]: {
@@ -227,5 +227,5 @@ export const API_MENU_CONFIG = {
   },
 } as const satisfies Record<
   CatalogType,
-  { title: string; tipTitle: string; newLabel: string; accentColor: string }
+  { title: string, tipTitle: string, newLabel: string, accentColor: string }
 >

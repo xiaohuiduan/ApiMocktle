@@ -3,7 +3,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { Editor, type EditorProps } from '@monaco-editor/react'
 import { merge } from 'lodash-es'
 
-import { UnsafeAny } from '@/types'
+import type { UnsafeAny } from '@/types'
 import { deserialize, isPureObject, serialize } from '@/utils'
 
 type EditorMountParams = Parameters<NonNullable<EditorProps['onMount']>>
@@ -60,6 +60,7 @@ function registerVariableCompletions(
       })
       const lastOpen = textBefore.lastIndexOf('{{')
       const lastClose = textBefore.lastIndexOf('}}')
+
       if (lastOpen < 0 || lastOpen < lastClose) {
         return { suggestions: [] }
       }
@@ -76,6 +77,7 @@ function registerVariableCompletions(
       const suggestions = items
         .filter((it) => {
           const f = filter.toLowerCase()
+
           return f.startsWith('$')
             ? it.label.toLowerCase().startsWith(f)
             : it.label.toLowerCase().includes(f)
@@ -91,6 +93,7 @@ function registerVariableCompletions(
       return { suggestions }
     },
   })
+
   return () => {
     disposable.dispose()
   }
@@ -120,10 +123,12 @@ function EditorX<ValueType = unknown>(
   // completionItems 变化时重新注册补全 provider（用户变量更新后补全项同步刷新）
   const completionItemsKey = completionItems ? completionItems.map((it) => it.label).join(',') : ''
   useEffect(() => {
-    if (!editorMounted || !completionItems || completionItems.length === 0) return
+    if (!editorMounted || !completionItems || completionItems.length === 0) { return }
+
     const editor = editorRef.current
     const monaco = monacoRef.current
-    if (!editor || !monaco) return
+
+    if (!editor || !monaco) { return }
 
     completionDisposeRef.current?.()
     const language = editor.getModel()?.getLanguageId() ?? 'json'

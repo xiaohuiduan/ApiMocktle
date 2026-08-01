@@ -23,29 +23,37 @@ function lineDiff(left: string, right: string): DiffRow[] {
   const m = b.length
   // LCS 长度表
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0))
+
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
       dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1])
     }
   }
+
   const rows: DiffRow[] = []
   let i = 0
   let j = 0
+
   while (i < n && j < m) {
     if (a[i] === b[j]) {
       rows.push({ left: a[i], right: b[j], type: 'same' })
       i++
       j++
-    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+    }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) {
       rows.push({ left: a[i], right: undefined, type: 'removed' })
       i++
-    } else {
+    }
+    else {
       rows.push({ left: undefined, right: b[j], type: 'added' })
       j++
     }
   }
-  while (i < n) rows.push({ left: a[i++], right: undefined, type: 'removed' })
-  while (j < m) rows.push({ left: undefined, right: b[j++], type: 'added' })
+
+  while (i < n) { rows.push({ left: a[i++], right: undefined, type: 'removed' }) }
+
+  while (j < m) { rows.push({ left: undefined, right: b[j++], type: 'added' }) }
+
   return rows
 }
 
@@ -59,14 +67,18 @@ export function MarkdownDiffView({ leftText, rightText, leftTitle, rightTitle }:
   useEffect(() => {
     const l = leftRef.current
     const r = rightRef.current
-    if (!l || !r) return
+
+    if (!l || !r) { return }
+
     const onScroll = (src: HTMLDivElement, dst: HTMLDivElement) => () => {
       dst.scrollTop = src.scrollTop
     }
+
     const ls = onScroll(l, r)
     const rs = onScroll(r, l)
     l.addEventListener('scroll', ls)
     r.addEventListener('scroll', rs)
+
     return () => {
       l.removeEventListener('scroll', ls)
       r.removeEventListener('scroll', rs)
@@ -81,15 +93,18 @@ export function MarkdownDiffView({ leftText, rightText, leftTitle, rightTitle }:
     <div ref={ref} className="flex-1 overflow-auto font-mono text-xs leading-5" style={{ maxHeight: '60vh' }}>
       {rows.map((row, idx) => {
         const text = side === 'left' ? row.left : row.right
+
         if (text === undefined) {
           return <div key={idx} style={{ height: 20, backgroundColor: 'var(--ds-bg-elevated, #fafafa)' }} />
         }
+
         const bg = row.type === 'same'
           ? 'transparent'
           : row.type === 'removed'
             ? 'color-mix(in srgb, var(--ds-error-color, #ef4444) 10%, transparent)'
             : 'color-mix(in srgb, var(--ds-success-color, #22c55e) 10%, transparent)'
         const color = row.type === 'removed' ? 'var(--ds-error-color, #c0392b)' : row.type === 'added' ? 'var(--ds-success-color, #1e8449)' : undefined
+
         return (
           <div key={idx} style={{ backgroundColor: bg, color, padding: '0 8px', whiteSpace: 'pre', borderBottom: '1px solid var(--ds-divider-color, #f0f0f0)' }}>
             {text || ' '}
@@ -101,7 +116,7 @@ export function MarkdownDiffView({ leftText, rightText, leftTitle, rightTitle }:
 
   return (
     <div>
-      <div className="mb-2 flex gap-2 text-xs text-secondary">
+      <div className="text-secondary mb-2 flex gap-2 text-xs">
         <span className="flex-1 font-medium">{leftTitle ?? '原始'}</span>
         <span className="flex-1 font-medium">{rightTitle ?? '对比'}</span>
       </div>

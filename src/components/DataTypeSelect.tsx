@@ -72,7 +72,8 @@ export function DataTypeSelect(props: DataTypeSelectProps) {
     if (type) {
       if ($ref) {
         // 从 $ref 中提取模型名称
-        const name = $ref.split('/').pop() || $ref
+        const name = $ref.split('/').pop() ?? $ref
+
         return schemaModels.find((it) => it.name === name)?.name ?? name
       }
       else {
@@ -139,11 +140,11 @@ export function DataTypeSelect(props: DataTypeSelectProps) {
                 ? (
                     <Select
                       className="w-full"
-                      placeholder="请选择引用的模型"
                       options={schemaModels.map((it) => ({
                         label: it.name,
                         value: `#/components/schemas/${it.name}`,
                       }))}
+                      placeholder="请选择引用的模型"
                       value={$ref}
                       onChange={(v) => {
                         onRefSelect?.(v)

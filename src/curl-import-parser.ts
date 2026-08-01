@@ -81,6 +81,7 @@ function tokenizeCurlCommand(command: string) {
       else {
         current += char
       }
+
       continue
     }
 
@@ -94,6 +95,7 @@ function tokenizeCurlCommand(command: string) {
         tokens.push(current)
         current = ''
       }
+
       continue
     }
 
@@ -170,6 +172,7 @@ export function parseAmpersandPairs(values: string[]) {
       .filter(Boolean)
       .map((segment) => {
         const pair = splitNameValue(segment, '=')
+
         return { name: safeDecode(pair.name), value: safeDecode(pair.value) }
       })
       .filter(({ name }) => Boolean(name))
@@ -281,6 +284,7 @@ export function parseCurlCommand(curlText: string): CurlParseState {
 
 export function looksLikeUrlEncodedBody(value: string) {
   const trimmedValue = value.trim()
+
   return trimmedValue.includes('=') && !trimmedValue.startsWith('{') && !trimmedValue.startsWith('<')
 }
 
@@ -314,6 +318,7 @@ export function extractHeaders(rawHeaders: string[], ignoreCommonHeaders: boolea
 
     if (lowerName === 'cookie') {
       cookiePairs.push(...parseCookiePairs([value]))
+
       return
     }
 

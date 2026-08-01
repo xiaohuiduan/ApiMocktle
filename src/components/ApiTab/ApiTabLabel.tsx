@@ -53,9 +53,9 @@ export function ApiTabLabel(props: ApiTabLabelProps) {
       <span>{menuData?.name ?? tabItem.label}</span>
       {hasUnsaved && (
         <span
+          aria-label="有未保存修改"
           className="ml-0.5 text-xs"
           style={{ color: token.colorWarning }}
-          aria-label="有未保存修改"
         >
           *
         </span>

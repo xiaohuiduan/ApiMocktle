@@ -1,4 +1,4 @@
-import { AnyType, UnsafeAny } from '@/types'
+import type { AnyType, UnsafeAny } from '@/types'
 
 export function getPageTitle(title?: string): string {
   const mainTitle = 'ApiMocktle'
@@ -23,7 +23,7 @@ export function isPureObject(value: AnyType): value is Record<string, UnsafeAny>
 }
 
 /** 移动数组元素。 */
-export function moveArrayItem<T>(arr: T[], fromIndex: number, toIndex: number) {
+export function moveArrayItem(arr: unknown[], fromIndex: number, toIndex: number) {
   // 先删除原位置上的元素。
   const element = arr.splice(fromIndex, 1)[0]
 

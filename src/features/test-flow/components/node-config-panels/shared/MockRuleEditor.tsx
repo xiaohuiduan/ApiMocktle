@@ -1,11 +1,14 @@
-import { useCallback, useState, useEffect } from 'react'
-import { Button, Select, Input, InputNumber, Switch, Space, Tag, Empty, Tooltip, Typography } from 'antd'
-import { PlusOutlined, DeleteOutlined, ThunderboltOutlined, ApiOutlined } from '@ant-design/icons'
+import { useCallback, useEffect, useState } from 'react'
+
+import { ApiOutlined, DeleteOutlined, PlusOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { invoke } from '@tauri-apps/api/core'
+import { Button, Empty, Input, InputNumber, Select, Space, Switch, Tag, Tooltip, Typography } from 'antd'
 import { nanoid } from 'nanoid'
+
 import { MonacoEditor } from '@/components/MonacoEditor/MonacoEditor'
+
 import { useFlowStore } from '../../../store/useFlowStore'
-import type { MockRule, AgentDiscoverResult, AgentClassInfo } from '../../../types/mock.types'
+import type { AgentClassInfo, AgentDiscoverResult, MockRule } from '../../../types/mock.types'
 
 const { Text } = Typography
 
@@ -31,27 +34,32 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
     if (!agentUrl) {
       setAgentConnected(false)
       setDiscoverResult(null)
+
       return
     }
+
     const check = async () => {
       try {
-        const statusResult = await invoke<{ ok: boolean; data?: { connected: boolean } }>(
-          'check_mock_agent_status', { agentUrl }
+        const statusResult = await invoke<{ ok: boolean, data?: { connected: boolean } }>(
+          'check_mock_agent_status', { agentUrl },
         )
         setAgentConnected(statusResult.data?.connected ?? false)
 
         if (statusResult.data?.connected) {
-          const result = await invoke<{ ok: boolean; data?: AgentDiscoverResult }>(
-            'discover_mock_targets', { agentUrl }
+          const result = await invoke<{ ok: boolean, data?: AgentDiscoverResult }>(
+            'discover_mock_targets', { agentUrl },
           )
+
           if (result.data) {
             setDiscoverResult(result.data)
           }
         }
-      } catch {
+      }
+      catch {
         setAgentConnected(false)
       }
     }
+
     check()
   }, [agentUrl])
 
@@ -60,27 +68,32 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
     if (!agentUrl) {
       setAgentConnected(false)
       setDiscoverResult(null)
+
       return
     }
+
     const check = async () => {
       try {
-        const statusResult = await invoke<{ ok: boolean; data?: { connected: boolean } }>(
-          'check_mock_agent_status', { agentUrl }
+        const statusResult = await invoke<{ ok: boolean, data?: { connected: boolean } }>(
+          'check_mock_agent_status', { agentUrl },
         )
         setAgentConnected(statusResult.data?.connected ?? false)
 
         if (statusResult.data?.connected) {
-          const result = await invoke<{ ok: boolean; data?: AgentDiscoverResult }>(
-            'discover_mock_targets', { agentUrl }
+          const result = await invoke<{ ok: boolean, data?: AgentDiscoverResult }>(
+            'discover_mock_targets', { agentUrl },
           )
+
           if (result.data) {
             setDiscoverResult(result.data)
           }
         }
-      } catch {
+      }
+      catch {
         setAgentConnected(false)
       }
     }
+
     check()
   }, [agentUrl])
 
@@ -101,12 +114,12 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
 
   // 更新规则
   const updateRule = useCallback((id: string, partial: Partial<MockRule>) => {
-    onChange(rules.map(r => r.id === id ? { ...r, ...partial } : r))
+    onChange(rules.map((r) => r.id === id ? { ...r, ...partial } : r))
   }, [rules, onChange])
 
   // 删除规则
   const removeRule = useCallback((id: string) => {
-    onChange(rules.filter(r => r.id !== id))
+    onChange(rules.filter((r) => r.id !== id))
   }, [rules, onChange])
 
   // 从发现列表添加
@@ -131,34 +144,36 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
       </div>
 
       {/* 已配置的规则列表 */}
-      {rules.length === 0 ? (
-        <Empty
-          description="暂无 Mock 规则"
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          style={{ margin: '16px 0' }}
-        />
-      ) : (
-        <div className="space-y-2">
-          {rules.map((rule) => (
-            <MockRuleItem
-              key={rule.id}
-              rule={rule}
-              expanded={expandedId === rule.id}
-              onToggleExpand={() => setExpandedId(expandedId === rule.id ? null : rule.id)}
-              onChange={(partial) => updateRule(rule.id, partial)}
-              onDelete={() => removeRule(rule.id)}
+      {rules.length === 0
+        ? (
+            <Empty
+              description="暂无 Mock 规则"
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              style={{ margin: '16px 0' }}
             />
-          ))}
-        </div>
-      )}
+          )
+        : (
+            <div className="space-y-2">
+              {rules.map((rule) => (
+                <MockRuleItem
+                  key={rule.id}
+                  expanded={expandedId === rule.id}
+                  rule={rule}
+                  onChange={(partial) => { updateRule(rule.id, partial) }}
+                  onDelete={() => { removeRule(rule.id) }}
+                  onToggleExpand={() => { setExpandedId(expandedId === rule.id ? null : rule.id) }}
+                />
+              ))}
+            </div>
+          )}
 
       {/* 添加规则按钮 */}
       <Space>
         <Button
+          icon={<PlusOutlined />}
           size="small"
           type="dashed"
-          icon={<PlusOutlined />}
-          onClick={() => addRule()}
+          onClick={() => { addRule() }}
         >
           添加规则
         </Button>
@@ -174,15 +189,19 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
         {/* 刷新 Agent 发现列表 */}
         {agentUrl && (
           <Button
-            size="small"
             icon={<ThunderboltOutlined />}
-            onClick={async () => {
-              try {
-                const result = await invoke<{ ok: boolean; data?: AgentDiscoverResult }>(
-                  'discover_mock_targets', { agentUrl }
-                )
-                if (result.ok && result.data) setDiscoverResult(result.data)
-              } catch { /* ignore */ }
+            size="small"
+            onClick={() => {
+              void (async () => {
+                try {
+                  const result = await invoke<{ ok: boolean, data?: AgentDiscoverResult }>(
+                    'discover_mock_targets', { agentUrl },
+                  )
+
+                  if (result.ok && result.data) { setDiscoverResult(result.data) }
+                }
+                catch { /* ignore */ }
+              })()
             }}
           >
             刷新发现
@@ -230,10 +249,10 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
         onClick={onToggleExpand}
       >
         <Switch
-          size="small"
           checked={rule.enabled}
-          onChange={(checked) => onChange({ enabled: checked })}
-          onClick={(_, e) => e.stopPropagation()}
+          size="small"
+          onChange={(checked) => { onChange({ enabled: checked }) }}
+          onClick={(_, e) => { e.stopPropagation() }}
         />
         <Tag color={targetTypeColor(rule.targetType)} style={{ margin: 0, fontSize: 11 }}>
           {rule.targetType}
@@ -251,10 +270,10 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
         </Text>
         <Tooltip title="删除">
           <Button
-            type="text"
-            size="small"
             danger
             icon={<DeleteOutlined />}
+            size="small"
+            type="text"
             onClick={(e) => { e.stopPropagation(); onDelete() }}
           />
         </Tooltip>
@@ -266,91 +285,95 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
           <div className="space-y-2">
             {/* 目标类型 */}
             <div>
-              <Text type="secondary" className="block text-xs mb-1">目标类型</Text>
+              <Text className="mb-1 block text-xs" type="secondary">目标类型</Text>
               <Select
-                size="small"
-                value={rule.targetType}
-                onChange={(v) => onChange({ targetType: v })}
-                style={{ width: '100%' }}
                 options={[
                   { value: 'feign', label: 'Feign Client' },
                   { value: 'mapper', label: 'MyBatis Mapper' },
                   { value: 'custom', label: '自定义方法' },
                 ]}
+                size="small"
+                style={{ width: '100%' }}
+                value={rule.targetType}
+                onChange={(v) => { onChange({ targetType: v }) }}
               />
             </div>
 
             {/* 类名 */}
             <div>
-              <Text type="secondary" className="block text-xs mb-1">类名（全限定名）</Text>
+              <Text className="mb-1 block text-xs" type="secondary">类名（全限定名）</Text>
               <Input
+                placeholder="com.example.feign.OrderClient"
                 size="small"
                 value={rule.className}
-                onChange={(e) => onChange({ className: e.target.value })}
-                placeholder="com.example.feign.OrderClient"
+                onChange={(e) => { onChange({ className: e.target.value }) }}
               />
             </div>
 
             {/* 方法名 */}
             <div>
-              <Text type="secondary" className="block text-xs mb-1">方法名</Text>
+              <Text className="mb-1 block text-xs" type="secondary">方法名</Text>
               <Input
+                placeholder="createOrder"
                 size="small"
                 value={rule.methodName}
-                onChange={(e) => onChange({ methodName: e.target.value })}
-                placeholder="createOrder"
+                onChange={(e) => { onChange({ methodName: e.target.value }) }}
               />
             </div>
 
             {/* 返回数据模板 */}
             <div>
-              <Text type="secondary" className="block text-xs mb-1">
+              <Text className="mb-1 block text-xs" type="secondary">
                 返回数据模板（JSON，支持 {'{{变量}}'} 插值）
               </Text>
               <MonacoEditor
-                value={responseStr}
                 deserializeOnChange={false}
+                height="120px"
+                language="json"
+                options={{ minimap: { enabled: false }, lineNumbers: 'on' }}
+                value={responseStr}
                 onChange={(val) => {
                   const str = String(val ?? '')
+
                   if (!str.trim()) {
                     onChange({ responseTemplate: {} })
+
                     return
                   }
+
                   try {
                     onChange({ responseTemplate: JSON.parse(str) })
-                  } catch {
+                  }
+                  catch {
                     // JSON 不完整时保留原文，等用户继续输入
                     onChange({ responseTemplate: str })
                   }
                 }}
-                language="json"
-                height="120px"
-                options={{ minimap: { enabled: false }, lineNumbers: 'on' }}
               />
             </div>
 
             {/* 高级选项 */}
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <Text type="secondary" className="block text-xs mb-1">模拟延迟 (ms)</Text>
+                <Text className="mb-1 block text-xs" type="secondary">模拟延迟 (ms)</Text>
                 <InputNumber
-                  size="small"
-                  value={rule.responseDelay}
-                  onChange={(v) => onChange({ responseDelay: v ?? undefined })}
                   min={0}
                   placeholder="0"
+                  size="small"
                   style={{ width: '100%' }}
+                  value={rule.responseDelay}
+                  onChange={(v) => { onChange({ responseDelay: v ?? undefined }) }}
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <Text type="secondary" className="block text-xs mb-1">最大拦截次数</Text>
+                <Text className="mb-1 block text-xs" type="secondary">最大拦截次数</Text>
                 <InputNumber
-                  size="small"
-                  value={rule.maxTimes}
-                  onChange={(v) => onChange({ maxTimes: v ?? undefined })}
                   min={1}
                   placeholder="不限"
+                  size="small"
                   style={{ width: '100%' }}
+                  value={rule.maxTimes}
+                  onChange={(v) => { onChange({ maxTimes: v ?? undefined }) }}
                 />
               </div>
             </div>
@@ -370,31 +393,32 @@ interface AddFromDiscoveryButtonProps {
 
 function AddFromDiscoveryButton({ discoverResult, onAdd }: AddFromDiscoveryButtonProps) {
   const allClasses = [...discoverResult.feignClients, ...discoverResult.mappers]
-  if (allClasses.length === 0) return null
+
+  if (allClasses.length === 0) { return null }
 
   return (
     <Select
-      size="small"
-      placeholder="从 Agent 发现列表添加"
-      style={{ width: 200 }}
       showSearch
       filterOption={(input, option) =>
-        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-      }
+        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+      options={allClasses.flatMap((cls) =>
+        cls.methods.map((m) => ({
+          value: `${cls.className}#${m.name}`,
+          label: `${cls.displayName}.${m.name}`,
+        })),
+      )}
+      placeholder="从 Agent 发现列表添加"
+      size="small"
+      style={{ width: 200 }}
       onChange={(value: string) => {
         const [className, methodName] = value.split('#')
-        const cls = allClasses.find(c => c.className === className)
-        const method = cls?.methods.find(m => m.name === methodName)
+        const cls = allClasses.find((c) => c.className === className)
+        const method = cls?.methods.find((m) => m.name === methodName)
+
         if (cls && method) {
           onAdd(cls, method.name, method.paramTypes.length > 0 ? method.paramTypes : undefined, method.returnType)
         }
       }}
-      options={allClasses.flatMap(cls =>
-        cls.methods.map(m => ({
-          value: `${cls.className}#${m.name}`,
-          label: `${cls.displayName}.${m.name}`,
-        }))
-      )}
     />
   )
 }
@@ -403,28 +427,39 @@ function AddFromDiscoveryButton({ discoverResult, onAdd }: AddFromDiscoveryButto
 
 function guessTargetType(className: string): 'feign' | 'mapper' | 'custom' {
   const lower = className.toLowerCase()
-  if (lower.includes('feign') || lower.includes('client')) return 'feign'
-  if (lower.includes('mapper') || lower.includes('dao') || lower.includes('repository')) return 'mapper'
+
+  if (lower.includes('feign') || lower.includes('client')) { return 'feign' }
+
+  if (lower.includes('mapper') || lower.includes('dao') || lower.includes('repository')) { return 'mapper' }
+
   return 'custom'
 }
 
 function targetTypeColor(type: string): string {
   switch (type) {
     case 'feign': return 'blue'
+
     case 'mapper': return 'green'
+
     case 'custom': return 'orange'
+
     default: return 'default'
   }
 }
 
 function generateDefaultTemplate(returnType?: string): unknown {
-  if (!returnType) return {}
-  const short = returnType.split('.').pop() || returnType
+  if (!returnType) { return {} }
+
+  const short = returnType.split('.').pop() ?? returnType
   const base = short.replace(/<.*/, '')
+
   if (/^(Result|Response|ApiResult|BaseResponse|CommonResult)$/.test(base)) {
     return { code: 200, message: 'success', data: {} }
   }
-  if (/^(List|ArrayList|LinkedList|Set|Collection|Array)$/.test(base)) return []
-  if (/^(Map|HashMap|LinkedHashMap)$/.test(base)) return {}
+
+  if (/^(List|ArrayList|LinkedList|Set|Collection|Array)$/.test(base)) { return [] }
+
+  if (/^(Map|HashMap|LinkedHashMap)$/.test(base)) { return {} }
+
   return {}
 }

@@ -1,7 +1,10 @@
 import { useCallback } from 'react'
+
 import { InputNumber, Radio, Typography } from 'antd'
-import type { PanelProps } from './shared/panelRegistry'
+
 import type { ParallelNodeData } from '../../types/flow.types'
+
+import type { PanelProps } from './shared/panelRegistry'
 
 const { Text } = Typography
 
@@ -29,43 +32,43 @@ export default function ParallelNodePanel({ data, onChange }: PanelProps<Paralle
   // 更新超时时间
   const handleTimeoutChange = useCallback(
     (value: number | null) => {
-      onChange({ timeoutMs: value || undefined })
+      onChange({ timeoutMs: value ?? undefined })
     },
     [onChange],
   )
 
   return (
     <div className="space-y-4">
-      <Text type="secondary" className="block text-xs">
+      <Text className="block text-xs" type="secondary">
         并行配置
       </Text>
 
       {/* 分支数量 */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           并行分支数 (2-6)
         </Text>
         <InputNumber
-          value={data.branchCount}
-          onChange={handleBranchCountChange}
-          min={2}
+          data-testid="parallel-branch-count"
           max={6}
+          min={2}
           size="small"
           style={{ width: '100%' }}
-          data-testid="parallel-branch-count"
+          value={data.branchCount}
+          onChange={handleBranchCountChange}
         />
       </div>
 
       {/* 等待模式 */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           等待模式
         </Text>
         <Radio.Group
+          data-testid="parallel-wait-mode"
+          size="small"
           value={data.waitAll}
           onChange={handleWaitAllChange}
-          size="small"
-          data-testid="parallel-wait-mode"
         >
           <Radio.Button value={true}>等待所有完成</Radio.Button>
           <Radio.Button value={false}>等待第一个完成</Radio.Button>
@@ -74,17 +77,17 @@ export default function ParallelNodePanel({ data, onChange }: PanelProps<Paralle
 
       {/* 超时时间（可选） */}
       <div>
-        <Text type="secondary" className="block text-xs mb-1">
+        <Text className="mb-1 block text-xs" type="secondary">
           整体超时时间（毫秒，可选）
         </Text>
         <InputNumber
-          value={data.timeoutMs}
-          onChange={handleTimeoutChange}
+          data-testid="parallel-timeout"
           min={0}
+          placeholder="不设置超时"
           size="small"
           style={{ width: '100%' }}
-          placeholder="不设置超时"
-          data-testid="parallel-timeout"
+          value={data.timeoutMs}
+          onChange={handleTimeoutChange}
         />
       </div>
     </div>

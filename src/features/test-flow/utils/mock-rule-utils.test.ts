@@ -1,20 +1,22 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
+import type { AgentDiscoverResult, MockCallLog, MockRule, MockTargetType } from '../types/mock.types'
+
 import {
-  validateMockRule,
-  isValidJavaFqn,
-  isValidJavaIdentifier,
+  buildAgentPushPayload,
   createEmptyMockRule,
   createMockRuleFromDiscovery,
-  guessTargetType,
+  flattenDiscoveredMethods,
+  formatMockCallLog,
   generateDefaultResponseTemplate,
+  guessTargetType,
+  interpolateValue,
+  isValidJavaFqn,
+  isValidJavaIdentifier,
   toAgentPayload,
   toAgentPayloads,
-  interpolateValue,
-  formatMockCallLog,
-  flattenDiscoveredMethods,
-  buildAgentPushPayload,
+  validateMockRule,
 } from './mock-rule-utils'
-import type { MockRule, MockTargetType, MockCallLog, AgentDiscoverResult } from '../types/mock.types'
 
 // ==================== isValidJavaIdentifier ====================
 
@@ -46,10 +48,10 @@ describe('isValidJavaFqn', () => {
   })
 
   it('非法全限定名', () => {
-    expect(isValidJavaFqn('MyClass')).toBe(false)        // 无包名
+    expect(isValidJavaFqn('MyClass')).toBe(false) // 无包名
     expect(isValidJavaFqn('')).toBe(false)
     expect(isValidJavaFqn('com.123invalid.Class')).toBe(false)
-    expect(isValidJavaFqn('com..MyClass')).toBe(false)    // 空段
+    expect(isValidJavaFqn('com..MyClass')).toBe(false) // 空段
   })
 })
 
@@ -264,7 +266,7 @@ describe('toAgentPayloads', () => {
     ]
     const payloads = toAgentPayloads(rules)
     expect(payloads).toHaveLength(2)
-    expect(payloads.map(p => p.className)).toEqual(['com.example.A', 'com.example.C'])
+    expect(payloads.map((p) => p.className)).toEqual(['com.example.A', 'com.example.C'])
   })
 
   it('空列表 → 空数组', () => {
@@ -327,20 +329,20 @@ describe('formatMockCallLog', () => {
 describe('flattenDiscoveredMethods', () => {
   it('扁平化 feign + mapper', () => {
     const discover: AgentDiscoverResult = {
-      feignClients: [{
-        className: 'com.example.feign.OrderClient',
-        displayName: 'OrderClient',
-        methods: [
-          { name: 'createOrder', paramTypes: ['CreateOrderReq'], returnType: 'Result<OrderVO>', displayName: 'createOrder(CreateOrderReq) → Result<OrderVO>' },
-        ],
-      }],
-      mappers: [{
-        className: 'com.example.mapper.UserMapper',
-        displayName: 'UserMapper',
-        methods: [
-          { name: 'selectById', paramTypes: ['Long'], returnType: 'User', displayName: 'selectById(Long) → User' },
-        ],
-      }],
+      feignClients: [
+        {
+          className: 'com.example.feign.OrderClient',
+          displayName: 'OrderClient',
+          methods: [{ name: 'createOrder', paramTypes: ['CreateOrderReq'], returnType: 'Result<OrderVO>', displayName: 'createOrder(CreateOrderReq) → Result<OrderVO>' }],
+        },
+      ],
+      mappers: [
+        {
+          className: 'com.example.mapper.UserMapper',
+          displayName: 'UserMapper',
+          methods: [{ name: 'selectById', paramTypes: ['Long'], returnType: 'User', displayName: 'selectById(Long) → User' }],
+        },
+      ],
       status: 'connected',
       version: '1.0.0',
     }
@@ -408,12 +410,12 @@ describe('buildAgentPushPayload', () => {
 
     expect(payload).toHaveLength(2)
 
-    const userPayload = payload.find(p => p.className.includes('UserClient'))!
+    const userPayload = payload.find((p) => p.className.includes('UserClient'))!
     const parsed = JSON.parse(userPayload.responseTemplate)
     expect(parsed.name).toBe('张三')
     expect(parsed.role).toBe('admin')
 
-    const orderPayload = payload.find(p => p.className.includes('OrderClient'))!
+    const orderPayload = payload.find((p) => p.className.includes('OrderClient'))!
     const parsedOrder = JSON.parse(orderPayload.responseTemplate)
     expect(parsedOrder.orderId).toBe('ORD_001')
   })
@@ -433,4 +435,3 @@ describe('buildAgentPushPayload', () => {
     expect(payload[0].className).toBe('com.example.A')
   })
 })
-

@@ -1,36 +1,37 @@
 'use client'
 
-import { ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router'
 
 import {
   Button,
   Dropdown,
   List,
+  message,
   Modal,
   Table,
   Tabs,
   Tag,
+  theme,
   Tooltip,
   Typography,
-  message,
-  theme,
 } from 'antd'
 import { MoreHorizontalIcon, TerminalIcon } from 'lucide-react'
 
 import { api } from '@/api-client'
-import { useProxyConfig } from '@/contexts/proxy-config'
-import { useAuth } from '@/contexts/auth'
 import { MonacoEditor } from '@/components/MonacoEditor'
+import { useAuth } from '@/contexts/auth'
+import { useProxyConfig } from '@/contexts/proxy-config'
 import { useStyles } from '@/hooks/useStyle'
 import type { ApiRunResult } from '@/types'
 
-import { ResponseBodyViewer } from './ResponseBodyViewer'
-import { ErrorDisplay } from './ErrorDisplay'
-import { MarkdownDiffView } from './MarkdownDiffView'
 import { buildMarkdownReport, downloadText } from '../exportMarkdown'
-import { formatTime } from './HistoryPanel'
 import { calcBodySize, detectLanguage, getStatusColor, headerTableColumns } from '../utils'
+
+import { ErrorDisplay } from './ErrorDisplay'
+import { formatTime } from './HistoryPanel'
+import { MarkdownDiffView } from './MarkdownDiffView'
+import { ResponseBodyViewer } from './ResponseBodyViewer'
 
 import { css } from '@emotion/css'
 
@@ -45,7 +46,7 @@ interface ResultViewerProps {
 interface HistoryPickItem {
   id: string
   statusCode: number
-  requestJson: { method: string; url: string }
+  requestJson: { method: string, url: string }
   responseJson: ApiRunResult
   createdAt: string
 }
@@ -64,12 +65,14 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
   const [diffOpen, setDiffOpen] = useState(false)
 
   const openHistoryPicker = async () => {
-    if (!menuItemId || !sessionId || !projectId) return
+    if (!menuItemId || !sessionId || !projectId) { return }
+
     try {
       const list = await api<HistoryPickItem[]>('list_request_history', { sessionId, projectId, menuItemId })
       setHistoryList(list)
       setHistoryOpen(true)
-    } catch {
+    }
+    catch {
       message.error('获取历史记录失败')
     }
   }
@@ -102,7 +105,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
     showDeprecated: false,
   }), [])
 
-  const { styles } = useStyles(({ token }) => ({
+  const { styles } = useStyles(() => ({
     resultContent: css({
       display: 'flex',
       flexDirection: 'column',
@@ -141,7 +144,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
     )
   }
 
-  if (!result) return null
+  if (!result) { return null }
 
   const tabsItems = [
     {
@@ -151,16 +154,16 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
         ? (
             <ResponseBodyViewer
               body={result.body}
-              contentType={result.contentType}
-              showFormatted={showFormatted}
-              onToggleFormat={() => setShowFormatted(v => !v)}
-              isBinary={result.isBinary}
               bodyBase64={result.bodyBase64}
               bodySize={result.bodySize}
+              contentType={result.contentType}
               fileName={result.url}
+              isBinary={result.isBinary}
+              showFormatted={showFormatted}
+              onToggleFormat={() => { setShowFormatted((v) => !v) }}
             />
           )
-        : <Typography.Text type="secondary" className="text-xs">无响应体</Typography.Text>,
+        : <Typography.Text className="text-xs" type="secondary">无响应体</Typography.Text>,
     },
     {
       key: 'resHeaders',
@@ -168,47 +171,47 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
       children: result.headers && result.headers.length > 0
         ? (
             <Table
-              size="small"
-              dataSource={result.headers}
               columns={headerTableColumns}
+              dataSource={result.headers}
               pagination={false}
               rowKey="name"
+              size="small"
             />
           )
-        : <Typography.Text type="secondary" className="text-xs">无响应头</Typography.Text>,
+        : <Typography.Text className="text-xs" type="secondary">无响应头</Typography.Text>,
     },
     {
       key: 'reqContent',
       label: '请求内容',
       children: (
-        <div className="flex flex-col h-full min-h-0">
-          <div className="rounded p-1 text-xs flex-shrink-0" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace' }}>
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="shrink-0 rounded p-1 text-xs" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace' }}>
             <span className="font-medium opacity-60">URL: </span>
             <span className="break-all">{result.url ?? '-'}</span>
           </div>
           {result.requestBodyText && (
-            <div className="flex-1 min-h-0 mt-1">
+            <div className="mt-1 min-h-0 flex-1">
               <MonacoEditor
                 height="100%"
                 language={detectLanguage(result.contentType)}
-                value={result.requestBodyText}
                 options={monacoOptions}
+                value={result.requestBodyText}
               />
             </div>
           )}
           {result.requestBodyParameters && result.requestBodyParameters.length > 0 && (
-            <div className="flex-shrink-0 mt-1">
+            <div className="mt-1 shrink-0">
               <Table
-                size="small"
-                dataSource={result.requestBodyParameters}
                 columns={headerTableColumns}
+                dataSource={result.requestBodyParameters}
                 pagination={false}
                 rowKey="name"
+                size="small"
               />
             </div>
           )}
           {!result.requestBodyText && (!result.requestBodyParameters || result.requestBodyParameters.length === 0) && (
-            <Typography.Text type="secondary" className="text-xs">无请求体</Typography.Text>
+            <Typography.Text className="text-xs" type="secondary">无请求体</Typography.Text>
           )}
         </div>
       ),
@@ -219,14 +222,14 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
       children: result.requestHeaders && result.requestHeaders.length > 0
         ? (
             <Table
-              size="small"
-              dataSource={result.requestHeaders}
               columns={headerTableColumns}
+              dataSource={result.requestHeaders}
               pagination={false}
               rowKey="name"
+              size="small"
             />
           )
-        : <Typography.Text type="secondary" className="text-xs">无请求头</Typography.Text>,
+        : <Typography.Text className="text-xs" type="secondary">无请求头</Typography.Text>,
     },
     {
       key: 'curl',
@@ -236,21 +239,20 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
           cURL
         </span>
       ),
-      children: curlContent ?? <Typography.Text type="secondary" className="text-xs">无 cURL 命令</Typography.Text>,
+      children: curlContent ?? <Typography.Text className="text-xs" type="secondary">无 cURL 命令</Typography.Text>,
     },
   ]
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col">
       <Tabs
-        size="small"
-        className={styles.resultContent}
         activeKey={activeTab}
-        onChange={setActiveTab}
+        className={styles.resultContent}
         items={tabsItems}
+        size="small"
         tabBarExtraContent={{
           right: (
-            <div className="flex items-center gap-3 text-sm max-w-full overflow-hidden">
+            <div className="flex max-w-full items-center gap-3 overflow-hidden text-sm">
               <Dropdown
                 menu={{
                   items: [
@@ -272,26 +274,28 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
                       onClick: () => void openHistoryPicker(),
                     },
                     ...(activeTab === 'resContent' && isJson
-                      ? [{
-                          key: 'format',
-                          label: showFormatted ? '查看原始' : '格式化 JSON',
-                          onClick: () => setShowFormatted(v => !v),
-                        }]
+                      ? [
+                          {
+                            key: 'format',
+                            label: showFormatted ? '查看原始' : '格式化 JSON',
+                            onClick: () => { setShowFormatted((v) => !v) },
+                          },
+                        ]
                       : []),
                   ],
                 }}
               >
                 <Button
-                  type="text"
-                  size="small"
-                  icon={<MoreHorizontalIcon size={14} />}
                   aria-label="更多操作"
+                  icon={<MoreHorizontalIcon size={14} />}
+                  size="small"
+                  type="text"
                 />
               </Dropdown>
-              <Tag className="flex-shrink-0" color={getStatusColor(result.status)}>
+              <Tag className="shrink-0" color={getStatusColor(result.status)}>
                 {result.status > 0 ? `${result.status} ${result.statusText}` : result.statusText}
               </Tag>
-              <span className="text-xs opacity-50 truncate">
+              <span className="truncate text-xs opacity-50">
                 {result.method?.toUpperCase()}
                 {result.proxyType && result.proxyType !== 'none' && (
                   <Tooltip title={proxyTooltip ? `代理: ${proxyTooltip}` : undefined}>
@@ -302,28 +306,29 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
                 {result.body ? ` | ${calcBodySize(result.body)}` : result.bodySize != null ? ` | ${result.bodySize}B` : ''}
               </span>
             </div>
-          )
+          ),
         }}
+        onChange={setActiveTab}
       />
 
-      <Modal title="选择历史记录对比" open={historyOpen} footer={null} onCancel={() => setHistoryOpen(false)} width={640}>
+      <Modal footer={null} open={historyOpen} title="选择历史记录对比" width={640} onCancel={() => { setHistoryOpen(false) }}>
         <List
-          size="small"
           dataSource={historyList}
           renderItem={(item) => (
-            <List.Item className="cursor-pointer" onClick={() => startCompare(item)} actions={[<Tag color={getStatusColor(item.statusCode)}>{item.statusCode || 'ERR'}</Tag>]}>
-              <List.Item.Meta title={`${item.requestJson.method} ${item.requestJson.url}`} description={formatTime(item.createdAt)} />
+            <List.Item actions={[<Tag color={getStatusColor(item.statusCode)}>{item.statusCode || 'ERR'}</Tag>]} className="cursor-pointer" onClick={() => { startCompare(item) }}>
+              <List.Item.Meta description={formatTime(item.createdAt)} title={`${item.requestJson.method} ${item.requestJson.url}`} />
             </List.Item>
           )}
+          size="small"
         />
       </Modal>
 
-      <Modal title="响应对比（当前 vs 历史）" open={diffOpen} footer={null} onCancel={() => setDiffOpen(false)} width={900}>
+      <Modal footer={null} open={diffOpen} title="响应对比（当前 vs 历史）" width={900} onCancel={() => { setDiffOpen(false) }}>
         {compareWith && (
           <MarkdownDiffView
             leftText={compareWith.body ?? ''}
-            rightText={result.body ?? ''}
             leftTitle="历史响应"
+            rightText={result.body ?? ''}
             rightTitle="当前响应"
           />
         )}

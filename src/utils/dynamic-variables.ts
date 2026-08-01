@@ -32,7 +32,9 @@ function randomInt(min: number, max: number): number {
 
 function randomLowerString(len: number): string {
   let s = ''
-  for (let i = 0; i < len; i++) s += String.fromCharCode(randomInt(97, 122))
+
+  for (let i = 0; i < len; i++) { s += String.fromCharCode(randomInt(97, 122)) }
+
   return s
 }
 
@@ -40,30 +42,42 @@ function resolveDynamicVariable(name: string): string | null {
   switch (name) {
     case '$timestamp':
       return String(Math.floor(Date.now() / 1000))
+
     case '$timestampISO':
       return new Date().toISOString()
+
     case '$guid':
       return crypto.randomUUID()
+
     case '$randomUUID':
       return crypto.randomUUID().replace(/-/g, '')
+
     case '$randomInt':
       return String(randomInt(0, 1000))
+
     case '$randomEmail':
       return `${randomLowerString(8)}@example.com`
+
     case '$randomIP':
       return `${randomInt(1, 255)}.${randomInt(0, 255)}.${randomInt(0, 255)}.${randomInt(1, 255)}`
+
     case '$randomMobile': {
       const tail = Array.from({ length: 8 }, () => randomInt(0, 9)).join('')
+
       return `${randomInt(130, 199)}${tail}`
     }
+
     case '$randomString': {
       let s = ''
+
       for (let i = 0; i < 8; i++) {
         const c = String.fromCharCode(randomInt(97, 122))
         s += Math.random() < 0.5 ? c : c.toUpperCase()
       }
+
       return s
     }
+
     default:
       return null
   }

@@ -1,10 +1,11 @@
 import { nanoid } from 'nanoid'
+
 import type {
-  MockRule,
-  MockTargetType,
-  MockRulePayload,
-  MockCallLog,
   AgentDiscoverResult,
+  MockCallLog,
+  MockRule,
+  MockRulePayload,
+  MockTargetType,
 } from '../types/mock.types'
 
 // ==================== 校验 ====================
@@ -22,19 +23,22 @@ export function validateMockRule(rule: Partial<MockRule>): ValidationError[] {
 
   if (!rule.className?.trim()) {
     errors.push({ field: 'className', message: '类名不能为空' })
-  } else if (!isValidJavaFqn(rule.className)) {
+  }
+  else if (!isValidJavaFqn(rule.className)) {
     errors.push({ field: 'className', message: '类名格式无效，应为全限定名如 com.example.MyClass' })
   }
 
   if (!rule.methodName?.trim()) {
     errors.push({ field: 'methodName', message: '方法名不能为空' })
-  } else if (!isValidJavaIdentifier(rule.methodName)) {
+  }
+  else if (!isValidJavaIdentifier(rule.methodName)) {
     errors.push({ field: 'methodName', message: '方法名不是合法的 Java 标识符' })
   }
 
   if (!rule.targetType) {
     errors.push({ field: 'targetType', message: '目标类型不能为空' })
-  } else if (!['feign', 'mapper', 'custom'].includes(rule.targetType)) {
+  }
+  else if (!['feign', 'mapper', 'custom'].includes(rule.targetType)) {
     errors.push({ field: 'targetType', message: `不支持的目标类型: ${rule.targetType}` })
   }
 
@@ -59,14 +63,17 @@ export function validateMockRule(rule: Partial<MockRule>): ValidationError[] {
 
 /** Java 全限定类名校验：至少包含一个 '.' 分隔符，每段为合法标识符 */
 export function isValidJavaFqn(name: string): boolean {
-  if (!name || typeof name !== 'string') return false
+  if (!name || typeof name !== 'string') { return false }
+
   const parts = name.split('.')
+
   return parts.length >= 2 && parts.every(isValidJavaIdentifier)
 }
 
 /** Java 标识符校验 */
 export function isValidJavaIdentifier(name: string): boolean {
-  if (!name || typeof name !== 'string') return false
+  if (!name || typeof name !== 'string') { return false }
+
   return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)
 }
 
@@ -113,8 +120,11 @@ export function createMockRuleFromDiscovery(
  */
 export function guessTargetType(className: string): MockTargetType {
   const lower = className.toLowerCase()
-  if (lower.includes('feign') || lower.includes('client')) return 'feign'
-  if (lower.includes('mapper') || lower.includes('dao') || lower.includes('repository')) return 'mapper'
+
+  if (lower.includes('feign') || lower.includes('client')) { return 'feign' }
+
+  if (lower.includes('mapper') || lower.includes('dao') || lower.includes('repository')) { return 'mapper' }
+
   return 'custom'
 }
 
@@ -122,10 +132,10 @@ export function guessTargetType(className: string): MockTargetType {
  * 生成默认的返回值模板（根据返回类型名推断）
  */
 export function generateDefaultResponseTemplate(returnType?: string): unknown {
-  if (!returnType) return {}
+  if (!returnType) { return {} }
 
   // 提取短类名（去掉包名和泛型参数）
-  const shortName = returnType.split('.').pop() || returnType
+  const shortName = returnType.split('.').pop() ?? returnType
   const baseName = shortName.replace(/<.*/, '') // "Result<OrderVO>" → "Result"
 
   // Result<T> / Response<T> 包装类型 → 生成 { code: 200, data: {}, message: "success" }
@@ -164,6 +174,7 @@ export function generateDefaultResponseTemplate(returnType?: string): unknown {
     Void: null,
     void: null,
   }
+
   if (baseName in primitiveDefaults) {
     return primitiveDefaults[baseName]
   }
@@ -202,7 +213,7 @@ export function toAgentPayload(rule: MockRule, variables?: Record<string, string
  * 将规则列表转为 Agent payload 列表（过滤禁用规则）
  */
 export function toAgentPayloads(rules: MockRule[], variables?: Record<string, string>): MockRulePayload[] {
-  return rules.filter(r => r.enabled).map(r => toAgentPayload(r, variables))
+  return rules.filter((r) => r.enabled).map((r) => toAgentPayload(r, variables))
 }
 
 // ==================== 变量插值 ====================
@@ -219,16 +230,21 @@ export function interpolateValue(value: unknown, variables: Record<string, strin
       return key in variables ? variables[key] : `{{${key}}}`
     })
   }
+
   if (Array.isArray(value)) {
-    return value.map(item => interpolateValue(item, variables))
+    return value.map((item) => interpolateValue(item, variables))
   }
+
   if (value !== null && typeof value === 'object') {
     const result: Record<string, unknown> = {}
+
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       result[k] = interpolateValue(v, variables)
     }
+
     return result
   }
+
   return value
 }
 
@@ -238,7 +254,8 @@ export function interpolateValue(value: unknown, variables: Record<string, strin
  * 格式化 Mock 调用日志为可读字符串
  */
 export function formatMockCallLog(log: MockCallLog): string {
-  const args = log.args.map(a => (typeof a === 'string' ? `"${a}"` : JSON.stringify(a))).join(', ')
+  const args = log.args.map((a) => (typeof a === 'string' ? `"${a}"` : JSON.stringify(a))).join(', ')
+
   return `${log.className}.${log.methodName}(${args}) → ${log.durationMs}ms`
 }
 
@@ -246,7 +263,7 @@ export function formatMockCallLog(log: MockCallLog): string {
  * 从发现结果中获取所有可拦截方法的扁平列表
  */
 export function flattenDiscoveredMethods(discover: AgentDiscoverResult) {
-  const methods: Array<{
+  const methods: {
     className: string
     displayName: string
     methodName: string
@@ -254,7 +271,7 @@ export function flattenDiscoveredMethods(discover: AgentDiscoverResult) {
     returnType: string
     methodDisplayName: string
     source: 'feign' | 'mapper'
-  }> = []
+  }[] = []
 
   for (const cls of discover.feignClients) {
     for (const m of cls.methods) {
@@ -298,7 +315,7 @@ export function buildAgentPushPayload(
   nodeRules: MockRule[] | undefined,
   variables: Record<string, string>,
 ): MockRulePayload[] {
-  if (!nodeRules || nodeRules.length === 0) return []
+  if (!nodeRules || nodeRules.length === 0) { return [] }
+
   return toAgentPayloads(nodeRules, variables)
 }
-

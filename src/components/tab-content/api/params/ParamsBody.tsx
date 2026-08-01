@@ -11,19 +11,30 @@ import { ParamsEditableTable } from '../components/ParamsEditableTable'
 import { GlobalParametersNotice } from './GlobalParametersNotice'
 
 function hasBodyTypeContent(value: ApiDetails['requestBody'] | undefined, type: BodyType): boolean {
-  if (!value) return false
+  if (!value) { return false }
+
   switch (type) {
     case BodyType.FormData:
+      // fallthrough
+
     case BodyType.UrlEncoded:
-      return (value.parameters ?? []).some(p => p.name && p.enable !== false)
+      return (value.parameters ?? []).some((p) => p.name && p.enable !== false)
+
     case BodyType.Json:
+      // fallthrough
+
     case BodyType.Xml:
+      // fallthrough
       return !!(value.jsonSchema && (
         (value.jsonSchema as { properties?: unknown[] }).properties?.length
       ))
+
     case BodyType.Raw:
+    // fallthrough
+
     case BodyType.Binary:
       return !!(value.rawText?.trim())
+
     default:
       return false
   }
@@ -110,7 +121,7 @@ export function ParamsBody(props: ParamsBodyProps) {
   const bodyParamNames = new Set(
     (value?.parameters ?? [])
       .filter((item) => item.name && item.enable !== false)
-      .map((item) => item.name as string),
+      .map((item) => item.name!),
   )
   const supportsGlobalBodyParams = selectedType === BodyType.FormData || selectedType === BodyType.UrlEncoded
 

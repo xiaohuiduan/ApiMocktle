@@ -1,8 +1,6 @@
-import { theme } from 'antd'
+import JsonView from 'react18-json-view'
 
 import { useStyles } from '@/hooks/useStyle'
-
-import JsonView from 'react18-json-view'
 
 import 'react18-json-view/src/style.css'
 

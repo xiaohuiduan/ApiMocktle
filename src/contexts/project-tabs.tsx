@@ -1,15 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import type { ApiTabItem } from '@/components/ApiTab'
 import type { ApiMenuData } from '@/components/ApiMenu'
+import type { ApiTabItem } from '@/components/ApiTab'
+import { API_MENU_CONFIG } from '@/configs/static'
+import { CatalogType } from '@/enums'
 import type {
   ApiEnvironment,
   ProjectEnvironmentConfig,
   RecycleData,
 } from '@/types'
-import { CatalogType } from '@/enums'
-import { API_MENU_CONFIG } from '@/configs/static'
 
 /* ------------------------------------------------------------------ */
 /*  Data types                                                         */
@@ -102,7 +102,6 @@ export interface ProjectTabsContextData {
 /* ------------------------------------------------------------------ */
 
 const OPEN_TABS_KEY = 'project-open-tabs'
-const getStateCacheKey = (projectId: string) => `project-state:${projectId}`
 
 function saveOpenTabInfoList(tabs: ProjectTabState[]) {
   try {
@@ -113,7 +112,8 @@ function saveOpenTabInfoList(tabs: ProjectTabState[]) {
       role: t.info.role,
     }))
     sessionStorage.setItem(OPEN_TABS_KEY, JSON.stringify(info))
-  } catch {
+  }
+  catch {
     // ignore
   }
 }
@@ -121,8 +121,10 @@ function saveOpenTabInfoList(tabs: ProjectTabState[]) {
 function loadOpenTabInfoList(): ProjectTabInfo[] {
   try {
     const raw = sessionStorage.getItem(OPEN_TABS_KEY)
+
     return raw ? (JSON.parse(raw) as ProjectTabInfo[]) : []
-  } catch {
+  }
+  catch {
     return []
   }
 }
@@ -147,7 +149,9 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
   const [openTabs, setOpenTabs] = useState<ProjectTabState[]>(() => {
     // 页面刷新时尝试从 sessionStorage 恢复已打开的项目标签
     const savedInfos = loadOpenTabInfoList()
-    if (savedInfos.length === 0) return []
+
+    if (savedInfos.length === 0) { return [] }
+
     return savedInfos.map((info) => ({
       info,
       projectState: {
@@ -165,6 +169,7 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
   // 初始 activeProjectId 从 URL 解析
   const [activeProjectId, setActiveProjectIdState] = useState<string | null>(() => {
     const parts = pathname.split('/').filter(Boolean)
+
     return parts[0] === 'projects' && parts[1] ? parts[1] : null
   })
 
@@ -173,11 +178,13 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
   const setActiveProjectId = useCallback(
     (id: string | null) => {
       setActiveProjectIdState(id)
+
       if (id) {
         const tab = openTabs.find((t) => t.info.projectId === id)
-        const subPath = tab?.lastSubPath || '/home'
+        const subPath = tab?.lastSubPath ?? '/home'
         navigate(`/projects/${id}${subPath}`, { replace: true })
-      } else {
+      }
+      else {
         navigate('/projects', { replace: true })
       }
     },
@@ -206,7 +213,7 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
       )
     }
 
-    if (pathname === prevPath) return
+    if (pathname === prevPath) { return }
 
     if (urlProjectId !== activeProjectId) {
       setActiveProjectIdState(urlProjectId)
@@ -237,12 +244,14 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
     ) => {
       setOpenTabs((prev) =>
         prev.map((tab) => {
-          if (tab.info.projectId !== projectId) return tab
+          if (tab.info.projectId !== projectId) { return tab }
+
           const updated = updater({
             tabItems: tab.tabItems,
             activeTabKey: tab.activeTabKey,
             lastActiveTabKey: tab.lastActiveTabKey,
           })
+
           return { ...tab, ...updated }
         }),
       )
@@ -264,6 +273,7 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
         if (prev.some((t) => t.info.projectId === info.projectId)) {
           return prev
         }
+
         return [
           ...prev,
           {
@@ -288,11 +298,14 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
   const closeProject = useCallback(
     (id: string) => {
       setOpenTabs((prev) => prev.filter((t) => t.info.projectId !== id))
+
       if (activeProjectId === id) {
         const remaining = openTabs.filter((t) => t.info.projectId !== id)
+
         if (remaining.length > 0) {
           setActiveProjectId(remaining[0].info.projectId)
-        } else {
+        }
+        else {
           setActiveProjectId(null)
         }
       }
@@ -312,7 +325,9 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
     (id: string) => {
       setOpenTabs((prev) => {
         const idx = prev.findIndex((t) => t.info.projectId === id)
-        if (idx === -1) return prev
+
+        if (idx === -1) { return prev }
+
         return prev.slice(0, idx + 1)
       })
       setActiveProjectId(id)

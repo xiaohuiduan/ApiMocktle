@@ -26,6 +26,7 @@ type GroupedMenu = Record<CatalogType, CatalogDataNode[]>
 const attachLeafCount = (node: CatalogDataNode): number => {
   if (node.isLeaf) {
     node.customData.leafCount = 0
+
     return 1
   }
 

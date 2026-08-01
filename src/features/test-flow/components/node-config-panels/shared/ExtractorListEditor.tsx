@@ -1,6 +1,8 @@
 import { useCallback } from 'react'
-import { Button, Select, Input, Space, Typography } from 'antd'
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Input, Select, Space, Typography } from 'antd'
+
 import type { TestExtractor } from '@/types'
 
 const { Text } = Typography
@@ -46,7 +48,8 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
   const handleUpdate = useCallback(
     (index: number, field: keyof TestExtractor, value: any) => {
       const newExtractors = extractors.map((extractor, i) => {
-        if (i !== index) return extractor
+        if (i !== index) { return extractor }
+
         return { ...extractor, [field]: value }
       })
       onChange(newExtractors)
@@ -67,91 +70,93 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Text type="secondary" className="text-xs">
+        <Text className="text-xs" type="secondary">
           提取器列表
         </Text>
         <Button
-          type="dashed"
-          size="small"
           icon={<PlusOutlined />}
+          size="small"
+          type="dashed"
           onClick={handleAdd}
         >
           添加提取器
         </Button>
       </div>
 
-      {extractors.length === 0 ? (
-        <Text type="secondary" className="text-xs italic">
-          暂无提取器
-        </Text>
-      ) : (
-        <div className="space-y-2">
-          {extractors.map((extractor, index) => (
-            <div
-              key={index}
-              className="p-2 border border-[color:var(--ds-node-border-color,#e5e7eb)] rounded-md space-y-2 bg-[color:var(--ds-node-bg-elevated,#f9fafb)]"
-            >
-              {/* 第一行：类型、路径/名称 */}
-              <Space.Compact block>
-                <Select
-                  value={extractor.type}
-                  onChange={(value) => handleUpdate(index, 'type', value)}
-                  options={EXTRACTOR_TYPE_OPTIONS}
-                  size="small"
-                  style={{ width: '35%' }}
-                  placeholder="提取类型"
-                />
-                {shouldShowPath(extractor.type) && (
-                  <Input
-                    value={extractor.path || ''}
-                    onChange={(e) => handleUpdate(index, 'path', e.target.value)}
-                    size="small"
-                    placeholder="data.token"
-                    style={{ width: '65%' }}
-                  />
-                )}
-                {extractor.type === 'header' && (
-                  <Input
-                    value={extractor.name || ''}
-                    onChange={(e) => handleUpdate(index, 'name', e.target.value)}
-                    size="small"
-                    placeholder="Header 名称"
-                    style={{ width: '65%' }}
-                  />
-                )}
-              </Space.Compact>
+      {extractors.length === 0
+        ? (
+            <Text className="text-xs italic" type="secondary">
+              暂无提取器
+            </Text>
+          )
+        : (
+            <div className="space-y-2">
+              {extractors.map((extractor, index) => (
+                <div
+                  key={index}
+                  className="space-y-2 rounded-md border border-[color:var(--ds-node-border-color,#e5e7eb)] bg-[color:var(--ds-node-bg-elevated,#f9fafb)] p-2"
+                >
+                  {/* 第一行：类型、路径/名称 */}
+                  <Space.Compact block>
+                    <Select
+                      options={EXTRACTOR_TYPE_OPTIONS}
+                      placeholder="提取类型"
+                      size="small"
+                      style={{ width: '35%' }}
+                      value={extractor.type}
+                      onChange={(value) => { handleUpdate(index, 'type', value) }}
+                    />
+                    {shouldShowPath(extractor.type) && (
+                      <Input
+                        placeholder="data.token"
+                        size="small"
+                        style={{ width: '65%' }}
+                        value={extractor.path ?? ''}
+                        onChange={(e) => { handleUpdate(index, 'path', e.target.value) }}
+                      />
+                    )}
+                    {extractor.type === 'header' && (
+                      <Input
+                        placeholder="Header 名称"
+                        size="small"
+                        style={{ width: '65%' }}
+                        value={extractor.name ?? ''}
+                        onChange={(e) => { handleUpdate(index, 'name', e.target.value) }}
+                      />
+                    )}
+                  </Space.Compact>
 
-              {/* 第二行：变量名、pattern（如果需要）、删除按钮 */}
-              <Space.Compact block>
-                <Input
-                  value={extractor.variable}
-                  onChange={(e) => handleUpdate(index, 'variable', e.target.value)}
-                  size="small"
-                  placeholder="变量名（必填）"
-                  style={{ width: shouldShowPattern(extractor.type) ? '50%' : '90%' }}
-                />
-                {shouldShowPattern(extractor.type) && (
-                  <Input
-                    value={extractor.pattern || ''}
-                    onChange={(e) => handleUpdate(index, 'pattern', e.target.value)}
-                    size="small"
-                    placeholder="提取模式"
-                    style={{ width: '40%' }}
-                  />
-                )}
-                <Button
-                  type="text"
-                  danger
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  onClick={() => handleDelete(index)}
-                  style={{ width: '10%' }}
-                />
-              </Space.Compact>
+                  {/* 第二行：变量名、pattern（如果需要）、删除按钮 */}
+                  <Space.Compact block>
+                    <Input
+                      placeholder="变量名（必填）"
+                      size="small"
+                      style={{ width: shouldShowPattern(extractor.type) ? '50%' : '90%' }}
+                      value={extractor.variable}
+                      onChange={(e) => { handleUpdate(index, 'variable', e.target.value) }}
+                    />
+                    {shouldShowPattern(extractor.type) && (
+                      <Input
+                        placeholder="提取模式"
+                        size="small"
+                        style={{ width: '40%' }}
+                        value={extractor.pattern ?? ''}
+                        onChange={(e) => { handleUpdate(index, 'pattern', e.target.value) }}
+                      />
+                    )}
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      size="small"
+                      style={{ width: '10%' }}
+                      type="text"
+                      onClick={() => { handleDelete(index) }}
+                    />
+                  </Space.Compact>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
     </div>
   )
 }
