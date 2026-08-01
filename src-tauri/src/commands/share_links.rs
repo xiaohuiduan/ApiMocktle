@@ -52,13 +52,13 @@ pub fn create_share_link(
         }
     }
 
-    // 密码可选：空字符串 = 无密码（打开即看）
-    let password_hash = if payload.password.is_empty() {
-        None
+    // 密码可选：空字符串 = 无密码（打开即看）。明文列供桌面端生成带密码链接，不向访客暴露。
+    let (password_hash, password_plain) = if payload.password.is_empty() {
+        (None, None)
     }
     else {
         match crate::services::crypto::hash_password(&payload.password) {
-            Ok(h) => Some(h),
+            Ok(h) => (Some(h), Some(payload.password.clone())),
             Err(e) => return crate::errors::AppError::Internal(e).into(),
         }
     };
@@ -77,6 +77,7 @@ pub fn create_share_link(
         &user.id,
         payload.api_menu_ids,
         password_hash,
+        password_plain,
         payload.expires_at,
         &title,
     ) {
@@ -141,22 +142,22 @@ pub fn update_share_link(
     }
 
     // 密码三态：remove_password → 清除；password 非空 → 设置新密码；否则保持原密码
-    let password_hash = if payload.remove_password {
-        None
+    let (password_hash, password_plain) = if payload.remove_password {
+        (None, None)
     }
     else if let Some(p) = &payload.password {
         if p.is_empty() {
-            link.password_hash.clone()
+            (link.password_hash.clone(), link.password_plain.clone())
         }
         else {
             match crate::services::crypto::hash_password(p) {
-                Ok(h) => Some(h),
+                Ok(h) => (Some(h), Some(p.clone())),
                 Err(e) => return crate::errors::AppError::Internal(e).into(),
             }
         }
     }
     else {
-        link.password_hash.clone()
+        (link.password_hash.clone(), link.password_plain.clone())
     };
 
     // 标题为空时使用项目名
@@ -172,6 +173,7 @@ pub fn update_share_link(
         &id,
         payload.api_menu_ids,
         password_hash,
+        password_plain,
         payload.expires_at,
         &title,
     ) {

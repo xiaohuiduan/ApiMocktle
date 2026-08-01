@@ -201,6 +201,17 @@ export function ShareServerPanel() {
     msgApi.success('链接已复制')
   }
 
+  /** 带密码链接：后端返回明文密码时直接复制，否则弹窗手动输入 */
+  const handlePwdLink = (record: ShareLink) => {
+    if (record.passwordPlain) {
+      void handleCopy(buildShareLinkUrl(baseUrl, record, true, record.passwordPlain))
+    }
+    else {
+      setPwdLinkTarget(record)
+      setPwdLinkInput('')
+    }
+  }
+
   return (
     <div>
       {contextHolder}
@@ -376,8 +387,7 @@ export function ShareServerPanel() {
                       icon={<Link2 size={14} />}
                       size="small"
                       onClick={() => {
-                        setPwdLinkTarget(record)
-                        setPwdLinkInput('')
+                        handlePwdLink(record)
                       }}
                     >
                       带密码链接

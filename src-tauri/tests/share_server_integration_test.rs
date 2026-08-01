@@ -106,6 +106,7 @@ async fn test_share_server_full_flow() {
         "u1",
         vec!["api1".to_string()],
         Some(password_hash),
+        Some("secret".to_string()),
         None,
         "订单接口",
     )
@@ -118,6 +119,7 @@ async fn test_share_server_full_flow() {
         "u1",
         vec![],
         Some(apimocktle_lib::services::crypto::hash_password("old").unwrap()),
+        Some("old".to_string()),
         Some("2020-01-01".to_string()),
         "已过期分享",
     )
@@ -315,7 +317,7 @@ async fn test_share_link_no_password_and_update() {
     let (db, _project_id) = setup_db();
 
     // 无密码分享（password_hash None）：任意密码均可登录，空密码也直接放行
-    let link = share_repo::create_share_link(&db, "p1", "u1", vec![], None, None, "").unwrap();
+    let link = share_repo::create_share_link(&db, "p1", "u1", vec![], None, None, None, "").unwrap();
     assert!(!link.has_password, "无密码分享 has_password 应为 false");
 
     let (handle, port) = start_test_server(db.clone()).await;
@@ -332,6 +334,7 @@ async fn test_share_link_no_password_and_update() {
         &link.id,
         vec!["api1".to_string(), "doc1".to_string()],
         Some(password_hash),
+        Some("newpass".to_string()),
         None,
         "编辑后的标题",
     )
@@ -339,6 +342,7 @@ async fn test_share_link_no_password_and_update() {
     assert!(updated.has_password, "设置密码后 has_password 应为 true");
     assert_eq!(updated.title, "编辑后的标题");
     assert_eq!(updated.api_menu_ids.len(), 2);
+    assert_eq!(updated.password_plain.as_deref(), Some("newpass"), "明文密码应持久化");
 
     // 旧 token 会话仍有效（会话只绑 share_id），菜单反映新范围
     let resp = client
@@ -371,6 +375,7 @@ async fn test_share_link_no_password_and_update() {
         vec![],
         None,
         None,
+        None,
         "编辑后的标题",
     )
     .unwrap();
@@ -394,6 +399,7 @@ async fn test_share_link_full_scope_and_expiry() {
         "u1",
         vec![],
         Some(password_hash),
+        Some("secret".to_string()),
         None,
         "全量分享",
     )

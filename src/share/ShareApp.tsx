@@ -235,6 +235,10 @@ export function ShareApp() {
           if (shareId && pwd) {
             void autoLogin(pwd)
           }
+          else if (shareId) {
+            // 无密码参数：尝试空密码（无密码分享自动放行；有密码分享静默落到密码页）
+            void autoLogin('', true)
+          }
           else {
             setPhase('login')
           }

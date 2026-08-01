@@ -39,6 +39,7 @@ pub fn create_share_link(
     creator_user_id: &str,
     api_menu_ids: Vec<String>,
     password_hash: Option<String>,
+    password_plain: Option<String>,
     expires_at: Option<String>,
     title: &str,
 ) -> Result<ShareLink, crate::errors::AppError> {
@@ -49,14 +50,15 @@ pub fn create_share_link(
     let expires_normalized = expires_at.as_deref().and_then(normalize_expiry);
 
     conn.execute(
-        "INSERT INTO share_links (id, project_id, creator_user_id, api_menu_ids, password_hash, expires_at, title, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO share_links (id, project_id, creator_user_id, api_menu_ids, password_hash, password_plain, expires_at, title, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             id,
             project_id,
             creator_user_id,
             menu_ids_json,
             password_hash,
+            password_plain,
             expires_normalized,
             title,
             now
@@ -70,6 +72,7 @@ pub fn create_share_link(
         api_menu_ids,
         has_password: password_hash.is_some(),
         password_hash,
+        password_plain,
         expires_at: expires_normalized,
         title: title.to_string(),
         created_at: now,
@@ -84,7 +87,8 @@ fn row_to_share_link(
     let api_menu_ids: Vec<String> =
         serde_json::from_str(&menu_ids_json).unwrap_or_default();
     let password_hash: Option<String> = row.get(4)?;
-    let project_name = if with_project_name { row.get(8)? } else { None };
+    let password_plain: Option<String> = row.get(5)?;
+    let project_name = if with_project_name { row.get(9)? } else { None };
     Ok(ShareLink {
         id: row.get(0)?,
         project_id: row.get(1)?,
@@ -92,9 +96,10 @@ fn row_to_share_link(
         api_menu_ids,
         has_password: password_hash.is_some(),
         password_hash,
-        expires_at: row.get(5)?,
-        title: row.get(6)?,
-        created_at: row.get(7)?,
+        password_plain,
+        expires_at: row.get(6)?,
+        title: row.get(7)?,
+        created_at: row.get(8)?,
         project_name,
     })
 }
@@ -107,6 +112,7 @@ pub fn update_share_link(
     id: &str,
     api_menu_ids: Vec<String>,
     password_hash: Option<String>,
+    password_plain: Option<String>,
     expires_at: Option<String>,
     title: &str,
 ) -> Result<ShareLink, crate::errors::AppError> {
@@ -115,16 +121,16 @@ pub fn update_share_link(
     let expires_normalized = expires_at.as_deref().and_then(normalize_expiry);
 
     let updated = conn.execute(
-        "UPDATE share_links SET api_menu_ids = ?1, password_hash = ?2, expires_at = ?3, title = ?4
-         WHERE id = ?5",
-        params![menu_ids_json, password_hash, expires_normalized, title, id],
+        "UPDATE share_links SET api_menu_ids = ?1, password_hash = ?2, password_plain = ?3, expires_at = ?4, title = ?5
+         WHERE id = ?6",
+        params![menu_ids_json, password_hash, password_plain, expires_normalized, title, id],
     )?;
     if updated == 0 {
         return Err(crate::errors::AppError::NotFound("分享链接不存在".into()));
     }
 
     conn.query_row(
-        "SELECT id, project_id, creator_user_id, api_menu_ids, password_hash, expires_at, title, created_at
+        "SELECT id, project_id, creator_user_id, api_menu_ids, password_hash, password_plain, expires_at, title, created_at
          FROM share_links WHERE id = ?1",
         params![id],
         |row| row_to_share_link(row, false),
@@ -135,7 +141,7 @@ pub fn update_share_link(
 pub fn get_share_link(db: &Db, id: &str) -> Result<Option<ShareLink>, crate::errors::AppError> {
     let conn = db.0.lock().unwrap();
     conn.query_row(
-        "SELECT id, project_id, creator_user_id, api_menu_ids, password_hash, expires_at, title, created_at
+        "SELECT id, project_id, creator_user_id, api_menu_ids, password_hash, password_plain, expires_at, title, created_at
          FROM share_links WHERE id = ?1",
         params![id],
         |row| row_to_share_link(row, false),
@@ -150,7 +156,7 @@ pub fn get_share_link(db: &Db, id: &str) -> Result<Option<ShareLink>, crate::err
 pub fn list_share_links(db: &Db) -> Result<Vec<ShareLink>, crate::errors::AppError> {
     let conn = db.0.lock().unwrap();
     let mut stmt = conn.prepare(
-        "SELECT s.id, s.project_id, s.creator_user_id, s.api_menu_ids, s.password_hash, s.expires_at, s.title, s.created_at, p.name
+        "SELECT s.id, s.project_id, s.creator_user_id, s.api_menu_ids, s.password_hash, s.password_plain, s.expires_at, s.title, s.created_at, p.name
          FROM share_links s LEFT JOIN projects p ON p.id = s.project_id
          ORDER BY s.created_at DESC",
     )?;

@@ -208,6 +208,9 @@ pub struct ShareLink {
     /// 是否设置了访问密码（密码本身不暴露给前端）
     #[serde(rename = "hasPassword", default)]
     pub has_password: bool,
+    /// 明文密码（仅桌面端 IPC 返回，用于生成带密码链接；访客 HTTP API 不序列化此结构）
+    #[serde(rename = "passwordPlain", default)]
+    pub password_plain: Option<String>,
     #[serde(rename = "expiresAt")]
     pub expires_at: Option<String>,
     pub title: String,

@@ -288,6 +288,17 @@ fn run_migrations(conn: &Connection) {
         [],
     ).ok(); // 已存在则静默忽略
 
+    // v1.7.0 迁移：分享链接明文密码列（桌面端生成带密码链接用，不向访客暴露）
+    let has_password_plain: bool = conn
+        .prepare("SELECT 1 AS yes FROM pragma_table_info('share_links') WHERE name = 'password_plain'")
+        .and_then(|mut s| s.exists([]))
+        .unwrap_or(false);
+
+    if !has_password_plain {
+        conn.execute("ALTER TABLE share_links ADD COLUMN password_plain TEXT", [])
+            .ok();
+    }
+
     // v1.6.0 迁移：Cookie 自动管理（按用户 + 域名隔离）
     conn.execute_batch(
         "

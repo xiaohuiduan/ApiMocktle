@@ -31,6 +31,8 @@ export interface ShareLink {
   projectName?: string
   apiMenuIds: string[]
   hasPassword: boolean
+  /** 明文密码（仅桌面端 IPC 返回，用于生成带密码链接） */
+  passwordPlain?: string
   expiresAt?: string
   title: string
   createdAt: string
@@ -175,6 +177,11 @@ export function CreateShareModal({
   }, [projectId, sessionId, isEditing, editing])
 
   const treeData = useMemo(() => buildTree(menuItems), [menuItems])
+
+  /** 随机生成 6 位数字密码 */
+  const genRandomPassword = () => {
+    setPassword(String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0'))
+  }
 
   const handleSubmit = async () => {
     if (!projectId) {
@@ -416,6 +423,15 @@ export function CreateShareModal({
                         </Radio.Group>
                         {passwordMode === 'set' && (
                           <Input.Password
+                            addonAfter={(
+                              <Button
+                                size="small"
+                                type="text"
+                                onClick={genRandomPassword}
+                              >
+                                随机
+                              </Button>
+                            )}
                             className="mt-2"
                             placeholder="输入新密码"
                             value={password}
@@ -434,6 +450,15 @@ export function CreateShareModal({
                   : (
                       <Form.Item label="访问密码（可选）">
                         <Input.Password
+                          addonAfter={(
+                            <Button
+                              size="small"
+                              type="text"
+                              onClick={genRandomPassword}
+                            >
+                              随机
+                            </Button>
+                          )}
                           placeholder="留空则不设密码"
                           value={password}
                           onChange={(e) => {

@@ -152,6 +152,7 @@ async fn main() {
         "u1",
         vec![],
         Some(password_hash),
+        Some("test1234".to_string()),
         None,
         "宠物店 API 文档",
     )
@@ -163,6 +164,7 @@ async fn main() {
         &project_id,
         "u1",
         vec!["api1".to_string()],
+        None,
         None,
         None,
         "宠物详情免密分享",
