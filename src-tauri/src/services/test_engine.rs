@@ -66,13 +66,71 @@ pub struct AssertionResult {
 pub struct TestEngine;
 
 impl TestEngine {
+    /// 内置动态变量求值（{{$xxx}} 语法，与 Postman 核心集对齐；不支持的值原样返回）
+    fn resolve_dynamic_variable(name: &str) -> Option<String> {
+        use rand::Rng;
+        use uuid::Uuid;
+
+        let mut rng = rand::thread_rng();
+        match name {
+            "$timestamp" => Some(chrono::Utc::now().timestamp().to_string()),
+            "$timestampISO" => Some(chrono::Utc::now().to_rfc3339()),
+            "$guid" => Some(Uuid::new_v4().to_string()),
+            "$randomUUID" => Some(Uuid::new_v4().simple().to_string()),
+            "$randomInt" => Some(rng.gen_range(0..=1000).to_string()),
+            "$randomEmail" => {
+                let local: String = (0..8).map(|_| rng.gen_range(b'a'..=b'z') as char).collect();
+                Some(format!("{}@example.com", local))
+            }
+            "$randomIP" => {
+                let ip = format!(
+                    "{}.{}.{}.{}",
+                    rng.gen_range(1..=255),
+                    rng.gen_range(0..=255),
+                    rng.gen_range(0..=255),
+                    rng.gen_range(1..=255)
+                );
+                Some(ip)
+            }
+            "$randomMobile" => {
+                let prefix = rng.gen_range(130..=199);
+                let tail: String = (0..8).map(|_| rng.gen_range(b'0'..=b'9') as char).collect();
+                Some(format!("{}{}", prefix, tail))
+            }
+            "$randomString" => {
+                let s: String = (0..8)
+                    .map(|_| {
+                        let c = rng.gen_range(b'a'..=b'z');
+                        (if rng.gen_bool(0.5) { c.to_ascii_uppercase() } else { c }) as char
+                    })
+                    .collect();
+                Some(s)
+            }
+            "$processEnv" => None,
+            _ if name.starts_with("$processEnv:") || name.starts_with("$processEnv.") => {
+                let key = name.trim_start_matches("$processEnv:").trim_start_matches("$processEnv.");
+                Some(std::env::var(key).unwrap_or_default())
+            }
+            _ => None,
+        }
+    }
+
     /// Variable template replacement: replace {{varName}} with actual values
+    /// 先替换内置动态变量（{{$xxx}}），再替换用户变量
     pub fn interpolate_variables(template: &str, variables: &HashMap<String, String>) -> String {
         let mut result = template.to_string();
         for (key, value) in variables {
             let placeholder = format!("{{{{{}}}}}", key);
             result = result.replace(&placeholder, value);
         }
+        // 内置动态变量最后替换，避免用户变量名与内置函数冲突
+        let dynamic_re = Regex::new(r"\{\{(\$[\w:.]+)\}\}").unwrap();
+        result = dynamic_re
+            .replace_all(&result, |caps: &regex::Captures| {
+                let name = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+                Self::resolve_dynamic_variable(name).unwrap_or_else(|| format!("{{{{{}}}}}", name))
+            })
+            .to_string();
         result
     }
 
@@ -309,6 +367,7 @@ impl TestEngine {
             form_data_files,
             proxy_config: None,
             insecure_skip_verify: false,
+            timeout_ms: None,
         })
     }
 
@@ -1309,5 +1368,62 @@ mod tests {
         assert_eq!(result.url, "https://api.example.com/users/123");
         assert_eq!(result.method, "GET");
         assert_eq!(result.headers[0].value, "Bearer mytoken");
+    }
+
+    #[test]
+    fn test_interpolate_dynamic_variables() {
+        let vars = HashMap::new();
+
+        // 时间戳类
+        let ts = TestEngine::interpolate_variables("t={{$timestamp}}", &vars);
+        let ts_val = ts.trim_start_matches("t=");
+        assert!(ts_val.parse::<i64>().is_ok(), "timestamp should be numeric: {}", ts);
+
+        // GUID 格式
+        let guid = TestEngine::interpolate_variables("{{$guid}}", &vars);
+        assert_eq!(guid.split('-').count(), 5, "guid should have hyphens: {}", guid);
+
+        // 随机 UUID 无横线
+        let uuid = TestEngine::interpolate_variables("{{$randomUUID}}", &vars);
+        assert_eq!(uuid.len(), 32, "randomUUID should be 32 chars: {}", uuid);
+
+        // 随机数字
+        let ri = TestEngine::interpolate_variables("{{$randomInt}}", &vars);
+        assert!(ri.parse::<u32>().is_ok());
+
+        // 随机手机号 11 位
+        let mobile = TestEngine::interpolate_variables("{{$randomMobile}}", &vars);
+        assert_eq!(mobile.len(), 11, "mobile should be 11 digits: {}", mobile);
+
+        // 邮箱格式
+        let email = TestEngine::interpolate_variables("{{$randomEmail}}", &vars);
+        assert!(email.ends_with("@example.com"), "email: {}", email);
+
+        // 用户变量与动态变量共存
+        let mut vars2 = HashMap::new();
+        vars2.insert("name".to_string(), "alice".to_string());
+        let out = TestEngine::interpolate_variables("user={{name}}&ts={{$timestamp}}", &vars2);
+        assert!(out.starts_with("user=alice&ts="));
+        assert!(out.len() > "user=alice&ts=".len());
+
+        // 未知动态变量原样保留
+        let unknown = TestEngine::interpolate_variables("{{$noSuchVar}}", &vars);
+        assert_eq!(unknown, "{{$noSuchVar}}");
+
+        // 环境变量读取（$processEnv:KEY）
+        std::env::set_var("APIMOCKTLE_TEST_ENV", "hello");
+        let env = TestEngine::interpolate_variables("{{$processEnv:APIMOCKTLE_TEST_ENV}}", &vars);
+        assert_eq!(env, "hello");
+    }
+
+    #[test]
+    fn test_interpolate_dynamic_variables_repeat() {
+        // 每次出现独立求值（两次值可以不同，但至少都能解析为数字）
+        let vars = HashMap::new();
+        let out = TestEngine::interpolate_variables("{{$randomInt}}-{{$randomInt}}", &vars);
+        let parts: Vec<&str> = out.split('-').collect();
+        assert_eq!(parts.len(), 2);
+        assert!(parts[0].parse::<u32>().is_ok());
+        assert!(parts[1].parse::<u32>().is_ok());
     }
 }

@@ -86,6 +86,9 @@ pub fn run() {
             // Request runner
             commands::request_runner::run_api_request,
             commands::request_runner::test_proxy_connection,
+            commands::request_runner::clear_cookie_jar,
+            commands::request_runner::get_cookie_jar_count,
+            commands::request_runner::save_response_file,
             // History
             commands::history::save_request_history,
             commands::history::list_request_history,

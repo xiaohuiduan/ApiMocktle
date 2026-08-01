@@ -247,6 +247,9 @@ pub struct RunRequestPayload {
     pub proxy_config: Option<ProxyConfig>,
     #[serde(rename = "insecureSkipVerify", default)]
     pub insecure_skip_verify: bool,
+    /// 请求超时（毫秒）；None 或 0 时使用全局默认，全局未配置时默认 30s
+    #[serde(rename = "timeoutMs", default)]
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

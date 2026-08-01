@@ -287,6 +287,25 @@ fn run_migrations(conn: &Connection) {
         "ALTER TABLE test_tasks ADD COLUMN folder_id TEXT",
         [],
     ).ok(); // 已存在则静默忽略
+
+    // v1.6.0 迁移：Cookie 自动管理（按用户 + 域名隔离）
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS cookie_jar (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            domain TEXT NOT NULL,
+            name TEXT NOT NULL,
+            value TEXT NOT NULL,
+            path TEXT NOT NULL DEFAULT '/',
+            expires_at INTEGER,
+            created_at TEXT NOT NULL,
+            UNIQUE (user_id, domain, name, path),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_cookie_jar_user_domain ON cookie_jar(user_id, domain);
+        ",
+    ).ok();
 }
 
 pub fn init_database(app_data_dir: &PathBuf) -> Db {

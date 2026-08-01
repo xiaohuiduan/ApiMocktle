@@ -1,11 +1,14 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use serde::Serialize;
 
 use crate::db::client::Db;
-use crate::db::{auth_repo, project_repo};
+use crate::db::{auth_repo, cookie_repo, project_repo};
 use crate::models::*;
+use crate::services::app_config::AppConfigService;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -116,9 +119,49 @@ fn categorize_request_error(e: &reqwest::Error) -> RequestErrorInfo {
     }
 }
 
+/// 请求超时解析：请求级 > 全局配置 > 默认 30s；0 表示不限时
+fn resolve_timeout_ms(payload_timeout: Option<u64>, config: &AppConfigService) -> Option<Duration> {
+    let ms = if let Some(t) = payload_timeout {
+        t
+    } else if let Some(req_cfg) = config.get("request") {
+        req_cfg.get("timeoutMs").and_then(|v| v.as_u64()).unwrap_or(30_000)
+    } else {
+        30_000
+    };
+    if ms == 0 { None } else { Some(Duration::from_millis(ms)) }
+}
+
+/// Cookie 自动管理开关（默认开启）
+fn cookie_jar_enabled(config: &AppConfigService) -> bool {
+    if let Some(req_cfg) = config.get("request") {
+        req_cfg.get("cookieJarEnabled").and_then(|v| v.as_bool()).unwrap_or(true)
+    } else {
+        true
+    }
+}
+
+/// 判断响应 Content-Type 是否为二进制（文本类返回 false）
+fn is_binary_content_type(content_type: &str) -> bool {
+    let ct = content_type.to_lowercase();
+    if ct.is_empty() {
+        return false;
+    }
+    let mime = ct.split(';').next().unwrap_or("").trim();
+    let is_text = mime.starts_with("text/")
+        || mime == "application/json"
+        || mime == "application/xml"
+        || mime == "application/javascript"
+        || mime == "application/x-www-form-urlencoded"
+        || mime.starts_with("application/xhtml")
+        || mime.ends_with("+json")
+        || mime.ends_with("+xml");
+    !is_text
+}
+
 #[tauri::command]
 pub async fn run_api_request(
     db: tauri::State<'_, Arc<Db>>,
+    config: tauri::State<'_, Arc<AppConfigService>>,
     session_id: String,
     project_id: String,
     payload: RunRequestPayload,
@@ -136,7 +179,11 @@ pub async fn run_api_request(
     let url = &payload.url;
 
     let start = Instant::now();
-    let client = build_client_with_proxy(payload.proxy_config.as_ref(), payload.insecure_skip_verify);
+    let client = build_client_with_proxy(
+        payload.proxy_config.as_ref(),
+        payload.insecure_skip_verify,
+        resolve_timeout_ms(payload.timeout_ms, &config),
+    );
 
     let mut req = match method.as_str() {
         "POST" => client.post(url),
@@ -153,9 +200,28 @@ pub async fn run_api_request(
         }
     }
 
+    // Cookie jar：自动附加匹配域名的 cookie（手动 Cookie header 存在时不附加）
+    let cookie_enabled = cookie_jar_enabled(&config);
+    if cookie_enabled && !payload.headers.iter().any(|h| h.name.to_lowercase() == "cookie") {
+        if let Ok(jar_cookies) = cookie_repo::list_cookies_for_url(&db, &user.id, url) {
+            if !jar_cookies.is_empty() {
+                let cookie_str = jar_cookies
+                    .iter()
+                    .map(|(n, v)| format!("{}={}", n, v))
+                    .collect::<Vec<_>>()
+                    .join("; ");
+                req = req.header("Cookie", cookie_str);
+            }
+        }
+    }
+
     // Content-Type (skip if we'll use multipart)
-    if !payload.form_data_files.is_empty() {
-        // multipart 请求不需要手动设置 Content-Type，reqwest 会自动生成
+    let is_multipart = payload.content_type
+        .as_deref()
+        .map(|c| c.to_lowercase().starts_with("multipart/form-data"))
+        .unwrap_or(false);
+    if is_multipart || !payload.form_data_files.is_empty() {
+        // multipart 请求不需要手动设置 Content-Type，reqwest 会自动生成（含 boundary）
     } else if let Some(ct) = &payload.content_type {
         if !payload.headers.iter().any(|h| h.name.to_lowercase() == "content-type") {
             req = req.header("Content-Type", ct.as_str());
@@ -192,6 +258,22 @@ pub async fn run_api_request(
                         .file_name(filename);
                     form = form.part(file.name.clone(), part);
                 }
+            }
+            req = req.multipart(form);
+        } else if is_multipart {
+            // 无文件的 form-data：body 是 a=1&b=2 格式，需转换为真正的 multipart 发送
+            let mut form = reqwest::multipart::Form::new();
+            for pair in payload.body.split('&') {
+                let (key, value) = if let Some((k, v)) = pair.split_once('=') {
+                    let decoded_key = urlencoding::decode(k).unwrap_or_default().to_string();
+                    let decoded_val = urlencoding::decode(v).unwrap_or_default().to_string();
+                    (decoded_key, decoded_val)
+                } else if !pair.is_empty() {
+                    (urlencoding::decode(pair).unwrap_or_default().to_string(), String::new())
+                } else {
+                    continue;
+                };
+                form = form.part(key, reqwest::multipart::Part::text(value));
             }
             req = req.multipart(form);
         } else {
@@ -235,7 +317,29 @@ pub async fn run_api_request(
                     })
                 })
                 .collect();
-            let body = resp.text().await.unwrap_or_default();
+
+            // 保存响应 Set-Cookie 到 cookie jar（按域名隔离）
+            if cookie_enabled {
+                let set_cookies: Vec<String> = resp
+                    .headers()
+                    .get_all("set-cookie")
+                    .iter()
+                    .filter_map(|v| v.to_str().ok().map(|s| s.to_string()))
+                    .collect();
+                let _ = cookie_repo::save_response_cookies(&db, &user.id, url, &set_cookies);
+            }
+
+            // 二进制响应：body 置空，bodyBase64 + bodySize 返回；文本正常返回
+            let resp_bytes = resp.bytes().await.unwrap_or_default();
+            let body_size = resp_bytes.len();
+            let is_binary = is_binary_content_type(&resp_content_type);
+            let body = if is_binary {
+                String::new()
+            } else {
+                String::from_utf8_lossy(&resp_bytes).to_string()
+            };
+            let body_base64 = if is_binary { Some(STANDARD.encode(&resp_bytes)) } else { None };
+
             let duration_ms = start.elapsed().as_millis() as u64;
 
             let req_headers_json: Vec<serde_json::Value> = payload.headers.iter()
@@ -256,6 +360,9 @@ pub async fn run_api_request(
                 "headers": resp_headers,
                 "contentType": resp_content_type,
                 "body": body,
+                "isBinary": is_binary,
+                "bodySize": body_size,
+                "bodyBase64": body_base64,
                 "proxyType": payload.proxy_config.as_ref().map(|pc| pc.proxy_type.clone()).unwrap_or_default(),
             })))
         }
@@ -275,6 +382,8 @@ pub async fn run_api_request(
                 "headers": [],
                 "contentType": "",
                 "body": "",
+                "isBinary": false,
+                "bodySize": 0,
                 "proxyType": payload.proxy_config.as_ref().map(|pc| pc.proxy_type.clone()).unwrap_or_default(),
                 "errorInfo": err_info,
             })))
@@ -446,10 +555,17 @@ fn build_schema_example(schema: &serde_json::Value) -> serde_json::Value {
     }
 }
 
-fn build_client_with_proxy(proxy_config: Option<&ProxyConfig>, insecure_skip_verify: bool) -> reqwest::Client {
+fn build_client_with_proxy(
+    proxy_config: Option<&ProxyConfig>,
+    insecure_skip_verify: bool,
+    timeout: Option<Duration>,
+) -> reqwest::Client {
     let mut builder = reqwest::Client::builder();
     if insecure_skip_verify {
         builder = builder.danger_accept_invalid_certs(true);
+    }
+    if let Some(t) = timeout {
+        builder = builder.timeout(t);
     }
     if let Some(pc) = proxy_config {
         match pc.proxy_type.as_str() {
@@ -485,7 +601,7 @@ pub async fn test_proxy_connection(
     test_url: String,
 ) -> Result<ApiResult<serde_json::Value>, String> {
     let start = Instant::now();
-    let client = build_client_with_proxy(Some(&proxy_config), false);
+    let client = build_client_with_proxy(Some(&proxy_config), false, Some(Duration::from_secs(15)));
     match client.get(&test_url).send().await {
         Ok(resp) => {
             let status = resp.status().as_u16();
@@ -518,6 +634,39 @@ pub async fn test_proxy_connection(
             })))
         },
     }
+}
+
+#[tauri::command]
+pub async fn clear_cookie_jar(
+    db: tauri::State<'_, Arc<Db>>,
+    session_id: String,
+) -> Result<ApiResult<()>, String> {
+    let user = match auth_repo::get_valid_session_user(&db, &session_id) {
+        Some(u) => u,
+        None => return Ok(crate::errors::AppError::Unauthorized("未登录".into()).into()),
+    };
+    cookie_repo::clear_cookie_jar(&db, &user.id).map_err(|e| e.to_string())?;
+    Ok(ApiResult::success(()))
+}
+
+#[tauri::command]
+pub async fn get_cookie_jar_count(
+    db: tauri::State<'_, Arc<Db>>,
+    session_id: String,
+) -> Result<ApiResult<i64>, String> {
+    let user = match auth_repo::get_valid_session_user(&db, &session_id) {
+        Some(u) => u,
+        None => return Ok(crate::errors::AppError::Unauthorized("未登录".into()).into()),
+    };
+    let count = cookie_repo::count_cookie_jar(&db, &user.id).map_err(|e| e.to_string())?;
+    Ok(ApiResult::success(count))
+}
+
+#[tauri::command]
+pub async fn save_response_file(path: String, data_base64: String) -> Result<ApiResult<()>, String> {
+    let bytes = STANDARD.decode(&data_base64).map_err(|e| format!("Base64 解码失败: {}", e))?;
+    std::fs::write(&path, bytes).map_err(|e| format!("写入文件失败: {}", e))?;
+    Ok(ApiResult::success(()))
 }
 
 #[cfg(test)]
@@ -710,8 +859,27 @@ mod tests {
 
     #[test]
     fn test_build_client_no_proxy() {
-        let client = build_client_with_proxy(None, false);
+        let client = build_client_with_proxy(None, false, None);
         // 验证客户端构建不 panic
         let _ = client;
+    }
+
+    #[test]
+    fn test_is_binary_content_type() {
+        // 文本类：正常文本预览
+        assert!(!is_binary_content_type("application/json"));
+        assert!(!is_binary_content_type("application/json; charset=utf-8"));
+        assert!(!is_binary_content_type("text/plain"));
+        assert!(!is_binary_content_type("text/html; charset=utf-8"));
+        assert!(!is_binary_content_type("application/xml"));
+        assert!(!is_binary_content_type("application/javascript"));
+        assert!(!is_binary_content_type("application/problem+json"));
+        assert!(!is_binary_content_type(""));
+        // 二进制类：base64 + 保存按钮
+        assert!(is_binary_content_type("image/png"));
+        assert!(is_binary_content_type("image/jpeg"));
+        assert!(is_binary_content_type("application/octet-stream"));
+        assert!(is_binary_content_type("application/pdf"));
+        assert!(is_binary_content_type("application/zip"));
     }
 }
