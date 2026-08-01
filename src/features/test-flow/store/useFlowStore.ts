@@ -254,12 +254,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   getGraph: () => {
     const { nodes, edges } = get()
     return {
-      nodes: nodes.map(({ id, type, position, data }) => ({
-        id,
-        type,
-        position,
-        data,
-      })) as FlowNode[],
+      nodes: nodes.map(({ id, type, position, data }) => {
+        // 剔除运行结果字段（exec*），避免污染存档
+        const cleanData = { ...(data as Record<string, unknown>) }
+        delete cleanData.execStatus
+        delete cleanData.execError
+        delete cleanData.execDurationMs
+        delete cleanData.execRequest
+        delete cleanData.execResponse
+        return { id, type, position, data: cleanData as FlowNodeData }
+      }) as FlowNode[],
       edges: edges.map(({ id, source, target, sourceHandle, targetHandle, label, data }) => ({
         id,
         source,

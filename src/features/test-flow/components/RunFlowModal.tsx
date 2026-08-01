@@ -4,8 +4,8 @@ import { Play, Square, CheckCircle, XCircle, Clock, AlertTriangle, SkipForward }
 import { invoke } from '@tauri-apps/api/core'
 import { css } from '@emotion/css'
 import type { FlowNode, FlowEdge, FlowNodeType, NodeExecStatus } from '../types/flow.types'
-import { FlowNodeType as NT } from '../types/flow.types'
-import { useFlowExecution, type FlowExecLog, type FlowExecState, type VariableSource } from '../hooks/useFlowExecution'
+import { NODE_TYPE_LABELS } from '../types/flow.types'
+import { useFlowExecution, type FlowExecLog, type VariableSource } from '../hooks/useFlowExecution'
 
 export type { VariableSource }
 
@@ -57,20 +57,7 @@ const statusIconMap: Record<NodeExecStatus, React.ReactNode> = {
   passed: <CheckCircle size={12} color="var(--ds-success-color, #22c55e)" />,
   failed: <XCircle size={12} color="var(--ds-error-color, #ef4444)" />,
   skipped: <SkipForward size={12} color="var(--ds-node-text-muted, #9ca3af)" />,
-  error: <AlertTriangle size={12} color="var(--ds-warning-color, #f97316)" />,
-}
-
-const NODE_TYPE_LABELS: Record<string, string> = {
-  [NT.Start]: '开始',
-  [NT.End]: '结束',
-  [NT.HttpRequest]: 'HTTP',
-  [NT.Condition]: '条件',
-  [NT.Loop]: '循环',
-  [NT.Parallel]: '并行',
-  [NT.Wait]: '等待',
-  [NT.SetVariable]: '变量',
-  [NT.Assert]: '断言',
-  [NT.SubFlow]: '子流程',
+  error: <AlertTriangle size={12} color="var(--ds-error-color, #ef4444)" />,
 }
 
 // ==================== 组件 ====================
@@ -92,6 +79,8 @@ interface RunFlowModalProps {
   edges: FlowEdge[]
   projectId: string
   environments?: Environment[]
+  /** 执行引擎（由父组件持有，便于工具栏同步运行/中止状态） */
+  execution: ReturnType<typeof useFlowExecution>
   onNodeStatusChange?: (nodeId: string, status: NodeExecStatus, extra?: {
     execError?: string
     execDurationMs?: number
@@ -109,13 +98,14 @@ export default function RunFlowModal({
   edges,
   projectId,
   environments = [],
+  execution,
   onNodeStatusChange,
   onRunComplete,
 }: RunFlowModalProps) {
   const [selectedEnv, setSelectedEnv] = useState<string>('')
   const [failFast, setFailFast] = useState(true)
   const [logHeight, setLogHeight] = useState(400)
-  const { state, executeFlow, abort, reset } = useFlowExecution()
+  const { state, executeFlow, abort, reset } = execution
   const logEndRef = useRef<HTMLDivElement>(null)
   const resizingRef = useRef(false)
 
@@ -157,6 +147,7 @@ export default function RunFlowModal({
 
   const handleRun = useCallback(async () => {
     const env = environments.find((e) => e.name === selectedEnv)
+    if (!env) return // 未选择环境（按钮已禁用，此处兜底）
     // 优先取 baseUrls[0].url，其次取 env.url
     const baseUrl = env?.baseUrls?.[0]?.url || env?.url || undefined
     // variables 是 [{name, value}] 数组，转为 Record
@@ -201,7 +192,6 @@ export default function RunFlowModal({
           'create_test_execution',
           { taskId, envJson: selectedEnv ? { name: selectedEnv } : null },
         )
-        console.log('[RunFlowModal] create_test_execution:', execRes)
         if (execRes.ok && execRes.data) {
           const executionId = execRes.data.id
           let sortOrder = 0
@@ -272,7 +262,7 @@ export default function RunFlowModal({
       footer={
         <Space>
           <Button onClick={handleClose}>
-            {state.status === 'running' ? '关闭（后台继续）' : '关闭'}
+            {state.status === 'running' ? '中止并关闭' : '关闭'}
           </Button>
           {state.status === 'running' && (
             <Button danger icon={<Square size={14} />} onClick={abort}>
@@ -284,6 +274,7 @@ export default function RunFlowModal({
               type="primary"
               icon={<Play size={14} />}
               onClick={handleRun}
+              disabled={!selectedEnv}
             >
               {state.status === 'idle' ? '开始运行' : '重新运行'}
             </Button>
@@ -292,7 +283,7 @@ export default function RunFlowModal({
       }
     >
       {/* 配置区 */}
-      <div style={{ display: 'flex', gap: 'var(--ds-pad-lg)', marginBottom: 'var(--ds-pad-lg)', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 'var(--ds-pad-lg)', marginBottom: 'var(--ds-pad-md)', alignItems: 'center' }}>
         <div style={{ flex: 1 }}>
           <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>
             运行环境
@@ -301,6 +292,7 @@ export default function RunFlowModal({
             value={selectedEnv || undefined}
             onChange={setSelectedEnv}
             placeholder="选择运行环境"
+            status={selectedEnv ? undefined : 'warning'}
             style={{ width: '100%' }}
             size="small"
             options={environments.map((e) => {
@@ -319,6 +311,13 @@ export default function RunFlowModal({
           <Switch checked={failFast} onChange={setFailFast} size="small" />
         </div>
       </div>
+      {!selectedEnv && (
+        <Text type="warning" style={{ display: 'block', fontSize: 12, marginBottom: 'var(--ds-pad-md)' }}>
+          {environments.length === 0
+            ? '当前项目未配置环境。请先在「环境」管理中创建环境（含 Base URL），否则相对路径请求无法解析。'
+            : '请先选择运行环境（需包含 Base URL），否则相对路径请求无法解析。'}
+        </Text>
+      )}
 
       {/* 状态统计 */}
       {state.status !== 'idle' && (

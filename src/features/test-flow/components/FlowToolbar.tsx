@@ -1,4 +1,4 @@
-import { Button, Tooltip, Space, Select, Input } from 'antd'
+import { Button, Tooltip, Space, Select, Input, Popconfirm } from 'antd'
 import { css } from '@emotion/css'
 import {
   Play,
@@ -31,6 +31,8 @@ export interface FlowToolbarProps {
   canRedo: boolean
   isRunning: boolean
   isDirty: boolean
+  /** 保存进行中（按钮 loading 态） */
+  isSaving?: boolean
   // Mock Agent 地址
   agentUrl: string
   onAgentUrlChange: (url: string) => void
@@ -74,6 +76,7 @@ export default function FlowToolbar({
   canRedo,
   isRunning,
   isDirty,
+  isSaving = false,
   agentUrl,
   onAgentUrlChange,
   environments = [],
@@ -171,6 +174,7 @@ export default function FlowToolbar({
             icon={<Save size={14} />}
             onClick={onSave}
             disabled={!isDirty}
+            loading={isSaving}
             data-testid="toolbar-save"
           />
         </Tooltip>
@@ -202,15 +206,21 @@ export default function FlowToolbar({
             data-testid="toolbar-validate"
           />
         </Tooltip>
-        <Tooltip title="清空">
+        <Popconfirm
+          title="清空画布"
+          description="将删除所有节点和连线，且不可撤销。确定清空？"
+          okText="清空"
+          okButtonProps={{ danger: true }}
+          cancelText="取消"
+          onConfirm={onClear}
+        >
           <Button
             size="small"
             danger
             icon={<Trash2 size={14} />}
-            onClick={onClear}
             data-testid="toolbar-clear"
           />
-        </Tooltip>
+        </Popconfirm>
       </Space>
 
       {/* 右侧：Mock Agent 地址 */}

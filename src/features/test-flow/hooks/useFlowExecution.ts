@@ -219,6 +219,13 @@ export function useFlowExecution() {
       const nodeName = (nodeData.label as string) || node.id
       const nodeType = node.type as FlowNodeType
 
+      // 节点被禁用时跳过，但不中断后续流程
+      if ((nodeData.enabled as boolean) === false) {
+        logs = addLog(logs, nodeId, nodeName, nodeType, 'skipped', '节点已禁用，跳过')
+        nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'skipped')
+        return { handleId: 'out' }
+      }
+
       nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'running')
       updateState({ currentNodeId: nodeId })
 
@@ -331,6 +338,13 @@ export function useFlowExecution() {
             logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `等待 ${waitMs}ms...`)
             updateState({})
             await new Promise((r) => setTimeout(r, waitMs))
+            if (abortRef.current) {
+              const dur = Date.now() - startMs
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'skipped', `等待被中止`, { durationMs: dur })
+              nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'skipped')
+              nodeDurations[nodeId] = dur
+              return { error: true }
+            }
             const dur = Date.now() - startMs
             logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', `等待完成 (${waitMs}ms)`, { durationMs: dur })
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
@@ -418,6 +432,15 @@ export function useFlowExecution() {
             )
 
             const dur = Date.now() - startMs
+
+            // 请求已发出，但运行已被中止：不再执行提取器/断言，避免中止后节点又变绿
+            if (abortRef.current) {
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'skipped',
+                `已中止（请求已完成，跳过后续处理）`, { durationMs: dur })
+              nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'skipped')
+              nodeDurations[nodeId] = dur
+              return { error: true }
+            }
 
             if (!result.ok || !result.data) {
               const errMsg = result.error?.includes('builder error')
@@ -567,38 +590,48 @@ export function useFlowExecution() {
               }
             }
 
-            const allAssertsPassed = assertionResults.length === 0 || assertionResults.every((a) => a.passed)
+            // 无断言时以 HTTP 状态码判定（4xx/5xx 视为失败），与单节点调试逻辑一致
+            const allAssertsPassed = assertionResults.length === 0
+              ? status < 400
+              : assertionResults.every((a) => a.passed)
             const nodeStatus: NodeExecStatus = allAssertsPassed ? 'passed' : 'failed'
 
             const statusMsg = allAssertsPassed
               ? `HTTP ${status} (${resp.responseTime}ms)`
-              : `HTTP ${status} - 断言失败 (${assertionResults.filter((a) => !a.passed).length}/${assertionResults.length})`
+              : assertionResults.length > 0
+                ? `HTTP ${status} - 断言失败 (${assertionResults.filter((a) => !a.passed).length}/${assertionResults.length})`
+                : `HTTP ${status} - 无断言，4xx/5xx 视为失败`
 
             // 存储错误信息到节点
             if (!allAssertsPassed) {
-              const failedAsserts = assertionResults.filter((a) => !a.passed)
-              const details = failedAsserts.map((a) => {
-                const atn = a.assertion as Record<string, unknown> | undefined
-                const atype = (atn?.type as string) || '未知'
-                const path = atn?.path as string | undefined
-                const name = atn?.name as string | undefined
-                const op = (atn?.operator as string) || '?'
-                const expected = atn?.expected
-                const actual = a.actual
+              let details: string
+              if (assertionResults.length === 0) {
+                details = `HTTP ${status} - 未配置断言，按失败处理（4xx/5xx）`
+              } else {
+                const failedAsserts = assertionResults.filter((a) => !a.passed)
+                details = failedAsserts.map((a) => {
+                  const atn = a.assertion as Record<string, unknown> | undefined
+                  const atype = (atn?.type as string) || '未知'
+                  const path = atn?.path as string | undefined
+                  const name = atn?.name as string | undefined
+                  const op = (atn?.operator as string) || '?'
+                  const expected = atn?.expected
+                  const actual = a.actual
 
-                // 构建标识：json_path:data.username / header:Content-Type / status
-                let target = atype
-                if (atype === 'json_path' && path) target = `json_path:${path}`
-                else if (atype === 'header' && name) target = `header:${name}`
+                  // 构建标识：json_path:data.username / header:Content-Type / status
+                  let target = atype
+                  if (atype === 'json_path' && path) target = `json_path:${path}`
+                  else if (atype === 'header' && name) target = `header:${name}`
 
-                // 构建详情
-                const expStr = expected !== undefined && expected !== null ? JSON.stringify(expected) : undefined
-                const actStr = actual !== undefined ? JSON.stringify(actual) : 'undefined'
-                if (expStr) {
-                  return `${target} ${op} 失败: 期望 ${expStr}, 实际 ${actStr}`
-                }
-                return `${target} ${op} 失败: ${a.error || `实际 ${actStr}`}`
-              }).join('\n')
+                  // 构建详情
+                  const expStr = expected !== undefined && expected !== null ? JSON.stringify(expected) : undefined
+                  const actStr = actual !== undefined ? JSON.stringify(actual) : 'undefined'
+                  if (expStr) {
+                    return `${target} ${op} 失败: 期望 ${expStr}, 实际 ${actStr}`
+                  }
+                  return `${target} ${op} 失败: ${a.error || `实际 ${actStr}`}`
+                }).join('\n')
+              }
               nodeErrors[nodeId] = details
             } else {
               delete nodeErrors[nodeId]

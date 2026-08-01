@@ -5,6 +5,7 @@ import { Layers, Database, ListTree, History } from 'lucide-react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { useFlowStore } from '../store/useFlowStore'
 import { useFlowPersistence } from '../hooks/useFlowPersistence'
+import { useFlowExecution } from '../hooks/useFlowExecution'
 import { FlowEditorContext } from '../contexts/FlowEditorContext'
 import { PathHighlightContext } from '../contexts/PathHighlightContext'
 import { usePathHighlight } from '../hooks/usePathHighlight'
@@ -59,8 +60,9 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
   const agentUrl = useFlowStore((s) => s.agentUrl)
   const setAgentUrl = useFlowStore((s) => s.setAgentUrl)
 
-  // 运行状态
-  const [isRunning, setIsRunning] = useState(false)
+  // 运行状态（执行引擎上提，供工具栏同步运行/中止）
+  const execution = useFlowExecution()
+  const isRunning = execution.state.status === 'running'
   const [runModalOpen, setRunModalOpen] = useState(false)
   const [environments, setEnvironments] = useState<Environment[]>([])
   const [variableSources, setVariableSources] = useState<Record<string, VariableSource>>({})
@@ -179,8 +181,8 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
   }, [])
 
   const handleAbort = useCallback(() => {
-    setIsRunning(false)
-  }, [])
+    execution.abort()
+  }, [execution])
 
   const handleAutoLayout = useCallback(async () => {
     await autoLayout()
@@ -195,8 +197,12 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
   }, [redo])
 
   const handleSave = useCallback(async () => {
-    await forceSave()
-    message.success('已保存')
+    const ok = await forceSave()
+    if (ok) {
+      message.success('已保存')
+    } else {
+      message.error('保存失败，请重试')
+    }
   }, [forceSave])
 
   // Ctrl+S 快捷键
@@ -315,6 +321,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
           canRedo={canRedo}
           isRunning={isRunning}
           isDirty={isDirty}
+          isSaving={isSaving}
           environments={environments}
           agentUrl={agentUrl}
           onAgentUrlChange={setAgentUrl}
@@ -380,13 +387,13 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
         open={runModalOpen}
         onClose={() => {
           setRunModalOpen(false)
-          setIsRunning(false)
         }}
         taskId={taskId}
         nodes={nodes}
         edges={edges}
         projectId={projectId}
         environments={environments}
+        execution={execution}
         onNodeStatusChange={handleNodeStatusChange}
         onRunComplete={handleRunComplete}
       />
