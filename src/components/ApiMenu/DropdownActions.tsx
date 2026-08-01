@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { show } from '@ebay/nice-modal-react'
 import { Dropdown, type DropDownProps, type MenuProps, Modal, Table, Tag, theme } from 'antd'
 import { CopyIcon, FolderInputIcon, FolderPlusIcon, PencilIcon, PlayIcon, TrashIcon } from 'lucide-react'
@@ -59,6 +59,14 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
   const envBaseUrl = currentEnv ? getPrimaryEnvironmentUrl(currentEnv) : ''
 
   const [batchResult, setBatchResult] = useState<Array<{ name: string; status: number; durationMs: number; error?: string }>>()
+
+  const notifyDeleted = useCallback(() => {
+    messageApi.success({
+      type: 'success',
+      content: '已移入回收站，30 天内可恢复，可在左侧“回收站”查看',
+      duration: 6,
+    })
+  }, [messageApi])
 
   const { tipTitle } = API_MENU_CONFIG[getCatalogType(catalog.type)]
   const createType = getCreateType(catalog.type)
@@ -186,6 +194,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
           maskClosable: true,
           onOk: () => {
             removeMenuItem({ id: catalog.id })
+            notifyDeleted()
           },
         })
       },
@@ -226,6 +235,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
           maskClosable: true,
           onOk: () => {
             removeMenuItem({ id: catalog.id })
+            notifyDeleted()
           },
         })
       },

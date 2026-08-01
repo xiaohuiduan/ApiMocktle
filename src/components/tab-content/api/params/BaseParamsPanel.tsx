@@ -1,6 +1,6 @@
 import { Switch, Tag, theme, Typography } from 'antd'
 
-import type { ApiEnvironmentValue, ApiDetails, ProjectEnvironmentConfig } from '@/types'
+import type { ApiEnvironmentValue, ApiDetails, Parameter, ProjectEnvironmentConfig } from '@/types'
 
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
 
@@ -162,7 +162,7 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
     }
   }
 
-  const handleChange = (newParams: ApiEnvironmentValue[] | undefined) => {
+  const handleChange = (newParams: Parameter[] | undefined) => {
     const updated = { ...parameters }
     switch (type) {
       case 'query':

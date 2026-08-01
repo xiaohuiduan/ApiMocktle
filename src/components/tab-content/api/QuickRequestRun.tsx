@@ -29,16 +29,17 @@ import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { useMenuTabContext, useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
-import { BodyType, MenuItemType } from '@/enums'
+import { BodyType, MenuItemType, ParamType } from '@/enums'
 import type { ApiDetails, RunTabInfo, Parameter } from '@/types'
 
 import { useApiRequestRunner } from './useApiRequestRunner'
 import { buildRequest } from './buildRequest'
 import { generateCurl } from './curl'
 import { buildJsoncBodyFillText } from './bodyJsonc'
+import { useResolvedVarMap } from './useResolvedVarMap'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
-import { HistoryPanel } from './components/HistoryPanel'
+import { HistoryPanel, type RequestHistoryItem } from './components/HistoryPanel'
 import { executeScript } from './scripts'
 import { QueryParamsPanel } from './params/QueryParamsPanel'
 import { HeadersParamsPanel } from './params/HeadersParamsPanel'
@@ -46,6 +47,8 @@ import { CookieParamsPanel } from './params/CookieParamsPanel'
 import { BodyPanel } from './params/BodyPanel'
 import { ScriptsPanel } from './params/ScriptsPanel'
 import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
+import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
+import { parseHistoryParams } from './historyUtils'
 
 function buildBodyExample(apiDetails: ApiDetails, menuRawList?: unknown): string {
   const body = apiDetails.requestBody
@@ -90,6 +93,24 @@ function createEmptyApiDetails(): ApiDetails {
   }
 }
 
+function mergeParams(
+  globalValues: { name: string; value?: string; enable?: boolean }[],
+  envValues: { name: string; value?: string; enable?: boolean }[],
+  localParams: { name?: string; enable?: boolean; example?: unknown }[],
+): { name: string; enable?: boolean; example?: unknown }[] {
+  const map = new Map<string, { name: string; enable?: boolean; example?: unknown }>()
+  for (const g of globalValues) {
+    if (g.name) map.set(g.name, { name: g.name, enable: g.enable, example: g.value })
+  }
+  for (const e of envValues) {
+    if (e.name) map.set(e.name, { name: e.name, enable: e.enable, example: e.value })
+  }
+  for (const l of localParams) {
+    if (l.name) map.set(l.name, { name: l.name, enable: l.enable, example: l.example })
+  }
+  return Array.from(map.values())
+}
+
 export function QuickRequestRun() {
   const { token } = theme.useToken()
   const { tabData } = useTabContentContext()
@@ -101,6 +122,11 @@ export function QuickRequestRun() {
     updateMenuItem,
     saveDraft,
     discardDraft,
+  } = useMenuHelpersContext()
+  const {
+    projectEnvironments,
+    currentProjectEnvironmentId,
+    projectEnvironmentConfig,
   } = useMenuHelpersContext()
   const { setTabItemStatus, setTabItemEditStatus } = useMenuTabHelpers()
   const { activeTabKey } = useMenuTabContext()
@@ -133,6 +159,16 @@ export function QuickRequestRun() {
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
+
+  const currentEnv = projectEnvironments?.find((e) => e.id === currentProjectEnvironmentId)
+    ?? projectEnvironmentConfig?.environments.find((e) => e.id === currentProjectEnvironmentId)
+  const envBaseUrl = currentEnv ? getPrimaryEnvironmentUrl(currentEnv) : ''
+
+  const { varMap, resolveVars } = useResolvedVarMap({
+    globalVariables: projectEnvironmentConfig?.globalVariables,
+    envVariables: currentEnv?.variables,
+    sessionVars,
+  })
 
   // 脚本相关状态
   const [preScriptConsole, setPreScriptConsole] = useState<ScriptConsoleEntry[]>([])
@@ -298,21 +334,55 @@ export function QuickRequestRun() {
     })), [])
 
   const handleRun = async () => {
+    const envParams = currentEnv?.parameters ?? { header: [], cookie: [], query: [], body: [] }
+    const allBodyParams: { name?: string, enable?: boolean, example?: string, type?: string, filePath?: string }[] = [
+      ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map((p) => ({
+        name: p.name,
+        enable: p.enable,
+        example: p.value as string,
+      })),
+      ...envParams.body.map((p) => ({
+        name: p.name,
+        enable: p.enable,
+        example: p.value as string,
+      })),
+      ...(workCopy.requestBody?.parameters ?? []).map((p) => ({
+        name: p.name,
+        enable: p.enable,
+        example: p.example as string,
+        type: p.type as string,
+        filePath: p.type === ParamType.File && 'filePath' in p ? p.filePath : undefined,
+      })),
+    ]
+
     // 统一通过共享核心构建请求（URL/Query/Header/Cookie/Body），cookie 序列化已内置于 buildRequest
     const built = buildRequest({
       method: workCopy.method ?? DEFAULT_METHOD,
+      baseUrl: envBaseUrl,
       path: workCopy.path,
-      query: workCopy.parameters?.query ?? [],
-      header: workCopy.parameters?.header ?? [],
-      cookie: workCopy.parameters?.cookie ?? [],
+      query: mergeParams(
+        (projectEnvironmentConfig?.globalParameters?.query ?? []).filter((p) => p.enable !== false),
+        envParams.query.filter((p) => p.enable !== false),
+        workCopy.parameters?.query ?? [],
+      ),
+      header: mergeParams(
+        (projectEnvironmentConfig?.globalParameters?.header ?? []).filter((p) => p.enable !== false),
+        envParams.header.filter((p) => p.enable !== false),
+        workCopy.parameters?.header ?? [],
+      ),
+      cookie: mergeParams(
+        (projectEnvironmentConfig?.globalParameters?.cookie ?? []).filter((p) => p.enable !== false),
+        envParams.cookie.filter((p) => p.enable !== false),
+        workCopy.parameters?.cookie ?? [],
+      ),
       body: workCopy.requestBody
         ? {
             type: workCopy.requestBody.type,
             rawText: bodyRawText ?? workCopy.requestBody.rawText,
-            parameters: workCopy.requestBody.parameters ?? [],
+            parameters: allBodyParams,
           }
         : undefined,
-      resolveVars: (s) => s,
+      resolveVars,
       buildBodyExample,
       apiDetails: workCopy,
       menuRawList,
@@ -398,6 +468,9 @@ export function QuickRequestRun() {
     if (workCopy.path?.trim()) {
       try {
         await persistToDb()
+        if (isCreating) {
+          messageApi.success('运行后已保存为快捷请求')
+        }
       } catch {
         // 自动保存失败不打断运行结果展示
       }
@@ -414,6 +487,34 @@ export function QuickRequestRun() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleApplyHistory = (item: RequestHistoryItem) => {
+    const parsed = parseHistoryParams(item.requestJson.headers ?? [], item.requestJson.url ?? '')
+    setBodyRawText(undefined)
+    setWorkCopy((prev) => {
+      const next = {
+        ...prev,
+        method: (item.requestJson.method ?? prev.method) as ApiDetails['method'],
+        path: item.requestJson.url?.split('?')[0] ?? prev.path,
+        parameters: {
+          ...prev.parameters,
+          query: parsed.query,
+          header: parsed.header,
+          cookie: parsed.cookie,
+        },
+      }
+      if (item.requestJson.body && next.requestBody) {
+        next.requestBody = {
+          ...next.requestBody,
+          type: item.requestJson.contentType === 'application/json' ? BodyType.Json : BodyType.Raw,
+          rawText: item.requestJson.body,
+        }
+      }
+      return next
+    })
+    setHistoryOpen(false)
+    messageApi.success('已回填历史请求')
   }
 
   useCtrlSave(handleSave, activeTabKey === tabData.key)
@@ -494,10 +595,18 @@ export function QuickRequestRun() {
             flex: 1,
           }}
         >
+          {envBaseUrl && !/^https?:\/\//i.test(workCopy.path ?? '') && (
+            <span
+              className="mr-0 shrink-0 select-none text-xs"
+              style={{ color: token.colorTextQuaternary }}
+            >
+              {envBaseUrl.replace(/\/$/, '')}
+            </span>
+          )}
           <Input
             variant="borderless"
             className="flex-1 min-w-0"
-            placeholder="输入完整 URL，如 https://api.example.com/users"
+            placeholder={envBaseUrl ? '输入路径，如 /users' : '输入完整 URL，如 https://api.example.com/users'}
             value={workCopy.path ?? ''}
             onChange={(e) => {
               setWorkCopy((prev) => ({ ...prev, path: e.target.value }))
@@ -561,6 +670,7 @@ export function QuickRequestRun() {
                 children: (
                   <div className="px-2 min-w-0 overflow-hidden">
                     <QueryParamsPanel
+                      varMap={varMap}
                       value={workCopy.parameters}
                       onChange={(parameters) => setWorkCopy((prev) => ({ ...prev, parameters }))}
                     />
@@ -573,6 +683,7 @@ export function QuickRequestRun() {
                 children: (
                   <div className="px-2 min-w-0 overflow-hidden">
                     <HeadersParamsPanel
+                      varMap={varMap}
                       value={workCopy.parameters}
                       onChange={(parameters) => setWorkCopy((prev) => ({ ...prev, parameters }))}
                     />
@@ -585,6 +696,7 @@ export function QuickRequestRun() {
                 children: (
                   <div className="px-2 min-w-0 overflow-hidden">
                     <CookieParamsPanel
+                      varMap={varMap}
                       value={workCopy.parameters}
                       onChange={(parameters) => setWorkCopy((prev) => ({ ...prev, parameters }))}
                     />
@@ -597,9 +709,13 @@ export function QuickRequestRun() {
                 children: (
                   <BodyPanel
                     requestBody={workCopy.requestBody}
-                    bodyRawText={bodyRawText}
+                    bodyRawText={bodyRawText ?? workCopy.requestBody?.rawText}
                     onBodyTypeChange={(type) => {
                       const oldType = workCopy.requestBody?.type
+
+                      if (oldType && oldType !== type && bodyRawText?.trim()) {
+                        messageApi.info('已保留原 Body 内容，可切换回原类型恢复')
+                      }
 
                       if (oldType && bodyRawText !== undefined) {
                         bodyTextsRef.current[oldType] = bodyRawText
@@ -651,17 +767,41 @@ export function QuickRequestRun() {
             onRetry={handleRun}
             menuItemId={isCreating ? undefined : tabData.key}
             curlContent={(() => {
+              const curlEnvParams = currentEnv?.parameters ?? { header: [], cookie: [], query: [], body: [] }
+              const base = envBaseUrl.replace(/\/$/, '')
+              const resolvedPath = resolveVars(workCopy.path ?? '/')
+              const curlUrl = /^https?:\/\//i.test(resolvedPath)
+                ? resolvedPath
+                : base
+                  ? `${base}${resolvedPath}`
+                  : resolvedPath
               const { linux, windows } = generateCurl({
                 method: workCopy.method ?? DEFAULT_METHOD,
-                url: workCopy.path ?? '/',
-                headers: workCopy.parameters?.header ?? [],
-                query: workCopy.parameters?.query ?? [],
-                cookie: workCopy.parameters?.cookie ?? [],
+                url: curlUrl,
+                headers: mergeParams(
+                  (projectEnvironmentConfig?.globalParameters?.header ?? []).filter((p) => p.enable !== false),
+                  curlEnvParams.header.filter((p) => p.enable !== false),
+                  workCopy.parameters?.header ?? [],
+                ),
+                query: mergeParams(
+                  (projectEnvironmentConfig?.globalParameters?.query ?? []).filter((p) => p.enable !== false),
+                  curlEnvParams.query.filter((p) => p.enable !== false),
+                  workCopy.parameters?.query ?? [],
+                ),
+                cookie: mergeParams(
+                  (projectEnvironmentConfig?.globalParameters?.cookie ?? []).filter((p) => p.enable !== false),
+                  curlEnvParams.cookie.filter((p) => p.enable !== false),
+                  workCopy.parameters?.cookie ?? [],
+                ),
                 body: workCopy.requestBody
                   ? {
                       type: workCopy.requestBody.type,
                       rawText: bodyRawText ?? workCopy.requestBody.rawText,
-                      parameters: workCopy.requestBody.parameters ?? [],
+                      parameters: [
+                        ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map((p) => ({ name: p.name, enable: p.enable, example: p.value as string })),
+                        ...curlEnvParams.body.map((p) => ({ name: p.name, enable: p.enable, example: p.value as string })),
+                        ...(workCopy.requestBody.parameters ?? []),
+                      ],
                     }
                   : undefined,
               })
@@ -708,7 +848,14 @@ export function QuickRequestRun() {
         autoSaveId="quick-request-run"
       />
 
-      {!isCreating && <HistoryPanel menuItemId={tabData.key} open={historyOpen} onClose={() => setHistoryOpen(false)} />}
+      {!isCreating && (
+        <HistoryPanel
+          menuItemId={tabData.key}
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          onApply={handleApplyHistory}
+        />
+      )}
     </div>
   )
 }

@@ -15,7 +15,7 @@ import {
   message,
   theme,
 } from 'antd'
-import { ClockIcon, CopyIcon, PlayIcon, RotateCcwIcon } from 'lucide-react'
+import { ClockIcon, CopyIcon, PlayIcon, RotateCcwIcon, SaveIcon } from 'lucide-react'
 
 import { useParams } from 'react-router'
 import { api } from '@/api-client'
@@ -27,11 +27,11 @@ import { MonacoEditor } from '@/components/MonacoEditor'
 import { HTTP_METHOD_CONFIG } from '@/configs/static'
 import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { BodyType, ParamType } from '@/enums'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 import type { ApiDetails, ApiRequestBody, ApiRunResult, RunTabInfo, SavedRequestConfig, Parameter } from '@/types'
-import { nanoid } from 'nanoid'
 
 import { ParamsEditableTable } from './components/ParamsEditableTable'
 import { ParamsTab } from './params/ParamsTab'
@@ -47,68 +47,12 @@ import { buildJsoncBodyFillText } from './bodyJsonc'
 import { useResolvedVarMap, buildVarMaps, makeResolveVars } from './useResolvedVarMap'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
-import { HistoryPanel } from './components/HistoryPanel'
+import { HistoryPanel, type RequestHistoryItem } from './components/HistoryPanel'
 import { ScriptTab, executeScript } from './scripts'
 import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
+import { parseHistoryParams } from './historyUtils'
 
 const STORAGE_PREFIX = 'run_tab_'
-
-/** 从 URL 中解析 query 参数 */
-function parseQueryFromUrl(url: string): Parameter[] {
-  try {
-    const parsed = new URL(url)
-    const params: Parameter[] = []
-    parsed.searchParams.forEach((value, name) => {
-      params.push({
-        id: nanoid(6),
-        name,
-        example: value,
-        enable: true,
-        type: ParamType.String,
-      } as Parameter)
-    })
-    return params
-  } catch {
-    return []
-  }
-}
-
-/** 从 requestJson 的 headers 和 url 中解析出 query/header/cookie 参数 */
-function parseHistoryParams(
-  headers: Array<{ name: string; value: string }>,
-  url: string,
-): { query: Parameter[], header: Parameter[], cookie: Parameter[] } {
-  const query = parseQueryFromUrl(url)
-  const header: Parameter[] = []
-  const cookie: Parameter[] = []
-
-  for (const h of headers) {
-    if (h.name.toLowerCase() === 'cookie') {
-      h.value.split(';').forEach(pair => {
-        const eqIdx = pair.indexOf('=')
-        if (eqIdx > 0) {
-          cookie.push({
-            id: nanoid(6),
-            name: pair.slice(0, eqIdx).trim(),
-            example: pair.slice(eqIdx + 1).trim(),
-            enable: true,
-            type: ParamType.String,
-          } as Parameter)
-        }
-      })
-    } else {
-      header.push({
-        id: nanoid(6),
-        name: h.name,
-        example: h.value,
-        enable: true,
-        type: ParamType.String,
-      } as Parameter)
-    }
-  }
-
-  return { query, header, cookie }
-}
 
 function cloneApiDetails(source: ApiDetails): ApiDetails {
   return JSON.parse(JSON.stringify(source)) as ApiDetails
@@ -193,7 +137,9 @@ export function RunTab() {
     projectEnvironments,
     currentProjectEnvironmentId,
     projectEnvironmentConfig,
+    updateMenuItem,
   } = useMenuHelpersContext()
+  const { setTabItemEditStatus } = useMenuTabHelpers()
 
   const { sessionVars, setSessionVars } = useSessionVariablesContext()
   const { projectId } = useParams()
@@ -499,10 +445,16 @@ export function RunTab() {
     const envParams = currentEnv?.parameters ?? { header: [], cookie: [], query: [], body: [] }
 
     // 统一通过共享核心构建请求（URL/Query/Header/Cookie/Body），避免与 QuickRequestRun 重复
-    const allBodyParams: Array<{ name?: string, enable?: boolean, example?: string, type?: string, filePath?: string }> = [
-      ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map(p => ({ name: p.name, enable: p.enable, example: p.value as string })),
-      ...envParams.body.map(p => ({ name: p.name, enable: p.enable, example: p.value as string })),
-      ...(workCopy.requestBody?.parameters ?? []).map(p => ({ name: p.name, enable: p.enable, example: p.example as string, type: p.type as string, filePath: (p as any).filePath })),
+    const allBodyParams: { name?: string, enable?: boolean, example?: string, type?: string, filePath?: string }[] = [
+      ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map((p) => ({ name: p.name, enable: p.enable, example: p.value as string })),
+      ...envParams.body.map((p) => ({ name: p.name, enable: p.enable, example: p.value as string })),
+      ...(workCopy.requestBody?.parameters ?? []).map((p) => ({
+        name: p.name,
+        enable: p.enable,
+        example: p.example as string,
+        type: p.type as string,
+        filePath: p.type === ParamType.File && 'filePath' in p ? p.filePath : undefined,
+      })),
     ]
 
     const built = buildRequest({
@@ -588,6 +540,64 @@ export function RunTab() {
     }
     setWorkCopy(next)
     persist(next)
+  }
+
+  const handleSaveToDoc = async () => {
+    if (!docValue || !workCopy) return
+
+    const name = menuApiItem?.name ?? docValue.name
+    const runTabInfo: RunTabInfo = {
+      parameters: workCopy.parameters,
+      bodyType: workCopy.requestBody?.type,
+      bodyParameters: workCopy.requestBody?.parameters,
+      bodyRawText: workCopy.requestBody?.rawText,
+      preScript: workCopy.preScript,
+      postScript: workCopy.postScript,
+    }
+
+    try {
+      await updateMenuItem({
+        id: tabData.key,
+        name,
+        data: { ...workCopy, name },
+        runTabInfo,
+      })
+      setTabItemEditStatus({ key: tabData.key }, 'saved')
+      messageApi.success('已保存到接口文档')
+    }
+    catch (err) {
+      messageApi.error(err instanceof Error ? err.message : '保存失败')
+    }
+  }
+
+  const handleApplyHistory = (item: RequestHistoryItem) => {
+    if (!workCopy) return
+
+    const parsed = parseHistoryParams(item.requestJson.headers ?? [], item.requestJson.url ?? '')
+    const next: ApiDetails = {
+      ...workCopy,
+      method: (item.requestJson.method ?? workCopy.method) as ApiDetails['method'],
+      path: item.requestJson.url?.split('?')[0] ?? workCopy.path,
+      parameters: {
+        ...workCopy.parameters,
+        query: parsed.query,
+        header: parsed.header,
+        cookie: parsed.cookie,
+      },
+    }
+
+    if (item.requestJson.body && next.requestBody) {
+      next.requestBody = {
+        ...next.requestBody,
+        type: item.requestJson.contentType === 'application/json' ? BodyType.Json : BodyType.Raw,
+        rawText: item.requestJson.body,
+      }
+    }
+
+    setWorkCopy(next)
+    persist(next)
+    setHistoryOpen(false)
+    messageApi.success('已回填历史请求')
   }
 
 
@@ -742,6 +752,11 @@ export function RunTab() {
         <Space className="shrink-0" style={{ marginLeft: 'auto' }}>
           <Button icon={<ClockIcon size={14} />} title="历史记录" onClick={() => setHistoryOpen(true)} />
           <Button
+            icon={<SaveIcon size={14} />}
+            title="保存到文档"
+            onClick={() => void handleSaveToDoc()}
+          />
+          <Button
             loading={running}
             type="primary"
             icon={<PlayIcon size={14} />}
@@ -842,6 +857,10 @@ export function RunTab() {
 
                       if (oldType && oldText !== undefined) {
                         bodyTextsRef.current[oldType] = oldText
+                      }
+
+                      if (oldType && oldType !== type && oldText?.trim()) {
+                        messageApi.info('已保留原 Body 内容，可切换回原类型恢复')
                       }
 
                       const nextText = type === oldType ? oldText : bodyTextsRef.current[type]
@@ -951,7 +970,12 @@ export function RunTab() {
         autoSaveId={`run-tab-${docValue.id}`}
       />
 
-      <HistoryPanel menuItemId={tabData.key} open={historyOpen} onClose={() => setHistoryOpen(false)} />
+      <HistoryPanel
+        menuItemId={tabData.key}
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onApply={handleApplyHistory}
+      />
     </div>
   )
 }

@@ -141,11 +141,19 @@ export function ApiTab(props: TabsProps) {
             }}
           >
             <span
-              className={`main-tabs-tab-close-icon flex size-full items-center justify-center text-[15px] opacity-0 ${tabItem.data?.editStatus === 'changed'
+              className={`main-tabs-tab-close-icon flex size-full items-center justify-center text-[15px] opacity-0 focus-visible:opacity-100 ${tabItem.data?.editStatus === 'changed'
                 ? 'group relative overflow-hidden rounded-full after:absolute after:size-2 after:rounded-full after:content-[""] hover:overflow-auto hover:bg-transparent hover:after:hidden'
                 : ''
               }`}
+              role="button"
+              tabIndex={0}
               data-no-dnd="true" // 「关闭」按钮不允许触发拖拽。
+              onKeyDown={(ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                  ev.preventDefault()
+                  ev.currentTarget.click()
+                }
+              }}
             >
               <XIcon
                 className={

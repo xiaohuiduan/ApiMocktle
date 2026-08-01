@@ -4,7 +4,7 @@ import { CopyOutlined, UploadOutlined, FileTextOutlined } from '@ant-design/icon
 import { invoke } from '@tauri-apps/api/core'
 import { Viewer } from '@bytemd/react'
 import gfm from '@bytemd/plugin-gfm'
-import type { FlowGraph } from '../../types/flow.types'
+import type { FlowGraph } from '../types/flow.types'
 import { useAuth } from '@/contexts/auth'
 import { css } from '@emotion/css'
 

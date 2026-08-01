@@ -1,8 +1,8 @@
-import { Button, Switch, Tag, Typography, theme } from 'antd'
+import { Button, Modal, Switch, Tag, Typography, theme } from 'antd'
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
 import { BodyType } from '@/enums'
-import type { ApiRequestBody, ApiEnvironmentValue } from '@/types'
+import type { ApiRequestBody, Parameter } from '@/types'
 
 /** 判断某个 body 类型是否已有内容（用于类型标签的绿标） */
 function bodyTypeHasContent(requestBody: ApiRequestBody | undefined, t: BodyType): boolean {
@@ -42,7 +42,7 @@ interface BodyPanelProps {
   bodyRawText?: string
   onBodyTypeChange?: (type: BodyType) => void
   onBodyRawTextChange?: (text: string) => void
-  onBodyParametersChange?: (params: ApiEnvironmentValue[]) => void
+  onBodyParametersChange?: (params: Parameter[]) => void
   onFillBody?: () => void
   fillWithComments?: boolean
   onFillWithCommentsChange?: (value: boolean) => void
@@ -75,6 +75,22 @@ export function BodyPanel(props: BodyPanelProps) {
     && (requestBody.type === BodyType.Json
       || requestBody.type === BodyType.Xml
       || requestBody.type === BodyType.Raw)
+
+  const handleFillClick = () => {
+    if (!onFillBody) return
+    if (!bodyRawText?.trim()) {
+      onFillBody()
+      return
+    }
+
+    Modal.confirm({
+      title: '一键填充 Body？',
+      content: '将覆盖当前已输入的内容，填充后不可撤销。',
+      okText: '填充',
+      cancelText: '取消',
+      onOk: onFillBody,
+    })
+  }
 
   if (!requestBody) {
     return <Typography.Text type="secondary" className="px-3 pt-2">无 Body</Typography.Text>
@@ -113,7 +129,7 @@ export function BodyPanel(props: BodyPanelProps) {
                 onChange={onFillWithCommentsChange}
               />
               <span className="text-xs" style={{ color: token.colorTextSecondary }}>注释</span>
-              <Button size="small" onClick={onFillBody}>一键填充</Button>
+              <Button size="small" onClick={handleFillClick}>一键填充</Button>
             </div>
           )}
         </div>
@@ -157,7 +173,7 @@ export function BodyPanel(props: BodyPanelProps) {
             <ParamsEditableTable
               showDescriptionColumn={false}
               value={requestBody.parameters}
-              onChange={onBodyParametersChange}
+              onChange={(params) => onBodyParametersChange?.(params ?? [])}
             />
           </div>
         )}

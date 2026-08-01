@@ -97,77 +97,79 @@ export function EditableTable<RecordType = AnyType>(props: EditableTableProps<Re
 
   return (
     <DndContext sensors={[sensor]}>
-      <table
-        className="w-full border-spacing-0"
-        style={{
-          border: `1px solid ${token.colorBorderSecondary}`,
-          borderRadius: token.borderRadius,
-          tableLayout: 'auto',
-          maxWidth: '100%',
-        }}
-      >
-        <colgroup>
-          {columns?.map((col, idx) => {
-            return <col key={col.dataIndex ?? `${idx}`} width={col.width} />
-          })}
-        </colgroup>
-
-        <thead>
-          <tr>
+      <div className="w-full overflow-x-auto">
+        <table
+          className="w-full border-spacing-0"
+          style={{
+            border: `1px solid ${token.colorBorderSecondary}`,
+            borderRadius: token.borderRadius,
+            tableLayout: 'auto',
+            maxWidth: '100%',
+          }}
+        >
+          <colgroup>
             {columns?.map((col, idx) => {
-              return (
-                <th
-                  key={col.dataIndex ?? `${idx}`}
-                  className={`p-1 text-left font-normal ${styles.th}`}
-                  scope="col"
-                >
-                  {col.title}
-                </th>
-              )
+              return <col key={col.dataIndex ?? `${idx}`} width={col.width} />
             })}
-          </tr>
-        </thead>
+          </colgroup>
 
-        <tbody>
-          <SortableContext
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error
-            items={internalDataSource.map((r, ridx) => r[rowKey] == null ? `__new_${ridx}` : `${ridx}_${String(r[rowKey])}`)}
-          >
-            {internalDataSource.map((record, ridx) => (
+          <thead>
+            <tr>
+              {columns?.map((col, idx) => {
+                return (
+                  <th
+                    key={col.dataIndex ?? `${idx}`}
+                    className={`p-1 text-left font-normal ${styles.th}`}
+                    scope="col"
+                  >
+                    {col.title}
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+
+          <tbody>
+            <SortableContext
               // eslint-disable-next-line @typescript-eslint/ban-ts-comment
               // @ts-expect-error
-              <DraggableTabNode key={record[rowKey] == null ? `__new_${ridx}` : `${ridx}_${String(record[rowKey])}`} className="h-fit">
-                <tr className="h-fit">
-                  {columns?.map((col, cidx) => {
-                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-expect-error
-                    const tdValue = col.dataIndex ? record[col.dataIndex] : null
+              items={internalDataSource.map((r, ridx) => r[rowKey] == null ? `__new_${ridx}` : `${ridx}_${String(r[rowKey])}`)}
+            >
+              {internalDataSource.map((record, ridx) => (
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                <DraggableTabNode key={record[rowKey] == null ? `__new_${ridx}` : `${ridx}_${String(record[rowKey])}`} className="h-fit">
+                  <tr className="h-fit">
+                    {columns?.map((col, cidx) => {
+                      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                      // @ts-expect-error
+                      const tdValue = col.dataIndex ? record[col.dataIndex] : null
 
-                    return (
-                      <td
-                        key={`${cidx}_${String(col.dataIndex)}`}
-                        className={styles.td}
-                        style={{
-                          border: internalDataSource.length === ridx + 1 ? 'none' : undefined,
-                        }}
-                      >
-                        {typeof col.render === 'function'
-                          ? (
-                              col.render(tdValue, record as RecordType, ridx)
-                            )
-                          : (
-                              <ParamsEditableCell>{String(tdValue)}</ParamsEditableCell>
-                            )}
-                      </td>
-                    )
-                  })}
-                </tr>
-              </DraggableTabNode>
-            ))}
-          </SortableContext>
-        </tbody>
-      </table>
+                      return (
+                        <td
+                          key={`${cidx}_${String(col.dataIndex)}`}
+                          className={styles.td}
+                          style={{
+                            border: internalDataSource.length === ridx + 1 ? 'none' : undefined,
+                          }}
+                        >
+                          {typeof col.render === 'function'
+                            ? (
+                                col.render(tdValue, record as RecordType, ridx)
+                              )
+                            : (
+                                <ParamsEditableCell>{String(tdValue)}</ParamsEditableCell>
+                              )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                </DraggableTabNode>
+              ))}
+            </SortableContext>
+          </tbody>
+        </table>
+      </div>
     </DndContext>
   )
 }

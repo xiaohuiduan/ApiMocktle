@@ -79,7 +79,8 @@ interface Environment {
   name: string
   url?: string
   baseUrls?: Array<{ id: string; url: string }>
-  variables?: Array<{ id: string; name: string; value?: string; enable?: boolean }>
+  variables?: Array<{ id: string; name: string; value?: string; enable?: boolean }> | Record<string, string>
+  agentUrl?: string
   [key: string]: unknown
 }
 
@@ -161,12 +162,20 @@ export default function RunFlowModal({
     // variables 是 [{name, value}] 数组，转为 Record
     const initialVars: Record<string, string> = {}
     if (env?.variables) {
-      for (const v of env.variables) {
-        if (v.name && v.enable !== false) initialVars[v.name] = v.value || ''
+      if (Array.isArray(env.variables)) {
+        for (const v of env.variables) {
+          if (v.name && v.enable !== false) initialVars[v.name] = v.value || ''
+        }
+      }
+      else {
+        for (const [name, value] of Object.entries(env.variables)) {
+          if (name) initialVars[name] = value || ''
+        }
       }
     }
 
-    const result = await executeFlow(nodes, edges, projectId, baseUrl, initialVars, failFast, undefined, env?.agentUrl)
+    const agentUrl = typeof env?.agentUrl === 'string' ? env.agentUrl : undefined
+    const result = await executeFlow(nodes, edges, projectId, baseUrl, initialVars, failFast, undefined, agentUrl)
 
     // 回调节点状态变化
     if (onNodeStatusChange && result) {
@@ -275,7 +284,6 @@ export default function RunFlowModal({
               type="primary"
               icon={<Play size={14} />}
               onClick={handleRun}
-              disabled={state.status === 'running'}
             >
               {state.status === 'idle' ? '开始运行' : '重新运行'}
             </Button>

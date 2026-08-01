@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { Button, Dropdown, theme, Typography, type MenuProps } from 'antd'
+import { Button, Dropdown, Input, theme, Typography, type MenuProps } from 'antd'
 import { CheckIcon, ChevronDownIcon, FolderIcon } from 'lucide-react'
 import { useNavigate } from 'react-router'
 
@@ -30,6 +30,7 @@ export function ProjectQuickSwitch() {
   const { activeProjectId, openProject } = useProjectTabsContext()
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [error, setError] = useState<string>()
+  const [searchText, setSearchText] = useState('')
 
   useEffect(() => {
     if (!sessionId) {
@@ -79,8 +80,14 @@ export function ProjectQuickSwitch() {
     [activeProjectId, projects],
   )
 
+  const filteredProjects = useMemo(() => {
+    const keyword = searchText.trim().toLowerCase()
+    if (!keyword) return projects
+    return projects.filter((p) => p.name.toLowerCase().includes(keyword))
+  }, [projects, searchText])
+
   const items = useMemo<DropdownItem[]>(() => {
-    const result: DropdownItem[] = projects.map((project) => ({
+    const result: DropdownItem[] = filteredProjects.map((project) => ({
       key: project.id,
       label: (
         <div className="flex min-w-[240px] items-center gap-3 py-1">
@@ -126,12 +133,26 @@ export function ProjectQuickSwitch() {
     })
 
     return result
-  }, [projects, error, activeProjectId, openProject, navigate])
+  }, [filteredProjects, error, activeProjectId, openProject, navigate])
 
   return (
     <Dropdown
       trigger={['click']}
       menu={{ items }}
+      dropdownRender={(menu) => (
+        <div>
+          <div className="px-2 py-1.5">
+            <Input
+              size="small"
+              allowClear
+              placeholder="搜索项目"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+            />
+          </div>
+          <div className="max-h-[320px] overflow-auto">{menu}</div>
+        </div>
+      )}
     >
       <Button
         className="min-w-[160px] justify-between"

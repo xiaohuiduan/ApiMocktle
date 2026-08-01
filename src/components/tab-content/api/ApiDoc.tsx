@@ -540,7 +540,7 @@ export function ApiDoc() {
         <Space className="group/action">
           <h2 className="text-base font-semibold">{docValue.name}</h2>
 
-          <Space className="opacity-0 group-hover/action:opacity-100" size="small">
+          <Space className="opacity-60 transition-opacity hover:opacity-100" size="small">
             <Tooltip title="复制 ID">
               <Button
                 size="small"

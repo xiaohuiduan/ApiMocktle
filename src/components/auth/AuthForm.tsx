@@ -38,6 +38,7 @@ export function AuthForm(props: AuthFormProps) {
   const { isGlassStyle, isNeumorphism, isSkeuomorphism } = useDesignStyle()
   const [submitting, setSubmitting] = useState(false)
   const [rememberPassword, setRememberPassword] = useState(false)
+  const [rememberLogin, setRememberLogin] = useState(false)
   const [rememberDays, setRememberDays] = useState<number>(7)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -60,7 +61,7 @@ export function AuthForm(props: AuthFormProps) {
     <div className="relative flex min-h-screen items-center justify-center px-4">
       <ParticleCanvas variant="fullscreen" preset="login" primaryColor={token.colorPrimary} />
       <div className="fixed right-4 top-4 z-50">
-        <Tooltip title="设置">
+        <Tooltip title="全局设置">
           <Button
             type="text"
             icon={<SettingsIcon size={18} />}
@@ -131,7 +132,7 @@ export function AuthForm(props: AuthFormProps) {
                 if (mode === 'login') {
                   await login(values.username, values.password, {
                     rememberPassword,
-                    rememberDays: rememberPassword ? rememberDays : 0,
+                    rememberDays: rememberLogin ? rememberDays : 0,
                   })
                 } else {
                   await register(values.username, values.password)
@@ -195,12 +196,21 @@ export function AuthForm(props: AuthFormProps) {
                     checked={rememberPassword}
                     onChange={(e) => setRememberPassword(e.target.checked)}
                   >
-                    记住密码
+                    记住账号密码
                   </Checkbox>
                 </Form.Item>
 
-                {rememberPassword && (
-                  <Form.Item label="记住登录状态">
+                <Form.Item>
+                  <Checkbox
+                    checked={rememberLogin}
+                    onChange={(e) => setRememberLogin(e.target.checked)}
+                  >
+                    保持登录状态
+                  </Checkbox>
+                </Form.Item>
+
+                {rememberLogin && (
+                  <Form.Item label="登录状态时长">
                     <Select
                       options={rememberDayOptions}
                       value={rememberDays}
@@ -209,6 +219,10 @@ export function AuthForm(props: AuthFormProps) {
                     />
                   </Form.Item>
                 )}
+
+                <Typography.Text type="secondary" className="block text-xs">
+                  “记住账号密码”会在本机保存凭据；“保持登录状态”会延长会话有效期。
+                </Typography.Text>
               </>
             )}
 

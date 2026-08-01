@@ -7,6 +7,7 @@ import { show } from '@ebay/nice-modal-react'
 import { IconLogo } from '@/components/icons/IconLogo'
 import { UserMenu } from '@/components/UserMenu'
 import { ModalSettings } from '@/components/modals/ModalSettings'
+import { SessionVariablesPanel } from '@/components/SessionVariablesPanel'
 import { useDesignStyle } from '@/hooks/useDesignStyle'
 
 import { NavMenu } from './NavMenu'
@@ -82,13 +83,14 @@ export function SideNav() {
 
       {/* 底部用户区域 */}
       <div className="mt-auto flex flex-col items-center gap-1 pb-3">
+        <SessionVariablesPanel />
         <UserMenu showUsername={false} />
         <Button
           type="text"
           size="small"
           icon={<SettingsIcon size={16} />}
           onClick={() => void show(ModalSettings)}
-          title="设置"
+          title="全局设置"
         />
       </div>
     </div>

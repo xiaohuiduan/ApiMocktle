@@ -1,10 +1,11 @@
 'use client'
 
-import { ReactNode } from 'react'
+import { ReactNode, useEffect, useRef } from 'react'
 
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 
 import { Typography, theme } from 'antd'
+import { TerminalIcon } from 'lucide-react'
 
 import { useStyles } from '@/hooks/useStyle'
 
@@ -19,6 +20,8 @@ interface ResponsePanelProps {
 
 export function ResponsePanel({ paramsArea, resultArea, hasResult, autoSaveId }: ResponsePanelProps) {
   const { token } = theme.useToken()
+  const resultPanelRef = useRef<ImperativePanelHandle>(null)
+  const prevHasResultRef = useRef(hasResult)
 
   const { styles } = useStyles(({ token }) => ({
     resizeHandle: css({
@@ -31,6 +34,15 @@ export function ResponsePanel({ paramsArea, resultArea, hasResult, autoSaveId }:
       },
     }),
   }))
+
+  useEffect(() => {
+    if (hasResult && !prevHasResultRef.current) {
+      requestAnimationFrame(() => {
+        resultPanelRef.current?.resize(50)
+      })
+    }
+    prevHasResultRef.current = hasResult
+  }, [hasResult])
 
   return (
     <PanelGroup
@@ -52,6 +64,7 @@ export function ResponsePanel({ paramsArea, resultArea, hasResult, autoSaveId }:
       <PanelResizeHandle className={styles.resizeHandle} />
 
       <Panel
+        ref={resultPanelRef}
         defaultSize={hasResult ? 50 : 0}
         minSize={15}
         className="flex flex-col overflow-hidden min-w-0"
@@ -60,9 +73,12 @@ export function ResponsePanel({ paramsArea, resultArea, hasResult, autoSaveId }:
           {hasResult ? (
             resultArea
           ) : (
-            <Typography.Text type="secondary" className="text-xs">
-              运行请求后将在此处显示结果
-            </Typography.Text>
+            <div className="flex h-full flex-col items-center justify-center gap-2">
+              <TerminalIcon size={22} style={{ color: token.colorTextTertiary }} />
+              <Typography.Text type="secondary" className="text-xs">
+                填写请求后点击“运行”查看响应
+              </Typography.Text>
+            </div>
           )}
         </div>
       </Panel>

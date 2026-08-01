@@ -1,24 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import { SchemaType, type JsonSchema } from '@/components/JsonSchema'
+import { ApiStatus, BodyType, ContentType, HttpMethod, ParamType } from '@/enums'
+import type { ApiDetails } from '@/types'
 import { generateApiDocMarkdown, type ExportApi, type ExportFolder, type ExportTreeInput } from './api-doc-markdown'
 
-function makeApiDetail(opts?: { id?: string; name?: string; dataOverrides?: Record<string, unknown> }) {
+function makeApiDetail(opts?: { id?: string; name?: string; dataOverrides?: Record<string, unknown> }): ExportApi {
   const { id = 'api-1', name = 'Test API', dataOverrides = {} } = opts ?? {}
   return {
     id,
     name,
     data: {
-      method: 'GET',
+      id,
+      name,
+      status: ApiStatus.Developing,
+      method: HttpMethod.Get,
       path: '/api/test',
       description: 'A test API',
       parameters: {
-        path: [{ name: 'id', type: 'string', required: true, description: 'Resource ID', example: '123' }],
-        query: [{ name: 'page', type: 'integer', required: false, description: 'Page number', example: 1 }],
+        path: [{ id: 'path-id', name: 'id', type: ParamType.String, required: true, description: 'Resource ID', example: '123' }],
+        query: [{ id: 'query-id', name: 'page', type: ParamType.Integer, required: false, description: 'Page number', example: '1' }],
         header: [],
         cookie: [],
       },
       requestBody: {
-        type: 'application/json',
+        type: BodyType.Json,
         jsonSchema: {
           type: SchemaType.Object,
           name: 'body',
@@ -37,9 +42,10 @@ function makeApiDetail(opts?: { id?: string; name?: string; dataOverrides?: Reco
       },
       responses: [
         {
+          id: 'res-1',
           code: 200,
           name: 'OK',
-          contentType: 'application/json',
+          contentType: ContentType.JSON,
           jsonSchema: {
             type: SchemaType.Object,
             properties: [
@@ -49,7 +55,7 @@ function makeApiDetail(opts?: { id?: string; name?: string; dataOverrides?: Reco
         },
       ],
       ...dataOverrides,
-    },
+    } satisfies ApiDetails,
   }
 }
 
@@ -159,19 +165,19 @@ describe('schema rendering in markdown', () => {
 
   it('handles Object schema with non-array properties', () => {
     const item = makeApiDetail()
-    ;(item.data.requestBody!.jsonSchema!.properties as unknown) = { foo: 'bar' }
+    ;((item.data.requestBody!.jsonSchema as { properties?: unknown }).properties as unknown) = { foo: 'bar' }
     expect(() => generateApiDocMarkdown('Bug', [], [item], 1)).not.toThrow()
   })
 
   it('handles schema node with undefined type (the replace bug)', () => {
     const item = makeApiDetail()
-    ;(item.data.requestBody!.jsonSchema!.properties as any)[0]!.type = undefined as any
+    ;((item.data.requestBody!.jsonSchema as { properties?: unknown }).properties as any)[0]!.type = undefined as any
     expect(() => generateApiDocMarkdown('Missing Type', [], [item], 1)).not.toThrow()
   })
 
   it('handles null properties gracefully', () => {
     const item = makeApiDetail()
-    ;(item.data.requestBody!.jsonSchema!.properties as unknown) = null
+    ;((item.data.requestBody!.jsonSchema as { properties?: unknown }).properties as unknown) = null
     expect(() => generateApiDocMarkdown('Null', [], [item], 1)).not.toThrow()
   })
 })
@@ -205,7 +211,7 @@ describe('edge cases in markdown generation', () => {
     const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
     for (const method of methods) {
       const item = makeApiDetail()
-      item.data.method = method
+      item.data.method = method as HttpMethod
       const md = generateApiDocMarkdown('Methods', [], [item], 1)
       expect(md).toContain(`### ${method}`)
     }
@@ -215,7 +221,7 @@ describe('edge cases in markdown generation', () => {
     const item = makeApiDetail()
     const md = generateApiDocMarkdown('Resp', [], [item], 1)
     expect(md).toContain('##### 200 OK')
-    expect(md).toContain('| 200 | application/json |')
+    expect(md).toContain('| 200 | json |')
   })
 
   it('does not include HTML tags', () => {

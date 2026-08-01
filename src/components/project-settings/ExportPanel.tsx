@@ -60,7 +60,6 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
       key: folder.id,
       title: folder.name,
       selectable: false,
-      checkable: false,
       children: buildNodes(childrenMap.get(folder.id) ?? []),
     }))
 
@@ -71,6 +70,23 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
     if (!menuRawList) return []
     return menuRawList.filter((i) => i.type === MenuItemType.ApiDetail).map((i) => i.id)
   }, [menuRawList])
+
+  const normalizeCheckedIds = (keys: React.Key[]) => {
+    const result = new Set<string>()
+    for (const key of keys) {
+      const folder = menuRawList?.some(
+        (f) => f.type === MenuItemType.ApiDetailFolder && f.id === key,
+      )
+      if (folder) {
+        menuRawList
+          ?.filter((a) => a.type === MenuItemType.ApiDetail && a.parentId === key)
+          .forEach((a) => result.add(a.id))
+      } else {
+        result.add(String(key))
+      }
+    }
+    return result
+  }
 
   const isAllChecked = allApiIds.length > 0 && checkedApiIds.size === allApiIds.length
   const isIndeterminate = checkedApiIds.size > 0 && checkedApiIds.size < allApiIds.length
@@ -197,7 +213,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
                       const keys = Array.isArray(checkedKeys)
                         ? checkedKeys
                         : checkedKeys.checked
-                      setCheckedApiIds(new Set(keys as string[]))
+                      setCheckedApiIds(normalizeCheckedIds(keys))
                     }}
                   />
                 )

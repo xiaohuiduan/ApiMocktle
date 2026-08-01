@@ -1,12 +1,16 @@
-import { Col, Row, Skeleton, theme } from 'antd'
+import { Button, Col, Empty, Row, Space, Typography, theme } from 'antd'
 import { useMemo } from 'react'
 
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { MenuItemType } from '@/enums'
+import { useHelpers } from '@/hooks/useHelpers'
 
 export function Overview() {
   const { token } = theme.useToken()
   const { menuRawList } = useMenuHelpersContext()
+  const { addTabItem } = useMenuTabHelpers()
+  const { createApiDetails, createApiRequest, createDoc, createApiSchema } = useHelpers()
   const stats = useMemo(() => {
     const list = menuRawList ?? []
     const apiCount = list.filter(({ type }) => type === MenuItemType.ApiDetail).length
@@ -21,6 +25,21 @@ export function Overview() {
       schemaCount,
       testScenarioCount: apiCaseCount,
     }
+  }, [menuRawList])
+
+  const recentItems = useMemo(() => {
+    return [...(menuRawList ?? [])]
+      .filter((item) => item.type !== MenuItemType.ApiDetailFolder)
+      .sort((a, b) => {
+        const ta = (a as unknown as { updatedAt?: string }).updatedAt
+          ?? (a.data as { updatedAt?: string } | undefined)?.updatedAt
+          ?? ''
+        const tb = (b as unknown as { updatedAt?: string }).updatedAt
+          ?? (b.data as { updatedAt?: string } | undefined)?.updatedAt
+          ?? ''
+        return tb.localeCompare(ta)
+      })
+      .slice(0, 6)
   }, [menuRawList])
 
   return (
@@ -77,7 +96,29 @@ export function Overview() {
             padding: token.padding,
           }}
         >
-          <Skeleton />
+          <div className="mb-3 text-base">最近编辑</div>
+          {recentItems.length === 0 ? (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无接口，从右侧新建开始" />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {recentItems.map((item) => (
+                <Button
+                  key={item.id}
+                  type="text"
+                  className="!flex !items-center !justify-start !px-2 !text-left"
+                  onClick={() => {
+                    addTabItem({
+                      key: item.id,
+                      label: item.name,
+                      contentType: item.type,
+                    })
+                  }}
+                >
+                  <span className="truncate">{item.name}</span>
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
       </Col>
 
@@ -89,7 +130,13 @@ export function Overview() {
             padding: token.padding,
           }}
         >
-          <Skeleton />
+          <div className="mb-3 text-base">快捷新建</div>
+          <Space direction="vertical" className="w-full">
+            <Button block onClick={() => createApiDetails()}>新建接口</Button>
+            <Button block onClick={() => createApiRequest()}>新建快捷请求</Button>
+            <Button block onClick={() => createDoc()}>新建 Markdown</Button>
+            <Button block onClick={() => createApiSchema()}>新建数据模型</Button>
+          </Space>
         </div>
       </Col>
     </Row>

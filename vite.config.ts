@@ -1,9 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { defineConfig, type Plugin } from 'vite'
+import { type Plugin } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
-
-/// <reference types="vitest/config" />
 
 const SRC_DIR = path.resolve(__dirname, 'src')
 const MONACO_VS_SRC = path.resolve(__dirname, 'node_modules/monaco-editor/min/vs')

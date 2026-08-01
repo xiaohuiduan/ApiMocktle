@@ -1,10 +1,9 @@
 import { CloseCircleFilled } from '@ant-design/icons'
-import { Button, Input, Select, Switch, theme, Tooltip } from 'antd'
-import { PlusCircleIcon, XCircleIcon } from 'lucide-react'
+import { Button, Input, Popconfirm, Select, Switch, theme, Tooltip } from 'antd'
+import { PlusCircleIcon, TrashIcon, XCircleIcon } from 'lucide-react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { nanoid } from 'nanoid'
 
-import { DoubleCheckRemoveBtn } from '@/components/DoubleCheckRemoveBtn'
 import { EditableTable, type EditableTableProps } from '@/components/EditableTable'
 import { ParamsEditableCell } from '@/components/tab-content/api/components/ParamsEditableCell'
 import { PARAMS_CONFIG } from '@/configs/static'
@@ -344,11 +343,23 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
         if (removable) {
           return (
             <div className="flex justify-center p-1 text-xs">
-              <DoubleCheckRemoveBtn
-                onRemove={() => {
+              <Popconfirm
+                title="删除该参数？"
+                okText="删除"
+                okButtonProps={{ danger: true }}
+                cancelText="取消"
+                onConfirm={() => {
                   onChange?.(value?.filter((_, i) => i !== idx))
                 }}
-              />
+              >
+                <Button
+                  size="small"
+                  type="text"
+                  danger
+                  icon={<TrashIcon size={13} />}
+                  aria-label="删除参数"
+                />
+              </Popconfirm>
             </div>
           )
         }

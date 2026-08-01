@@ -38,7 +38,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
 
   // 更新表达式（onBlur 提交）
   const handleExpressionBlur = useCallback(
-    (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       onChange({ expression: e.target.value })
     },
     [onChange],

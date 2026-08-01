@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useState } from 'react'
 
-import { Button, Dropdown, Select, theme } from 'antd'
-import { ArrowLeftIcon, CopyIcon, PlusIcon, RefreshCw, XIcon } from 'lucide-react'
+import { Button, Dropdown, Modal, Select, Tooltip, theme } from 'antd'
+import { ArrowLeftIcon, CopyIcon, PlusIcon, RefreshCw, Settings2Icon, XIcon } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import type { MenuProps } from 'antd'
 
-import { ProjectIcon, getIconColor } from '@/components/ProjectIcon'
+import { ProjectIcon } from '@/components/ProjectIcon'
 import { ProjectQuickSwitch } from '@/components/ProjectQuickSwitch'
+import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useProjectTabsContext } from '@/contexts/project-tabs'
 import type { ProjectTabState } from '@/contexts/project-tabs'
@@ -22,6 +23,9 @@ interface TabItemProps {
   index: number
   total: number
   isActive: boolean
+  hasUnsaved: boolean
+  othersHaveDirty: boolean
+  rightHaveDirty: boolean
   onSelect: () => void
   onClose: () => void
   onCloseOthers: () => void
@@ -35,6 +39,9 @@ function TabItem({
   index,
   total,
   isActive,
+  hasUnsaved,
+  othersHaveDirty,
+  rightHaveDirty,
   onSelect,
   onClose,
   onCloseOthers,
@@ -43,8 +50,23 @@ function TabItem({
   token,
 }: TabItemProps) {
   const handleCopyName = useCallback(() => {
-    navigator.clipboard.writeText(tab.info.name).catch(() => {})
+    void navigator.clipboard.writeText(tab.info.name).catch(() => undefined)
   }, [tab.info.name])
+
+  const confirmIfDirty = useCallback((title: string, dirty: boolean, action: () => void) => {
+    if (!dirty) {
+      action()
+      return
+    }
+
+    Modal.confirm({
+      title,
+      content: '该项目存在未保存的修改。关闭后内容会保留为草稿，重新打开项目时可继续编辑。',
+      okText: '关闭',
+      cancelText: '取消',
+      onOk: action,
+    })
+  }, [])
 
   const menuItems = useMemo<MenuProps['items']>(
     () => [
@@ -52,28 +74,36 @@ function TabItem({
         key: 'close',
         label: '关闭标签页',
         icon: <XIcon size={14} />,
-        onClick: onClose,
+        onClick: () => {
+          confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose)
+        },
       },
       {
         key: 'closeOthers',
         label: '关闭其他标签页',
         icon: <XIcon size={14} />,
         disabled: total <= 1,
-        onClick: onCloseOthers,
+        onClick: () => {
+          confirmIfDirty('关闭其他项目？', othersHaveDirty, onCloseOthers)
+        },
       },
       {
         key: 'closeRight',
         label: '关闭右侧标签页',
         icon: <XIcon size={14} />,
         disabled: index >= total - 1,
-        onClick: onCloseRight,
+        onClick: () => {
+          confirmIfDirty('关闭右侧项目？', rightHaveDirty, onCloseRight)
+        },
       },
       { type: 'divider' },
       {
         key: 'closeAll',
         label: '全部关闭',
         icon: <XIcon size={14} />,
-        onClick: onCloseAll,
+        onClick: () => {
+          confirmIfDirty('关闭全部项目？', hasUnsaved || othersHaveDirty, onCloseAll)
+        },
       },
       { type: 'divider' },
       {
@@ -83,10 +113,21 @@ function TabItem({
         onClick: handleCopyName,
       },
     ],
-    [onClose, onCloseOthers, onCloseRight, onCloseAll, handleCopyName, total, index],
+    [
+      onClose,
+      onCloseOthers,
+      onCloseRight,
+      onCloseAll,
+      handleCopyName,
+      confirmIfDirty,
+      tab.info.name,
+      hasUnsaved,
+      othersHaveDirty,
+      rightHaveDirty,
+      total,
+      index,
+    ],
   )
-
-  const iconColor = getIconColor(tab.info.icon || '')
 
   return (
     <Dropdown trigger={['contextMenu']} menu={{ items: menuItems }}>
@@ -106,7 +147,9 @@ function TabItem({
         }}
         onClick={onSelect}
         onAuxClick={(e) => {
-          if (e.button === 1) onClose()
+          if (e.button === 1) {
+            confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose)
+          }
         }}
         onMouseEnter={(e) => {
           if (!isActive) {
@@ -125,14 +168,25 @@ function TabItem({
 
         <span className="max-w-[120px] truncate text-sm">{tab.info.name}</span>
 
+        {hasUnsaved && (
+          <span
+            className="size-1.5 shrink-0 rounded-full"
+            style={{ backgroundColor: token.colorWarning }}
+            aria-label="有未保存修改"
+          />
+        )}
+
         {/* 关闭按钮：活跃标签始终显示，不活跃标签 hover 时显示 */}
-        <span
+        <button
+          type="button"
           className={`flex size-4 shrink-0 items-center justify-center rounded transition-all duration-100 ${
-            isActive ? '' : 'opacity-0 group-hover:opacity-100'
+            isActive ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
           }`}
           style={{
             color: isActive ? token.colorTextTertiary : token.colorTextQuaternary,
             backgroundColor: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
           }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0,0,0,0.06)'
@@ -142,13 +196,12 @@ function TabItem({
           }}
           onClick={(e) => {
             e.stopPropagation()
-            onClose()
+            confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose)
           }}
-          role="button"
-          tabIndex={-1}
+          aria-label="关闭标签页"
         >
           <XIcon size={12} />
-        </span>
+        </button>
       </div>
     </Dropdown>
   )
@@ -176,6 +229,12 @@ export function ProjectTabBar() {
 
   if (openTabs.length === 0) return null
 
+  const hasUnsavedTab = (tab: ProjectTabState) => {
+    return tab.tabItems.some((item) => {
+      return item.data?.editStatus === 'changed' || item.data?.tabStatus === PageTabStatus.Create
+    })
+  }
+
   return (
     <div
       className="flex shrink-0 items-stretch overflow-hidden"
@@ -199,6 +258,11 @@ export function ProjectTabBar() {
       >
         {openTabs.map((tab, index) => {
           const isActive = tab.info.projectId === activeProjectId
+          const dirty = hasUnsavedTab(tab)
+          const othersDirty = openTabs.some(
+            (t) => t.info.projectId !== tab.info.projectId && hasUnsavedTab(t),
+          )
+          const rightDirty = openTabs.slice(index + 1).some((t) => hasUnsavedTab(t))
 
           return (
             <TabItem
@@ -207,6 +271,9 @@ export function ProjectTabBar() {
               index={index}
               total={openTabs.length}
               isActive={isActive}
+              hasUnsaved={dirty}
+              othersHaveDirty={othersDirty}
+              rightHaveDirty={rightDirty}
               onSelect={() => setActiveProjectId(tab.info.projectId)}
               onClose={() => closeProject(tab.info.projectId)}
               onCloseOthers={() => closeOtherProjects(tab.info.projectId)}
@@ -231,8 +298,8 @@ export function ProjectTabBar() {
           border: 'none',
           backgroundColor: 'transparent',
         }}
-        onClick={() => navigate('/projects')}
-        title="打开项目"
+        onClick={() => navigate('/projects?create=1')}
+        title="新建项目"
       >
         <PlusIcon size={16} />
       </button>
@@ -240,9 +307,9 @@ export function ProjectTabBar() {
       {/* 右侧工具栏 */}
       <div className="ml-auto flex shrink-0 items-center gap-1 px-2">
         <ProjectQuickSwitch />
-        {projectEnvironments.length > 0 && (
-          <>
-            <span className="text-xs shrink-0" style={{ color: token.colorTextSecondary }}>环境</span>
+        <>
+          <span className="text-xs shrink-0" style={{ color: token.colorTextSecondary }}>环境</span>
+          {projectEnvironments.length > 0 && (
             <Select
               size="small"
               className="min-w-[140px]"
@@ -261,8 +328,19 @@ export function ProjectTabBar() {
               }))}
               onChange={(envId) => setCurrentProjectEnvironmentId(envId)}
             />
-          </>
-        )}
+          )}
+          <Tooltip title="管理环境">
+            <Button
+              size="small"
+              icon={<Settings2Icon size={14} />}
+              onClick={() => {
+                if (activeProjectId) {
+                  navigate(`/projects/${activeProjectId}/settings?section=environments`)
+                }
+              }}
+            />
+          </Tooltip>
+        </>
         <Button
           icon={<RefreshCw size={14} />}
           size="small"

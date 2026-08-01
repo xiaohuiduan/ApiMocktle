@@ -49,6 +49,19 @@ function pickImportFile(onSelect: (file: File) => void) {
   input.click()
 }
 
+function countOpenApiPaths(content: string): number | null {
+  try {
+    const doc = JSON.parse(content) as { paths?: unknown }
+    if (doc?.paths && typeof doc.paths === 'object') {
+      return Object.keys(doc.paths).length
+    }
+  }
+  catch {
+    // YAML 或其它格式无法用 JSON 统计
+  }
+  return null
+}
+
 export function ApiTransferPanel() {
   const { token } = theme.useToken()
   const { pathname } = useLocation()
@@ -98,7 +111,6 @@ export function ApiTransferPanel() {
       key: folder.id,
       title: folder.name,
       selectable: false,
-      checkable: false,
       children: buildNodes(childrenMap.get(folder.id) ?? []),
     }))
 
@@ -109,6 +121,23 @@ export function ApiTransferPanel() {
     if (!menuRawList) return []
     return menuRawList.filter((i) => i.type === MenuItemType.ApiDetail).map((i) => i.id)
   }, [menuRawList])
+
+  const normalizeCheckedIds = (keys: React.Key[]) => {
+    const result = new Set<string>()
+    for (const key of keys) {
+      const folder = menuRawList?.some(
+        (f) => f.type === MenuItemType.ApiDetailFolder && f.id === key,
+      )
+      if (folder) {
+        menuRawList
+          ?.filter((a) => a.type === MenuItemType.ApiDetail && a.parentId === key)
+          .forEach((a) => result.add(a.id))
+      } else {
+        result.add(String(key))
+      }
+    }
+    return result
+  }
 
   const isAllChecked = allApiIds.length > 0 && checkedApiIds.size === allApiIds.length
   const isIndeterminate = checkedApiIds.size > 0 && checkedApiIds.size < allApiIds.length
@@ -189,7 +218,7 @@ export function ApiTransferPanel() {
     }
   }
 
-  const handleImport = async (file: File) => {
+  const doImport = async (file: File) => {
     if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导入')
       return
@@ -238,7 +267,47 @@ export function ApiTransferPanel() {
     }
   }
 
-  const handleImportFromUrl = async () => {
+  const handleImport = async (file: File) => {
+    if (!projectId || !sessionId) {
+      msgApi.error('请在项目页面执行导入')
+      return
+    }
+
+    let pathsCount: number | null = null
+    try {
+      pathsCount = countOpenApiPaths(await file.text())
+    }
+    catch {
+      // 忽略读取失败，仍允许确认
+    }
+
+    Modal.confirm({
+      title: '导入接口文档？',
+      content: pathsCount !== null
+        ? `检测到 ${pathsCount} 个接口路径。导入会静默合并到当前项目，不会清空已有内容，同名接口按导入规则合并覆盖。`
+        : '导入会静默合并到当前项目，不会清空已有内容。同名接口将按导入规则合并覆盖。',
+      okText: '开始导入',
+      cancelText: '取消',
+      onOk: () => doImport(file),
+    })
+  }
+
+  const handleImportFromUrl = () => {
+    if (!projectId || !sessionId) {
+      msgApi.error('请在项目页面执行导入')
+      return
+    }
+
+    Modal.confirm({
+      title: '从 URL 导入接口文档？',
+      content: '导入会静默合并到当前项目，不会清空已有内容。同名接口将按导入规则合并覆盖。',
+      okText: '开始导入',
+      cancelText: '取消',
+      onOk: () => doImportFromUrl(),
+    })
+  }
+
+  const doImportFromUrl = async () => {
     if (!projectId || !sessionId) {
       msgApi.error('请在项目页面执行导入')
       return
@@ -315,7 +384,7 @@ export function ApiTransferPanel() {
           支持导入 OpenAPI 3.x / Swagger 2.0 的 JSON 或 YAML，导入后会静默合并到当前项目里的接口、请求目录与模型数据，不会清空已有内容。
         </Typography.Paragraph>
         <Typography.Paragraph className="!mb-4" type="secondary">
-          选择文件或从 URL 导入后会直接开始合并，不再弹出覆盖确认。URL 需可被本服务访问（例如本机后端请使用局域网 IP 或主机名，勿写浏览器专属地址）。
+          选择文件或从 URL 导入前会先确认合并规则，导入过程不会清空已有内容。URL 需可被本服务访问（例如本机后端请使用局域网 IP 或主机名，勿写浏览器专属地址）。
         </Typography.Paragraph>
 
         <Space className="w-full max-w-2xl" direction="vertical" size={12}>
@@ -464,11 +533,10 @@ export function ApiTransferPanel() {
                 defaultExpandAll
                 treeData={apiTreeData}
                 onCheck={(checkedKeys) => {
-                  // 文件夹节点 checkable=false，不会进入 checkedKeys，这里只会拿到接口叶子 key
                   const keys = Array.isArray(checkedKeys)
                     ? checkedKeys
                     : checkedKeys.checked
-                  setCheckedApiIds(new Set(keys as string[]))
+                  setCheckedApiIds(normalizeCheckedIds(keys))
                 }}
               />
             )

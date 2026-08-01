@@ -64,6 +64,7 @@ export function Doc() {
         },
         { replaceTab: tabData.key },
       )
+      messageApi.success('已保存')
     }
     else {
       updateMenuItem({

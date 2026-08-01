@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 import { CaretRightFilled } from '@ant-design/icons'
 import { show } from '@ebay/nice-modal-react'
@@ -21,7 +21,6 @@ import { API_MENU_CONFIG, ROOT_CATALOG } from '@/configs/static'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { CatalogType, MenuItemType } from '@/enums'
-import type { ApiDetails } from '@/types'
 import { getCreateType, isMenuFolder } from '@/helpers'
 import { useHelpers } from '@/hooks/useHelpers'
 
@@ -56,6 +55,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
   } = useApiMenuContext()
 
   const { createTabItem } = useHelpers()
+  const [plusOpen, setPlusOpen] = useState(false)
 
   const menuFolderKeys = useMemo(() => {
     const folders = groupedMenus?.[topMenuType].filter((it) =>
@@ -73,8 +73,6 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
   const { title, newLabel } = API_MENU_CONFIG[topMenuType]
 
   const noActions = topMenuType === CatalogType.Overview || topMenuType === CatalogType.Recycle
-
-  const isRequest = topMenuType === CatalogType.Request
 
   const handleCreateTabItem = () => {
     createTabItem(getCreateType(topMenuType))
@@ -97,7 +95,9 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
       {!noActions && (
         <AppMenuControls>
           <Dropdown
-            trigger={isRequest ? ['hover', 'click'] : ['hover']}
+            open={plusOpen}
+            onOpenChange={setPlusOpen}
+            trigger={['click']}
             menu={{
               items: [
                 {
@@ -164,10 +164,10 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
                           void show(ModalImportCurl, {
                             onImport: (menuItem) => {
                               if (menuItem.data && 'path' in menuItem.data) {
-                                const d = menuItem.data as ApiDetails
+                                const d = menuItem.data
                                 menuItem.data = {
                                   ...d,
-                                  path: (d.serverUrl || '') + (d.path || '/'),
+                                  path: (d.serverUrl ?? '') + (d.path ?? '/'),
                                 }
                               }
                               menuItem.type = MenuItemType.HttpRequest
@@ -190,9 +190,8 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
             <MenuActionButton
               icon={<PlusIcon size={14} />}
               onClick={(ev) => {
-                if (isRequest) return
                 ev.stopPropagation()
-                handleCreateTabItem()
+                setPlusOpen(true)
               }}
             />
           </Dropdown>
@@ -219,6 +218,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
 
           {topMenuType === CatalogType.Http && (
             <Dropdown
+              trigger={['click']}
               menu={{
                 items: [
                   {

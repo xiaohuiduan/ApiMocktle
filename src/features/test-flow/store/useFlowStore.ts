@@ -47,6 +47,7 @@ interface FlowState {
   addNode: (node: FlowNode) => void
   deleteNodes: (nodeIds: string[]) => void
   updateNodeData: (nodeId: string, data: Partial<FlowNodeData>) => void
+  cleanupOrphanedEdges: (nodeId: string) => void
   selectNode: (nodeId: string | null) => void
   deleteEdge: (edgeId: string) => void
   setDrawerOpen: (open: boolean) => void

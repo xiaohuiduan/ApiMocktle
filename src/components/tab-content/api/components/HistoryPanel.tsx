@@ -15,7 +15,7 @@ import { MarkdownDiffView } from './MarkdownDiffView'
 import { buildMarkdownReport, downloadText } from '../exportMarkdown'
 import { calcBodySize, detectLanguage, getStatusColor, headerTableColumns } from '../utils'
 
-interface RequestHistoryItem {
+export interface RequestHistoryItem {
   id: string
   menuItemId: string
   requestJson: { url: string, method: string, headers: Array<{ name: string, value: string }>, body: string, contentType?: string }
@@ -29,6 +29,7 @@ interface HistoryPanelProps {
   menuItemId: string
   open: boolean
   onClose: () => void
+  onApply?: (item: RequestHistoryItem) => void
 }
 
 export function formatTime(iso: string) {
@@ -40,7 +41,7 @@ export function formatTime(iso: string) {
   }
 }
 
-export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
+export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPanelProps) {
   const { token } = theme.useToken()
   const { projectId } = useParams()
   const { sessionId } = useAuth()
@@ -110,7 +111,7 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
     <Drawer
       title="历史记录"
       placement="right"
-      width="80%"
+      width="60%"
       open={open}
       onClose={onClose}
       styles={{ body: { padding: 0, display: 'flex', overflow: 'hidden' } }}
@@ -122,6 +123,17 @@ export function HistoryPanel({ menuItemId, open, onClose }: HistoryPanelProps) {
           <Button size="small" type="link" onClick={() => void loadHistory()}>刷新</Button>
         </div>
         <div className="flex items-center gap-2 px-[var(--ds-pad-md)] pb-[var(--ds-pad-sm)]">
+          <Button
+            size="small"
+            type="primary"
+            disabled={!selectedId || !onApply}
+            onClick={() => {
+              const item = items.find(i => i.id === selectedId)
+              if (item) onApply?.(item)
+            }}
+          >
+            回填
+          </Button>
           <Button
             size="small"
             disabled={!selectedId}

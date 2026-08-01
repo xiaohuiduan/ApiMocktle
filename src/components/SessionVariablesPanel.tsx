@@ -135,17 +135,14 @@ export function SessionVariablesPanel() {
   )
 
   return (
-    <div
-      className="fixed z-50"
-      style={{ left: 92, bottom: 20 }}
-    >
+    <div>
       <Popover
         content={content}
         title="变量管理"
         trigger="click"
         open={open}
         onOpenChange={setOpen}
-        placement="topLeft"
+        placement="right"
       >
         <Tooltip title="查看变量" placement="right">
           <Badge count={sessionCount} size="small" offset={[-4, 4]}>

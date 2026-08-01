@@ -7,6 +7,7 @@ import useResizeObserver from 'use-resize-observer'
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { API_MENU_CONFIG } from '@/configs/static'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
+import { useGlobalContext } from '@/contexts/global'
 import { CatalogType, MenuItemType } from '@/enums'
 import { isMenuSameGroup } from '@/helpers'
 import { useStyles } from '@/hooks/useStyle'
@@ -46,6 +47,7 @@ const TREE_MIN_VIEWPORT_HEIGHT = 240
  * - 文件夹可以包含文件和另一个文件夹，包含的关系以层级递进的形式展示。
  */
 export function ApiMenu() {
+  const { messageApi } = useGlobalContext()
   const { moveMenuItem, menuRawList, removeMenuItems } = useMenuHelpersContext()
   const { expandedMenuKeys, addExpandedMenuKeys, removeExpandedMenuKeys, menuTree }
     = useApiMenuContext()
@@ -98,6 +100,11 @@ export function ApiMenu() {
             removeTabItem({ key })
           })
           exitBatchMode()
+          messageApi.open({
+            type: 'success',
+            content: `已移入回收站 ${ids.length} 项，30 天内可恢复，可在左侧“回收站”查看`,
+            duration: 6,
+          })
         }
         catch (error) {
           Modal.error({
@@ -107,7 +114,7 @@ export function ApiMenu() {
         }
       },
     })
-  }, [checkedKeys, exitBatchMode, menuRawList, removeMenuItems, removeTabItem])
+  }, [checkedKeys, exitBatchMode, menuRawList, removeMenuItems, removeTabItem, messageApi])
 
   const handleMenuSelect = useEvent<TreeOnSelect>((_, { node }) => {
     if (batchMode) {
@@ -169,11 +176,6 @@ export function ApiMenu() {
           },
         },
 
-        ':hover': {
-          '.ui-menu-controls': {
-            display: 'inline-flex',
-          },
-        },
       },
     }),
   }))

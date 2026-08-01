@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
-import { Button, Card, Form, Input, Modal, Space, Spin, Tooltip, Typography, message, theme } from 'antd'
+import { Button, Card, Empty, Form, Input, Modal, Space, Spin, Tooltip, Typography, message, theme } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
 import { show } from '@ebay/nice-modal-react'
 import { SettingsIcon } from 'lucide-react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 
 import { ModalSettings } from '@/components/modals/ModalSettings'
 import { ParticleCanvas } from '@/components/ParticleCanvas'
@@ -175,12 +175,15 @@ export function ProjectsClient() {
   const { token } = theme.useToken()
   const { isGlassStyle, isNeumorphism, isSkeuomorphism } = useDesignStyle()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { sessionId } = useAuth()
   const { openProject } = useProjectTabsContext()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [projects, setProjects] = useState<ProjectItem[]>([])
-  const [dialog, setDialog] = useState<ProjectDialogState>(null)
+  const [dialog, setDialog] = useState<ProjectDialogState>(() => {
+    return searchParams.get('create') === '1' ? { mode: 'create' } : null
+  })
   const [form] = Form.useForm<ProjectFormValues>()
   const [messageApi, contextHolder] = message.useMessage()
 
@@ -308,7 +311,7 @@ export function ProjectsClient() {
         </Typography.Title>
 
         <Space className="ml-auto">
-          <Tooltip title="设置">
+          <Tooltip title="全局设置">
             <Button
               type="text"
               icon={<SettingsIcon size={16} />}
@@ -323,8 +326,16 @@ export function ProjectsClient() {
       </div>
 
       <Spin spinning={loading}>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {projects.map((project) => {
+        {!loading && projects.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 py-20">
+            <Empty description="还没有项目" />
+            <Button type="primary" onClick={openCreateDialog}>
+              新建项目
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {projects.map((project) => {
             const iconColor = getIconColor(project.icon || '')
             const IconComp = ICON_MAP[project.icon || '']
 
@@ -395,7 +406,7 @@ export function ProjectsClient() {
                   {/* 操作按钮 */}
                   {project.role === 'owner' && (
                     <div
-                      className="absolute right-0 top-0 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100"
+                      className="absolute right-0 top-0 z-10 flex gap-1 opacity-70 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
                       onClick={(event) => { event.stopPropagation() }}
                     >
                       <Button
@@ -449,8 +460,9 @@ export function ProjectsClient() {
                 </div>
               </Card>
             )
-          })}
-        </div>
+            })}
+          </div>
+        )}
       </Spin>
 
       <Modal

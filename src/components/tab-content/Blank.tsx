@@ -1,6 +1,5 @@
 import { show } from '@ebay/nice-modal-react'
-import { Button, Col, Dropdown, Row, theme } from 'antd'
-import { ChevronDownIcon, FolderInputIcon, FolderPlusIcon } from 'lucide-react'
+import { Col, Row, theme } from 'antd'
 
 import { useTabContentContext } from '@/components/ApiTab/TabContentContext'
 import { FileIcon } from '@/components/icons/FileIcon'
@@ -55,8 +54,6 @@ function NewItem(props: NewItemProps) {
 }
 
 export function Blank() {
-  const { token } = theme.useToken()
-
   const { createApiDetails, createApiRequest, createDoc, createApiSchema } = useHelpers()
   const { tabData } = useTabContentContext()
   const { addMenuItem } = useMenuHelpersContext()
@@ -65,7 +62,7 @@ export function Blank() {
   return (
     <div className="flex h-full flex-col items-center justify-center py-8">
       <Row wrap className="mb-6 w-[750px]" gutter={[16, 16]} justify="center">
-        <Col lg={6} md={12}>
+        <Col lg={4} md={8}>
           <NewItem
             catalogType={CatalogType.Http}
             label="新建接口"
@@ -74,7 +71,7 @@ export function Blank() {
             }}
           />
         </Col>
-        <Col lg={6} md={12}>
+        <Col lg={4} md={8}>
           <NewItem
             catalogType={CatalogType.Request}
             label="快捷请求"
@@ -83,7 +80,7 @@ export function Blank() {
             }}
           />
         </Col>
-        <Col lg={6} md={12}>
+        <Col lg={4} md={8}>
           <NewItem
             catalogType={CatalogType.Markdown}
             label="新建 Markdown"
@@ -92,7 +89,7 @@ export function Blank() {
             }}
           />
         </Col>
-        <Col lg={6} md={12}>
+        <Col lg={4} md={8}>
           <NewItem
             catalogType={CatalogType.Schema}
             label="新建数据模型"
@@ -101,53 +98,34 @@ export function Blank() {
             }}
           />
         </Col>
+        <Col lg={4} md={8}>
+          <NewItem
+            catalogType={CatalogType.Http}
+            label="新建接口目录"
+            onClick={() => {
+              void show(ModalNewCatalog, { formData: { type: MenuItemType.ApiDetailFolder } })
+            }}
+          />
+        </Col>
+        <Col lg={4} md={8}>
+          <NewItem
+            catalogType={CatalogType.Http}
+            label="导入 cURL"
+            onClick={() => {
+              void show(ModalImportCurl, {
+                onImport: (menuItem) => {
+                  addMenuItem(menuItem)
+                  addTabItem({
+                    key: menuItem.id,
+                    label: menuItem.name,
+                    contentType: menuItem.type,
+                  })
+                },
+              })
+            }}
+          />
+        </Col>
       </Row>
-
-      <Dropdown
-        menu={{
-          items: [
-            {
-              key: '0',
-              label: '新建接口目录',
-              icon: <FolderPlusIcon size={18} />,
-              onClick: () => {
-                void show(ModalNewCatalog, { formData: { type: MenuItemType.ApiDetailFolder } })
-              },
-            },
-            {
-              key: '1',
-              label: '导入 cURL',
-              icon: <FolderInputIcon size={18} />,
-              onClick: () => {
-                void show(ModalImportCurl, {
-                  onImport: (menuItem) => {
-                    addMenuItem(menuItem)
-                    addTabItem({
-                      key: menuItem.id,
-                      label: menuItem.name,
-                      contentType: menuItem.type,
-                    })
-                  },
-                })
-              },
-            },
-          ],
-        }}
-        placement="bottom"
-      >
-        <Button
-          style={{ color: token.colorTextTertiary }}
-          type="link"
-          onClick={(ev) => {
-            ev.preventDefault()
-          }}
-        >
-          <span className="!inline-flex items-center gap-1">
-            <span>更多功能</span>
-            <ChevronDownIcon size={14} />
-          </span>
-        </Button>
-      </Dropdown>
     </div>
   )
 }

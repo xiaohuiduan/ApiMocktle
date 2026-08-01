@@ -89,6 +89,7 @@ export function Schema() {
               },
               { replaceTab: tabData.key },
             )
+            messageApi.success('保存成功')
           }
           else {
             try {

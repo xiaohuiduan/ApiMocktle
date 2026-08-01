@@ -8,6 +8,7 @@ import { IconText } from '@/components/IconText'
 import { JsonSchemaCard } from '@/components/JsonSchemaCard'
 import { ModalNewResponse } from '@/components/tab-content/api/ModalNewResponse'
 import { useStyles } from '@/hooks/useStyle'
+import { useGlobalContext } from '@/contexts/global'
 import type { ApiDetails } from '@/types'
 
 import { css } from '@emotion/css'
@@ -36,6 +37,7 @@ interface ResponseTabProps {
 
 export function ResponseTab(props: ResponseTabProps) {
   const { value, onChange } = props
+  const { messageApi } = useGlobalContext()
 
   const { token } = theme.useToken()
 
@@ -84,6 +86,7 @@ export function ResponseTab(props: ResponseTabProps) {
                         const newResponses = value.filter((_, i) => i !== idx)
                         onChange?.(newResponses)
                         setActiveResTabKey(newResponses.at(0)?.id)
+                        messageApi.info('响应已删除，点击右上角保存后生效')
                       }}
                     >
                       <Button

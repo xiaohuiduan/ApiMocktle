@@ -1,10 +1,11 @@
 'use client'
 
-import { ReactNode, useMemo, useState } from 'react'
+import { ReactNode, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router'
 
 import {
   Button,
+  Dropdown,
   List,
   Modal,
   Table,
@@ -15,7 +16,7 @@ import {
   message,
   theme,
 } from 'antd'
-import { MinusIcon, PlusIcon, TerminalIcon } from 'lucide-react'
+import { MoreHorizontalIcon, TerminalIcon } from 'lucide-react'
 
 import { api } from '@/api-client'
 import { useProxyConfig } from '@/contexts/proxy-config'
@@ -86,6 +87,10 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
   const isLarge = bodySize > FORMAT_SIZE_LIMIT
   const [showFormatted, setShowFormatted] = useState(isJson && !isLarge)
   const [activeTab, setActiveTab] = useState(result?.body ? 'resContent' : 'reqContent')
+
+  useEffect(() => {
+    setShowFormatted(isJson && !isLarge)
+  }, [result?.body, result?.contentType, isJson, isLarge])
 
   const monacoOptions = useMemo(() => ({
     readOnly: true,
@@ -242,26 +247,43 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
         tabBarExtraContent={{
           right: (
             <div className="flex items-center gap-3 text-sm max-w-full overflow-hidden">
-              <Button type="text" size="small" onClick={() => {
-                const md = buildMarkdownReport(
-                  { url: result.url, method: result.method, headers: result.requestHeaders, body: result.requestBodyText, contentType: result.contentType, query: result.requestQuery },
-                  { status: result.status, statusText: result.statusText, headers: result.headers, body: result.body, durationMs: result.durationMs, contentType: result.contentType },
-                )
-                downloadText(`接口报告-${result.status}-${Date.now()}.md`, md)
-              }}>导出</Button>
-              <Button type="text" size="small" disabled={!menuItemId} onClick={() => void openHistoryPicker()}>对比历史</Button>
-              {/* 格式化按钮：仅在"响应内容" tab 且是 JSON 时显示 */}
-              {activeTab === 'resContent' && isJson && (
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'export',
+                      label: '导出 Markdown',
+                      onClick: () => {
+                        const md = buildMarkdownReport(
+                          { url: result.url, method: result.method, headers: result.requestHeaders, body: result.requestBodyText, contentType: result.contentType, query: result.requestQuery },
+                          { status: result.status, statusText: result.statusText, headers: result.headers, body: result.body, durationMs: result.durationMs, contentType: result.contentType },
+                        )
+                        downloadText(`接口报告-${result.status}-${Date.now()}.md`, md)
+                      },
+                    },
+                    {
+                      key: 'compare',
+                      label: '对比历史',
+                      disabled: !menuItemId,
+                      onClick: () => void openHistoryPicker(),
+                    },
+                    ...(activeTab === 'resContent' && isJson
+                      ? [{
+                          key: 'format',
+                          label: showFormatted ? '查看原始' : '格式化 JSON',
+                          onClick: () => setShowFormatted(v => !v),
+                        }]
+                      : []),
+                  ],
+                }}
+              >
                 <Button
                   type="text"
                   size="small"
-                  icon={showFormatted ? <MinusIcon size={12} /> : <PlusIcon size={12} />}
-                  onClick={() => setShowFormatted(v => !v)}
-                  style={{ marginRight: 8 }}
-                >
-                  {showFormatted ? '原始' : '格式化'}
-                </Button>
-              )}
+                  icon={<MoreHorizontalIcon size={14} />}
+                  aria-label="更多操作"
+                />
+              </Dropdown>
               <Tag className="flex-shrink-0" color={getStatusColor(result.status)}>
                 {result.status > 0 ? `${result.status} ${result.statusText}` : result.statusText}
               </Tag>
