@@ -418,7 +418,11 @@ export function ApiDoc() {
         '.schema-table': {
           width: '100%',
           tableLayout: 'auto',
-          borderCollapse: 'collapse',
+          // 注意：border-collapse 不能为 collapse——sticky 表头在 collapse 模式下
+          // 背景会被滚动上来的行内容穿透覆盖（列名与字段名重叠的 Chromium bug），
+          // separate + spacing 0 外观一致且 sticky 背景完整
+          borderCollapse: 'separate',
+          borderSpacing: 0,
           color: token.colorText,
 
           'th, td': {
