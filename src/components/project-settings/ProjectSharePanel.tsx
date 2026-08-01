@@ -5,8 +5,6 @@ import {
   Alert,
   Button,
   Card,
-  Form,
-  InputNumber,
   message,
   Space,
   Table,
@@ -14,7 +12,7 @@ import {
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
-import { Copy, Link2, Play, Plus } from 'lucide-react'
+import { Link2, Play, Plus } from 'lucide-react'
 
 import { useAuth } from '@/contexts/auth'
 
@@ -25,17 +23,12 @@ interface ShareServerStatus {
   port: number
 }
 
-interface ShareServerConfig {
-  port: number
-}
-
-export function ShareServerPanel() {
+export function ProjectSharePanel({ projectId }: { projectId: string }) {
   const { sessionId } = useAuth()
   const [status, setStatus] = useState<ShareServerStatus>({ running: false, port: 0 })
-  const [config, setConfig] = useState<ShareServerConfig>({ port: 14204 })
   const [lanIps, setLanIps] = useState<string[]>([])
   const [links, setLinks] = useState<ShareLink[]>([])
-  const [loading, setLoading] = useState(false)
+  const [starting, setStarting] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [msgApi, contextHolder] = message.useMessage()
 
@@ -49,19 +42,6 @@ export function ShareServerPanel() {
     }
     catch (err) {
       console.error('Failed to fetch share server status:', err)
-    }
-  }, [])
-
-  const fetchConfig = useCallback(async () => {
-    try {
-      const result = await invoke<{ ok: boolean, data?: ShareServerConfig }>('get_share_server_config')
-
-      if (result.ok && result.data) {
-        setConfig(result.data)
-      }
-    }
-    catch (err) {
-      console.error('Failed to fetch share server config:', err)
     }
   }, [])
 
@@ -83,17 +63,16 @@ export function ShareServerPanel() {
       const result = await invoke<{ ok: boolean, data?: ShareLink[] }>('list_share_links', { sessionId })
 
       if (result.ok && result.data) {
-        setLinks(result.data)
+        setLinks(result.data.filter((l) => l.projectId === projectId))
       }
     }
     catch (err) {
       console.error('Failed to fetch share links:', err)
     }
-  }, [sessionId])
+  }, [sessionId, projectId])
 
   useEffect(() => {
     void fetchStatus()
-    void fetchConfig()
     void fetchLanIps()
     void fetchLinks()
     const interval = setInterval(() => {
@@ -103,7 +82,7 @@ export function ShareServerPanel() {
     return () => {
       clearInterval(interval)
     }
-  }, [fetchStatus, fetchConfig, fetchLanIps, fetchLinks])
+  }, [fetchStatus, fetchLanIps, fetchLinks])
 
   const accessUrls = useMemo(() => {
     const hosts = lanIps.length > 0 ? lanIps : ['127.0.0.1']
@@ -118,12 +97,10 @@ export function ShareServerPanel() {
   }
 
   const handleStart = async () => {
-    setLoading(true)
+    setStarting(true)
 
     try {
-      const result = await invoke<{ ok: boolean, data?: ShareServerStatus }>('start_share_server', {
-        port: config.port,
-      })
+      const result = await invoke<{ ok: boolean, data?: ShareServerStatus }>('start_share_server')
 
       if (result.ok && result.data) {
         setStatus(result.data)
@@ -140,36 +117,7 @@ export function ShareServerPanel() {
       msgApi.error('启动失败: ' + String(err))
     }
     finally {
-      setLoading(false)
-    }
-  }
-
-  const handleStop = async () => {
-    setLoading(true)
-
-    try {
-      const result = await invoke<{ ok: boolean, data?: ShareServerStatus }>('stop_share_server')
-
-      if (result.ok && result.data) {
-        setStatus(result.data)
-        msgApi.success('分享服务已停止')
-      }
-    }
-    catch (err) {
-      msgApi.error('停止失败: ' + String(err))
-    }
-    finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSaveConfig = async () => {
-    try {
-      await invoke('save_share_server_config', { config })
-      msgApi.success('配置已保存')
-    }
-    catch (err) {
-      msgApi.error('保存失败: ' + String(err))
+      setStarting(false)
     }
   }
 
@@ -200,100 +148,57 @@ export function ShareServerPanel() {
     <div>
       {contextHolder}
 
-      <Card className="mb-3" size="small" title="服务状态">
-        <div className="mb-3 flex items-center justify-between">
-          <Space>
-            <Tag color={status.running ? 'success' : 'default'}>
-              {status.running ? '运行中' : '已停止'}
-            </Tag>
-            {status.running && <Tag>端口: {status.port}</Tag>}
-          </Space>
-          <Space>
-            {status.running
-              ? (
-                  <Button
-                    danger
-                    icon={<Play size={14} />}
-                    loading={loading}
-                    size="small"
-                    onClick={() => {
-                      void handleStop()
-                    }}
-                  >
-                    停止
-                  </Button>
-                )
-              : (
-                  <Button
-                    icon={<Play size={14} />}
-                    loading={loading}
-                    size="small"
-                    type="primary"
-                    onClick={() => {
-                      void handleStart()
-                    }}
-                  >
-                    启动
-                  </Button>
-                )}
-          </Space>
-        </div>
-
-        {status.running && (
-          <Alert
-            showIcon
-            description={(
-              <div className="space-y-1">
-                {accessUrls.map((url) => (
-                  <div key={url} className="flex items-center gap-2">
-                    <Typography.Text code>{url}</Typography.Text>
-                    <Button
-                      icon={<Copy size={14} />}
-                      size="small"
-                      type="text"
-                      onClick={() => {
-                        void handleCopy(url)
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-            message="同局域网设备访问以下地址（需先创建分享链接）"
-            type="success"
-          />
-        )}
-      </Card>
-
-      <Card size="small" title="服务配置">
-        <Form layout="vertical" size="small">
-          <Form.Item label="端口号">
-            <InputNumber
-              max={65535}
-              min={1024}
-              style={{ width: 150 }}
-              value={config.port}
-              onChange={(value) => {
-                setConfig({ ...config, port: value ?? 14204 })
-              }}
+      {status.running
+        ? (
+            <Alert
+              showIcon
+              className="mb-3"
+              description={(
+                <div className="space-y-1">
+                  {accessUrls.map((url) => (
+                    <div key={url} className="flex items-center gap-2">
+                      <Typography.Text code>{url}</Typography.Text>
+                      <Button
+                        icon={<Link2 size={14} />}
+                        size="small"
+                        type="text"
+                        onClick={() => {
+                          void handleCopy(url)
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              message={`分享服务运行中（端口 ${status.port}）`}
+              type="success"
             />
-          </Form.Item>
-          <Form.Item>
-            <Button
-              size="small"
-              type="primary"
-              onClick={() => {
-                void handleSaveConfig()
-              }}
-            >
-              保存配置
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
+          )
+        : (
+            <Alert
+              showIcon
+              action={(
+                <Button
+                  icon={<Play size={14} />}
+                  loading={starting}
+                  size="small"
+                  type="primary"
+                  onClick={() => {
+                    void handleStart()
+                  }}
+                >
+                  启动服务
+                </Button>
+              )}
+              className="mb-3"
+              description="启动后才能生成可访问的分享链接。端口与启停控制可在「全局设置 → 文档分享」中配置。"
+              message="分享服务未启动"
+              type="warning"
+            />
+          )}
 
       <Card
-        className="mt-3"
+        className="mb-3"
         extra={(
           <Button
             icon={<Plus size={14} />}
@@ -307,18 +212,20 @@ export function ShareServerPanel() {
           </Button>
         )}
         size="small"
-        title="全部分享链接"
+        title="分享当前项目"
       >
+        <Typography.Paragraph className="!mb-0 text-sm">
+          生成带密码的访问链接，同局域网用户可在浏览器中只读查看本项目接口与文档。
+          分享内容默认全部，也可勾选部分；删除链接后已打开的页面立即失效。
+        </Typography.Paragraph>
+      </Card>
+
+      <Card size="small" title="本项目分享链接">
         <Table<ShareLink>
           columns={[
             {
               title: '标题',
               dataIndex: 'title',
-              render: (value: string | undefined, record) => value ?? record.projectName ?? '-',
-            },
-            {
-              title: '项目',
-              dataIndex: 'projectName',
               render: (value?: string) => value ?? '-',
             },
             {
@@ -346,7 +253,7 @@ export function ShareServerPanel() {
             },
             {
               title: '操作',
-              width: 140,
+              width: 150,
               render: (_, record) => (
                 <Space>
                   <Button
@@ -380,25 +287,8 @@ export function ShareServerPanel() {
         />
       </Card>
 
-      <Card className="mt-3" size="small" title="使用说明">
-        <Typography.Paragraph className="text-sm">
-          1. 启动服务后，在「项目设置 → 文档分享」中选择项目新建分享，或在此处选择项目创建
-          <br />
-          2. 将生成的访问链接 + 密码发给同局域网的用户
-          <br />
-          3. 用户在浏览器打开链接，输入密码即可只读查看接口文档
-          <br />
-          4. 删除分享链接后，已打开的页面将立即失效
-        </Typography.Paragraph>
-        <Alert
-          showIcon
-          description={'首次启动服务时，Windows 可能弹出防火墙授权提示，请选择"允许访问"，否则其他设备无法访问。所有设备需处于同一局域网。'}
-          message="Windows 防火墙"
-          type="warning"
-        />
-      </Card>
-
       <CreateShareModal
+        fixedProjectId={projectId}
         open={createOpen}
         onClose={() => {
           setCreateOpen(false)

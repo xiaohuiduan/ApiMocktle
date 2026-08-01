@@ -1,29 +1,30 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router'
 
 import {
   ConfigProvider,
   Menu,
   type MenuProps,
+  message,
   Space,
   Tag,
   theme,
   Typography,
-  message,
 } from 'antd'
 import { LayersIcon, SettingsIcon } from 'lucide-react'
-import { useLocation } from 'react-router'
 
 import { api } from '@/api-client'
-import { useAuth } from '@/contexts/auth'
-import { ProjectEnvironmentsPanel } from '@/components/project-settings/ProjectEnvironmentsPanel'
 import { ApiTransferPanel } from '@/components/project-settings/ApiTransferPanel'
+import { ProjectEnvironmentsPanel } from '@/components/project-settings/ProjectEnvironmentsPanel'
 import {
-  ProjectMembersSection,
   type MemberItem,
+  ProjectMembersSection,
   type Role,
 } from '@/components/project-settings/ProjectMembersSection'
+import { ProjectSharePanel } from '@/components/project-settings/ProjectSharePanel'
+import { useAuth } from '@/contexts/auth'
 
 import { PanelLayout } from '../components/PanelLayout'
 
@@ -33,6 +34,7 @@ const enum SettingsSectionKey {
   Members = 'members',
   Environments = 'environments',
   ImportApi = 'import-api',
+  Share = 'share',
 }
 
 interface ProjectInfo {
@@ -66,7 +68,10 @@ const items: MenuItem[] = [
       </div>
     ),
     type: 'group',
-    children: [{ key: SettingsSectionKey.ImportApi, label: '导入导出接口' }],
+    children: [
+      { key: SettingsSectionKey.ImportApi, label: '导入导出接口' },
+      { key: SettingsSectionKey.Share, label: '文档分享' },
+    ],
   },
 ]
 
@@ -82,6 +87,13 @@ function sectionMeta(section: SettingsSectionKey) {
     return {
       title: '环境管理',
       description: '统一维护项目环境、前置 URL、全局变量与密钥。',
+    }
+  }
+
+  if (section === SettingsSectionKey.Share) {
+    return {
+      title: '文档分享',
+      description: '分享当前项目文档，生成带密码的局域网访问链接，供同局域网用户只读查看。',
     }
   }
 
@@ -130,6 +142,7 @@ export default function SettingsPage() {
 
   const projectId = useMemo(() => {
     const parts = pathname.split('/').filter(Boolean)
+
     return parts.at(0) === 'projects' ? parts.at(1) : undefined
   }, [pathname])
 
@@ -137,6 +150,7 @@ export default function SettingsPage() {
   const canManageEnvironments = projectRole === 'owner' || projectRole === 'editor'
   const isMembersSection = selectedSection === SettingsSectionKey.Members
   const isEnvironmentsSection = selectedSection === SettingsSectionKey.Environments
+  const isShareSection = selectedSection === SettingsSectionKey.Share
   const currentSectionMeta = sectionMeta(selectedSection)
 
   const fetchData = useCallback(async () => {
@@ -180,11 +194,13 @@ export default function SettingsPage() {
 
     if (section === SettingsSectionKey.Environments) {
       setSelectedSection(SettingsSectionKey.Environments)
+
       return
     }
 
     if (section === SettingsSectionKey.ImportApi) {
       setSelectedSection(SettingsSectionKey.ImportApi)
+
       return
     }
 
@@ -237,7 +253,7 @@ export default function SettingsPage() {
                 {currentSectionMeta.description}
               </Typography.Paragraph>
             </div>
-            <Space size={8} wrap>
+            <Space wrap size={8}>
               <Tag bordered={false}>项目：{project?.name ?? '-'}</Tag>
               {projectRole ? <Tag color="blue">{roleText(projectRole)}</Tag> : <Tag>-</Tag>}
             </Space>
@@ -258,7 +274,11 @@ export default function SettingsPage() {
               ? (
                   <ProjectEnvironmentsPanel editable={canManageEnvironments} />
                 )
-              : <ApiTransferPanel />}
+              : isShareSection
+                ? (
+                    <ProjectSharePanel projectId={projectId ?? ''} />
+                  )
+                : <ApiTransferPanel />}
         </div>
       )}
     />
