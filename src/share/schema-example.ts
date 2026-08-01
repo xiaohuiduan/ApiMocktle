@@ -114,16 +114,64 @@ export interface SchemaRow {
   description?: string
 }
 
-function rowFromChild(name: string, child: unknown, required: boolean, baseName: string): SchemaRow {
-  const childObj = asRecord(child)
+/** 递归收集字段行：嵌套 object/array 展开为点号路径（args.q1、headers.Accept） */
+function appendRows(s: Record<string, unknown> | null, baseName: string, out: SchemaRow[]): void {
+  if (!s) {
+    return
+  }
 
-  return {
-    name: baseName ? `${baseName}.${name}` : name,
-    type: childObj && typeof childObj.type === 'string' ? childObj.type : 'any',
-    required,
-    description: childObj && typeof childObj.description === 'string'
-      ? childObj.description
-      : undefined,
+  const props = s.properties
+
+  if (Array.isArray(props)) {
+    // 内部格式：properties 为 [{ name, type, required, description }]
+    for (const item of props) {
+      const row = asRecord(item)
+
+      if (!row || typeof row.name !== 'string') {
+        continue
+      }
+
+      const childType = typeof row.type === 'string' ? row.type : 'any'
+      const fullName = baseName ? `${baseName}.${row.name}` : row.name
+
+      out.push({
+        name: fullName,
+        type: childType,
+        required: row.required === true,
+        description: typeof row.description === 'string' ? row.description : undefined,
+      })
+
+      if (childType === 'object' || childType === 'array') {
+        appendRows(row, childType === 'array' ? `${fullName}[]` : fullName, out)
+      }
+    }
+    return
+  }
+
+  const map = asRecord(props)
+
+  if (map) {
+    // 标准格式：properties 为对象 map
+    const required: string[] = Array.isArray(s.required) ? (s.required as string[]) : []
+
+    for (const [name, child] of Object.entries(map)) {
+      const childObj = asRecord(child)
+      const childType = childObj && typeof childObj.type === 'string' ? childObj.type : 'any'
+      const fullName = baseName ? `${baseName}.${name}` : name
+
+      out.push({
+        name: fullName,
+        type: childType,
+        required: required.includes(name),
+        description: childObj && typeof childObj.description === 'string'
+          ? childObj.description
+          : undefined,
+      })
+
+      if (childObj && (childType === 'object' || childType === 'array')) {
+        appendRows(childObj, childType === 'array' ? `${fullName}[]` : fullName, out)
+      }
+    }
   }
 }
 
@@ -134,47 +182,12 @@ export function schemaRows(schema: unknown, baseName = ''): SchemaRow[] {
     return []
   }
 
-  if (s.type === 'object') {
-    const props = s.properties
-
-    if (Array.isArray(props)) {
-      // 内部格式：properties 为 [{ name, type, required, description }]
-      const rows: SchemaRow[] = []
-
-      for (const item of props) {
-        const row = asRecord(item)
-
-        if (!row || typeof row.name !== 'string') {
-          continue
-        }
-
-        rows.push({
-          name: baseName ? `${baseName}.${row.name}` : row.name,
-          type: typeof row.type === 'string' ? row.type : 'any',
-          required: row.required === true,
-          description: typeof row.description === 'string' ? row.description : undefined,
-        })
-      }
-
-      return rows
-    }
-
-    const map = asRecord(props)
-
-    if (map) {
-      const required: string[] = Array.isArray(s.required) ? (s.required as string[]) : []
-
-      return Object.entries(map).map(([name, child]) => {
-        return rowFromChild(name, child, required.includes(name), baseName)
-      })
-    }
-
-    return []
-  }
-
   if (s.type === 'array' && s.items !== undefined) {
     return schemaRows(s.items, baseName ? `${baseName}[]` : '[]')
   }
 
-  return []
+  const rows: SchemaRow[] = []
+  appendRows(s, baseName, rows)
+
+  return rows
 }
