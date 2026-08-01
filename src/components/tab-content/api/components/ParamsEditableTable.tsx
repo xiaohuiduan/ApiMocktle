@@ -247,7 +247,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
           return (
             <ParamsEditableCell>
               <div className="flex items-center gap-1">
-                <span className="text-xs text-gray-400 truncate max-w-[100px]" title={record.filePath}>
+                <span className="text-xs text-[color:var(--color-text-secondary,#667085)] truncate max-w-[100px]" title={record.filePath}>
                   {record.filePath ? record.filePath.split(/[/\\]/).pop() : '未选择'}
                 </span>
                 <Button

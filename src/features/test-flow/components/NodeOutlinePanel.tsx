@@ -121,7 +121,7 @@ export default function NodeOutlinePanel() {
                 gap: 4,
               }}>
                 {NODE_TYPE_LABELS[type]}
-                <Badge count={items.length} size="small" style={{ backgroundColor: '#d9d9d9' }} />
+                <Badge count={items.length} size="small" style={{ backgroundColor: 'var(--ds-node-text-muted, #9ca3af)' }} />
               </div>
               {items.map((node) => {
                 const label = (node.data?.label as string) ?? node.id

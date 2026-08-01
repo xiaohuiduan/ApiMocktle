@@ -189,7 +189,7 @@ function TabItem({
             cursor: 'pointer',
           }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0,0,0,0.06)'
+            (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--color-bg-hover, #eef0f4)'
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'

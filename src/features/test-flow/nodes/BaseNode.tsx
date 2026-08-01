@@ -17,21 +17,9 @@ import {
 } from 'lucide-react'
 import { useDesignStyle } from '@/hooks/useDesignStyle'
 import { FlowNodeType, type NodeExecStatus, type HandleSpec } from '../types/flow.types'
+import { NODE_TYPE_COLORS } from './nodeColors'
 
-// ==================== 颜色映射 ====================
-
-const NODE_COLORS: Record<string, string> = {
-  [FlowNodeType.Start]: '#6b7280',       // gray-500
-  [FlowNodeType.End]: '#6b7280',         // gray-500
-  [FlowNodeType.HttpRequest]: '#3b82f6', // blue-500
-  [FlowNodeType.Condition]: '#f97316',   // orange-500
-  [FlowNodeType.Loop]: '#a855f7',        // purple-500
-  [FlowNodeType.Parallel]: '#14b8a6',    // teal-500
-  [FlowNodeType.Wait]: '#eab308',        // yellow-500
-  [FlowNodeType.SubFlow]: '#6366f1',     // indigo-500
-  [FlowNodeType.SetVariable]: '#22c55e', // green-500
-  [FlowNodeType.Assert]: '#ef4444',      // red-500
-}
+// ==================== 节点类型颜色映射（单源：nodes/nodeColors.ts） ====================
 
 // ==================== 图标映射 ====================
 
@@ -48,15 +36,15 @@ const NODE_ICONS: Record<string, LucideIcon> = {
   [FlowNodeType.Assert]: ShieldCheck,
 }
 
-// ==================== 状态颜色映射 ====================
+// ==================== 状态颜色映射（跟随主题，接入 --ds-* 变量） ====================
 
 const STATUS_COLORS: Record<NodeExecStatus, string> = {
   idle: '',
-  running: '#3b82f6',
-  passed: '#22c55e',
-  failed: '#ef4444',
-  skipped: '#9ca3af',
-  error: '#ef4444',
+  running: 'var(--ds-highlight-selected, #3b82f6)',
+  passed: 'var(--ds-success-color, #22c55e)',
+  failed: 'var(--ds-error-color, #ef4444)',
+  skipped: 'var(--ds-node-text-muted, #9ca3af)',
+  error: 'var(--ds-error-color, #ef4444)',
 }
 
 const STATUS_LABELS: Record<NodeExecStatus, string> = {
@@ -222,7 +210,7 @@ function BaseNodeInner({
   const execStatus = data.execStatus as NodeExecStatus | undefined
   const execError = data.execError as string | undefined
   const execDurationMs = data.execDurationMs as number | undefined
-  const color = NODE_COLORS[type] ?? token.colorPrimary
+  const color = NODE_TYPE_COLORS[type as FlowNodeType] ?? token.colorPrimary
   const Icon = NODE_ICONS[type] ?? Globe
 
   // 设计风格签名效果类

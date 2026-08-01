@@ -18,6 +18,7 @@ import '@xyflow/react/dist/style.css'
 import { useFlowStore } from '../store/useFlowStore'
 import { getNodeTypes, getDefaultNodeData } from '../nodes/nodeRegistry'
 import { FlowNodeType, type FlowNode, type FlowEdge } from '../types/flow.types'
+import { NODE_TYPE_COLORS } from '../nodes/nodeColors'
 import { FlowInstanceContext, globalFlowInstanceRef } from '../contexts/FlowInstanceContext'
 import { usePathHighlightContext } from '../contexts/PathHighlightContext'
 import { useDesignStyle } from '@/hooks/useDesignStyle'
@@ -93,7 +94,7 @@ function FlowCanvasInner() {
     const mutedColor = getCssVar('--ds-node-text-muted', '#9ca3af')
     const successColor = getCssVar('--ds-success-color', '#22c55e')
     const errorColor = getCssVar('--ds-error-color', '#ef4444')
-    const loopColor = '#a855f7'
+    const loopColor = NODE_TYPE_COLORS[FlowNodeType.Loop]
     for (const node of nodes) {
       const d = node.data as Record<string, unknown>
       if (node.type === 'condition') {

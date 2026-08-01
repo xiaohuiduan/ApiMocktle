@@ -1,5 +1,6 @@
 import { Tag, Typography } from 'antd'
-import { FlowNodeType } from '../../types/flow.types'
+import { FlowNodeType, NODE_TYPE_LABELS } from '../../types/flow.types'
+import { NODE_TYPE_COLORS } from '../../nodes/nodeColors'
 import {
   PlayCircleOutlined,
   StopOutlined,
@@ -14,36 +15,6 @@ import {
 } from '@ant-design/icons'
 
 const { Text } = Typography
-
-// ==================== 节点类型标签映射 ====================
-
-const NODE_TYPE_LABELS: Record<string, string> = {
-  start: '开始节点',
-  end: '结束节点',
-  httpRequest: 'HTTP 请求',
-  condition: '条件判断',
-  loop: '循环',
-  parallel: '并行',
-  wait: '等待',
-  subFlow: '子流程',
-  setVariable: '变量赋值',
-  assert: '断言',
-}
-
-// ==================== 节点类型颜色映射 ====================
-
-const NODE_TYPE_COLORS: Record<string, string> = {
-  start: '#6b7280',
-  end: '#6b7280',
-  httpRequest: '#3b82f6',
-  condition: '#f97316',
-  loop: '#a855f7',
-  parallel: '#14b8a6',
-  wait: '#eab308',
-  subFlow: '#6366f1',
-  setVariable: '#22c55e',
-  assert: '#ef4444',
-}
 
 // ==================== 节点类型图标映射 ====================
 
@@ -70,8 +41,8 @@ interface TypeHeaderProps {
 // ==================== 组件 ====================
 
 export default function TypeHeader({ nodeType, nodeId }: TypeHeaderProps) {
-  const label = NODE_TYPE_LABELS[nodeType] || nodeType
-  const color = NODE_TYPE_COLORS[nodeType] || '#3b82f6'
+  const label = NODE_TYPE_LABELS[nodeType]
+  const color = NODE_TYPE_COLORS[nodeType]
   const icon = NODE_TYPE_ICONS[nodeType] || null
 
   return (

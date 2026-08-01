@@ -56,7 +56,7 @@ export default function AssertNodePanel({ data, onChange }: PanelProps<AssertNod
               folding: true,
             }}
           />
-          <Text type="secondary" className="block text-xs mt-2" style={{ color: '#94a3b8' }}>
+          <Text type="secondary" className="block text-xs mt-2" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }}>
             示例: pm.test('token已获取', () =&gt; {'{'} pm.expect(variables.token).toBeDefined() {'}'})
           </Text>
         </div>

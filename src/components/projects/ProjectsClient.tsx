@@ -341,11 +341,11 @@ export function ProjectsClient() {
 
             const cardBaseStyle: React.CSSProperties = isGlassStyle
               ? {
-                  backgroundColor: `color-mix(in srgb, ${iconColor} 10%, rgba(255,255,255,0.1))`,
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                  backgroundColor: `color-mix(in srgb, ${iconColor} 10%, var(--ds-node-bg, rgba(255,255,255,0.1)))`,
+                  backdropFilter: `blur(var(--ds-blur, 20px)) saturate(var(--ds-saturate, 150%))`,
+                  WebkitBackdropFilter: `blur(var(--ds-blur, 20px)) saturate(var(--ds-saturate, 150%))`,
+                  border: 'var(--ds-border-subtle, 1px solid rgba(255,255,255,0.2))',
+                  boxShadow: 'var(--ds-shadow-md, 0 4px 16px rgba(0,0,0,0.06))',
                 }
               : isNeumorphism
                 ? {

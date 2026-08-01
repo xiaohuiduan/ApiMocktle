@@ -91,7 +91,7 @@ export function ProjectQuickSwitch() {
       key: project.id,
       label: (
         <div className="flex min-w-[240px] items-center gap-3 py-1">
-          <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-black/5 text-xs font-semibold">
+          <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-[color:var(--color-bg-hover,#eef0f4)] text-xs font-semibold">
             {getProjectMark(project.name)}
           </span>
           <div className="min-w-0 flex-1">
