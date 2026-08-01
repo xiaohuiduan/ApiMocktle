@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
 
 use crate::db::client::Db;
@@ -120,27 +121,112 @@ pub async fn save_share_server_config(
     Ok(ApiResult::success(()))
 }
 
-/// IPv6 链路本地地址（fe80::/10）无 zone 不可直接访问，过滤掉
-fn is_link_local(ip: &std::net::IpAddr) -> bool {
+/// 常见的虚拟网卡关键字（VMware/VirtualBox/Hyper-V/Docker/WSL 等）
+const VIRTUAL_IFACE_KEYWORDS: [&str; 9] = [
+    "vmware", "virtualbox", "hyper-v", "hyperv", "vethernet", "wsl", "docker", "vmnet",
+    "tailscale",
+];
+
+/// IPv4 是否属于私网段（10/8、172.16/12、192.168/16）
+fn is_private_v4(ip: &std::net::Ipv4Addr) -> bool {
+    let o = ip.octets();
+    o[0] == 10
+        || (o[0] == 172 && (16..=31).contains(&o[1]))
+        || (o[0] == 192 && o[1] == 168)
+}
+
+/// 过滤对局域网分享无用的地址：
+/// - 虚拟网卡（按网卡名关键字）
+/// - 链路本地（169.254/16、fe80::/10，无 DHCP 自动地址，局域网不可达）
+/// - Benchmark 测试网段（198.18/15，代理虚拟网卡常用）
+/// - Docker 默认网桥（172.17/16）
+/// - 非私网 IPv4（公网地址不是本机局域网入口）
+fn is_useful_lan_ip(name: &str, ip: &std::net::IpAddr) -> bool {
+    if ip.is_loopback() {
+        return false;
+    }
+    let lower = name.to_lowercase();
+    if VIRTUAL_IFACE_KEYWORDS.iter().any(|k| lower.contains(k)) {
+        return false;
+    }
     match ip {
-        std::net::IpAddr::V6(v6) => v6.segments()[0] == 0xfe80,
-        _ => false,
+        std::net::IpAddr::V4(v4) => {
+            let o = v4.octets();
+            if o[0] == 169 && o[1] == 254 {
+                return false;
+            }
+            if o[0] == 198 && (o[1] == 18 || o[1] == 19) {
+                return false;
+            }
+            if o[0] == 172 && o[1] == 17 {
+                return false;
+            }
+            is_private_v4(v4)
+        }
+        std::net::IpAddr::V6(v6) => v6.segments()[0] != 0xfe80,
     }
 }
 
-/// 本机局域网 IP 列表（用于展示访问地址）
+/// 排序：IPv4 私网优先（更可能是真实局域网入口）
+fn lan_ip_sort_key(ip: &str) -> (u8, String) {
+    if ip.parse::<std::net::Ipv4Addr>().is_ok() {
+        (0, ip.to_string())
+    }
+    else {
+        (1, ip.to_string())
+    }
+}
+
+/// 本机局域网 IP 列表（用于展示访问地址，已过滤虚拟网卡与不可达地址）
 #[tauri::command]
 pub async fn get_lan_ip() -> Result<ApiResult<Vec<String>>, String> {
-    let ips = match local_ip_address::list_afinet_netifas() {
+    let mut ips: Vec<String> = match local_ip_address::list_afinet_netifas() {
         Ok(ifas) => ifas
             .into_iter()
-            .filter(|(_, ip)| !ip.is_loopback() && !is_link_local(ip))
+            .filter(|(name, ip)| is_useful_lan_ip(name, ip))
             .map(|(_, ip)| ip.to_string())
             .collect(),
         Err(_) => Vec::new(),
     };
+    ips.sort_by_key(|ip| lan_ip_sort_key(ip));
 
     Ok(ApiResult::success(ips))
 }
 
-use serde::{Deserialize, Serialize};
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_lan_ips() {
+        use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+        let cases = [
+            // (网卡名, IP, 期望结果)
+            ("以太网", IpAddr::V4(Ipv4Addr::new(192, 168, 1, 5)), true),
+            ("WLAN", IpAddr::V4(Ipv4Addr::new(10, 142, 124, 97)), true),
+            ("Ethernet", IpAddr::V4(Ipv4Addr::new(172, 20, 10, 1)), true),
+            // APIPA 链路本地
+            ("以太网", IpAddr::V4(Ipv4Addr::new(169, 254, 219, 241)), false),
+            // Benchmark 网段（代理虚拟网卡）
+            ("Loopback Pseudo-Interface", IpAddr::V4(Ipv4Addr::new(198, 18, 0, 1)), false),
+            // Docker 网桥
+            ("vEthernet (Docker)", IpAddr::V4(Ipv4Addr::new(172, 17, 144, 1)), false),
+            // Hyper-V 虚拟交换机
+            ("vEthernet (Default Switch)", IpAddr::V4(Ipv4Addr::new(192, 168, 221, 1)), false),
+            // VMware
+            ("VMware Network Adapter VMnet1", IpAddr::V4(Ipv4Addr::new(192, 168, 233, 1)), false),
+            // IPv6 链路本地
+            ("以太网", IpAddr::V6(Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1)), false),
+            // IPv6 ULA
+            ("以太网", IpAddr::V6(Ipv6Addr::new(0xfd00, 0, 0, 0, 0, 0, 0, 1)), true),
+            // loopback
+            ("Loopback Pseudo-Interface", IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), false),
+        ];
+
+        for (name, ip, expected) in cases {
+            let got = is_useful_lan_ip(name, &ip);
+            assert_eq!(got, expected, "网卡 {} 的 {} 过滤结果应为 {expected}", name, ip);
+        }
+    }
+}
