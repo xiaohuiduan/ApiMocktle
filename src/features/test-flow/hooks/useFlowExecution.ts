@@ -1135,7 +1135,9 @@ export function useFlowExecution() {
       updateState({ currentNodeId: currentNode.id })
 
       if (result.error || !result.handleId) {
-        // 快速失败：标记后续所有未执行节点为 skipped
+        // 用户中止：立即停止，不标记 skipped
+        if (abortRef.current) break
+        // 快速失败：标记后续所有未执行节点为 skipped 并停止
         if (failFast && result.error) {
           const failedId = currentNode.id
           const failedName = (currentNode.data as Record<string, unknown>)?.label as string || failedId
@@ -1148,8 +1150,15 @@ export function useFlowExecution() {
               logs = addLog(logs, n.id, (n.data as Record<string, unknown>)?.label as string || n.id, n.type as FlowNodeType, 'skipped', reason)
             }
           }
+          break
         }
-        break
+        // 节点无出口：流程到头，停止
+        if (!result.handleId) break
+        // 未开启快速失败：记录失败后继续执行后续节点
+        const nextNodes = getNextNodes(currentNode.id)
+        if (nextNodes.length === 0) break
+        currentNode = nextNodes[0] // 简单取第一个后继
+        continue
       }
 
       const nextNodes = getNextNodes(currentNode.id, result.handleId)
