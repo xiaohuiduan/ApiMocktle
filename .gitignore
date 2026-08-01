@@ -61,6 +61,7 @@ runtime/
 
 # Rust build output
 src-tauri/target/
+src-tauri/target-test/
 
 # Electron/Tauri release output
 /release/
