@@ -135,7 +135,7 @@ function ShareLogin({
       <Card className="w-96">
         <div className="mb-4 flex flex-col items-center gap-2">
           <LockKeyhole className="text-blue-500" size={36} />
-          <Title className="!mb-0" level={4}>接口文档分享</Title>
+          <Title className="!my-0" level={4}>接口文档分享</Title>
           <Text type="secondary">该分享已设置密码保护</Text>
         </div>
         <Input.Password
@@ -336,7 +336,7 @@ export function ShareApp() {
     <Layout className="h-full">
       <Header className="flex items-center gap-3 border-b border-gray-200 bg-white !px-4" style={{ height: 48, lineHeight: '48px' }}>
         <Globe2 className="text-blue-500" size={18} />
-        <Title className="!mb-0" level={5}>
+        <Title className="!my-0" level={5}>
           {menu?.project.name ?? menu?.title ?? '接口文档分享'}
         </Title>
         {menu?.title && menu.title !== menu.project.name && (

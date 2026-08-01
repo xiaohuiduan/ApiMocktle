@@ -1,7 +1,7 @@
 import type { Config } from 'tailwindcss'
 
 export default {
-  content: ['./src/{app,components}/**/*.{js,jsx,ts,tsx}'],
+  content: ['./src/{app,components,share}/**/*.{js,jsx,ts,tsx}'],
 
   // dark:* 变体跟随 App 主题（html[theme="darkDefault"]），而非 OS prefers-color-scheme
   darkMode: ['selector', '[theme="darkDefault"]'],

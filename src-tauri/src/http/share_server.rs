@@ -3,13 +3,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use tokio::sync::Mutex;
 use tower_http::services::{ServeDir, ServeFile};
+use tower_http::set_header::SetResponseHeaderLayer;
 use uuid::Uuid;
 
 use crate::db::client::Db;
@@ -354,11 +355,21 @@ fn build_router(state: AppState) -> Router {
         .route("/api/share/overview", get(handle_overview))
         .fallback(get(handle_not_found));
 
-    // 静态入口：share.html 存在则直接服务，否则返回构建提示
+    // 静态入口：share.html 存在则直接服务，否则返回构建提示。
+    // HTML 加 no-cache：hash 文件名资源可长缓存，但入口 HTML 每次都要重新验证，
+    // 否则浏览器启发式缓存旧 HTML 会引用已不存在的旧 hash 资源（样式全丢）。
     if let Some(dir) = &state.dist_dir {
         let share_html = dir.join("share.html");
         if share_html.exists() {
-            router = router.route_service("/", ServeFile::new(share_html));
+            router = router.route_service(
+                "/",
+                tower::ServiceBuilder::new()
+                    .layer(SetResponseHeaderLayer::overriding(
+                        header::CACHE_CONTROL,
+                        HeaderValue::from_static("no-cache"),
+                    ))
+                    .service(ServeFile::new(share_html)),
+            );
             return router.with_state(state);
         }
     }

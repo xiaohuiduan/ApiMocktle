@@ -157,7 +157,7 @@ export function ApiDetailView({ data }: { data: unknown }) {
     <div className="space-y-4 p-4">
       <div className="flex items-center gap-3">
         {details.method && <MethodBadge method={details.method} />}
-        <Title className="!mb-0 font-mono" level={4}>{details.path ?? details.name ?? '未命名接口'}</Title>
+        <Title className="!my-0 font-mono" level={4}>{details.path ?? details.name ?? '未命名接口'}</Title>
       </div>
 
       {details.name && details.path !== details.name && (
