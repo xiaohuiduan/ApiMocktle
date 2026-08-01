@@ -5,6 +5,21 @@ import { ApiDetailView } from './ApiDetailView'
 import { DocView } from './DocView'
 import { SchemaView } from './SchemaView'
 
+// antd Table 的响应式监听依赖 matchMedia，jsdom 缺失需要 stub
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    dispatchEvent: () => false,
+  }),
+})
+
 const apiDetailData = {
   method: 'GET',
   path: '/pet/{petId}',
@@ -100,8 +115,9 @@ describe('share 只读视图渲染', () => {
     // 表格字段
     expect(screen.getByText('name')).toBeTruthy()
     expect(screen.getByText('tag')).toBeTruthy()
-    // 嵌套字段递归展开
-    expect(screen.getByText('data.id')).toBeTruthy()
+    // 嵌套字段树形展开（子行短名；data 在请求体与响应各出现一次）
+    expect(screen.getAllByText('data').length).toBeGreaterThan(0)
+    expect(screen.getByText('id')).toBeTruthy()
     // 示例 JSON 含字段值而非空对象
     expect(screen.getByText(/"name": "string"/)).toBeTruthy()
     expect(screen.getByText(/"code": 0/)).toBeTruthy()

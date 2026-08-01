@@ -114,6 +114,103 @@ export interface SchemaRow {
   description?: string
 }
 
+/** 树形展开节点：嵌套 object/array 子字段在 children 中，缩进展示层级 */
+export interface SchemaTreeNode {
+  name: string
+  type: string
+  required: boolean
+  description?: string
+  children?: SchemaTreeNode[]
+}
+
+/** 构建字段树：嵌套 object/array 递归为 children（name 用短名，层级靠缩进表达） */
+function buildTree(s: Record<string, unknown> | null): SchemaTreeNode[] {
+  if (!s) {
+    return []
+  }
+
+  const props = s.properties
+  const rows: SchemaTreeNode[] = []
+
+  if (Array.isArray(props)) {
+    // 内部格式：properties 为 [{ name, type, required, description }]
+    for (const item of props) {
+      const row = asRecord(item)
+
+      if (!row || typeof row.name !== 'string') {
+        continue
+      }
+
+      const childType = typeof row.type === 'string' ? row.type : 'any'
+      const node: SchemaTreeNode = {
+        name: row.name,
+        type: childType,
+        required: row.required === true,
+        description: typeof row.description === 'string' ? row.description : undefined,
+      }
+
+      if (childType === 'object' || childType === 'array') {
+        const children = buildTree(row)
+
+        if (children.length > 0) {
+          node.children = children
+        }
+      }
+
+      rows.push(node)
+    }
+
+    return rows
+  }
+
+  const map = asRecord(props)
+
+  if (map) {
+    // 标准格式：properties 为对象 map
+    const required: string[] = Array.isArray(s.required) ? (s.required as string[]) : []
+
+    for (const [name, child] of Object.entries(map)) {
+      const childObj = asRecord(child)
+      const childType = childObj && typeof childObj.type === 'string' ? childObj.type : 'any'
+      const node: SchemaTreeNode = {
+        name,
+        type: childType,
+        required: required.includes(name),
+        description: childObj && typeof childObj.description === 'string'
+          ? childObj.description
+          : undefined,
+      }
+
+      if (childObj && (childType === 'object' || childType === 'array')) {
+        const children = buildTree(childObj)
+
+        if (children.length > 0) {
+          node.children = children
+        }
+      }
+
+      rows.push(node)
+    }
+  }
+
+  return rows
+}
+
+/** 字段树（供表格展开渲染）；顶层数组直接展开 items */
+export function schemaTree(schema: unknown): SchemaTreeNode[] {
+  const s = asRecord(schema)
+
+  if (!s) {
+    return []
+  }
+
+  if (s.type === 'array' && s.items !== undefined) {
+    return buildTree(asRecord(s.items))
+  }
+
+  return buildTree(s)
+}
+
 /** 递归收集字段行：嵌套 object/array 展开为点号路径（args.q1、headers.Accept） */
 function appendRows(s: Record<string, unknown> | null, baseName: string, out: SchemaRow[]): void {
   if (!s) {
@@ -145,6 +242,7 @@ function appendRows(s: Record<string, unknown> | null, baseName: string, out: Sc
         appendRows(row, childType === 'array' ? `${fullName}[]` : fullName, out)
       }
     }
+
     return
   }
 

@@ -337,9 +337,11 @@ export function ShareApp() {
       <Header className="flex items-center gap-3 border-b border-gray-200 bg-white !px-4" style={{ height: 48, lineHeight: '48px' }}>
         <Globe2 className="text-blue-500" size={18} />
         <Title className="!mb-0" level={5}>
-          {menu?.title ?? menu?.project.name ?? '接口文档分享'}
+          {menu?.project.name ?? menu?.title ?? '接口文档分享'}
         </Title>
-        <Text className="truncate" type="secondary">{menu?.project.name}</Text>
+        {menu?.title && menu.title !== menu.project.name && (
+          <Text className="truncate text-xs" type="secondary">{menu.title}</Text>
+        )}
         <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
           {overview && (
             <>

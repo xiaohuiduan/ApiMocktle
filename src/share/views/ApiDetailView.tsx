@@ -1,7 +1,7 @@
-import { Card, Descriptions, Tag, Typography } from 'antd'
+import { Card, Descriptions, Table, Tag, Typography } from 'antd'
 import { FileJson2 } from 'lucide-react'
 
-import { schemaExample, schemaRows } from '../schema-example'
+import { schemaExample, schemaTree, type SchemaTreeNode } from '../schema-example'
 
 import { MethodBadge } from './MethodBadge'
 
@@ -33,35 +33,45 @@ function SchemaSection({ title, schema }: SchemaSectionProps) {
     return null
   }
 
-  const rows = schemaRows(schema)
+  const treeData = schemaTree(schema)
   const example = schemaExample(schema)
 
   return (
     <div className="mt-3">
       <Title className="!mt-0" level={5}>{title}</Title>
-      {rows.length > 0 && (
-        <table className="mb-2 w-full border-collapse text-xs">
-          <thead>
-            <tr>
-              <th className="border border-gray-200 bg-gray-50 p-2 text-left">字段</th>
-              <th className="border border-gray-200 bg-gray-50 p-2 text-left">类型</th>
-              <th className="border border-gray-200 bg-gray-50 p-2 text-left">必填</th>
-              <th className="border border-gray-200 bg-gray-50 p-2 text-left">说明</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.name}>
-                <td className="border border-gray-200 p-2 font-mono">{row.name}</td>
-                <td className="border border-gray-200 p-2 font-mono">{row.type}</td>
-                <td className="border border-gray-200 p-2">
-                  {row.required ? <Tag color="red">必填</Tag> : <Tag>可选</Tag>}
-                </td>
-                <td className="border border-gray-200 p-2">{row.description ?? '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {treeData.length > 0 && (
+        <Table<SchemaTreeNode>
+          className="mb-2"
+          columns={[
+            {
+              title: '字段',
+              dataIndex: 'name',
+              render: (value: string) => <span className="font-mono">{value}</span>,
+            },
+            {
+              title: '类型',
+              dataIndex: 'type',
+              width: 140,
+              render: (value: string) => <span className="font-mono">{value}</span>,
+            },
+            {
+              title: '必填',
+              dataIndex: 'required',
+              width: 80,
+              render: (value: boolean) => (value ? <Tag color="red">必填</Tag> : <Tag>可选</Tag>),
+            },
+            {
+              title: '说明',
+              dataIndex: 'description',
+              render: (value?: string) => value ?? '-',
+            },
+          ]}
+          dataSource={treeData}
+          expandable={{ defaultExpandAllRows: true }}
+          pagination={false}
+          rowKey={(row) => row.name}
+          size="small"
+        />
       )}
       <div className="flex items-center gap-1 text-xs text-gray-500">
         <FileJson2 size={14} />
