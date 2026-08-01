@@ -82,16 +82,16 @@ export function MarkdownDiffView({ leftText, rightText, leftTitle, rightTitle }:
       {rows.map((row, idx) => {
         const text = side === 'left' ? row.left : row.right
         if (text === undefined) {
-          return <div key={idx} style={{ height: 20, backgroundColor: '#fafafa' }} />
+          return <div key={idx} style={{ height: 20, backgroundColor: 'var(--ds-bg-elevated, #fafafa)' }} />
         }
         const bg = row.type === 'same'
           ? 'transparent'
           : row.type === 'removed'
-            ? 'rgba(255, 0, 0, 0.08)'
-            : 'rgba(0, 180, 0, 0.08)'
-        const color = row.type === 'removed' ? '#c0392b' : row.type === 'added' ? '#1e8449' : undefined
+            ? 'color-mix(in srgb, var(--ds-error-color, #ef4444) 10%, transparent)'
+            : 'color-mix(in srgb, var(--ds-success-color, #22c55e) 10%, transparent)'
+        const color = row.type === 'removed' ? 'var(--ds-error-color, #c0392b)' : row.type === 'added' ? 'var(--ds-success-color, #1e8449)' : undefined
         return (
-          <div key={idx} style={{ backgroundColor: bg, color, padding: '0 8px', whiteSpace: 'pre', borderBottom: '1px solid #f0f0f0' }}>
+          <div key={idx} style={{ backgroundColor: bg, color, padding: '0 8px', whiteSpace: 'pre', borderBottom: '1px solid var(--ds-divider-color, #f0f0f0)' }}>
             {text || ' '}
           </div>
         )

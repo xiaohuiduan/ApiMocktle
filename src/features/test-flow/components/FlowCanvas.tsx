@@ -20,6 +20,7 @@ import { getNodeTypes, getDefaultNodeData } from '../nodes/nodeRegistry'
 import { FlowNodeType, type FlowNode, type FlowEdge } from '../types/flow.types'
 import { FlowInstanceContext, globalFlowInstanceRef } from '../contexts/FlowInstanceContext'
 import { usePathHighlightContext } from '../contexts/PathHighlightContext'
+import { useDesignStyle } from '@/hooks/useDesignStyle'
 
 /** 读取 html 元素上的 CSS 变量值 */
 function getCssVar(name: string, fallback: string): string {
@@ -33,6 +34,8 @@ function FlowCanvasInner() {
   const reactFlow = useReactFlow()
   const { screenToFlowPosition } = reactFlow
   const { flowInstanceRef } = useContext(FlowInstanceContext)
+  // 设计风格（依赖它刷新 CSS 变量读取结果，主题切换后边色/标签色即时更新）
+  const { designStyle } = useDesignStyle()
 
   // 暴露 ReactFlow 实例给外部
   useEffect(() => {
@@ -81,7 +84,7 @@ function FlowCanvasInner() {
       animated: false,
       markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor, width: 20, height: 20 },
     }
-  }, [])
+  }, [designStyle])
 
   // 节点的 handle 标签映射（用于连线标注）
   const nodeHandleLabels: Record<string, Record<string, { label: string; color: string }>> = useMemo(() => {
@@ -114,7 +117,7 @@ function FlowCanvasInner() {
       }
     }
     return map
-  }, [nodes])
+  }, [nodes, designStyle])
 
   // 为边注入选中状态样式 + 连线标签 + 路径高亮
   const edgesWithSelection = useMemo(() => {
@@ -165,7 +168,7 @@ function FlowCanvasInner() {
       }
     })
   },
-    [edges, selectedEdgeId, nodeHandleLabels, activeNodeId, upstreamEdgeIds, downstreamEdgeIds, isLocked],
+    [edges, selectedEdgeId, nodeHandleLabels, activeNodeId, upstreamEdgeIds, downstreamEdgeIds, isLocked, designStyle],
   )
 
   // 节点注入选中状态 + 路径高亮 className
@@ -322,9 +325,6 @@ function FlowCanvasInner() {
     const el = canvasRef.current
     if (!el) return
 
-    const rect = el.getBoundingClientRect()
-    console.log('[FlowCanvas] 画布尺寸:', { width: rect.width, height: rect.height, top: rect.top, left: rect.left })
-
     const handleMouseUp = (e: MouseEvent) => {
       const draggingType = (window as any).__DRAG_NODE_TYPE__ as string | undefined
       delete (window as any).__DRAG_NODE_TYPE__  // 读取后立即清理，防止重复放置
@@ -333,14 +333,10 @@ function FlowCanvasInner() {
       // 检查鼠标是否在画布区域内
       const r = el.getBoundingClientRect()
       if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) {
-        console.log('[MouseUp] 鼠标不在画布区域内，跳过')
         return
       }
 
-      console.log('[MouseUp] 在画布中放下节点! nodeType:', draggingType, 'clientX:', e.clientX, 'clientY:', e.clientY)
-
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY })
-      console.log('[MouseUp] 画布坐标:', position)
 
       const defaultData = getDefaultNodeData(draggingType as FlowNodeType)
       const newNode: FlowNode = {
@@ -350,9 +346,7 @@ function FlowCanvasInner() {
         data: defaultData,
       } as FlowNode
 
-      console.log('[MouseUp] 创建节点:', newNode)
       addNode(newNode)
-      console.log('[MouseUp] 当前节点数:', useFlowStore.getState().nodes.length)
     }
 
     window.addEventListener('mouseup', handleMouseUp)
@@ -362,7 +356,12 @@ function FlowCanvasInner() {
   return (
     <div
       ref={canvasRef}
-      style={{ width: '100%', height: '100%' }}
+      style={{
+        width: '100%',
+        height: '100%',
+        // 画布背景跟随设计风格（玻璃/拟物/新拟态各有专属背景与渐变素材）
+        background: 'var(--ds-canvas-bg, #fafafa)',
+      }}
       data-testid="flow-canvas"
     >
       {/* 节点高亮样式 */}
@@ -372,11 +371,37 @@ function FlowCanvasInner() {
           border-radius: 8px;
         }
         @keyframes node-running-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-          50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+          0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ds-highlight-selected, #3b82f6) 40%, transparent); }
+          50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--ds-highlight-selected, #3b82f6) 0%, transparent); }
         }
         .react-flow__node[data-exec-status="running"] {
           animation: node-running-pulse 1.5s ease-in-out infinite;
+          border-radius: 8px;
+        }
+        /* 控件条（缩放/适应视图）跟随主题 */
+        .react-flow__controls {
+          background: var(--ds-panel-bg, #fafafa);
+          border: var(--ds-border, none);
+          box-shadow: var(--ds-shadow-sm, 0 1px 3px rgba(0,0,0,0.1));
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        .react-flow__controls-button {
+          background: var(--ds-node-bg, #fff);
+          border-bottom: 1px solid var(--ds-divider-color, #e5e7eb);
+          color: var(--ds-node-text-primary, #1f2937);
+          fill: var(--ds-node-text-primary, #1f2937);
+        }
+        .react-flow__controls-button:hover {
+          background: var(--ds-bg-elevated, #f8fafc);
+        }
+        .react-flow__controls-button:last-child {
+          border-bottom: none;
+        }
+        /* 小地图遮罩与背景跟随主题 */
+        .react-flow__minimap {
+          background: var(--ds-panel-bg, #fafafa);
+          border: var(--ds-border, none);
           border-radius: 8px;
         }
         .react-flow__node[data-exec-status="passed"] {
@@ -440,8 +465,10 @@ function FlowCanvasInner() {
         edgesReconnectable
         fitView
       >
-        <Background gap={16} size={1} />
+        <Background gap={16} size={1} color="var(--ds-canvas-dot, rgba(0, 0, 0, 0.08))" />
         <MiniMap
+          style={{ background: 'var(--ds-panel-bg, #fafafa)' }}
+          maskColor="var(--ds-bg-overlay, rgba(0, 0, 0, 0.2))"
           nodeColor={(node) => {
             if (!activeNodeId) return getCssVar('--ds-node-border-color', '#ddd')
             if (node.id === activeNodeId) return getCssVar('--ds-highlight-selected', '#3b82f6')

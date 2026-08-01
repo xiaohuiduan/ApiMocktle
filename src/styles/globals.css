@@ -116,6 +116,12 @@
   color-scheme: dark;
 }
 
+/* 页面兜底背景：跟随明暗主题（登录/注册等无主布局包裹的页面依赖此背景） */
+body {
+  background: var(--color-bg-panel, #ffffff);
+  color: var(--color-text-primary, #1d2939);
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

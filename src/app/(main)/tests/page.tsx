@@ -286,9 +286,9 @@ export default function TestTaskListPage() {
       <PanelGroup direction="horizontal" autoSaveId="tests-folder-sidebar">
         {/* Left: Folder sidebar */}
         <Panel defaultSize={20} minSize={15} maxSize={35}>
-          <div className="h-full border-r border-gray-200 bg-gray-50/50 flex flex-col">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
-              <span className="text-xs font-medium text-gray-500">文件夹</span>
+          <div className="h-full border-r border-[color:var(--ds-panel-border,#f0f0f0)] bg-[color:var(--ds-panel-bg,#fafafa)] flex flex-col">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--ds-divider-color,#e5e7eb)]">
+              <span className="text-xs font-medium text-[color:var(--ds-node-text-secondary,#6b7280)]">文件夹</span>
               <Button
                 type="text"
                 size="small"
@@ -300,25 +300,28 @@ export default function TestTaskListPage() {
               {menuItems.map((item) => {
                 const isFolder = item.key !== ALL_KEY && item.key !== DEFAULT_KEY
                 const isEditing = editingFolderId === item.key
+                const isSelected = selectedFolderKey === item.key
                 return (
                   <div
                     key={item.key}
                     className={`group flex items-center justify-between px-3 py-1.5 cursor-pointer text-sm transition-colors ${
-                      selectedFolderKey === item.key
-                        ? 'bg-blue-50 text-blue-600 font-medium'
-                        : 'text-gray-700 hover:bg-gray-100'
+                      isSelected ? 'font-medium' : 'hover:bg-[color:var(--ds-bg-elevated,#f8fafc)]'
                     }`}
+                    style={{
+                      background: isSelected ? 'var(--ds-highlight-selected, #3b82f6)' : undefined,
+                      color: isSelected ? '#fff' : 'var(--ds-node-text-primary, #1f2937)',
+                    }}
                     onClick={() => {
                       if (!isEditing) setSelectedFolderKey(item.key)
                     }}
                   >
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       {isFolder ? (
-                        <FolderOutlined className="text-yellow-500 text-xs shrink-0" />
+                        <FolderOutlined style={{ color: 'var(--ds-warning-color, #f59e0b)' }} className="text-xs shrink-0" />
                       ) : item.key === ALL_KEY ? (
                         <span className="text-xs shrink-0">📋</span>
                       ) : (
-                        <FolderOutlined className="text-gray-400 text-xs shrink-0" />
+                        <FolderOutlined style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} className="text-xs shrink-0" />
                       )}
                       {isEditing ? (
                         <Input
@@ -338,7 +341,7 @@ export default function TestTaskListPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-gray-400">{item.count}</span>
+                      <span className="text-[10px] text-[color:var(--ds-node-text-muted,#9ca3af)]">{item.count}</span>
                       {isFolder && !isEditing && (
                         <Dropdown menu={getFolderMenuItems(folders.find((f) => f.id === item.key)!)} trigger={['click']}>
                           <Button
@@ -358,7 +361,7 @@ export default function TestTaskListPage() {
           </div>
         </Panel>
 
-        <PanelResizeHandle className="w-px bg-gray-200 hover:bg-blue-400 transition-colors" />
+        <PanelResizeHandle className="w-px bg-[color:var(--ds-divider-color,#e5e7eb)] hover:bg-[color:var(--ds-highlight-selected,#3b82f6)] transition-colors" />
 
         {/* Right: Task table */}
         <Panel>

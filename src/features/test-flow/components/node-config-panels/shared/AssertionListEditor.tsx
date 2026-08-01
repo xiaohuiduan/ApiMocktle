@@ -108,7 +108,7 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
           {assertions.map((assertion, index) => (
             <div
               key={index}
-              className="p-2 border border-gray-200 rounded-md space-y-2 bg-gray-50"
+              className="p-2 border border-[color:var(--ds-node-border-color,#e5e7eb)] rounded-md space-y-2 bg-[color:var(--ds-node-bg-elevated,#f9fafb)]"
             >
               {/* 第一行：类型、路径 */}
               <Space.Compact block>
