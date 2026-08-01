@@ -2,6 +2,7 @@ import { Card, Descriptions, Tag, Typography } from 'antd'
 import { FileJson2 } from 'lucide-react'
 
 import { schemaExample, schemaRows } from '../schema-example'
+
 import { MethodBadge } from './MethodBadge'
 
 const { Paragraph, Title } = Typography

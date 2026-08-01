@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 
 import { ApiDetailView } from './ApiDetailView'
 import { DocView } from './DocView'
@@ -12,15 +12,9 @@ const apiDetailData = {
   description: '根据 ID 查询宠物信息',
   tags: ['宠物', '查询'],
   parameters: {
-    path: [
-      { id: 'p1', name: 'petId', type: 'integer', required: true, description: '宠物 ID', example: '1' },
-    ],
-    query: [
-      { id: 'q1', name: 'verbose', type: 'boolean', required: false, description: '是否返回详细信息', example: 'true' },
-    ],
-    header: [
-      { id: 'h1', name: 'X-Trace-Id', type: 'string', required: false, description: '链路追踪 ID', example: 'abc-123' },
-    ],
+    path: [{ id: 'p1', name: 'petId', type: 'integer', required: true, description: '宠物 ID', example: '1' }],
+    query: [{ id: 'q1', name: 'verbose', type: 'boolean', required: false, description: '是否返回详细信息', example: 'true' }],
+    header: [{ id: 'h1', name: 'X-Trace-Id', type: 'string', required: false, description: '链路追踪 ID', example: 'abc-123' }],
   },
   requestBody: { type: 'none' },
   responses: [

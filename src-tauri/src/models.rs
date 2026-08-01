@@ -205,6 +205,9 @@ pub struct ShareLink {
     pub api_menu_ids: Vec<String>,
     #[serde(rename = "passwordHash", skip_serializing)]
     pub password_hash: Option<String>,
+    /// 是否设置了访问密码（密码本身不暴露给前端）
+    #[serde(rename = "hasPassword", default)]
+    pub has_password: bool,
     #[serde(rename = "expiresAt")]
     pub expires_at: Option<String>,
     pub title: String,

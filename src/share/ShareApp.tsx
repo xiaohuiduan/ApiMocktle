@@ -10,6 +10,7 @@ import {
   clearToken,
   getToken,
   parseShareId,
+  parseSharePwd,
   setToken,
   shareApi,
   ShareApiError,
@@ -79,13 +80,16 @@ function TypeIcon({ type }: { type: string }) {
 function ShareLogin({
   shareId,
   onSuccess,
+  initialError,
 }: {
   shareId: string
   onSuccess: (menu: ShareMenuData, overview: ShareOverview) => void
+  /** 自动登录失败（如带密码链接密码错误）时预置的错误提示 */
+  initialError?: string
 }) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(initialError ?? '')
   const [messageApi, contextHolder] = message.useMessage()
 
   const handleLogin = async () => {
@@ -171,6 +175,7 @@ export function ShareApp() {
   const [detailLoading, setDetailLoading] = useState(false)
 
   const shareId = useMemo(() => parseShareId(), [])
+  const [autoLoginError, setAutoLoginError] = useState('')
 
   const loadMenu = useCallback((info: ShareMenuData, ov: ShareOverview) => {
     setMenu(info)
@@ -178,10 +183,43 @@ export function ShareApp() {
     setPhase('ready')
   }, [])
 
+  const autoLogin = useCallback(async (pwd: string, silentOn401 = false) => {
+    try {
+      const result = await shareApi.login(shareId, pwd)
+      setToken(result.token)
+      const [info, ov] = await Promise.all([shareApi.menu(), shareApi.overview()])
+      loadMenu(info, ov)
+    }
+    catch (e) {
+      clearToken()
+
+      // 静默模式（如无密码分享探测）：401 时不显示错误，直接落到密码页
+      if (silentOn401 && e instanceof ShareApiError && e.status === 401) {
+        setPhase('login')
+      }
+      else {
+        setAutoLoginError(e instanceof ShareApiError ? e.message : '自动登录失败，请手动输入密码')
+        setPhase('login')
+      }
+    }
+  }, [shareId, loadMenu])
+
   useEffect(() => {
     // 已有 token 则直接尝试恢复会话
     if (!getToken()) {
-      setPhase('login')
+      const pwd = parseSharePwd()
+
+      if (shareId && pwd) {
+        // 带密码链接（?pwd=xxx）：自动填充密码登录
+        void autoLogin(pwd)
+      }
+      else if (shareId) {
+        // 无密码参数：尝试空密码（无密码分享自动放行；有密码分享则静默落到密码页）
+        void autoLogin('', true)
+      }
+      else {
+        setPhase('login')
+      }
 
       return
     }
@@ -189,14 +227,37 @@ export function ShareApp() {
     shareApi
       .menu()
       .then(async (info) => {
+        // token 属于其他分享链接（URL 切换了分享 ID）→ 会话作废，重新走登录/自动登录
+        if (info.shareId !== shareId) {
+          clearToken()
+          const pwd = parseSharePwd()
+
+          if (shareId && pwd) {
+            void autoLogin(pwd)
+          }
+          else {
+            setPhase('login')
+          }
+
+          return
+        }
+
         const ov = await shareApi.overview()
         loadMenu(info, ov)
       })
       .catch(() => {
         clearToken()
-        setPhase('login')
+        // token 失效时若链接带 pwd，仍尝试自动登录
+        const pwd = parseSharePwd()
+
+        if (shareId && pwd) {
+          void autoLogin(pwd)
+        }
+        else {
+          setPhase('login')
+        }
       })
-  }, [loadMenu])
+  }, [loadMenu, autoLogin, shareId])
 
   const treeData = useMemo(() => (menu ? buildTree(menu.items) : []), [menu])
 
@@ -258,6 +319,7 @@ export function ShareApp() {
   if (phase === 'login') {
     return (
       <ShareLogin
+        initialError={autoLoginError}
         shareId={shareId}
         onSuccess={(info, ov) => {
           loadMenu(info, ov)

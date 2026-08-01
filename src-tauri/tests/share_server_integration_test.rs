@@ -311,6 +311,78 @@ async fn test_share_server_without_dist_shows_hint() {
 }
 
 #[tokio::test]
+async fn test_share_link_no_password_and_update() {
+    let (db, _project_id) = setup_db();
+
+    // 无密码分享（password_hash None）：任意密码均可登录，空密码也直接放行
+    let link = share_repo::create_share_link(&db, "p1", "u1", vec![], None, None, "").unwrap();
+    assert!(!link.has_password, "无密码分享 has_password 应为 false");
+
+    let (handle, port) = start_test_server(db.clone()).await;
+    let base = format!("http://127.0.0.1:{port}");
+    let client = reqwest::Client::new();
+
+    // 免密直接登录成功（任意密码都行）
+    let token = login(&client, &base, &link.id, "whatever").await;
+
+    // 编辑：设置密码 + 改标题 + 改范围
+    let password_hash = apimocktle_lib::services::crypto::hash_password("newpass").unwrap();
+    let updated = share_repo::update_share_link(
+        &db,
+        &link.id,
+        vec!["api1".to_string(), "doc1".to_string()],
+        Some(password_hash),
+        None,
+        "编辑后的标题",
+    )
+    .unwrap();
+    assert!(updated.has_password, "设置密码后 has_password 应为 true");
+    assert_eq!(updated.title, "编辑后的标题");
+    assert_eq!(updated.api_menu_ids.len(), 2);
+
+    // 旧 token 会话仍有效（会话只绑 share_id），菜单反映新范围
+    let resp = client
+        .get(format!("{base}/api/share/menu"))
+        .header("X-Share-Token", &token)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), reqwest::StatusCode::OK);
+    let menu_json: serde_json::Value = resp.json().await.unwrap();
+    let items = menu_json["data"]["items"].as_array().unwrap();
+    assert_eq!(items.len(), 2, "编辑后范围应为 api1 + doc1");
+
+    // 旧密码登录失败（此前无密码，现在任意密码都该失败？——设置了密码后必须用新密码）
+    let resp = client
+        .post(format!("{base}/api/share/login"))
+        .json(&serde_json::json!({ "shareId": link.id, "password": "whatever" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), reqwest::StatusCode::UNAUTHORIZED, "设密码后旧口令应失效");
+
+    // 新密码登录成功
+    let _new_token = login(&client, &base, &link.id, "newpass").await;
+
+    // 编辑：移除密码
+    let updated2 = share_repo::update_share_link(
+        &db,
+        &link.id,
+        vec![],
+        None,
+        None,
+        "编辑后的标题",
+    )
+    .unwrap();
+    assert!(!updated2.has_password, "移除密码后 has_password 应为 false");
+
+    // 移除密码后任意密码可登录
+    let _ = login(&client, &base, &link.id, "anything").await;
+
+    handle.stop().await;
+}
+
+#[tokio::test]
 async fn test_share_link_full_scope_and_expiry() {
     let (db, _project_id) = setup_db();
 

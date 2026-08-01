@@ -152,8 +152,35 @@ async fn handle_login(
         return err_response(StatusCode::FORBIDDEN, "分享链接已过期");
     }
 
+    // 无密码分享：直接放行
     let Some(hash) = &link.password_hash else {
-        return err_response(StatusCode::FORBIDDEN, "该分享未设置密码");
+        let token = Uuid::new_v4().to_string();
+        let session = ShareSession {
+            share_id: link.id.clone(),
+            created_at: chrono::Utc::now(),
+        };
+        state.sessions.lock().await.insert(token.clone(), session);
+
+        let project_name = project_repo::get_project_by_id(&state.db, &link.project_id)
+            .ok()
+            .flatten()
+            .map(|(_, name)| name)
+            .unwrap_or_default();
+
+        return (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "errcode": 0,
+                "errmsg": "成功!",
+                "data": {
+                    "token": token,
+                    "projectName": project_name,
+                    "title": link.title,
+                    "expiresAt": link.expires_at,
+                }
+            })),
+        )
+            .into_response();
     };
     if !crate::services::crypto::verify_password(&body.password, hash) {
         return err_response(StatusCode::UNAUTHORIZED, "密码错误");
@@ -212,6 +239,7 @@ async fn handle_menu(State(state): State<AppState>, headers: HeaderMap) -> Respo
             "errcode": 0,
             "errmsg": "成功!",
             "data": {
+                "shareId": link.id,
                 "project": project,
                 "title": link.title,
                 "expiresAt": link.expires_at,

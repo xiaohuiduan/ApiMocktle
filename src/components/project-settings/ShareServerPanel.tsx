@@ -6,19 +6,22 @@ import {
   Button,
   Card,
   Form,
+  Input,
   InputNumber,
   message,
+  Modal,
   Space,
   Table,
   Tag,
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
-import { Copy, Link2, Play, Plus } from 'lucide-react'
+import { Copy, Edit3, Link2, Play, Plus } from 'lucide-react'
 
 import { useAuth } from '@/contexts/auth'
 
 import { CreateShareModal, type ShareLink } from './CreateShareModal'
+import { buildShareLinkUrl } from './share-url'
 
 interface ShareServerStatus {
   running: boolean
@@ -37,6 +40,7 @@ export function ShareServerPanel() {
   const [links, setLinks] = useState<ShareLink[]>([])
   const [loading, setLoading] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [editingLink, setEditingLink] = useState<ShareLink>()
   const [msgApi, contextHolder] = message.useMessage()
 
   const fetchStatus = useCallback(async () => {
@@ -98,6 +102,7 @@ export function ShareServerPanel() {
     void fetchLinks()
     const interval = setInterval(() => {
       void fetchStatus()
+      void fetchLinks()
     }, 5000)
 
     return () => {
@@ -111,11 +116,11 @@ export function ShareServerPanel() {
     return hosts.map((ip) => `http://${ip}:${status.port}/`)
   }, [lanIps, status.port])
 
-  const buildLinkUrl = (linkId: string) => {
-    const base = accessUrls[0] ?? `http://127.0.0.1:${status.port}/`
+  const baseUrl = accessUrls[0] ?? `http://127.0.0.1:${status.port}/`
 
-    return `${base}#/share/${linkId}`
-  }
+  /** 打开"输入密码生成带密码链接"弹窗 */
+  const [pwdLinkTarget, setPwdLinkTarget] = useState<ShareLink>()
+  const [pwdLinkInput, setPwdLinkInput] = useState('')
 
   const handleStart = async () => {
     setLoading(true)
@@ -345,8 +350,14 @@ export function ShareServerPanel() {
               render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm'),
             },
             {
+              title: '密码',
+              dataIndex: 'hasPassword',
+              width: 70,
+              render: (has: boolean) => (has ? <Tag color="orange">有密码</Tag> : <Tag>无</Tag>),
+            },
+            {
               title: '操作',
-              width: 140,
+              width: 320,
               render: (_, record) => (
                 <Space>
                   <Button
@@ -354,10 +365,32 @@ export function ShareServerPanel() {
                     icon={<Link2 size={14} />}
                     size="small"
                     onClick={() => {
-                      void handleCopy(buildLinkUrl(record.id))
+                      void handleCopy(buildShareLinkUrl(baseUrl, record, false))
                     }}
                   >
                     复制链接
+                  </Button>
+                  {record.hasPassword && (
+                    <Button
+                      disabled={!status.running}
+                      icon={<Link2 size={14} />}
+                      size="small"
+                      onClick={() => {
+                        setPwdLinkTarget(record)
+                        setPwdLinkInput('')
+                      }}
+                    >
+                      带密码链接
+                    </Button>
+                  )}
+                  <Button
+                    icon={<Edit3 size={14} />}
+                    size="small"
+                    onClick={() => {
+                      setEditingLink(record)
+                    }}
+                  >
+                    编辑
                   </Button>
                   <Button
                     danger
@@ -398,10 +431,50 @@ export function ShareServerPanel() {
         />
       </Card>
 
+      <Modal
+        cancelText="取消"
+        okText="复制链接"
+        open={Boolean(pwdLinkTarget)}
+        title="生成带密码链接"
+        width={480}
+        onCancel={() => {
+          setPwdLinkTarget(undefined)
+        }}
+        onOk={() => {
+          if (pwdLinkTarget && pwdLinkInput) {
+            void handleCopy(buildShareLinkUrl(baseUrl, pwdLinkTarget, true, pwdLinkInput))
+            setPwdLinkTarget(undefined)
+          }
+          else {
+            msgApi.error('请输入该分享的访问密码')
+          }
+        }}
+      >
+        <Typography.Paragraph className="text-sm">
+          输入该分享链接的访问密码，生成「打开即自动填充密码」的链接，访客无需手动输入。
+        </Typography.Paragraph>
+        <Input.Password
+          placeholder="输入该分享的访问密码"
+          value={pwdLinkInput}
+          onChange={(e) => {
+            setPwdLinkInput(e.target.value)
+          }}
+          onPressEnter={() => {
+            if (pwdLinkTarget && pwdLinkInput) {
+              void handleCopy(buildShareLinkUrl(baseUrl, pwdLinkTarget, true, pwdLinkInput))
+              setPwdLinkTarget(undefined)
+            }
+          }}
+        />
+      </Modal>
+
       <CreateShareModal
-        open={createOpen}
+        baseUrl={baseUrl}
+        editing={editingLink}
+        open={createOpen || Boolean(editingLink)}
         onClose={() => {
           setCreateOpen(false)
+          setEditingLink(undefined)
         }}
         onCreated={() => {
           void fetchLinks()

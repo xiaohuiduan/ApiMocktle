@@ -154,6 +154,7 @@ pub fn run() {
             commands::share_server::get_lan_ip,
             // Share Links
             commands::share_links::create_share_link,
+            commands::share_links::update_share_link,
             commands::share_links::list_share_links,
             commands::share_links::get_share_link,
             commands::share_links::delete_share_link,

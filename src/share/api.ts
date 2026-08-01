@@ -41,6 +41,7 @@ export interface ShareMenuItem {
 }
 
 export interface ShareMenuData {
+  shareId: string
   project: { id: string, name: string }
   title: string
   expiresAt?: string
@@ -100,9 +101,16 @@ export const shareApi = {
   },
 }
 
-/** 从 URL hash 解析分享 ID：形如 #/share/xxxx */
+/** 从 URL hash 解析分享 ID：形如 #/share/xxxx 或 #/share/xxxx?pwd=yyy */
 export function parseShareId(): string {
   const match = /#\/share\/([^/?#]+)/.exec(location.hash)
 
   return match?.[1] ?? ''
+}
+
+/** 从 URL hash 解析带密码链接的密码参数：?pwd=yyy */
+export function parseSharePwd(): string {
+  const match = /[?#&]pwd=([^&]+)/.exec(location.hash)
+
+  return match ? decodeURIComponent(match[1]) : ''
 }

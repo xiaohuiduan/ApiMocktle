@@ -144,7 +144,7 @@ async fn main() {
         apimocktle_lib::db::menu_repo::create_menu_item(&db, &project_id, &payload).unwrap();
     }
 
-    // 分享链接：全量内容，密码 test1234，永久
+    // 分享链接1：全量内容，密码 test1234，永久
     let password_hash = apimocktle_lib::services::crypto::hash_password("test1234").unwrap();
     let link = share_repo::create_share_link(
         &db,
@@ -154,6 +154,18 @@ async fn main() {
         Some(password_hash),
         None,
         "宠物店 API 文档",
+    )
+    .unwrap();
+
+    // 分享链接2：无密码（打开即看）
+    let link_no_pwd = share_repo::create_share_link(
+        &db,
+        &project_id,
+        "u1",
+        vec!["api1".to_string()],
+        None,
+        None,
+        "宠物详情免密分享",
     )
     .unwrap();
 
@@ -177,8 +189,10 @@ async fn main() {
 
     println!("==============================================");
     println!("端到端验证服务器已就绪");
-    println!("访问地址: http://127.0.0.1:{}/#/share/{}", port, link.id);
-    println!("访问密码: test1234");
+    println!("带密码链接:   http://127.0.0.1:{}/#/share/{}", port, link.id);
+    println!("带密码直连:   http://127.0.0.1:{}/#/share/{}?pwd=test1234", port, link.id);
+    println!("访问密码:     test1234");
+    println!("无密码链接:   http://127.0.0.1:{}/#/share/{}", port, link_no_pwd.id);
     println!("Ctrl+C 退出");
     println!("==============================================");
 

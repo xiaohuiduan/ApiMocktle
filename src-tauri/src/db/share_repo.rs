@@ -68,6 +68,7 @@ pub fn create_share_link(
         project_id: project_id.to_string(),
         creator_user_id: creator_user_id.to_string(),
         api_menu_ids,
+        has_password: password_hash.is_some(),
         password_hash,
         expires_at: expires_normalized,
         title: title.to_string(),
@@ -75,7 +76,6 @@ pub fn create_share_link(
         project_name: None,
     })
 }
-
 fn row_to_share_link(
     row: &rusqlite::Row<'_>,
     with_project_name: bool,
@@ -83,18 +83,53 @@ fn row_to_share_link(
     let menu_ids_json: String = row.get(3)?;
     let api_menu_ids: Vec<String> =
         serde_json::from_str(&menu_ids_json).unwrap_or_default();
+    let password_hash: Option<String> = row.get(4)?;
     let project_name = if with_project_name { row.get(8)? } else { None };
     Ok(ShareLink {
         id: row.get(0)?,
         project_id: row.get(1)?,
         creator_user_id: row.get(2)?,
         api_menu_ids,
-        password_hash: row.get(4)?,
+        has_password: password_hash.is_some(),
+        password_hash,
         expires_at: row.get(5)?,
         title: row.get(6)?,
         created_at: row.get(7)?,
         project_name,
     })
+}
+
+/// 更新分享链接（标题 / 内容范围 / 过期时间 / 密码）。
+/// password_hash: Some = 更新为新密码；None = 移除密码。
+/// api_menu_ids 为空数组 = 全量分享。
+pub fn update_share_link(
+    db: &Db,
+    id: &str,
+    api_menu_ids: Vec<String>,
+    password_hash: Option<String>,
+    expires_at: Option<String>,
+    title: &str,
+) -> Result<ShareLink, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    let menu_ids_json = serde_json::to_string(&api_menu_ids)?;
+    let expires_normalized = expires_at.as_deref().and_then(normalize_expiry);
+
+    let updated = conn.execute(
+        "UPDATE share_links SET api_menu_ids = ?1, password_hash = ?2, expires_at = ?3, title = ?4
+         WHERE id = ?5",
+        params![menu_ids_json, password_hash, expires_normalized, title, id],
+    )?;
+    if updated == 0 {
+        return Err(crate::errors::AppError::NotFound("分享链接不存在".into()));
+    }
+
+    conn.query_row(
+        "SELECT id, project_id, creator_user_id, api_menu_ids, password_hash, expires_at, title, created_at
+         FROM share_links WHERE id = ?1",
+        params![id],
+        |row| row_to_share_link(row, false),
+    )
+    .map_err(|e| e.into())
 }
 
 pub fn get_share_link(db: &Db, id: &str) -> Result<Option<ShareLink>, crate::errors::AppError> {
