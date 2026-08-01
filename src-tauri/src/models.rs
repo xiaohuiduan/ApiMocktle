@@ -193,6 +193,27 @@ pub struct ProjectMember {
     pub created_at: String,
 }
 
+// Share Links
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ShareLink {
+    pub id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    #[serde(rename = "creatorUserId")]
+    pub creator_user_id: String,
+    #[serde(rename = "apiMenuIds", default)]
+    pub api_menu_ids: Vec<String>,
+    #[serde(rename = "passwordHash", skip_serializing)]
+    pub password_hash: Option<String>,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: Option<String>,
+    pub title: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "projectName", skip_serializing_if = "Option::is_none")]
+    pub project_name: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AddMemberPayload {
     pub username: String,

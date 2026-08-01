@@ -8,3 +8,4 @@ pub mod history_repo;
 pub mod cookie_repo;
 pub mod test_repo;
 pub mod flow_repo;
+pub mod share_repo;

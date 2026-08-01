@@ -37,6 +37,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     target: 'esnext',
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        share: path.resolve(__dirname, 'share.html'),
+      },
+    },
   },
   base: './',
   test: {

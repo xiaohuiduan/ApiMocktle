@@ -1,9 +1,9 @@
 mod commands;
-mod db;
+pub mod db;
 mod errors;
-mod http;
-mod models;
-mod services;
+pub mod http;
+pub mod models;
+pub mod services;
 
 
 use std::sync::Arc;
@@ -38,6 +38,10 @@ pub fn run() {
             // MCP Server handle
             let mcp_handle = Arc::new(http::mcp_server::McpServerHandle::new());
             app.manage(mcp_handle);
+
+            // Share Server handle（不自动启动，由前端命令启动）
+            let share_handle = Arc::new(http::share_server::ShareServerHandle::new());
+            app.manage(share_handle);
 
             Ok(())
         })
@@ -141,6 +145,18 @@ pub fn run() {
             commands::mock_agent::get_mock_call_logs,
             commands::mock_agent::discover_mock_targets,
             commands::mock_agent::check_mock_agent_status,
+            // Share Server
+            commands::share_server::get_share_server_status,
+            commands::share_server::start_share_server,
+            commands::share_server::stop_share_server,
+            commands::share_server::get_share_server_config,
+            commands::share_server::save_share_server_config,
+            commands::share_server::get_lan_ip,
+            // Share Links
+            commands::share_links::create_share_link,
+            commands::share_links::list_share_links,
+            commands::share_links::get_share_link,
+            commands::share_links::delete_share_link,
             // Tokens
         ])
         .run(tauri::generate_context!())

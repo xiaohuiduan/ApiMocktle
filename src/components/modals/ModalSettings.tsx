@@ -2,16 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { Viewer } from '@bytemd/react'
 import { create, useModal } from '@ebay/nice-modal-react'
-import { ConfigProvider, Menu, type MenuProps, Modal, type ModalProps, theme } from 'antd'
-import { Globe, InfoIcon, KeyRoundIcon, SendIcon, ShirtIcon, Zap } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
+import { ConfigProvider, Menu, type MenuProps, Modal, type ModalProps, theme } from 'antd'
+import { Globe, InfoIcon, KeyRoundIcon, SendIcon, Share2, ShirtIcon, Zap } from 'lucide-react'
 
-import { PROJECT_ABOUT_MARKDOWN } from '@/content/project-about'
-import { ThemeEditor, useThemeContext } from '@/components/ThemeEditor'
-import { ProxySettingsForm } from '@/components/proxy-settings/ProxySettingsForm'
 import { McpServerPanel } from '@/components/project-settings/McpServerPanel'
+import { ShareServerPanel } from '@/components/project-settings/ShareServerPanel'
+import { ProxySettingsForm } from '@/components/proxy-settings/ProxySettingsForm'
 import { PersonalTokenPanel } from '@/components/settings/PersonalTokenPanel'
 import { RequestSettingsPanel } from '@/components/settings/RequestSettingsPanel'
+import { ThemeEditor, useThemeContext } from '@/components/ThemeEditor'
+import { PROJECT_ABOUT_MARKDOWN } from '@/content/project-about'
 
 export const enum SettingsMenuKey {
   Appearance = '0',
@@ -20,6 +21,7 @@ export const enum SettingsMenuKey {
   McpServer = '3',
   Tokens = '4',
   Request = '5',
+  Share = '6',
 }
 
 const settingMenuItems = [
@@ -47,6 +49,11 @@ const settingMenuItems = [
     key: SettingsMenuKey.McpServer,
     icon: <Zap size={16} />,
     label: 'MCP 服务',
+  },
+  {
+    key: SettingsMenuKey.Share,
+    icon: <Share2 size={16} />,
+    label: '文档分享',
   },
   {
     key: SettingsMenuKey.About,
@@ -84,6 +91,9 @@ const renderMenuContent = (props: { menuKey: SettingsMenuKey }) => {
 
     case SettingsMenuKey.McpServer:
       return <McpServerPanel />
+
+    case SettingsMenuKey.Share:
+      return <ShareServerPanel />
 
     case SettingsMenuKey.Tokens:
       return <PersonalTokenPanel />
