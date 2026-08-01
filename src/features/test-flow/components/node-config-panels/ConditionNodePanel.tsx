@@ -3,6 +3,7 @@ import { Radio, Select, Input, Typography, Button, Space } from 'antd'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { PanelProps } from './shared/panelRegistry'
 import type { ConditionNodeData, ConditionBranch } from '../../types/flow.types'
+import { useDraft } from './shared/useDraft'
 
 const { Text } = Typography
 
@@ -28,6 +29,30 @@ const OPERATOR_OPTIONS = [
 // ==================== 组件 ====================
 
 export default function ConditionNodePanel({ data, onChange }: PanelProps<ConditionNodeData>) {
+  // 表达式（受控草稿 + blur 提交；status_code 模式共用 data.expression）
+  const { draft: expressionDraft, setDraft: setExpressionDraft, commit: commitExpression } = useDraft(
+    data.expression ?? '',
+    (v) => {
+      onChange({ expression: v })
+    },
+  )
+
+  // 变量名（受控草稿 + blur 提交）
+  const { draft: variableNameDraft, setDraft: setVariableNameDraft, commit: commitVariableName } = useDraft(
+    data.variableName ?? '',
+    (v) => {
+      onChange({ variableName: v })
+    },
+  )
+
+  // 比较值（受控草稿 + blur 提交）
+  const { draft: compareValueDraft, setDraft: setCompareValueDraft, commit: commitCompareValue } = useDraft(
+    data.compareValue ?? '',
+    (v) => {
+      onChange({ compareValue: v })
+    },
+  )
+
   // 更新条件类型
   const handleConditionTypeChange = useCallback(
     (e: any) => {
@@ -36,34 +61,10 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
     [onChange],
   )
 
-  // 更新表达式（onBlur 提交）
-  const handleExpressionBlur = useCallback(
-    (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      onChange({ expression: e.target.value })
-    },
-    [onChange],
-  )
-
-  // 更新变量名（onBlur 提交）
-  const handleVariableNameBlur = useCallback(
-    (e: React.FocusEvent<HTMLInputElement>) => {
-      onChange({ variableName: e.target.value })
-    },
-    [onChange],
-  )
-
   // 更新操作符
   const handleOperatorChange = useCallback(
     (value: string) => {
       onChange({ operator: value as ConditionNodeData['operator'] })
-    },
-    [onChange],
-  )
-
-  // 更新比较值（onBlur 提交）
-  const handleCompareValueBlur = useCallback(
-    (e: React.FocusEvent<HTMLInputElement>) => {
-      onChange({ compareValue: e.target.value })
     },
     [onChange],
   )
@@ -148,8 +149,11 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
             JavaScript 表达式
           </Text>
           <Input.TextArea
-            defaultValue={data.expression || ''}
-            onBlur={handleExpressionBlur}
+            value={expressionDraft}
+            onChange={(e) => {
+              setExpressionDraft(e.target.value)
+            }}
+            onBlur={commitExpression}
             placeholder="例如: variables.token && variables.count > 0"
             rows={3}
             size="small"
@@ -165,8 +169,11 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
             预期状态码
           </Text>
           <Input
-            defaultValue={data.expression || ''}
-            onBlur={handleExpressionBlur}
+            value={expressionDraft}
+            onChange={(e) => {
+              setExpressionDraft(e.target.value)
+            }}
+            onBlur={commitExpression}
             placeholder="例如: 200、201、404"
             size="small"
             data-testid="condition-status-code"
@@ -181,8 +188,11 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
             变量名
           </Text>
           <Input
-            defaultValue={data.variableName || ''}
-            onBlur={handleVariableNameBlur}
+            value={variableNameDraft}
+            onChange={(e) => {
+              setVariableNameDraft(e.target.value)
+            }}
+            onBlur={commitVariableName}
             placeholder="例如: token"
             size="small"
             data-testid="condition-variable-name"
@@ -214,8 +224,11 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
             比较值
           </Text>
           <Input
-            defaultValue={data.compareValue || ''}
-            onBlur={handleCompareValueBlur}
+            value={compareValueDraft}
+            onChange={(e) => {
+              setCompareValueDraft(e.target.value)
+            }}
+            onBlur={commitCompareValue}
             placeholder="期望值"
             size="small"
             data-testid="condition-compare-value"
@@ -248,7 +261,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
             {data.conditions!.map((condition, index) => (
               <div
                 key={condition.id}
-                className="p-3 border border-gray-200 rounded-md space-y-2 bg-gray-50"
+                className="p-3 border border-[color:var(--ds-node-border-color,#e5e7eb)] rounded-md space-y-2 bg-[color:var(--ds-node-bg-elevated,#f9fafb)]"
               >
                 <div className="flex items-center justify-between">
                   <Text strong className="text-xs">
@@ -284,7 +297,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
             ))}
 
             {/* 默认分支 */}
-            <div className="p-3 border border-dashed border-gray-300 rounded-md bg-gray-100">
+            <div className="p-3 border border-dashed border-[color:var(--ds-node-border-color,#d1d5db)] rounded-md bg-[color:var(--ds-node-bg,#f3f4f6)]">
               <Text type="secondary" className="block text-xs mb-2">
                 默认分支（当所有条件都不满足时）
               </Text>

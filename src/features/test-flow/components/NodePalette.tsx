@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   type LucideIcon,
 } from 'lucide-react'
-import { FlowNodeType } from '../types/flow.types'
+import { FlowNodeType, NODE_TYPE_LABELS } from '../types/flow.types'
 import { useFlowStore } from '../store/useFlowStore'
 import { getDefaultNodeData } from '../nodes/nodeRegistry'
 import type { FlowNode } from '../types/flow.types'
@@ -29,15 +29,15 @@ interface PaletteNodeItem {
 }
 
 const PALETTE_NODES: PaletteNodeItem[] = [
-  { type: FlowNodeType.Start, label: '开始', description: '流程起点', icon: Play, color: '#6b7280' },
-  { type: FlowNodeType.End, label: '结束', description: '流程终点', icon: CircleStop, color: '#6b7280' },
-  { type: FlowNodeType.HttpRequest, label: 'HTTP 请求', description: '发送 API 请求', icon: Globe, color: '#3b82f6' },
-  { type: FlowNodeType.Condition, label: '条件判断', description: 'if/else 分支', icon: GitBranch, color: '#f97316' },
-  { type: FlowNodeType.Loop, label: '循环', description: '重复执行', icon: Repeat, color: '#a855f7' },
-  { type: FlowNodeType.Parallel, label: '并行', description: '同时执行', icon: Split, color: '#14b8a6' },
-  { type: FlowNodeType.Wait, label: '等待', description: '延迟执行', icon: Timer, color: '#eab308' },
-  { type: FlowNodeType.SetVariable, label: '变量赋值', description: '设置变量', icon: Variable, color: '#22c55e' },
-  { type: FlowNodeType.Assert, label: '断言', description: '验证变量', icon: ShieldCheck, color: '#ef4444' },
+  { type: FlowNodeType.Start, label: NODE_TYPE_LABELS[FlowNodeType.Start], description: '流程起点', icon: Play, color: '#6b7280' },
+  { type: FlowNodeType.End, label: NODE_TYPE_LABELS[FlowNodeType.End], description: '流程终点', icon: CircleStop, color: '#6b7280' },
+  { type: FlowNodeType.HttpRequest, label: NODE_TYPE_LABELS[FlowNodeType.HttpRequest], description: '发送 API 请求', icon: Globe, color: '#3b82f6' },
+  { type: FlowNodeType.Condition, label: NODE_TYPE_LABELS[FlowNodeType.Condition], description: 'if/else 分支', icon: GitBranch, color: '#f97316' },
+  { type: FlowNodeType.Loop, label: NODE_TYPE_LABELS[FlowNodeType.Loop], description: '重复执行', icon: Repeat, color: '#a855f7' },
+  { type: FlowNodeType.Parallel, label: NODE_TYPE_LABELS[FlowNodeType.Parallel], description: '同时执行', icon: Split, color: '#14b8a6' },
+  { type: FlowNodeType.Wait, label: NODE_TYPE_LABELS[FlowNodeType.Wait], description: '延迟执行', icon: Timer, color: '#eab308' },
+  { type: FlowNodeType.SetVariable, label: NODE_TYPE_LABELS[FlowNodeType.SetVariable], description: '设置变量', icon: Variable, color: '#22c55e' },
+  { type: FlowNodeType.Assert, label: NODE_TYPE_LABELS[FlowNodeType.Assert], description: '验证变量', icon: ShieldCheck, color: '#ef4444' },
 ]
 
 // ==================== 样式 ====================
@@ -126,7 +126,6 @@ export default function NodePalette() {
 
   // 鼠标事件模拟拖拽（绕过 Tauri WebView2 对 HTML5 拖拽 API 的兼容问题）
   const handleMouseDown = useCallback((e: React.MouseEvent, nodeType: FlowNodeType) => {
-    console.log('[MouseDown] nodeType:', nodeType)
     setDraggingType(nodeType)
     setGhostPos({ x: e.clientX, y: e.clientY })
     ;(window as any).__DRAG_NODE_TYPE__ = nodeType
@@ -139,9 +138,6 @@ export default function NodePalette() {
       }
     }
     const handleMouseUp = () => {
-      if ((window as any).__DRAG_NODE_TYPE__) {
-        console.log('[MouseUp] 拖动结束，nodeType:', (window as any).__DRAG_NODE_TYPE__)
-      }
       setDraggingType(null)
       // 注意：不清除 __DRAG_NODE_TYPE__，由 FlowCanvas 读取后负责清理
     }

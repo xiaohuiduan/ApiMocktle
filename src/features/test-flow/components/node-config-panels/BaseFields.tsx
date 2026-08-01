@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { Input, Switch, Space, Typography } from 'antd'
 import type { FlowNodeData } from '../../types/flow.types'
+import { useDraft } from './shared/useDraft'
 
 const { Text } = Typography
 
@@ -14,20 +15,20 @@ interface BaseFieldsProps {
 // ==================== 组件 ====================
 
 export default function BaseFields({ data, onChange }: BaseFieldsProps) {
-  // 更新标签（onBlur 提交）
-  const handleLabelBlur = useCallback(
-    (e: React.FocusEvent<HTMLInputElement>) => {
-      onChange({ label: e.target.value })
+  // 标签（受控草稿 + blur 提交）
+  const { draft: labelDraft, setDraft: setLabelDraft, commit: commitLabel } = useDraft(
+    data.label,
+    (v) => {
+      onChange({ label: v })
     },
-    [onChange],
   )
 
-  // 更新描述（onBlur 提交）
-  const handleDescriptionBlur = useCallback(
-    (e: React.FocusEvent<HTMLTextAreaElement>) => {
-      onChange({ description: e.target.value })
+  // 描述（受控草稿 + blur 提交）
+  const { draft: descDraft, setDraft: setDescDraft, commit: commitDesc } = useDraft(
+    data.description ?? '',
+    (v) => {
+      onChange({ description: v })
     },
-    [onChange],
   )
 
   // 切换启用状态（直接提交）
@@ -46,8 +47,11 @@ export default function BaseFields({ data, onChange }: BaseFieldsProps) {
           标签
         </Text>
         <Input
-          defaultValue={data.label || ''}
-          onBlur={handleLabelBlur}
+          value={labelDraft}
+          onChange={(e) => {
+            setLabelDraft(e.target.value)
+          }}
+          onBlur={commitLabel}
           placeholder="节点标签"
           data-testid="node-label-input"
         />
@@ -59,8 +63,11 @@ export default function BaseFields({ data, onChange }: BaseFieldsProps) {
           描述（可选）
         </Text>
         <Input.TextArea
-          defaultValue={data.description || ''}
-          onBlur={handleDescriptionBlur}
+          value={descDraft}
+          onChange={(e) => {
+            setDescDraft(e.target.value)
+          }}
+          onBlur={commitDesc}
           placeholder="节点描述"
           rows={2}
           data-testid="node-description-input"

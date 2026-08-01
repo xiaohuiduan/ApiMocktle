@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { Radio, InputNumber, Input, Typography, Switch } from 'antd'
 import type { PanelProps } from './shared/panelRegistry'
 import type { LoopNodeData } from '../../types/flow.types'
+import { useDraft } from './shared/useDraft'
 
 const { Text } = Typography
 
@@ -16,42 +17,42 @@ const LOOP_TYPE_OPTIONS = [
 // ==================== 组件 ====================
 
 export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeData>) {
+  // 循环次数（受控草稿 + blur 提交，支持 {{variable}} 表达式）
+  const { draft: countDraft, setDraft: setCountDraft, commit: commitCount } = useDraft(
+    data.count !== undefined ? String(data.count) : '',
+    (v) => {
+      onChange({ count: v })
+    },
+  )
+
+  // while 表达式（受控草稿 + blur 提交）
+  const { draft: whileDraft, setDraft: setWhileDraft, commit: commitWhile } = useDraft(
+    data.whileExpression ?? '',
+    (v) => {
+      onChange({ whileExpression: v })
+    },
+  )
+
+  // 集合变量名（受控草稿 + blur 提交）
+  const { draft: collectionDraft, setDraft: setCollectionDraft, commit: commitCollection } = useDraft(
+    data.collectionVariable ?? '',
+    (v) => {
+      onChange({ collectionVariable: v })
+    },
+  )
+
+  // 迭代变量名（受控草稿 + blur 提交）
+  const { draft: iteratorDraft, setDraft: setIteratorDraft, commit: commitIterator } = useDraft(
+    data.iteratorVariable ?? 'item',
+    (v) => {
+      onChange({ iteratorVariable: v })
+    },
+  )
+
   // 更新循环类型
   const handleLoopTypeChange = useCallback(
     (e: any) => {
       onChange({ loopType: e.target.value })
-    },
-    [onChange],
-  )
-
-  // 更新循环次数（onBlur 提交，支持 {{variable}} 表达式）
-  const handleCountBlur = useCallback(
-    (e: React.FocusEvent<HTMLInputElement>) => {
-      onChange({ count: e.target.value })
-    },
-    [onChange],
-  )
-
-  // 更新 while 表达式（onBlur 提交）
-  const handleWhileExpressionBlur = useCallback(
-    (e: React.FocusEvent<HTMLTextAreaElement>) => {
-      onChange({ whileExpression: e.target.value })
-    },
-    [onChange],
-  )
-
-  // 更新集合变量名（onBlur 提交）
-  const handleCollectionVariableBlur = useCallback(
-    (e: React.FocusEvent<HTMLInputElement>) => {
-      onChange({ collectionVariable: e.target.value })
-    },
-    [onChange],
-  )
-
-  // 更新迭代变量名（onBlur 提交）
-  const handleIteratorVariableBlur = useCallback(
-    (e: React.FocusEvent<HTMLInputElement>) => {
-      onChange({ iteratorVariable: e.target.value })
     },
     [onChange],
   )
@@ -104,8 +105,11 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
             循环次数
           </Text>
           <Input
-            defaultValue={data.count !== undefined ? String(data.count) : ''}
-            onBlur={handleCountBlur}
+            value={countDraft}
+            onChange={(e) => {
+              setCountDraft(e.target.value)
+            }}
+            onBlur={commitCount}
             placeholder="例如: 5 或 {{maxRetries}}"
             size="small"
             data-testid="loop-count"
@@ -123,8 +127,11 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
             循环条件（为假时停止）
           </Text>
           <Input.TextArea
-            defaultValue={data.whileExpression || ''}
-            onBlur={handleWhileExpressionBlur}
+            value={whileDraft}
+            onChange={(e) => {
+              setWhileDraft(e.target.value)
+            }}
+            onBlur={commitWhile}
             placeholder="例如: variables.retryCount < 3"
             rows={2}
             size="small"
@@ -140,8 +147,11 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
             集合变量名（存放数组）
           </Text>
           <Input
-            defaultValue={data.collectionVariable || ''}
-            onBlur={handleCollectionVariableBlur}
+            value={collectionDraft}
+            onChange={(e) => {
+              setCollectionDraft(e.target.value)
+            }}
+            onBlur={commitCollection}
             placeholder="例如: items"
             size="small"
             data-testid="loop-collection-variable"
@@ -156,8 +166,11 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
             迭代变量名（每轮当前元素的变量名）
           </Text>
           <Input
-            defaultValue={data.iteratorVariable || 'item'}
-            onBlur={handleIteratorVariableBlur}
+            value={iteratorDraft}
+            onChange={(e) => {
+              setIteratorDraft(e.target.value)
+            }}
+            onBlur={commitIterator}
             placeholder="默认 item，用 {{item}} 引用当前元素"
             size="small"
             data-testid="loop-iterator-variable"

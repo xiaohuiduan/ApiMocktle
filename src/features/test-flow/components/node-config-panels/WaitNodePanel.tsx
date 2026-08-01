@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { Radio, InputNumber, Input, Typography } from 'antd'
 import type { PanelProps } from './shared/panelRegistry'
 import type { WaitNodeData } from '../../types/flow.types'
+import { useDraft } from './shared/useDraft'
 
 const { Text } = Typography
 
@@ -16,6 +17,22 @@ const WAIT_TYPE_OPTIONS = [
 // ==================== 组件 ====================
 
 export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeData>) {
+  // 变量名（受控草稿 + blur 提交）
+  const { draft: variableDraft, setDraft: setVariableDraft, commit: commitVariable } = useDraft(
+    data.durationVariable ?? '',
+    (v) => {
+      onChange({ durationVariable: v })
+    },
+  )
+
+  // 条件表达式（受控草稿 + blur 提交）
+  const { draft: conditionDraft, setDraft: setConditionDraft, commit: commitCondition } = useDraft(
+    data.conditionExpression ?? '',
+    (v) => {
+      onChange({ conditionExpression: v })
+    },
+  )
+
   // 更新等待类型
   const handleWaitTypeChange = useCallback(
     (e: any) => {
@@ -28,22 +45,6 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
   const handleDurationChange = useCallback(
     (value: number | null) => {
       onChange({ durationMs: value || undefined })
-    },
-    [onChange],
-  )
-
-  // 更新变量名（onBlur 提交）
-  const handleVariableBlur = useCallback(
-    (e: React.FocusEvent<HTMLInputElement>) => {
-      onChange({ durationVariable: e.target.value })
-    },
-    [onChange],
-  )
-
-  // 更新条件表达式（onBlur 提交）
-  const handleConditionBlur = useCallback(
-    (e: React.FocusEvent<HTMLTextAreaElement>) => {
-      onChange({ conditionExpression: e.target.value })
     },
     [onChange],
   )
@@ -114,8 +115,11 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
             变量名（存放毫秒值）
           </Text>
           <Input
-            defaultValue={data.durationVariable || ''}
-            onBlur={handleVariableBlur}
+            value={variableDraft}
+            onChange={(e) => {
+              setVariableDraft(e.target.value)
+            }}
+            onBlur={commitVariable}
             placeholder="例如: waitTime"
             size="small"
             data-testid="wait-variable"
@@ -131,8 +135,11 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
               轮询条件（为真时结束等待）
             </Text>
             <Input.TextArea
-              defaultValue={data.conditionExpression || ''}
-              onBlur={handleConditionBlur}
+              value={conditionDraft}
+              onChange={(e) => {
+                setConditionDraft(e.target.value)
+              }}
+              onBlur={commitCondition}
               placeholder="例如: variables.status === 'ready'"
               rows={2}
               size="small"

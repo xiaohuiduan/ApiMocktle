@@ -21,6 +21,21 @@ export enum FlowNodeType {
 
 export type NodeExecStatus = 'idle' | 'running' | 'passed' | 'failed' | 'skipped' | 'error'
 
+// ==================== 节点类型中文名（全站统一） ====================
+
+export const NODE_TYPE_LABELS: Record<FlowNodeType, string> = {
+  [FlowNodeType.Start]: '开始',
+  [FlowNodeType.End]: '结束',
+  [FlowNodeType.HttpRequest]: 'HTTP 请求',
+  [FlowNodeType.Condition]: '条件判断',
+  [FlowNodeType.Loop]: '循环',
+  [FlowNodeType.Parallel]: '并行',
+  [FlowNodeType.Wait]: '等待',
+  [FlowNodeType.SetVariable]: '变量赋值',
+  [FlowNodeType.Assert]: '断言',
+  [FlowNodeType.SubFlow]: '子流程',
+}
+
 // ==================== 基础节点数据 ====================
 
 export interface BaseNodeData {

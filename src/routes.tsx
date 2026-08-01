@@ -8,7 +8,6 @@ import ProjectLayout from '@/app/projects/[projectId]/layout'
 import MainLayout from '@/app/(main)/layout'
 import HomePage from '@/app/(main)/home/page'
 import SettingsPage from '@/app/(main)/settings/page'
-import TestPage from '@/app/test/page'
 import TestTaskListPage from '@/app/(main)/tests/page'
 import TestTaskDetailPage from '@/app/(main)/tests/[taskId]/page'
 import Root from './root'
@@ -28,6 +27,5 @@ export const appRoutes = (
         <Route path="tests/:taskId" element={<TestTaskDetailPage />} />
       </Route>
     </Route>
-    <Route path="test" element={<TestPage />} />
   </Route>
 )

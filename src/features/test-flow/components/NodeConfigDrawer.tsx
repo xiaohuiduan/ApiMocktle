@@ -412,6 +412,7 @@ export default function NodeConfigDrawer() {
               <>
                 <Divider style={{ margin: 'var(--ds-pad-md) 0' }} />
                 <PanelComponent
+                  key={selectedNode.id}
                   data={selectedNode.data as FlowNodeData}
                   onChange={handlePanelChange}
                   projectId={projectId}

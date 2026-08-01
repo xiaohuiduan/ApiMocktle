@@ -36,7 +36,7 @@ const resultBlockClass = css`
 const STEP_STATUS_CONFIG: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
   passed: { color: 'success', icon: <CheckCircle size={14} />, label: '通过' },
   failed: { color: 'error', icon: <XCircle size={14} />, label: '失败' },
-  error: { color: 'warning', icon: <AlertTriangle size={14} />, label: '错误' },
+  error: { color: 'error', icon: <AlertTriangle size={14} />, label: '错误' },
   skipped: { color: 'default', icon: null, label: '跳过' },
 }
 
