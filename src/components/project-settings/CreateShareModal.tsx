@@ -178,9 +178,15 @@ export function CreateShareModal({
 
   const treeData = useMemo(() => buildTree(menuItems), [menuItems])
 
-  /** 随机生成 6 位数字密码 */
+  /** 随机生成 6 位密码（英文大小写 + 数字） */
   const genRandomPassword = () => {
-    setPassword(String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0'))
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    let pwd = ''
+
+    for (let i = 0; i < 6; i += 1) {
+      pwd += chars[Math.floor(Math.random() * chars.length)]
+    }
+    setPassword(pwd)
   }
 
   const handleSubmit = async () => {

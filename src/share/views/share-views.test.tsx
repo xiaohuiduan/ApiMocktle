@@ -61,4 +61,46 @@ describe('share 只读视图渲染', () => {
     render(<ApiDetailView data={undefined} />)
     expect(screen.getByText('未命名接口')).toBeTruthy()
   })
+
+  it('ApiDetailView 渲染项目内部格式（properties 数组 + ref/any）', () => {
+    render(<ApiDetailView data={{
+      method: 'POST',
+      path: '/pet',
+      name: '新增宠物',
+      requestBody: {
+        type: 'application/json',
+        jsonSchema: {
+          type: 'object',
+          properties: [
+            { name: 'name', type: 'string', description: '宠物名称' },
+            { name: 'tag', type: 'string', description: '标签' },
+            { name: 'data', type: 'object', properties: [{ name: 'id', type: 'integer' }] },
+          ],
+        },
+      },
+      responses: [
+        {
+          code: 200,
+          name: '成功',
+          contentType: 'json',
+          jsonSchema: {
+            type: 'object',
+            properties: [
+              { name: 'code', type: 'integer', description: '状态码' },
+              { name: 'data', type: 'ref', $ref: '.1.2', description: '宠物信息' },
+            ],
+          },
+        },
+      ],
+    }} />)
+    // 表格字段
+    expect(screen.getByText('name')).toBeTruthy()
+    expect(screen.getByText('tag')).toBeTruthy()
+    // 示例 JSON 含字段值而非空对象
+    expect(screen.getByText(/"name": "string"/)).toBeTruthy()
+    expect(screen.getByText(/"code": 0/)).toBeTruthy()
+    expect(screen.getByText(/"\$ref": "\.1\.2"/)).toBeTruthy()
+    // ref 类型行
+    expect(screen.getByText('ref')).toBeTruthy()
+  })
 })

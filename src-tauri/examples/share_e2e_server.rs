@@ -85,11 +85,16 @@ async fn main() {
                         "contentType": "json",
                         "jsonSchema": {
                             "type": "object",
-                            "properties": {
-                                "id": { "type": "integer", "description": "宠物 ID" },
-                                "name": { "type": "string", "description": "宠物名称" },
-                                "status": { "type": "string", "enum": ["available", "pending", "sold"] }
-                            }
+                            "properties": [
+                                { "name": "id", "type": "integer", "description": "宠物 ID" },
+                                { "name": "name", "type": "string", "description": "宠物名称" },
+                                { "name": "status", "type": "string", "description": "状态" },
+                                { "name": "info", "type": "object", "properties": [
+                                    { "name": "age", "type": "integer", "description": "年龄" },
+                                    { "name": "tags", "type": "array", "items": { "type": "string" } }
+                                ] },
+                                { "name": "category", "type": "ref", "$ref": ".1.2", "description": "分类引用" }
+                            ]
                         }
                     }
                 ]

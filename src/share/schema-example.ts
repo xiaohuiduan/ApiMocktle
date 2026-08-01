@@ -1,12 +1,25 @@
 /**
- * 轻量 JSON Schema → 示例值生成（只读展示用，不做完整校验实现）
- * 处理标准 JSON Schema 常见形态：type / properties / items / $ref / enum / example / default
+ * 轻量 JSON Schema → 示例值生成（只读展示用，不做完整校验实现）。
+ * 兼容两种格式：
+ * - 标准 JSON Schema：properties 为对象 map（{ name: childSchema }）
+ * - 项目内部格式：properties 为数组（[{ name, type, description, required, ... }]）
  */
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null
+}
+
+/** 内部格式的 properties 数组项：{ name, type, ... } */
+function asNamedRow(value: unknown): { name: string, type: string } | null {
+  const row = asRecord(value)
+
+  if (!row || typeof row.name !== 'string' || typeof row.type !== 'string') {
+    return null
+  }
+
+  return { name: row.name, type: row.type }
 }
 
 export function schemaExample(schema: unknown): unknown {
@@ -35,11 +48,25 @@ export function schemaExample(schema: unknown): unknown {
   switch (s.type) {
     case 'object': {
       const result: Record<string, unknown> = {}
-      const props = asRecord(s.properties)
+      const props = s.properties
 
-      if (props) {
-        for (const [key, value] of Object.entries(props)) {
-          result[key] = schemaExample(value)
+      if (Array.isArray(props)) {
+        // 内部格式：properties 为 [{ name, type, ... }]
+        for (const item of props) {
+          const row = asNamedRow(item)
+
+          if (row) {
+            result[row.name] = schemaExample(item)
+          }
+        }
+      }
+      else {
+        const map = asRecord(props)
+
+        if (map) {
+          for (const [key, value] of Object.entries(map)) {
+            result[key] = schemaExample(value)
+          }
         }
       }
 
@@ -67,6 +94,13 @@ export function schemaExample(schema: unknown): unknown {
     case 'null':
       return null
 
+    case 'any':
+      return 'any'
+
+    case 'ref':
+      // 引用其他 Schema 节点：展示引用名，避免空对象
+      return { $ref: typeof s.$ref === 'string' ? s.$ref : '引用' }
+
     default:
       return {}
   }
@@ -80,12 +114,7 @@ export interface SchemaRow {
   description?: string
 }
 
-function rowFromChild(
-  name: string,
-  child: unknown,
-  required: boolean,
-  baseName: string,
-): SchemaRow {
+function rowFromChild(name: string, child: unknown, required: boolean, baseName: string): SchemaRow {
   const childObj = asRecord(child)
 
   return {
@@ -105,13 +134,42 @@ export function schemaRows(schema: unknown, baseName = ''): SchemaRow[] {
     return []
   }
 
-  if (s.type === 'object' && asRecord(s.properties)) {
-    const required: string[] = Array.isArray(s.required) ? (s.required as string[]) : []
-    const props = asRecord(s.properties) ?? {}
+  if (s.type === 'object') {
+    const props = s.properties
 
-    return Object.entries(props).map(([name, child]) => {
-      return rowFromChild(name, child, required.includes(name), baseName)
-    })
+    if (Array.isArray(props)) {
+      // 内部格式：properties 为 [{ name, type, required, description }]
+      const rows: SchemaRow[] = []
+
+      for (const item of props) {
+        const row = asRecord(item)
+
+        if (!row || typeof row.name !== 'string') {
+          continue
+        }
+
+        rows.push({
+          name: baseName ? `${baseName}.${row.name}` : row.name,
+          type: typeof row.type === 'string' ? row.type : 'any',
+          required: row.required === true,
+          description: typeof row.description === 'string' ? row.description : undefined,
+        })
+      }
+
+      return rows
+    }
+
+    const map = asRecord(props)
+
+    if (map) {
+      const required: string[] = Array.isArray(s.required) ? (s.required as string[]) : []
+
+      return Object.entries(map).map(([name, child]) => {
+        return rowFromChild(name, child, required.includes(name), baseName)
+      })
+    }
+
+    return []
   }
 
   if (s.type === 'array' && s.items !== undefined) {
