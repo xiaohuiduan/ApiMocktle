@@ -4,8 +4,8 @@ import { Button, Modal, Switch, Tag, theme, Typography } from 'antd'
 
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { BodyType } from '@/enums'
+import { useDynamicVariableDefs } from '@/hooks/useDynamicVariableDefs'
 import type { ApiRequestBody, Parameter } from '@/types'
-import { DYNAMIC_VARIABLE_DEFS } from '@/utils/dynamic-variables'
 
 import { DynamicVariablesHelp } from '../components/DynamicVariablesHelp'
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
@@ -74,8 +74,9 @@ export function BodyPanel(props: BodyPanelProps) {
   const { token } = theme.useToken()
 
   // 变量补全项：内置动态变量 + 已定义用户变量
+  const dynamicDefs = useDynamicVariableDefs()
   const completionItems = useMemo(() => {
-    const dyn = DYNAMIC_VARIABLE_DEFS.map((d) => ({ label: d.name, detail: d.desc }))
+    const dyn = dynamicDefs.map((d) => ({ label: d.name, detail: d.desc }))
     const users = varMap
       ? Array.from(varMap.entries())
           .filter(([k]) => !k.startsWith('$'))
@@ -83,7 +84,7 @@ export function BodyPanel(props: BodyPanelProps) {
       : []
 
     return [...dyn, ...users]
-  }, [varMap])
+  }, [dynamicDefs, varMap])
 
   const showBodyEditor = requestBody
     && (requestBody.type === BodyType.Json

@@ -1,4 +1,5 @@
 import nextPreset from 'prefer-code-style/eslint/preset/next'
+import tsEslintPlugin from '@typescript-eslint/eslint-plugin'
 
 export default [
   ...nextPreset,
@@ -38,7 +39,15 @@ export default [
     },
   },
 
-  // 忽略本地工具目录（.gitignore 已忽略，非项目源码）
+  // 非 TypeScript 文件（.js/.jsx/.cjs/.mjs）无类型信息，关闭全部类型感知规则（否则加载即报错）
+  {
+    files: ['**/*.{js,jsx,cjs,mjs}'],
+    rules: Object.fromEntries(
+      Object.keys(tsEslintPlugin.rules).map((r) => [`@typescript-eslint/${r}`, 0]),
+    ),
+  },
+
+  // 忽略本地工具目录（.gitignore 已忽略，非项目源码）、开发分析脚本与根配置文件
   {
     ignores: [
       '.agents/**',
@@ -47,6 +56,16 @@ export default [
       '.zcode/**',
       'plans/**',
       'package.json',
+      'scripts/**',
+      'postcss.config.cjs',
+      'tailwind.config.ts',
+      'vite.config.ts',
+      'eslint.config.mjs',
+      'src-tauri/target/**',
+      'src-tauri/target-test/**',
+      'dist/**',
+      // e2e 测试（playwright）独立 tsconfig，不在主项目类型检查范围内
+      'tests/e2e/**',
     ],
   },
 ]

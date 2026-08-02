@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Modal, Table, theme, Tooltip, Typography } from 'antd'
 import { HelpCircleIcon } from 'lucide-react'
 
-import { DYNAMIC_VARIABLE_DEFS } from '@/utils/dynamic-variables'
+import { useDynamicVariableDefs } from '@/hooks/useDynamicVariableDefs'
 
 /**
  * 动态变量说明入口：? 图标 + 说明弹窗。
@@ -12,6 +12,7 @@ import { DYNAMIC_VARIABLE_DEFS } from '@/utils/dynamic-variables'
 export function DynamicVariablesHelp() {
   const { token } = theme.useToken()
   const [open, setOpen] = useState(false)
+  const dynamicDefs = useDynamicVariableDefs()
 
   return (
     <>
@@ -69,7 +70,7 @@ export function DynamicVariablesHelp() {
               ),
             },
           ]}
-          dataSource={DYNAMIC_VARIABLE_DEFS}
+          dataSource={dynamicDefs}
           pagination={false}
           rowKey="name"
           size="small"

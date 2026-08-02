@@ -41,7 +41,7 @@ import { HeadersParamsPanel } from './params/HeadersParamsPanel'
 import { QueryParamsPanel } from './params/QueryParamsPanel'
 import { ScriptsPanel } from './params/ScriptsPanel'
 import { buildJsoncBodyFillText } from './bodyJsonc'
-import { buildRequest } from './buildRequest'
+import { buildRequest, type BuildRequestResult } from './buildRequest'
 import { generateCurl } from './curl'
 import { parseHistoryParams } from './historyUtils'
 import { executeScript } from './scripts'
@@ -192,6 +192,8 @@ export function RunTab() {
   })
 
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
+  // 最近一次实际发送的请求（变量已解析），驱动展示区与 cURL 快照
+  const [lastBuilt, setLastBuilt] = useState<BuildRequestResult | null>(null)
   // 请求超时（秒）；undefined 表示跟随全局默认
   const [timeoutSeconds, setTimeoutSeconds] = useState<number | undefined>(() => {
     const ms = savedRunTabInfo?.timeoutMs
@@ -507,7 +509,7 @@ export function RunTab() {
       })),
     ]
 
-    const built = buildRequest({
+    const built = await buildRequest({
       method: workCopy.method ?? 'GET',
       baseUrl: envBaseUrl,
       path: workCopy.path,
@@ -537,6 +539,7 @@ export function RunTab() {
     })
 
     const { url, headers, bodyText } = built
+    setLastBuilt(built)
 
     // 请求级超时（毫秒）；未设置时 Rust 端回落到全局默认
     const timeoutMs = timeoutSeconds ? Math.round(timeoutSeconds * 1000) : undefined
@@ -704,8 +707,29 @@ export function RunTab() {
     )
   }
 
-  // cURL
+  // cURL：有发送记录时用最近一次实际值快照；否则模板原文
   const curlCommands = useMemo(() => {
+    if (lastBuilt) {
+      const bodyType = lastBuilt.contentType === 'application/json'
+        ? BodyType.Json
+        : lastBuilt.contentType === 'application/xml'
+          ? BodyType.Xml
+          : BodyType.Raw
+
+      return generateCurl({
+        method: lastBuilt.method,
+        url: lastBuilt.url,
+        headers: lastBuilt.headers.map((h) => ({ name: h.name, example: h.value })),
+        body: lastBuilt.bodyText
+          ? {
+              type: bodyType,
+              rawText: lastBuilt.bodyText,
+              rawContentType: bodyType === BodyType.Raw ? lastBuilt.contentType : undefined,
+            }
+          : undefined,
+      })
+    }
+
     if (!workCopy) { return { windows: '', linux: '' } }
 
     const resolvedUrl = envBaseUrl
@@ -726,7 +750,7 @@ export function RunTab() {
           }
         : undefined,
     })
-  }, [workCopy, envBaseUrl])
+  }, [workCopy, envBaseUrl, lastBuilt])
 
   const methodOptions = useMemo(() =>
     Object.entries(HTTP_METHOD_CONFIG).map(([method, { color }]) => ({
@@ -1036,6 +1060,7 @@ export function RunTab() {
             )}
             error={error}
             menuItemId={tabData.key}
+            requestVars={lastBuilt?.requestVars}
             result={result}
             onRetry={() => { void handleRun() }}
           />

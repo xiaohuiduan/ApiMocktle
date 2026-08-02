@@ -12,6 +12,8 @@ export interface CurlBodyInput {
   type: BodyType
   rawText?: string
   parameters?: CurlParam[]
+  /** 仅 Raw 类型：覆盖默认 text/plain 的 Content-Type（如已序列化的 form-data/urlencoded 文本） */
+  rawContentType?: string
 }
 
 export interface CurlInput {
@@ -105,7 +107,10 @@ export function generateCurl(input: CurlInput): CurlOutput {
       : (raw ?? '').trim()
 
     if (payload) {
-      args.push('-H', quoteSingle(`Content-Type: ${contentTypeForBody(bodyType)}`))
+      const contentType = bodyType === BodyType.Raw && body?.rawContentType
+        ? body.rawContentType
+        : contentTypeForBody(bodyType)
+      args.push('-H', quoteSingle(`Content-Type: ${contentType}`))
       args.push('-d', quoteSingle(payload))
     }
   }

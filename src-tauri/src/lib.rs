@@ -21,6 +21,9 @@ pub fn run() {
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir().expect("Failed to get app data dir");
             let db = Arc::new(init_database(&app_data_dir));
+            // 内置动态变量 seed（幂等）+ 引擎定义缓存；失败不阻断启动，IPC 保存时也会刷新
+            db::dynamic_variables_repo::ensure_seed(&db).ok();
+            services::dynamic_variables::refresh_defs(&db).ok();
             let db_http = db.clone();
             app.manage(db);
 
@@ -158,6 +161,12 @@ pub fn run() {
             commands::share_links::list_share_links,
             commands::share_links::get_share_link,
             commands::share_links::delete_share_link,
+            // Dynamic Variables
+            commands::dynamic_variables::resolve_template_batch,
+            commands::dynamic_variables::list_dynamic_variables,
+            commands::dynamic_variables::save_dynamic_variable,
+            commands::dynamic_variables::delete_dynamic_variable,
+            commands::dynamic_variables::test_script,
             // Tokens
         ])
         .run(tauri::generate_context!())

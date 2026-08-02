@@ -532,6 +532,75 @@ fn default_true() -> bool {
     true
 }
 
+// Dynamic Variables（{{$xxx}} 动态变量定义；内置 seed 与用户自定义共用）
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DynamicVariableDef {
+    pub id: String,
+    /// 含 $ 前缀，如 $myToken
+    pub name: String,
+    /// static | expression | script
+    #[serde(rename = "type")]
+    pub var_type: String,
+    /// 静态值 / 函数名 / Rhai 源码
+    pub value: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(rename = "isBuiltin", default)]
+    pub is_builtin: bool,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+/// 保存动态变量入参（id 为空表示新建）
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SaveDynamicVariablePayload {
+    #[serde(default)]
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub var_type: String,
+    pub value: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+/// 单个变量替换片段（start/end 为模板中的字符偏移，供前端高亮渲染）
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ResolvedVar {
+    pub name: String,
+    pub value: String,
+    pub start: usize,
+    pub end: usize,
+}
+
+/// 单字段求值结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResolvedField {
+    pub resolved: String,
+    #[serde(default)]
+    pub vars: Vec<ResolvedVar>,
+    /// 求值诊断（变量错误/缺失等，不影响发送）
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub errors: Vec<String>,
+}
+
+/// 脚本试运行结果（管理面板调试输出）
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScriptTestResult {
+    /// print 输出
+    pub output: String,
+    /// 脚本返回值（转字符串）
+    pub result: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
 impl<T: Serialize> ApiResult<T> {
     pub fn success(data: T) -> Self {
         ApiResult {

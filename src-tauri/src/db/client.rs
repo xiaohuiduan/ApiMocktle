@@ -317,6 +317,23 @@ fn run_migrations(conn: &Connection) {
         CREATE INDEX IF NOT EXISTS idx_cookie_jar_user_domain ON cookie_jar(user_id, domain);
         ",
     ).ok();
+
+    // 动态变量（{{$xxx}}）：内置 seed + 用户自定义，求值统一入口
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS dynamic_variables (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            var_type TEXT NOT NULL,
+            value TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            is_builtin INTEGER NOT NULL DEFAULT 0,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        ",
+    ).ok();
 }
 
 pub fn init_database(app_data_dir: &PathBuf) -> Db {

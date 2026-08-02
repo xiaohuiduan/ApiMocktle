@@ -42,7 +42,7 @@ import { HeadersParamsPanel } from './params/HeadersParamsPanel'
 import { QueryParamsPanel } from './params/QueryParamsPanel'
 import { ScriptsPanel } from './params/ScriptsPanel'
 import { buildJsoncBodyFillText } from './bodyJsonc'
-import { buildRequest } from './buildRequest'
+import { buildRequest, type BuildRequestResult } from './buildRequest'
 import { generateCurl } from './curl'
 import { parseHistoryParams } from './historyUtils'
 import { executeScript } from './scripts'
@@ -171,6 +171,8 @@ export function QuickRequestRun() {
   const [saving, setSaving] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [insecureSkipVerify, setInsecureSkipVerify] = useState(false)
+  // 最近一次实际发送的请求（变量已解析），驱动 cURL 快照
+  const [lastBuilt, setLastBuilt] = useState<BuildRequestResult | null>(null)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
 
@@ -379,7 +381,7 @@ export function QuickRequestRun() {
     ]
 
     // 统一通过共享核心构建请求（URL/Query/Header/Cookie/Body），cookie 序列化已内置于 buildRequest
-    const built = buildRequest({
+    const built = await buildRequest({
       method: workCopy.method ?? DEFAULT_METHOD,
       baseUrl: envBaseUrl,
       path: workCopy.path,
@@ -412,6 +414,7 @@ export function QuickRequestRun() {
       insecureSkipVerify,
     })
     const { url, headers, bodyText } = built
+    setLastBuilt(built)
 
     // ====== 前置脚本执行 ======
     if (workCopy.preScript?.trim()) {
@@ -815,44 +818,71 @@ export function QuickRequestRun() {
         resultArea={(
           <ResultViewer
             curlContent={(() => {
-              const curlEnvParams = currentEnv?.parameters ?? { header: [], cookie: [], query: [], body: [] }
-              const base = envBaseUrl.replace(/\/$/, '')
-              const resolvedPath = resolveVars(workCopy.path ?? '/')
-              const curlUrl = /^https?:\/\//i.test(resolvedPath)
-                ? resolvedPath
-                : base
-                  ? `${base}${resolvedPath}`
-                  : resolvedPath
-              const { linux, windows } = generateCurl({
-                method: workCopy.method ?? DEFAULT_METHOD,
-                url: curlUrl,
-                headers: mergeParams(
-                  (projectEnvironmentConfig?.globalParameters?.header ?? []).filter((p) => p.enable !== false),
-                  curlEnvParams.header.filter((p) => p.enable !== false),
-                  workCopy.parameters?.header ?? [],
-                ),
-                query: mergeParams(
-                  (projectEnvironmentConfig?.globalParameters?.query ?? []).filter((p) => p.enable !== false),
-                  curlEnvParams.query.filter((p) => p.enable !== false),
-                  workCopy.parameters?.query ?? [],
-                ),
-                cookie: mergeParams(
-                  (projectEnvironmentConfig?.globalParameters?.cookie ?? []).filter((p) => p.enable !== false),
-                  curlEnvParams.cookie.filter((p) => p.enable !== false),
-                  workCopy.parameters?.cookie ?? [],
-                ),
-                body: workCopy.requestBody
-                  ? {
-                      type: workCopy.requestBody.type,
-                      rawText: bodyRawText ?? workCopy.requestBody.rawText,
-                      parameters: [
-                        ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map((p) => ({ name: p.name, enable: p.enable, example: p.value! })),
-                        ...curlEnvParams.body.map((p) => ({ name: p.name, enable: p.enable, example: p.value! })),
-                        ...(workCopy.requestBody.parameters ?? []),
-                      ],
-                    }
-                  : undefined,
-              })
+              // 有发送记录：cURL 为最近一次实际值快照（变量已解析）
+              let curlInput
+              let bodyType: BodyType | undefined
+
+              if (lastBuilt) {
+                bodyType = lastBuilt.contentType === 'application/json'
+                  ? BodyType.Json
+                  : lastBuilt.contentType === 'application/xml'
+                    ? BodyType.Xml
+                    : BodyType.Raw
+                curlInput = {
+                  method: lastBuilt.method,
+                  url: lastBuilt.url,
+                  headers: lastBuilt.headers.map((h) => ({ name: h.name, example: h.value })),
+                  body: lastBuilt.bodyText
+                    ? {
+                        type: bodyType,
+                        rawText: lastBuilt.bodyText,
+                        rawContentType: bodyType === BodyType.Raw ? lastBuilt.contentType : undefined,
+                      }
+                    : undefined,
+                }
+              }
+              else {
+                const curlEnvParams = currentEnv?.parameters ?? { header: [], cookie: [], query: [], body: [] }
+                const base = envBaseUrl.replace(/\/$/, '')
+                const resolvedPath = resolveVars(workCopy.path ?? '/')
+                const curlUrl = /^https?:\/\//i.test(resolvedPath)
+                  ? resolvedPath
+                  : base
+                    ? `${base}${resolvedPath}`
+                    : resolvedPath
+                curlInput = {
+                  method: workCopy.method ?? DEFAULT_METHOD,
+                  url: curlUrl,
+                  headers: mergeParams(
+                    (projectEnvironmentConfig?.globalParameters?.header ?? []).filter((p) => p.enable !== false),
+                    curlEnvParams.header.filter((p) => p.enable !== false),
+                    workCopy.parameters?.header ?? [],
+                  ),
+                  query: mergeParams(
+                    (projectEnvironmentConfig?.globalParameters?.query ?? []).filter((p) => p.enable !== false),
+                    curlEnvParams.query.filter((p) => p.enable !== false),
+                    workCopy.parameters?.query ?? [],
+                  ),
+                  cookie: mergeParams(
+                    (projectEnvironmentConfig?.globalParameters?.cookie ?? []).filter((p) => p.enable !== false),
+                    curlEnvParams.cookie.filter((p) => p.enable !== false),
+                    workCopy.parameters?.cookie ?? [],
+                  ),
+                  body: workCopy.requestBody
+                    ? {
+                        type: workCopy.requestBody.type,
+                        rawText: bodyRawText ?? workCopy.requestBody.rawText,
+                        parameters: [
+                          ...(projectEnvironmentConfig?.globalParameters?.body ?? []).map((p) => ({ name: p.name, enable: p.enable, example: p.value! })),
+                          ...curlEnvParams.body.map((p) => ({ name: p.name, enable: p.enable, example: p.value! })),
+                          ...(workCopy.requestBody.parameters ?? []),
+                        ],
+                      }
+                    : undefined,
+                }
+              }
+
+              const { linux, windows } = generateCurl(curlInput)
 
               return (
                 <div className="flex flex-col gap-3">
@@ -893,6 +923,7 @@ export function QuickRequestRun() {
             })()}
             error={error}
             menuItemId={isCreating ? undefined : tabData.key}
+            requestVars={lastBuilt?.requestVars}
             result={result}
             onRetry={() => { void handleRun() }}
           />

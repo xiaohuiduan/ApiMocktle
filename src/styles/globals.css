@@ -399,3 +399,16 @@ html:not(.theme-ready) * {
     transform: translateY(0);
   }
 }
+
+/* 动态变量替换片段高亮（Runtab 请求展示区；hover 显示原变量名） */
+.var-highlight {
+  background-color: rgba(250, 204, 21, 0.22);
+  border-bottom: 1px dashed rgba(202, 138, 4, 0.75);
+  border-radius: 2px;
+  padding: 0 2px;
+  cursor: help;
+}
+
+.var-highlight:hover {
+  background-color: rgba(250, 204, 21, 0.4);
+}

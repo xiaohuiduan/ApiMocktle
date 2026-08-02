@@ -66,57 +66,9 @@ pub struct AssertionResult {
 pub struct TestEngine;
 
 impl TestEngine {
-    /// 内置动态变量求值（{{$xxx}} 语法，与 Postman 核心集对齐；不支持的值原样返回）
-    fn resolve_dynamic_variable(name: &str) -> Option<String> {
-        use rand::Rng;
-        use uuid::Uuid;
-
-        let mut rng = rand::thread_rng();
-        match name {
-            "$timestamp" => Some(chrono::Utc::now().timestamp().to_string()),
-            "$timestampISO" => Some(chrono::Utc::now().to_rfc3339()),
-            "$guid" => Some(Uuid::new_v4().to_string()),
-            "$randomUUID" => Some(Uuid::new_v4().simple().to_string()),
-            "$randomInt" => Some(rng.gen_range(0..=1000).to_string()),
-            "$randomEmail" => {
-                let local: String = (0..8).map(|_| rng.gen_range(b'a'..=b'z') as char).collect();
-                Some(format!("{}@example.com", local))
-            }
-            "$randomIP" => {
-                let ip = format!(
-                    "{}.{}.{}.{}",
-                    rng.gen_range(1..=255),
-                    rng.gen_range(0..=255),
-                    rng.gen_range(0..=255),
-                    rng.gen_range(1..=255)
-                );
-                Some(ip)
-            }
-            "$randomMobile" => {
-                let prefix = rng.gen_range(130..=199);
-                let tail: String = (0..8).map(|_| rng.gen_range(b'0'..=b'9') as char).collect();
-                Some(format!("{}{}", prefix, tail))
-            }
-            "$randomString" => {
-                let s: String = (0..8)
-                    .map(|_| {
-                        let c = rng.gen_range(b'a'..=b'z');
-                        (if rng.gen_bool(0.5) { c.to_ascii_uppercase() } else { c }) as char
-                    })
-                    .collect();
-                Some(s)
-            }
-            "$processEnv" => None,
-            _ if name.starts_with("$processEnv:") || name.starts_with("$processEnv.") => {
-                let key = name.trim_start_matches("$processEnv:").trim_start_matches("$processEnv.");
-                Some(std::env::var(key).unwrap_or_default())
-            }
-            _ => None,
-        }
-    }
-
     /// Variable template replacement: replace {{varName}} with actual values
-    /// 先替换内置动态变量（{{$xxx}}），再替换用户变量
+    /// 先替换用户变量，再统一走动态变量单点求值（Rhai 引擎 + DB 定义，
+    /// 与手动请求同一实现；{{$xxx}} 未知/错误原样保留）
     pub fn interpolate_variables(template: &str, variables: &HashMap<String, String>) -> String {
         let mut result = template.to_string();
         for (key, value) in variables {
@@ -124,13 +76,7 @@ impl TestEngine {
             result = result.replace(&placeholder, value);
         }
         // 内置动态变量最后替换，避免用户变量名与内置函数冲突
-        let dynamic_re = Regex::new(r"\{\{(\$[\w:.]+)\}\}").unwrap();
-        result = dynamic_re
-            .replace_all(&result, |caps: &regex::Captures| {
-                let name = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-                Self::resolve_dynamic_variable(name).unwrap_or_else(|| format!("{{{{{}}}}}", name))
-            })
-            .to_string();
+        result = crate::services::dynamic_variables::resolve_field(&result).resolved;
         result
     }
 
@@ -1000,6 +946,9 @@ pub async fn execute_task_full(
     let mut failed_count: i32 = 0;
     let mut skipped_count: i32 = 0;
 
+    // 未解析动态变量检测用正则（与 dynamic_variables 的 PLACEHOLDER_RE 同构）
+    let unresolved_re = Regex::new(r"\{\{(\$[\w:.]+(?:\([^)]*\))?)\}\}").expect("静态正则");
+
     // 5. Loop through steps sequentially
     for (index, step) in enabled_steps.iter().enumerate() {
         let step_start = Instant::now();
@@ -1241,6 +1190,27 @@ pub async fn execute_task_full(
             Some(serde_json::to_value(&variable_deltas).unwrap_or(serde_json::json!({})))
         };
 
+        // 动态变量求值失败/未定义残留检测（脚本错误、未知变量等）→ 进测试报告
+        let var_error_message = {
+            let mut names: Vec<String> = Vec::new();
+            if let Some(rj) = &request_json {
+                for caps in unresolved_re.captures_iter(&rj.to_string()) {
+                    let name = caps.get(1).map(|m| m.as_str()).unwrap_or("").to_string();
+                    if !names.contains(&name) { names.push(name); }
+
+                    if names.len() >= 3 { break; }
+                }
+            }
+            if names.is_empty() {
+                None
+            } else {
+                Some(format!(
+                    "包含未解析的动态变量（{} 原样发送），请检查变量定义或脚本",
+                    names.join(", ")
+                ))
+            }
+        };
+
         let result = TestStepResult {
             id: uuid::Uuid::new_v4().to_string(),
             execution_id: execution_id.clone(),
@@ -1252,7 +1222,7 @@ pub async fn execute_task_full(
             script_results_json: None,
             variable_deltas_json,
             duration_ms,
-            error_message: None,
+            error_message: var_error_message,
             executed_at: chrono::Utc::now().to_rfc3339(),
         };
         let _ = test_repo::create_step_result(db, &result);
@@ -1310,6 +1280,29 @@ pub async fn execute_task_full(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::dynamic_variables::TEST_LOCK;
+
+    /// 动态变量求值依赖引擎单例的 DB 定义缓存：注入内置 seed，保证测试可解析
+    fn seed_dynamic_defs() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE dynamic_variables (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                var_type TEXT NOT NULL,
+                value TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                is_builtin INTEGER NOT NULL DEFAULT 0,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );",
+        )
+        .unwrap();
+        let db = crate::db::client::Db(std::sync::Mutex::new(conn));
+        crate::db::dynamic_variables_repo::ensure_seed(&db).unwrap();
+        crate::services::dynamic_variables::DynamicVarEngine::instance().refresh_defs(&db).unwrap();
+    }
 
     #[test]
     fn test_interpolate_variables() {
@@ -1372,6 +1365,8 @@ mod tests {
 
     #[test]
     fn test_interpolate_dynamic_variables() {
+        let _g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        seed_dynamic_defs();
         let vars = HashMap::new();
 
         // 时间戳类
@@ -1418,7 +1413,9 @@ mod tests {
 
     #[test]
     fn test_interpolate_dynamic_variables_repeat() {
-        // 每次出现独立求值（两次值可以不同，但至少都能解析为数字）
+        let _g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        seed_dynamic_defs();
+        // 同一字段内同名同参只求值一次（复用），两次出现值一致且可解析为数字
         let vars = HashMap::new();
         let out = TestEngine::interpolate_variables("{{$randomInt}}-{{$randomInt}}", &vars);
         let parts: Vec<&str> = out.split('-').collect();

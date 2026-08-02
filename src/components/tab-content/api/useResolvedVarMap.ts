@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 
-import { resolveDynamicVariables } from '@/utils/dynamic-variables'
+import { api } from '@/api-client'
 
 export interface EnvVarInput {
   name?: string
@@ -62,15 +62,35 @@ export function buildVarMaps(input: VarMapInput): ResolvedVarMaps {
   return { varMap, globalsMap, envMap }
 }
 
-/** 生成 {{var}} 替换函数；内置动态变量（{{$xxx}}）与用户变量均支持 */
+/** Rust 返回的变量替换位置（字符偏移） */
+export interface ResolvedVar {
+  name: string
+  value: string
+  start: number
+  end: number
+}
+
+/** 单字段求值结果 */
+export interface ResolvedField {
+  resolved: string
+  vars: ResolvedVar[]
+  errors: string[]
+}
+
+/**
+ * 批量解析动态变量（{{$xxx}}）：一次 IPC 交给 Rust 单点求值（Rhai 引擎），
+ * 返回与输入同序的替换结果（含替换位置映射，供展示区高亮）。
+ * 用户变量（{{var}}）由 makeResolveVars 本地替换。
+ */
+export async function resolveTemplateBatch(fields: string[]): Promise<ResolvedField[]> {
+  return api<ResolvedField[]>('resolve_template_batch', { fields })
+}
+
+/** 生成 {{var}} 替换函数（用户变量；内置动态变量 {{$xxx}} 已由 IPC 预处理） */
 export function makeResolveVars(varMap: Map<string, string>): (val: string) => string {
   return (s: string) => {
-    // 1. 内置动态变量（{{$timestamp}} 等），每次求值重新生成
-    let resolved = resolveDynamicVariables(s)
-    // 2. 用户变量（{{name}}），未命中保留原样
-    resolved = resolved.replace(/\{\{(\w+)\}\}/g, (_, name) => varMap.get(name) ?? `{{${name}}}`)
-
-    return resolved
+    // 用户变量（{{name}}），未命中保留原样
+    return s.replace(/\{\{(\w+)\}\}/g, (_, name) => varMap.get(name) ?? `{{${name}}}`)
   }
 }
 

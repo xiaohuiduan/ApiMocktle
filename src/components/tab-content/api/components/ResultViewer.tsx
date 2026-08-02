@@ -26,12 +26,14 @@ import { useStyles } from '@/hooks/useStyle'
 import type { ApiRunResult } from '@/types'
 
 import { buildMarkdownReport, downloadText } from '../exportMarkdown'
+import type { ResolvedVar } from '../useResolvedVarMap'
 import { calcBodySize, detectLanguage, getStatusColor, headerTableColumns } from '../utils'
 
 import { ErrorDisplay } from './ErrorDisplay'
 import { formatTime } from './HistoryPanel'
 import { MarkdownDiffView } from './MarkdownDiffView'
 import { ResponseBodyViewer } from './ResponseBodyViewer'
+import { renderVarHighlight } from './VarHighlightText'
 
 import { css } from '@emotion/css'
 
@@ -41,6 +43,14 @@ interface ResultViewerProps {
   curlContent?: ReactNode
   onRetry?: () => void
   menuItemId?: string
+  /** 最近一次实际发送请求的变量位置映射（有则请求内容/请求头展示高亮） */
+  requestVars?: {
+    urlBase: string
+    urlPath: { resolved: string, vars: ResolvedVar[] }
+    urlQuery: string
+    headers: ({ name: string, resolved: string, vars: ResolvedVar[] } | null)[]
+    body: { resolved: string, vars: ResolvedVar[] } | null
+  }
 }
 
 interface HistoryPickItem {
@@ -51,7 +61,7 @@ interface HistoryPickItem {
   createdAt: string
 }
 
-export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }: ResultViewerProps) {
+export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, requestVars }: ResultViewerProps) {
   const { token } = theme.useToken()
   const { proxyConfig } = useProxyConfig()
   const { projectId } = useParams()
@@ -187,9 +197,23 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
         <div className="flex h-full min-h-0 flex-col">
           <div className="shrink-0 rounded p-1 text-xs" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace' }}>
             <span className="font-medium opacity-60">URL: </span>
-            <span className="break-all">{result.url ?? '-'}</span>
+            {requestVars
+              ? (
+                  <span className="break-all">
+                    <span className="opacity-80">{requestVars.urlBase}</span>
+                    {renderVarHighlight(requestVars.urlPath.resolved, requestVars.urlPath.vars, 'url-path')}
+                    {requestVars.urlQuery && <span className="opacity-80">{`?${requestVars.urlQuery}`}</span>}
+                  </span>
+                )
+              : <span className="break-all">{result.url ?? '-'}</span>}
           </div>
-          {result.requestBodyText && (
+          {requestVars?.body && (
+            <div className="mt-1 shrink-0 rounded p-1 text-xs" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace' }}>
+              <span className="font-medium opacity-60">Body: </span>
+              <span className="whitespace-pre-wrap break-all">{renderVarHighlight(requestVars.body.resolved, requestVars.body.vars, 'req-body')}</span>
+            </div>
+          )}
+          {!requestVars?.body && result.requestBodyText && (
             <div className="mt-1 min-h-0 flex-1">
               <MonacoEditor
                 height="100%"
@@ -210,7 +234,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
               />
             </div>
           )}
-          {!result.requestBodyText && (!result.requestBodyParameters || result.requestBodyParameters.length === 0) && (
+          {!requestVars?.body && !result.requestBodyText && (!result.requestBodyParameters || result.requestBodyParameters.length === 0) && (
             <Typography.Text className="text-xs" type="secondary">无请求体</Typography.Text>
           )}
         </div>
@@ -218,18 +242,49 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId }
     },
     {
       key: 'reqHeaders',
-      label: `请求头${result.requestHeaders?.length ? ` (${result.requestHeaders.length})` : ''}`,
-      children: result.requestHeaders && result.requestHeaders.length > 0
+      label: `请求头${requestVars
+        ? (requestVars.headers.length ? ` (${requestVars.headers.length})` : '')
+        : (result.requestHeaders?.length ? ` (${result.requestHeaders.length})` : '')}`,
+      children: requestVars
         ? (
-            <Table
-              columns={headerTableColumns}
-              dataSource={result.requestHeaders}
-              pagination={false}
-              rowKey="name"
-              size="small"
-            />
+            requestVars.headers.length > 0
+              ? (
+                  <Table
+                    columns={[
+                      ...headerTableColumns.slice(0, 1),
+                      {
+                        title: '值',
+                        dataIndex: 'value',
+                        key: 'value',
+                        render: (_: unknown, __: unknown, index: number) => {
+                          const f = requestVars.headers[index]
+
+                          return f ? renderVarHighlight(f.resolved, f.vars, `req-hdr-${index}`) : null
+                        },
+                      },
+                    ]}
+                    dataSource={requestVars.headers.map((f, i) => ({
+                      name: f?.name ?? result.requestHeaders?.[i]?.name ?? '',
+                      value: f?.resolved ?? result.requestHeaders?.[i]?.value ?? '',
+                    }))}
+                    pagination={false}
+                    rowKey="name"
+                    size="small"
+                  />
+                )
+              : <Typography.Text className="text-xs" type="secondary">无请求头</Typography.Text>
           )
-        : <Typography.Text className="text-xs" type="secondary">无请求头</Typography.Text>,
+        : result.requestHeaders && result.requestHeaders.length > 0
+          ? (
+              <Table
+                columns={headerTableColumns}
+                dataSource={result.requestHeaders}
+                pagination={false}
+                rowKey="name"
+                size="small"
+              />
+            )
+          : <Typography.Text className="text-xs" type="secondary">无请求头</Typography.Text>,
     },
     {
       key: 'curl',

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { Input, type InputRef, Popover, Tag, theme, Tooltip } from 'antd'
 
-import { DYNAMIC_VARIABLE_DEFS } from '@/utils/dynamic-variables'
+import { useDynamicVariableDefs } from '@/hooks/useDynamicVariableDefs'
 
 interface VarHighlightInputProps {
   value?: string
@@ -43,18 +43,19 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [dropdownFilter, setDropdownFilter] = useState('')
 
+  const dynamicDefs = useDynamicVariableDefs()
   const referencedVars = useMemo(() => extractVarNames(value), [value])
   const definedVars = referencedVars.filter((n) => varMap.has(n))
   const undefinedVars = referencedVars.filter((n) => !varMap.has(n))
 
   /** 动态变量补全项（全部，过滤在下方） */
   const dynamicItems: CompletionItem[] = useMemo(() => {
-    return DYNAMIC_VARIABLE_DEFS.map((d) => ({
+    return dynamicDefs.map((d) => ({
       label: d.name,
       detail: d.desc,
       isDynamic: true,
     }))
-  }, [])
+  }, [dynamicDefs])
 
   /** 用户变量补全项（已定义的，带当前值） */
   const userItems: CompletionItem[] = useMemo(() => {

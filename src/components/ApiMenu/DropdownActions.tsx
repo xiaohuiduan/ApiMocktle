@@ -287,7 +287,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
         continue
       }
 
-      const built = buildRequest({
+      const built = await buildRequest({
         method: details.method ?? 'GET',
         baseUrl: envBaseUrl,
         path: details.path,
