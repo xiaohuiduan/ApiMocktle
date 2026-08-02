@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
