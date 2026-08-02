@@ -3,18 +3,27 @@ use rusqlite::{params, Connection, OptionalExtension};
 use crate::errors::AppError;
 use crate::models::{DynamicVariableDef, SaveDynamicVariablePayload};
 
-/// 内置动态变量 seed（expression 类型，value 为 Rhai 引擎注册函数名）。
+/// 内置动态变量 seed（script 类型，值为 Rhai 脚本，调用引擎注册函数）。
+/// 带参内置（$randomInt/$randomString）用预置 args 数组做条件消费：有参用参数，无参用默认。
 /// 求值代码内无硬编码变量清单；$processEnv 前缀为特判，不入库。
 const BUILTIN_SEED: &[(&str, &str, &str)] = &[
-    ("$timestamp", "timestamp", "秒级时间戳"),
-    ("$timestampISO", "timestamp_iso", "ISO 8601 时间"),
-    ("$guid", "guid", "UUID（带横线）"),
-    ("$randomUUID", "random_uuid", "UUID（32 位无横线）"),
-    ("$randomInt", "random_int", "0-1000 随机整数（可带参 min,max）"),
-    ("$randomEmail", "random_email", "随机邮箱"),
-    ("$randomIP", "random_ip", "随机 IPv4 地址"),
-    ("$randomMobile", "random_mobile", "11 位随机手机号"),
-    ("$randomString", "random_string", "8 位随机字母字符串（可带参长度）"),
+    ("$timestamp", "timestamp()", "秒级时间戳"),
+    ("$timestampISO", "timestamp_iso()", "ISO 8601 时间"),
+    ("$guid", "guid()", "UUID（带横线）"),
+    ("$randomUUID", "random_uuid()", "UUID（32 位无横线）"),
+    (
+        "$randomInt",
+        "if args.len() >= 2 { random_int(args[0], args[1]) } else { random_int(0, 1000) }",
+        "0-1000 随机整数（可带参 min,max，如 {{$randomInt(1,100)}}）",
+    ),
+    ("$randomEmail", "random_email()", "随机邮箱"),
+    ("$randomIP", "random_ip()", "随机 IPv4 地址"),
+    ("$randomMobile", "random_mobile()", "11 位随机手机号"),
+    (
+        "$randomString",
+        "if args.len() >= 1 { random_string(args[0]) } else { random_string(8) }",
+        "8 位随机字母字符串（可带参长度，如 {{$randomString(16)}}）",
+    ),
 ];
 
 pub fn row_to_def(row: &rusqlite::Row) -> Result<DynamicVariableDef, rusqlite::Error> {
@@ -55,12 +64,18 @@ pub fn get_by_name(db: &crate::db::client::Db, name: &str) -> Result<Option<Dyna
 
 pub fn ensure_seed(db: &crate::db::client::Db) -> Result<(), AppError> {
     let conn = db.0.lock().unwrap();
-    for (name, func, desc) in BUILTIN_SEED {
+    for (name, script, desc) in BUILTIN_SEED {
         conn.execute(
             "INSERT OR IGNORE INTO dynamic_variables
              (id, name, var_type, value, description, is_builtin, enabled, created_at, updated_at)
-             VALUES (?1, ?2, 'expression', ?3, ?4, 1, 1, ?5, ?5)",
-            params![uuid::Uuid::new_v4().to_string(), name, func, desc, chrono::Utc::now().to_rfc3339()],
+             VALUES (?1, ?2, 'script', ?3, ?4, 1, 1, ?5, ?5)",
+            params![uuid::Uuid::new_v4().to_string(), name, script, desc, chrono::Utc::now().to_rfc3339()],
+        )?;
+        // 内置行脚本同步为最新 seed（存量库迁移后 value 可能是旧形式；内置 value 不可被用户修改，同步安全）
+        conn.execute(
+            "UPDATE dynamic_variables SET var_type = 'script', value = ?1, description = ?2, updated_at = updated_at
+             WHERE name = ?3 AND is_builtin = 1",
+            params![script, desc, name],
         )?;
     }
     Ok(())
@@ -82,8 +97,8 @@ pub fn save(db: &crate::db::client::Db, payload: &SaveDynamicVariablePayload) ->
     if name.len() < 2 {
         return Err(AppError::BadRequest("变量名过短".into()));
     }
-    if !["static", "expression", "script"].contains(&payload.var_type.as_str()) {
-        return Err(AppError::BadRequest("type 必须是 static / expression / script".into()));
+    if payload.var_type != "script" {
+        return Err(AppError::BadRequest("动态变量仅支持 script 类型".into()));
     }
     if payload.value.trim().is_empty() {
         return Err(AppError::BadRequest("value 不能为空".into()));
@@ -142,6 +157,28 @@ pub fn save(db: &crate::db::client::Db, payload: &SaveDynamicVariablePayload) ->
     rows.next().transpose()?.ok_or_else(|| AppError::NotFound("动态变量不存在".into()))
 }
 
+/// 存量 static/expression 统一转 script（幂等；在 ensure_seed 前调用）：
+/// - expression：value 为函数名 → 补括号（random_int → random_int()）；模板带参 {{$randomInt(1,100)}} 走参数注入，兼容
+/// - static：值转义为 Rhai 字符串字面量（引用其他变量的能力已废弃，行为按设计变化）
+pub fn migrate_legacy_types(conn: &Connection) -> Result<(), AppError> {
+    conn.execute(
+        "UPDATE dynamic_variables SET var_type = 'script', value = value || '()' WHERE var_type = 'expression'",
+        [],
+    )?;
+    let static_rows: Vec<(String, String)> = conn
+        .prepare("SELECT id, value FROM dynamic_variables WHERE var_type = 'static'")?
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+        .collect::<Result<Vec<_>, _>>()?;
+    for (id, value) in static_rows {
+        let escaped = format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""));
+        conn.execute(
+            "UPDATE dynamic_variables SET var_type = 'script', value = ?1 WHERE id = ?2",
+            params![escaped, id],
+        )?;
+    }
+    Ok(())
+}
+
 /// 删除（内置变量禁止删除）。
 pub fn delete(db: &crate::db::client::Db, id: &str) -> Result<(), AppError> {
     let conn = db.0.lock().unwrap();
@@ -192,10 +229,10 @@ mod tests {
     fn seed_names_match_builtin() {
         let db = test_db();
         ensure_seed(&db).unwrap();
-        for (name, func, _) in BUILTIN_SEED {
+        for (name, script, _) in BUILTIN_SEED {
             let def = get_by_name(&db, name).unwrap().expect("seed 存在");
-            assert_eq!(def.var_type, "expression");
-            assert_eq!(def.value, *func);
+            assert_eq!(def.var_type, "script");
+            assert_eq!(def.value, *script);
         }
     }
 
@@ -209,7 +246,7 @@ mod tests {
             &SaveDynamicVariablePayload {
                 id: String::new(),
                 name: "$myToken".into(),
-                var_type: "static".into(),
+                var_type: "script".into(),
                 value: "abc123".into(),
                 description: "我的令牌".into(),
                 enabled: true,
@@ -224,7 +261,7 @@ mod tests {
             &SaveDynamicVariablePayload {
                 id: created.id.clone(),
                 name: "$myToken".into(),
-                var_type: "static".into(),
+                var_type: "script".into(),
                 value: "new-value".into(),
                 description: "改过了".into(),
                 enabled: false,
@@ -243,7 +280,7 @@ mod tests {
             &SaveDynamicVariablePayload {
                 id: String::new(),
                 name: "noPrefix".into(),
-                var_type: "static".into(),
+                var_type: "script".into(),
                 value: "x".into(),
                 description: String::new(),
                 enabled: true,
@@ -256,7 +293,7 @@ mod tests {
             &SaveDynamicVariablePayload {
                 id: String::new(),
                 name: "$bad".into(),
-                var_type: "evil".into(),
+                var_type: "static".into(),
                 value: "x".into(),
                 description: String::new(),
                 enabled: true,
@@ -277,15 +314,15 @@ mod tests {
             &SaveDynamicVariablePayload {
                 id: ts.id.clone(),
                 name: "$timestamp".into(),
-                var_type: "static".into(),
+                var_type: "script".into(),
                 value: "hacked".into(),
                 description: "说明改了".into(),
                 enabled: false,
             },
         )
         .unwrap();
-        assert_eq!(updated.value, "timestamp");
-        assert_eq!(updated.var_type, "expression");
+        assert_eq!(updated.value, "timestamp()");
+        assert_eq!(updated.var_type, "script");
         assert_eq!(updated.description, "说明改了");
         assert!(!updated.enabled);
 
@@ -315,6 +352,55 @@ mod tests {
     }
 
     #[test]
+    fn migrate_legacy_types_converts() {
+        let db = test_db();
+        {
+            let conn = db.0.lock().unwrap();
+            let now = chrono::Utc::now().to_rfc3339();
+            conn.execute(
+                "INSERT INTO dynamic_variables (id, name, var_type, value, description, is_builtin, enabled, created_at, updated_at)
+                 VALUES ('e1', '$legacyExpr', 'expression', 'random_int', '', 0, 1, ?1, ?1)",
+                params![now],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO dynamic_variables (id, name, var_type, value, description, is_builtin, enabled, created_at, updated_at)
+                 VALUES ('s1', '$legacyStatic', 'static', 'hello {{$timestamp}}', '', 0, 1, ?1, ?1)",
+                params![now],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO dynamic_variables (id, name, var_type, value, description, is_builtin, enabled, created_at, updated_at)
+                 VALUES ('s2', '$legacyQuote', 'static', 'say \"hi\" / ok', '', 0, 1, ?1, ?1)",
+                params![now],
+            )
+            .unwrap();
+        }
+        {
+            let conn = db.0.lock().unwrap();
+            migrate_legacy_types(&conn).unwrap();
+        }
+        let expr = get_by_name(&db, "$legacyExpr").unwrap().unwrap();
+        assert_eq!(expr.var_type, "script");
+        assert_eq!(expr.value, "random_int()");
+
+        let stat = get_by_name(&db, "$legacyStatic").unwrap().unwrap();
+        assert_eq!(stat.var_type, "script");
+        assert_eq!(stat.value, "\"hello {{$timestamp}}\"");
+
+        // 含引号/反斜杠的 static 值转义正确（Rhai 字符串字面量）
+        let quote = get_by_name(&db, "$legacyQuote").unwrap().unwrap();
+        assert_eq!(quote.value, "\"say \\\"hi\\\" / ok\"");
+
+        // 幂等：二次迁移无变化
+        {
+            let conn = db.0.lock().unwrap();
+            migrate_legacy_types(&conn).unwrap();
+        }
+        assert_eq!(get_by_name(&db, "$legacyExpr").unwrap().unwrap().value, "random_int()");
+    }
+
+    #[test]
     fn name_conflict_rejected() {
         let db = test_db();
         save(
@@ -322,7 +408,7 @@ mod tests {
             &SaveDynamicVariablePayload {
                 id: String::new(),
                 name: "$dup".into(),
-                var_type: "static".into(),
+                var_type: "script".into(),
                 value: "1".into(),
                 description: String::new(),
                 enabled: true,
@@ -334,7 +420,7 @@ mod tests {
             &SaveDynamicVariablePayload {
                 id: String::new(),
                 name: "$dup".into(),
-                var_type: "static".into(),
+                var_type: "script".into(),
                 value: "2".into(),
                 description: String::new(),
                 enabled: true,

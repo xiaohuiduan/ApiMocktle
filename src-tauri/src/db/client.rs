@@ -1,4 +1,4 @@
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -334,6 +334,9 @@ fn run_migrations(conn: &Connection) {
         );
         ",
     ).ok();
+
+    // 动态变量单类型化迁移：存量 static/expression 统一转 script（幂等）
+    crate::db::dynamic_variables_repo::migrate_legacy_types(conn).ok();
 }
 
 pub fn init_database(app_data_dir: &PathBuf) -> Db {

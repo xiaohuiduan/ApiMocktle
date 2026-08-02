@@ -14,9 +14,6 @@ use crate::models::{ResolvedField, ResolvedVar, ScriptTestResult};
 /// 注意 `.` 不匹配 `\r`，CRLF 行尾下 `[^)]*` 不受影响；`[\w:.]` 覆盖冒号与点。
 const PLACEHOLDER_RE: &str = r"\{\{(\$[\w:.]+(?:\([^)]*\))?)\}\}";
 
-/// static 递归替换最大深度（防循环引用）
-const MAX_STATIC_DEPTH: usize = 3;
-
 /// print 输出捕获缓冲。仅在 exec_lock 内读写，不会串台。
 static PRINT_BUFFER: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
@@ -80,6 +77,13 @@ fn register_functions(engine: &mut rhai::Engine) {
     engine.register_fn("random_string", || random_string_impl(8));
     engine.register_fn("random_string", |len: i64| random_string_impl(len.max(0) as usize));
     engine.register_fn("env", |key: &str| std::env::var(key).unwrap_or_default());
+    // Rust/JS 习惯的方法名别名（Rhai 原生为 to_upper/to_lower；返回字符串而非 Result，避免新手踩坑）
+    engine.register_fn("to_uppercase", |s: &str| s.to_uppercase());
+    engine.register_fn("to_lowercase", |s: &str| s.to_lowercase());
+    // Array::join（Rhai 标准库无此方法，JS 习惯写法直接可用）
+    engine.register_fn("join", |arr: rhai::Array, sep: &str| {
+        arr.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(sep)
+    });
 }
 
 impl DynamicVarEngine {
@@ -123,7 +127,6 @@ impl DynamicVarEngine {
         &self,
         name: &str,
         args: Option<&str>,
-        depth: usize,
         cache: &mut HashMap<(String, String), String>,
         errors: &mut Vec<String>,
     ) -> Option<String> {
@@ -143,15 +146,11 @@ impl DynamicVarEngine {
         let def = self.lookup_def(name);
         let result = match def {
             None => None,
-            Some(def) => match def.var_type.as_str() {
-                "static" => Some(self.resolve_static(&def.value, depth, cache, errors)),
-                "expression" => self.eval_expression(&def.value, args, errors),
-                "script" => self.eval_script(&def.value, errors),
-                other => {
-                    errors.push(format!("{{{{{name}}}}}: 未知类型 {other}"));
-                    None
-                }
-            },
+            Some(def) if def.var_type == "script" => self.eval_script(&def.value, args, errors),
+            Some(def) => {
+                errors.push(format!("{{{{{name}}}}}: 未知类型 {}", def.var_type));
+                None
+            }
         };
 
         if let Some(ref v) = result {
@@ -160,44 +159,21 @@ impl DynamicVarEngine {
         result
     }
 
-    /// static：值作模板递归替换（深度 ≤ MAX_STATIC_DEPTH）
-    fn resolve_static(
-        &self,
-        template: &str,
-        depth: usize,
-        cache: &mut HashMap<(String, String), String>,
-        errors: &mut Vec<String>,
-    ) -> String {
-        if depth >= MAX_STATIC_DEPTH || !template.contains("{{") {
-            return template.to_string();
-        }
-        self.resolve_template_impl(template, depth, cache, errors)
-    }
+    /// 脚本执行（唯一变量类型）。模板参数 {{$xxx(1,2)}} 注入为预置数组变量 args（args[0]/args[1]）；
+    /// 无参时注入空数组 `let args = [];`（脚本可统一用 `args.len()` 判断是否有参数）。
+    /// AST 缓存 key 为注入后的完整源码（参数变化重新编译；同参命中缓存）。
+    fn eval_script(&self, source: &str, args: Option<&str>, errors: &mut Vec<String>) -> Option<String> {
+        let full_source = format!("let args = [{}];\n{}", inject_args(args.unwrap_or("")), source);
 
-    fn eval_expression(&self, func: &str, args: Option<&str>, errors: &mut Vec<String>) -> Option<String> {
-        let expr = match args {
-            Some(a) if !a.trim().is_empty() => format!("{func}({a})"),
-            _ => format!("{func}()"),
-        };
-        match self.engine.eval::<Dynamic>(&expr) {
-            Ok(v) => Some(dynamic_to_string(v)),
-            Err(e) => {
-                errors.push(format!("{expr}: {e}"));
-                None
-            }
-        }
-    }
-
-    fn eval_script(&self, source: &str, errors: &mut Vec<String>) -> Option<String> {
         let ast = {
             let mut cache = self.script_cache.lock().unwrap();
-            if let Some(a) = cache.get(source) {
+            if let Some(a) = cache.get(&full_source) {
                 a.clone()
             } else {
-                match self.engine.compile(source) {
+                match self.engine.compile(&full_source) {
                     Ok(a) => {
                         let arc = std::sync::Arc::new(a);
-                        cache.insert(source.to_string(), arc.clone());
+                        cache.insert(full_source.clone(), arc.clone());
                         arc
                     }
                     Err(e) => {
@@ -214,33 +190,6 @@ impl DynamicVarEngine {
                 None
             }
         }
-    }
-
-    /// 模板求值（static 递归的公共路径；depth 为当前层，内层 eval_var 递进）
-    fn resolve_template_impl(
-        &self,
-        text: &str,
-        depth: usize,
-        cache: &mut HashMap<(String, String), String>,
-        errors: &mut Vec<String>,
-    ) -> String {
-        let re = Regex::new(PLACEHOLDER_RE).expect("静态正则");
-        let mut result = text.to_string();
-        // 逆序替换避免偏移错乱
-        let matches: Vec<(usize, usize, String)> = re
-            .find_iter(text)
-            .map(|m| (m.start(), m.end(), m.as_str().to_string()))
-            .collect();
-
-        for (start, end, full) in matches.into_iter().rev() {
-            let inner = &full[2..full.len() - 2]; // 去掉 {{ }}
-            let (name, args) = split_name_args(inner);
-            let value = self.eval_var(&name, args.as_deref(), depth + 1, cache, errors);
-            if let Some(v) = value {
-                result.replace_range(start..end, &v);
-            }
-        }
-        result
     }
 
     /// 求值单个字段：返回替换后文本 + 变量位置映射（字符偏移）+ 诊断。
@@ -263,7 +212,7 @@ impl DynamicVarEngine {
         for (start, end, full) in matches.into_iter().rev() {
             let inner = &full[2..full.len() - 2];
             let (name, args) = split_name_args(inner);
-            let value = self.eval_var(&name, args.as_deref(), 0, &mut cache, &mut errors);
+            let value = self.eval_var(&name, args.as_deref(), &mut cache, &mut errors);
             if let Some(v) = value {
                 // 字节偏移 → 字符偏移（前端按 char 索引渲染）
                 let start_chars = text[..start].chars().count();
@@ -277,11 +226,12 @@ impl DynamicVarEngine {
         ResolvedField { resolved: result, vars, errors }
     }
 
-    /// 脚本试运行（不落库、不进 AST 缓存）
-    pub fn test_script(&self, script: &str) -> ScriptTestResult {
+    /// 脚本试运行（不落库、不进 AST 缓存）。与变量求值一致：参数注入预置 args 数组（无参注入空数组）。
+    pub fn test_script(&self, script: &str, args: Option<&str>) -> ScriptTestResult {
         let _guard = self.exec_lock.lock().unwrap();
         PRINT_BUFFER.lock().unwrap().clear();
-        let result = self.engine.eval::<Dynamic>(script);
+        let full_source = format!("let args = [{}];\n{}", inject_args(args.unwrap_or("")), script);
+        let result = self.engine.eval::<Dynamic>(&full_source);
         let output = PRINT_BUFFER.lock().unwrap().join("\n");
         match result {
             Ok(v) => ScriptTestResult { output, result: dynamic_to_string(v), error: None },
@@ -298,6 +248,26 @@ fn split_name_args(inner: &str) -> (String, Option<String>) {
         }
         _ => (inner.to_string(), None),
     }
+}
+
+/// 模板参数串 → Rhai 数组字面量元素：数字/布尔原样，其余转字符串字面量（转义引号与反斜杠）。
+/// 如 "1,100" → "1, 100"；"1,abc" → "1, \"abc\""。结果拼为 `let args = [...]` 注入脚本。
+fn inject_args(args: &str) -> String {
+    let trimmed = args.trim();
+    if trimmed.is_empty() {
+        return String::new(); // 空参数 → `let args = [];`（split 对空串会返回一个空元素，需特判）
+    }
+    trimmed.split(',')
+        .map(|p| p.trim())
+        .map(|p| {
+            if p.parse::<f64>().is_ok() || p == "true" || p == "false" {
+                p.to_string()
+            } else {
+                format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\""))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn dynamic_to_string(v: Dynamic) -> String {
@@ -431,30 +401,62 @@ mod tests {
     }
 
     #[test]
-    fn static_recursive_and_cycle_guard() {
+    fn script_args_injection() {
         let _g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let db = test_db();
         let engine = DynamicVarEngine::instance();
-        // 静态变量引用其他变量
+        // 脚本内通过预置 args 数组读取模板参数
         let defs = vec![
-            ("$greet".to_string(), VarDef { var_type: "static".into(), value: "hello {{$who}}".into() }),
-            ("$who".to_string(), VarDef { var_type: "static".into(), value: "world".into() }),
+            (
+                "$echo".to_string(),
+                VarDef { var_type: "script".into(), value: "`${args[0]}-${args[1]}`".into() },
+            ),
+            (
+                "$sum".to_string(),
+                VarDef { var_type: "script".into(), value: "args[0] + args[1]".into() },
+            ),
+            (
+                "$greet".to_string(),
+                VarDef { var_type: "script".into(), value: "`hello ${args[0]}`".into() },
+            ),
         ]
         .into_iter()
         .collect::<HashMap<_, _>>();
         *engine.defs.lock().unwrap() = defs;
-        let r = engine.resolve_field("{{$greet}}!");
-        assert_eq!(r.resolved, "hello world!");
 
-        // 循环引用不栈溢出（深度 3 展开三层）
-        let defs = vec![
-            ("$a".to_string(), VarDef { var_type: "static".into(), value: "x{{$b}}".into() }),
-            ("$b".to_string(), VarDef { var_type: "static".into(), value: "y{{$a}}".into() }),
-        ]
+        // 数字参数
+        let r = engine.resolve_field("{{$echo(1,100)}}");
+        assert_eq!(r.resolved, "1-100");
+
+        // 数值计算（args 为 Rhai 数组，元素为 i64）
+        let r = engine.resolve_field("{{$sum(20,22)}}");
+        assert_eq!(r.resolved, "42");
+
+        // 字符串参数（自动转字符串字面量）
+        let r = engine.resolve_field("{{$greet(world)}}");
+        assert_eq!(r.resolved, "hello world");
+
+        // 恢复 defs
+        engine_with_defs(&db);
+    }
+
+    #[test]
+    fn script_args_absent_keeps_script_runnable() {
+        let _g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let db = test_db();
+        let engine = DynamicVarEngine::instance();
+        let defs = vec![(
+            "$noarg".to_string(),
+            VarDef { var_type: "script".into(), value: "1 + 1".into() },
+        )]
         .into_iter()
         .collect::<HashMap<_, _>>();
         *engine.defs.lock().unwrap() = defs;
-        let r = engine.resolve_field("{{$a}}");
-        assert_eq!(r.resolved, "xyxy{{$a}}");
+        // 无参时脚本原样执行（不注入 args）
+        let r = engine.resolve_field("{{$noarg}}");
+        assert_eq!(r.resolved, "2");
+        assert!(r.errors.is_empty());
+        engine_with_defs(&db);
     }
 
     #[test]
@@ -497,13 +499,36 @@ mod tests {
     fn test_script_manual() {
         let _g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let engine = DynamicVarEngine::instance();
-        let r = engine.test_script("print(\"hi\"); 1 + 2");
+        let r = engine.test_script("print(\"hi\"); 1 + 2", None);
         assert_eq!(r.output, "hi");
         assert_eq!(r.result, "3");
         assert!(r.error.is_none());
 
-        let bad = engine.test_script("syntax error here !!!");
+        let bad = engine.test_script("syntax error here !!!", None);
         assert!(bad.error.is_some());
+
+        // 带参试运行：参数注入 args 数组（与变量求值一致）；to_uppercase 为兼容别名
+        let with_args = engine.test_script("args[0].to_uppercase()", Some("abc"));
+        assert_eq!(with_args.result, "ABC");
+        assert!(with_args.error.is_none());
+
+        // Rhai 原生方法名也可用
+        let native = engine.test_script("args[0].to_upper()", Some("abc"));
+        assert_eq!(native.result, "ABC");
+
+        // Array::join 兼容方法（用户完整脚本场景：生成 MAC 地址片段）
+        let mac = engine.test_script(
+            "let parts = []; let i = 0; while i < 3 { parts.push(random_int(0, 255).to_hex()); i = i + 1; } parts.join(\":\")",
+            None,
+        );
+        assert!(mac.error.is_none(), "join 报错: {:?}", mac.error);
+        assert_eq!(mac.result.split(':').count(), 3);
+
+        // 无参试运行：注入空数组，args.len() 可安全判断（回归：空参数不得产生 [""] 元素）
+        let no_args = engine.test_script("if args.len() >= 1 { args[0] } else { \"none\" }", None);
+        assert_eq!(no_args.result, "none");
+        let len_probe = engine.test_script("args.len().to_string()", None);
+        assert_eq!(len_probe.result, "0");
     }
 
     #[test]
@@ -528,4 +553,5 @@ mod tests {
         assert_eq!(r.resolved, "{{$timestamp}}");
         engine_with_defs(&db);
     }
+
 }

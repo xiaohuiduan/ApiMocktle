@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { Alert, Button, Form, Input, message, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography } from 'antd'
-import { Code2Icon, CopyIcon, PlayIcon, PlusIcon, TrashIcon } from 'lucide-react'
+import { Alert, Button, Form, Input, message, Modal, Popconfirm, Space, Switch, Table, Tag, Typography } from 'antd'
+import { Code2Icon, CopyIcon, HelpCircleIcon, PlayIcon, PlusIcon, TrashIcon } from 'lucide-react'
 
 import { api } from '@/api-client'
 import { useAuth } from '@/contexts/auth'
@@ -10,7 +10,8 @@ import { invalidateDynamicVariableDefs } from '@/utils/dynamic-variables'
 interface DynamicVariableDef {
   id: string
   name: string
-  type: 'static' | 'expression' | 'script'
+  /** 仅 script（单类型）；保留字段与后端兼容 */
+  type: 'script'
   value: string
   description: string
   isBuiltin: boolean
@@ -22,7 +23,7 @@ interface DynamicVariableDef {
 interface SavePayload {
   id?: string
   name: string
-  type: 'static' | 'expression' | 'script'
+  type: 'script'
   value: string
   description: string
   enabled: boolean
@@ -32,33 +33,6 @@ interface ScriptTestResult {
   output: string
   result: string
   error?: string
-}
-
-type VarType = DynamicVariableDef['type']
-
-const TYPE_LABELS: Record<VarType, string> = {
-  static: '静态值',
-  expression: '表达式',
-  script: '脚本',
-}
-
-/** 类型元数据：求值原理 + 值字段说明 + 试运行默认脚本生成 */
-const TYPE_META: Record<VarType, { valueLabel: string, principle: string, valueExtra: string }> = {
-  static: {
-    valueLabel: '模板内容',
-    principle: '作为文本模板，其中 {{$xxx}} 会被递归替换成实际值（如 hello {{$timestamp}}）',
-    valueExtra: '模板文本，可引用其他变量：hello {{$timestamp}}',
-  },
-  expression: {
-    valueLabel: '函数名',
-    principle: '值为函数名，使用时写成 {{$函数名(参数)}}，由引擎调用该函数求值（无参可省略括号）',
-    valueExtra: '函数名，调用时拼成 函数名(参数)：{{$randomInt(1,100)}}；无参直接 {{$xxx}}',
-  },
-  script: {
-    valueLabel: '脚本源码',
-    principle: 'Rhai 脚本：求值时执行完整脚本，最后一行表达式的值作为结果；print() 输出调试信息',
-    valueExtra: 'Rhai 脚本：字符串用双引号，print() 输出调试，最后一行表达式为返回值',
-  },
 }
 
 /** 内置可带参变量的调用示例（seed 中仅这两个函数支持参数） */
@@ -71,26 +45,21 @@ function usageExample(item: DynamicVariableDef): string {
   return USAGE_EXAMPLES[item.name] ?? `{{${item.name}}}`
 }
 
-/** 试运行默认脚本：打印当前变量的求值结果 */
-function defaultTestScript(type: VarType, value: string): string {
-  if (type === 'expression') {
-    return `print(${value || 'timestamp'}())`
-  }
-
-  if (type === 'script') { return value }
-
-  return `print(${JSON.stringify(value)})`
+/** 试运行默认脚本：编辑 = 脚本原文；新建 = 打印示例 */
+function defaultTestScript(value: string): string {
+  return value || 'print(timestamp())'
 }
 
-/** AI 提示词模板：内置函数签名与语法规则，复制给 AI 生成表达式/脚本 */
+/** AI 提示词模板：脚本语法 + 内置函数签名 + 参数用法，复制给 AI 生成脚本 */
 function buildAiPrompt(): string {
   return [
-    '你是 ApiMocktle 动态变量脚本专家。请根据我的需求，生成 {{$变量名}} 的表达式或脚本，只输出代码，不要解释。',
+    '你是 ApiMocktle 动态变量脚本专家。请根据我的需求，生成 {{$变量名}} 的 Rhai 脚本，只输出代码，不要解释。',
     '',
-    '## 三种变量类型',
-    '- static 静态值：值为文本模板，可引用其他变量 {{$xxx}}，求值时递归替换',
-    '- expression 表达式：值为函数名，使用时写 {{$函数名(参数)}}，无参可省略括号',
-    '- script 脚本：值为 Rhai 完整脚本，最后一行表达式的值作为结果；字符串必须用双引号；print() 输出调试信息',
+    '## 脚本语法（Rhai）',
+    '- 最后一行表达式的值作为变量结果',
+    '- 字符串必须用双引号；print() 输出调试信息',
+    '- 模板参数：{{$myScript(1,100)}} 的括号参数注入为预置数组 args（args[0]、args[1]…）；无参时 args 为空数组，可用 args.len() 判断',
+    '- 脚本返回值中的 {{$xxx}} 不会被二次解析（保持字面）',
     '',
     '## 内置函数',
     '- timestamp()：秒级时间戳',
@@ -105,23 +74,20 @@ function buildAiPrompt(): string {
     '- env(key)：读取系统环境变量',
     '',
     '## 示例',
-    '- {{$randomInt(1,100)}}：1-100 随机整数（expression，函数名 random_int）',
-    '- 需求「生成下月 1 号的时间戳」→ expression，函数名 timestamp_iso 无法满足时用 script：let d = timestamp_iso(); d',
+    '- {{$randomInt(1,100)}}：脚本 `random_int(args[0], args[1])`（有参用 args，无参回退默认）',
+    '- 需求「生成带前缀的订单号，可传前缀，无前缀用 ORD」→ 脚本：',
+    '  let tag = if args.len() >= 1 { args[0] } else { "ORD" }',
+    '  print(`tag=${tag}`)',
+    '  `${tag}-${timestamp()}-${random_string(6)}`',
+    '  （{{$orderNo(ORD)}} → ORD-1750000000-AbCdEf；{{$orderNo}} → ORD-1750000000-AbCdEf）',
     '',
     '## 我的需求',
     '（在这里写你的需求，如：生成 30 天后过期的时间）',
     '',
     '请直接输出：',
     '1. 变量名（$ 开头）',
-    '2. 类型（static / expression / script）',
-    '3. 值（代码）',
+    '2. 脚本代码（直接可填入变量值）',
   ].join('\n')
-}
-
-function typeTag(type: VarType) {
-  const color = type === 'static' ? 'blue' : type === 'expression' ? 'purple' : 'green'
-
-  return <Tag color={color}>{TYPE_LABELS[type]}</Tag>
 }
 
 export function DynamicVariablePanel() {
@@ -132,10 +98,9 @@ export function DynamicVariablePanel() {
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm<SavePayload>()
-  // 当前选中类型（state 同步，避开 useWatch 类型/运行时不一致的坑）
-  const [watchType, setWatchType] = useState<VarType>('static')
-  const typeMeta = TYPE_META[watchType]
   const [testScript, setTestScript] = useState('')
+  const [testArgs, setTestArgs] = useState('')
+  const [helpOpen, setHelpOpen] = useState(false)
   const [testRunning, setTestRunning] = useState(false)
   const [testResult, setTestResult] = useState<ScriptTestResult | null>(null)
 
@@ -162,10 +127,9 @@ export function DynamicVariablePanel() {
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ name: '$', type: 'static', value: '', description: '', enabled: true })
-    setWatchType('static')
+    form.setFieldsValue({ name: '$', type: 'script', value: '', description: '', enabled: true })
     setTestResult(null)
-    setTestScript(defaultTestScript('static', ''))
+    setTestScript(defaultTestScript(''))
     setModalOpen(true)
   }
 
@@ -178,9 +142,8 @@ export function DynamicVariablePanel() {
       description: item.description,
       enabled: item.enabled,
     })
-    setWatchType(item.type)
     setTestResult(null)
-    setTestScript(defaultTestScript(item.type, item.value))
+    setTestScript(defaultTestScript(item.value))
     setModalOpen(true)
   }
 
@@ -250,7 +213,8 @@ export function DynamicVariablePanel() {
     setTestResult(null)
 
     try {
-      setTestResult(await api<ScriptTestResult>('test_script', { script: testScript }))
+      // args 传逗号分隔串；留空/空串 → Rust 注入空数组（args.len() = 0）
+      setTestResult(await api<ScriptTestResult>('test_script', { script: testScript, args: testArgs.trim() || null }))
     }
     catch (err) {
       message.error((err as Error).message)
@@ -266,7 +230,9 @@ export function DynamicVariablePanel() {
         <div>
           <Typography.Title className="!my-0" level={5}>动态变量</Typography.Title>
           <Typography.Text className="text-xs" type="secondary">
-            {'{{$xxx}}'} 求值统一在 Rust 侧（Rhai 引擎）；内置变量仅可修改说明与开关，自定义变量支持三类：静态值 / 表达式 / 脚本。
+            {'{{$xxx}}'} 求值统一在 Rust 侧（Rhai 引擎）；内置变量仅可修改说明与开关，自定义变量为 Rhai 脚本——支持模板参数（
+            {'{{$myScript(1,2)}}'}
+            → 脚本内 args 数组），试运行可调试输出。
           </Typography.Text>
         </div>
         <Space>
@@ -297,7 +263,6 @@ export function DynamicVariablePanel() {
               </Space>
             ),
           },
-          { title: '类型', dataIndex: 'type', key: 'type', width: 90, render: typeTag },
           {
             title: '调用示例',
             key: 'usage',
@@ -355,62 +320,45 @@ export function DynamicVariablePanel() {
       >
         <div className="flex flex-col gap-5">
           <Form className="!mt-0" form={form} layout="vertical">
-            {/* 第一行：变量名 + 类型（两列固定比例，不挤压） */}
-            <div className="flex gap-3">
-              <Form.Item
-                className="min-w-0 flex-1"
-                label="变量名"
-                name="name"
-                rules={[
-                  { required: true, message: '请输入变量名' },
-                  { pattern: /^\$[\w:.]+$/, message: '需以 $ 开头，仅含字母/数字/_/:/.' },
-                ]}
-              >
-                <Input disabled={editing?.isBuiltin} placeholder="$myToken" />
-              </Form.Item>
-              <Form.Item className="w-44 shrink-0" label="类型" name="type">
-                <Select
-                  disabled={editing?.isBuiltin}
-                  options={[
-                    { value: 'static', label: '静态值' },
-                    { value: 'expression', label: '表达式' },
-                    { value: 'script', label: '脚本' },
-                  ]}
-                  onChange={(v) => { setWatchType(v as VarType) }}
-                />
-              </Form.Item>
-            </div>
-            {/* 第二行：说明（独占一行，全宽） */}
+            <Form.Item
+              label="变量名"
+              name="name"
+              rules={[
+                { required: true, message: '请输入变量名' },
+                { pattern: /^\$[\w:.]+$/, message: '需以 $ 开头，仅含字母/数字/_/:/.' },
+              ]}
+            >
+              <Input disabled={editing?.isBuiltin} placeholder="$myToken" />
+            </Form.Item>
             <Form.Item label="说明" name="description">
               <Input placeholder="变量用途说明（补全弹窗展示）" />
             </Form.Item>
             <Form.Item
               className="!mb-0"
-              extra={typeMeta.valueExtra}
-              label={typeMeta.valueLabel}
+              label={(
+                <span className="inline-flex items-center gap-1">
+                  脚本源码
+                  <HelpCircleIcon
+                    className="cursor-pointer opacity-50 transition-opacity hover:opacity-100"
+                    size={14}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setHelpOpen(true)
+                    }}
+                  />
+                </span>
+              )}
               name="value"
-              rules={[{ required: true, message: '请输入值' }]}
+              rules={[{ required: true, message: '请输入脚本' }]}
             >
               <Input.TextArea
-                autoSize={{ minRows: 2, maxRows: 10 }}
+                autoSize={{ minRows: 3, maxRows: 12 }}
                 disabled={editing?.isBuiltin}
-                placeholder={watchType === 'expression' ? 'timestamp' : watchType === 'script' ? 'let x = 1; x * 2' : 'hello {{$timestamp}}'}
+                placeholder={'if args.len() >= 1 { args[0] } else { "默认值" }'}
                 style={{ fontFamily: 'var(--font-mono, monospace)' }}
               />
             </Form.Item>
           </Form>
-
-          <Alert
-            showIcon
-            className="!mb-0"
-            description={(
-              <span className="text-xs">
-                请求发送时，Rust 引擎把 {'{{$xxx}}'} 替换为实际值。当前类型：{TYPE_LABELS[watchType]} —— {typeMeta.principle}
-              </span>
-            )}
-            message="求值原理"
-            type="info"
-          />
 
           <div className="rounded-lg border p-4" style={{ borderColor: 'var(--ant-color-border-secondary, #d9d9d9)' }}>
             <div className="mb-3 flex items-center justify-between">
@@ -422,6 +370,14 @@ export function DynamicVariablePanel() {
                 运行
               </Button>
             </div>
+            <Input
+              allowClear
+              className="!mb-2"
+              placeholder="可选参数，逗号分隔（如 ORD,123 → 脚本内 args[0]=ORD, args[1]=123）；留空 = 无参"
+              size="small"
+              value={testArgs}
+              onChange={(e) => { setTestArgs(e.target.value) }}
+            />
             <Input.TextArea
               autoSize={{ minRows: 2, maxRows: 6 }}
               className="!mb-3"
@@ -445,6 +401,53 @@ export function DynamicVariablePanel() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        footer={null}
+        open={helpOpen}
+        styles={{
+          header: { padding: '16px 24px', marginBottom: 0 },
+          body: { padding: '16px 24px' },
+        }}
+        title="脚本语法说明"
+        width={560}
+        onCancel={() => { setHelpOpen(false) }}
+      >
+        <div className="flex flex-col gap-3 text-sm">
+          <div>
+            脚本为 Rhai 语言：字符串用双引号，print() 输出调试，最后一行表达式的值作为变量结果。
+          </div>
+          <div>
+            模板参数写法
+            {'{{$myScript(1,100)}}'}
+            → 括号内参数注入为预置数组 args（脚本内用 args[0] / args[1]；无参时 args 为空数组，可用 args.len() 判断是否有参数）
+          </div>
+          <div className="mb-1 opacity-70">示例（调用 {'{{$orderNo(ORD)}}'}，无参调用 {'{{$orderNo}}'} 回退默认前缀）：</div>
+          <pre
+            className="m-0 overflow-auto rounded p-3 text-xs leading-relaxed"
+            style={{ backgroundColor: 'var(--ant-color-fill-tertiary, #f5f5f5)', fontFamily: 'var(--font-mono, monospace)' }}
+          >
+            {`let tag = if args.len() >= 1 { args[0] } else { "ORD" }
+print(\`tag=\${tag}\`)
+\`\${tag}-\${timestamp()}-\${random_string(6)}\``}
+          </pre>
+          <div className="opacity-70">
+            输出：print 显示 tag=ORD，变量值形如
+            ORD-1750000000-AbCdEf
+            ——示例同时覆盖 args 条件消费、内置函数组合与 print 调试输出
+          </div>
+          <div className="opacity-70">
+            兼容 API（Rhai 原生无、可直接使用的 JS/Rust 习惯写法）：
+            <code>to_uppercase()</code>
+            {' '}
+            <code>to_lowercase()</code>
+            {' '}
+            <code>join(sep)</code>
+            {' '}
+            （Rhai 原生为 to_upper / to_lower）
           </div>
         </div>
       </Modal>
