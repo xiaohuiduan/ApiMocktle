@@ -1301,7 +1301,7 @@ mod tests {
         .unwrap();
         let db = crate::db::client::Db(std::sync::Mutex::new(conn));
         crate::db::dynamic_variables_repo::ensure_seed(&db).unwrap();
-        crate::services::dynamic_variables::DynamicVarEngine::instance().refresh_defs(&db).unwrap();
+        crate::services::dynamic_variables::with_engine(|e| e.refresh_defs(&db)).unwrap();
     }
 
     #[test]

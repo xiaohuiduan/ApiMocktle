@@ -50,15 +50,18 @@ function defaultTestScript(value: string): string {
   return value || 'print(timestamp())'
 }
 
-/** AI 提示词模板：脚本语法 + 内置函数签名 + 参数用法，复制给 AI 生成脚本 */
+/** AI 提示词模板：JS 语法 + 内置函数签名 + 参数用法，复制给 AI 生成脚本 */
 function buildAiPrompt(): string {
   return [
-    '你是 ApiMocktle 动态变量脚本专家。请根据我的需求，生成 {{$变量名}} 的 Rhai 脚本，只输出代码，不要解释。',
+    '你是 ApiMocktle 动态变量脚本专家。请根据我的需求，生成 {{$变量名}} 的 JavaScript 脚本，只输出代码，不要解释。',
     '',
-    '## 脚本语法（Rhai）',
-    '- 最后一行表达式的值作为变量结果',
-    '- 字符串必须用双引号；print() 输出调试信息',
-    '- 模板参数：{{$myScript(1,100)}} 的括号参数注入为预置数组 args（args[0]、args[1]…）；无参时 args 为空数组，可用 args.len() 判断',
+    '## 脚本语法（JavaScript）',
+    '- 脚本最后一条表达式的值作为变量结果；不要在脚本顶层写 return（会报语法错误）',
+    '- 结果会被转成字符串（数字/布尔自动转；对象会变成 [object Object]，请返回字符串或数字）',
+    '- console.log(...) / print(...) 输出调试信息（多参数自动拼接；console.log 后请用最后一条表达式作为结果）',
+    '- 不要使用 async/await/Promise（无法同步返回结果）',
+    '- 优先使用下方内置函数（Math.random 等 JS 原生 API 可用，但与内置函数行为不统一，不建议）',
+    '- 模板参数：{{$myScript(1,100)}} 的括号参数注入为预置数组 args（args[0]、args[1]…）；无参时 args 为空数组，可用 args.length 判断',
     '- 脚本返回值中的 {{$xxx}} 不会被二次解析（保持字面）',
     '',
     '## 内置函数',
@@ -74,19 +77,17 @@ function buildAiPrompt(): string {
     '- env(key)：读取系统环境变量',
     '',
     '## 示例',
-    '- {{$randomInt(1,100)}}：脚本 `random_int(args[0], args[1])`（有参用 args，无参回退默认）',
+    '- {{$randomInt(1,100)}}：脚本 `args.length >= 2 ? random_int(args[0], args[1]) : random_int()`（有参用 args，无参回退默认）',
     '- 需求「生成带前缀的订单号，可传前缀，无前缀用 ORD」→ 脚本：',
-    '  let tag = if args.len() >= 1 { args[0] } else { "ORD" }',
-    '  print(`tag=${tag}`)',
+    '  const tag = args.length >= 1 ? args[0] : "ORD"',
+    '  console.log(`tag=${tag}`)',
     '  `${tag}-${timestamp()}-${random_string(6)}`',
     '  （{{$orderNo(ORD)}} → ORD-1750000000-AbCdEf；{{$orderNo}} → ORD-1750000000-AbCdEf）',
     '',
     '## 我的需求',
     '（在这里写你的需求，如：生成 30 天后过期的时间）',
     '',
-    '请直接输出：',
-    '1. 变量名（$ 开头）',
-    '2. 脚本代码（直接可填入变量值）',
+    '请直接输出脚本代码（可直接填入变量值），不要输出变量名、不要任何解释或代码块标记。',
   ].join('\n')
 }
 
@@ -213,7 +214,7 @@ export function DynamicVariablePanel() {
     setTestResult(null)
 
     try {
-      // args 传逗号分隔串；留空/空串 → Rust 注入空数组（args.len() = 0）
+      // args 传逗号分隔串；留空/空串 → Rust 注入空数组（args.length = 0）
       setTestResult(await api<ScriptTestResult>('test_script', { script: testScript, args: testArgs.trim() || null }))
     }
     catch (err) {
@@ -230,7 +231,7 @@ export function DynamicVariablePanel() {
         <div>
           <Typography.Title className="!my-0" level={5}>动态变量</Typography.Title>
           <Typography.Text className="text-xs" type="secondary">
-            {'{{$xxx}}'} 求值统一在 Rust 侧（Rhai 引擎）；内置变量仅可修改说明与开关，自定义变量为 Rhai 脚本——支持模板参数（
+            {'{{$xxx}}'} 求值统一在 Rust 侧（QuickJS 引擎）；内置变量仅可修改说明与开关，自定义变量为 JavaScript 脚本——支持模板参数（
             {'{{$myScript(1,2)}}'}
             → 脚本内 args 数组），试运行可调试输出。
           </Typography.Text>
@@ -354,7 +355,7 @@ export function DynamicVariablePanel() {
               <Input.TextArea
                 autoSize={{ minRows: 3, maxRows: 12 }}
                 disabled={editing?.isBuiltin}
-                placeholder={'if args.len() >= 1 { args[0] } else { "默认值" }'}
+                placeholder={'args.length >= 1 ? args[0] : "默认值"'}
                 style={{ fontFamily: 'var(--font-mono, monospace)' }}
               />
             </Form.Item>
@@ -418,36 +419,26 @@ export function DynamicVariablePanel() {
       >
         <div className="flex flex-col gap-3 text-sm">
           <div>
-            脚本为 Rhai 语言：字符串用双引号，print() 输出调试，最后一行表达式的值作为变量结果。
+            脚本为 JavaScript（QuickJS 引擎）：console.log() / print() 输出调试，脚本最后一条表达式的值作为变量结果。
           </div>
           <div>
             模板参数写法
             {'{{$myScript(1,100)}}'}
-            → 括号内参数注入为预置数组 args（脚本内用 args[0] / args[1]；无参时 args 为空数组，可用 args.len() 判断是否有参数）
+            → 括号内参数注入为预置数组 args（脚本内用 args[0] / args[1]；无参时 args 为空数组，可用 args.length 判断是否有参数）
           </div>
           <div className="mb-1 opacity-70">示例（调用 {'{{$orderNo(ORD)}}'}，无参调用 {'{{$orderNo}}'} 回退默认前缀）：</div>
           <pre
             className="m-0 overflow-auto rounded p-3 text-xs leading-relaxed"
             style={{ backgroundColor: 'var(--ant-color-fill-tertiary, #f5f5f5)', fontFamily: 'var(--font-mono, monospace)' }}
           >
-            {`let tag = if args.len() >= 1 { args[0] } else { "ORD" }
-print(\`tag=\${tag}\`)
+            {`const tag = args.length >= 1 ? args[0] : "ORD"
+console.log(\`tag=\${tag}\`)
 \`\${tag}-\${timestamp()}-\${random_string(6)}\``}
           </pre>
           <div className="opacity-70">
-            输出：print 显示 tag=ORD，变量值形如
+            输出：console.log 显示 tag=ORD，变量值形如
             ORD-1750000000-AbCdEf
-            ——示例同时覆盖 args 条件消费、内置函数组合与 print 调试输出
-          </div>
-          <div className="opacity-70">
-            兼容 API（Rhai 原生无、可直接使用的 JS/Rust 习惯写法）：
-            <code>to_uppercase()</code>
-            {' '}
-            <code>to_lowercase()</code>
-            {' '}
-            <code>join(sep)</code>
-            {' '}
-            （Rhai 原生为 to_upper / to_lower）
+            ——示例同时覆盖 args 条件消费、内置函数组合与调试输出
           </div>
         </div>
       </Modal>

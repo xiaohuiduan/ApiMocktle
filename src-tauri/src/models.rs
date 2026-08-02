@@ -532,6 +532,11 @@ fn default_true() -> bool {
     true
 }
 
+/// 单类型化后默认脚本类型（前端不再传 type，后端强制 script）
+fn default_script() -> String {
+    "script".to_string()
+}
+
 // Dynamic Variables（{{$xxx}} 动态变量定义；内置 seed 与用户自定义共用）
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DynamicVariableDef {
@@ -555,13 +560,13 @@ pub struct DynamicVariableDef {
     pub updated_at: String,
 }
 
-/// 保存动态变量入参（id 为空表示新建）
+/// 保存动态变量入参（id 为空表示新建；type 已单类型化，不传默认 script）
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SaveDynamicVariablePayload {
     #[serde(default)]
     pub id: String,
     pub name: String,
-    #[serde(rename = "type")]
+    #[serde(rename = "type", default = "default_script")]
     pub var_type: String,
     pub value: String,
     #[serde(default)]

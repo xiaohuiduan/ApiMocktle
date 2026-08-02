@@ -3,7 +3,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use crate::errors::AppError;
 use crate::models::{DynamicVariableDef, SaveDynamicVariablePayload};
 
-/// 内置动态变量 seed（script 类型，值为 Rhai 脚本，调用引擎注册函数）。
+/// 内置动态变量 seed（script 类型，值为 JavaScript 脚本，调用引擎注册函数）。
 /// 带参内置（$randomInt/$randomString）用预置 args 数组做条件消费：有参用参数，无参用默认。
 /// 求值代码内无硬编码变量清单；$processEnv 前缀为特判，不入库。
 const BUILTIN_SEED: &[(&str, &str, &str)] = &[
@@ -13,7 +13,7 @@ const BUILTIN_SEED: &[(&str, &str, &str)] = &[
     ("$randomUUID", "random_uuid()", "UUID（32 位无横线）"),
     (
         "$randomInt",
-        "if args.len() >= 2 { random_int(args[0], args[1]) } else { random_int(0, 1000) }",
+        "args.length >= 2 ? random_int(args[0], args[1]) : random_int()",
         "0-1000 随机整数（可带参 min,max，如 {{$randomInt(1,100)}}）",
     ),
     ("$randomEmail", "random_email()", "随机邮箱"),
@@ -21,7 +21,7 @@ const BUILTIN_SEED: &[(&str, &str, &str)] = &[
     ("$randomMobile", "random_mobile()", "11 位随机手机号"),
     (
         "$randomString",
-        "if args.len() >= 1 { random_string(args[0]) } else { random_string(8) }",
+        "args.length >= 1 ? random_string(args[0]) : random_string()",
         "8 位随机字母字符串（可带参长度，如 {{$randomString(16)}}）",
     ),
 ];
@@ -234,6 +234,20 @@ mod tests {
             assert_eq!(def.var_type, "script");
             assert_eq!(def.value, *script);
         }
+    }
+
+    #[test]
+    fn payload_without_type_defaults_to_script() {
+        // 单类型化后前端不再传 type：缺省字段应默认 script 而非反序列化报错
+        let json = r#"{"id":"","name":"$noType","value":"print(1)"}"#;
+        let payload: SaveDynamicVariablePayload = serde_json::from_str(json).unwrap();
+        assert_eq!(payload.var_type, "script");
+
+        let db = test_db();
+        ensure_seed(&db).unwrap();
+        let saved = save(&db, &payload).unwrap();
+        assert_eq!(saved.name, "$noType");
+        assert_eq!(saved.var_type, "script");
     }
 
     #[test]

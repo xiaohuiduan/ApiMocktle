@@ -64,5 +64,8 @@ pub fn delete_dynamic_variable(db: State<'_, Arc<Db>>, session_id: String, id: S
 /// 脚本试运行（管理面板调试输出；不落库）。args 为逗号分隔的模板参数（如 "1,100"），注入脚本内 args 数组
 #[tauri::command]
 pub fn test_script(script: String, args: Option<String>) -> ApiResult<ScriptTestResult> {
-    ApiResult::success(var_service::DynamicVarEngine::instance().test_script(&script, args.as_deref()))
+    match var_service::with_engine(|e| e.test_script(&script, args.as_deref())) {
+        Ok(r) => ApiResult::success(r),
+        Err(e) => e.into(),
+    }
 }
