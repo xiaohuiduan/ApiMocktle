@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 
 import { show } from '@ebay/nice-modal-react'
-import { Button, Checkbox, Form, Input, message, Select, theme, Tooltip, Typography } from 'antd'
+import { Button, Checkbox, Form, Input, message, Segmented, Select, theme, Tooltip, Typography } from 'antd'
 import { SettingsIcon } from 'lucide-react'
 
 import { IconLogo } from '@/components/icons/IconLogo'
@@ -12,14 +12,7 @@ import { ModalSettings } from '@/components/modals/ModalSettings'
 import { ParticleCanvas } from '@/components/ParticleCanvas'
 import { getSavedCredentials, useAuth } from '@/contexts/auth'
 import { useDesignStyle } from '@/hooks/useDesignStyle'
-
-function resolveRedirectTarget(value: string | null | undefined) {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) {
-    return '/projects'
-  }
-
-  return value
-}
+import { resolveAuthRedirectTarget } from '@/router/auth-redirect'
 
 interface AuthFormProps {
   mode: 'login' | 'register'
@@ -34,18 +27,18 @@ const rememberDayOptions = [
 ]
 
 export function AuthForm(props: AuthFormProps) {
-  const { mode } = props
   const { token } = theme.useToken()
   const { isGlassStyle, isNeumorphism, isSkeuomorphism } = useDesignStyle()
   const [submitting, setSubmitting] = useState(false)
   const [rememberPassword, setRememberPassword] = useState(false)
   const [rememberLogin, setRememberLogin] = useState(false)
   const [rememberDays, setRememberDays] = useState<number>(7)
+  // 登录/注册在卡片内 Tab 切换，不再整页跳转（props.mode 仅作为初始值）
+  const [mode, setMode] = useState<'login' | 'register'>(props.mode)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { login, register } = useAuth()
-  const redirectTo = resolveRedirectTarget(searchParams.get('redirect'))
-  const peerAuthPath = `${mode === 'login' ? '/register' : '/login'}?redirect=${encodeURIComponent(redirectTo)}`
+  const redirectTo = resolveAuthRedirectTarget(searchParams.get('redirect'))
   const [form] = Form.useForm<{ username: string, password: string }>()
 
   useEffect(() => {
@@ -120,9 +113,18 @@ export function AuthForm(props: AuthFormProps) {
 
         {/* Form */}
         <div className="px-6 pb-6 pt-4">
-          <Typography.Title level={4} style={{ marginTop: 0, marginBottom: 20 }}>
-            {mode === 'login' ? '欢迎回来' : '创建账号'}
-          </Typography.Title>
+          <Segmented
+            block
+            className="mb-5"
+            options={[
+              { label: '登录', value: 'login' },
+              { label: '注册', value: 'register' },
+            ]}
+            value={mode}
+            onChange={(value) => {
+              setMode(value as 'login' | 'register')
+            }}
+          />
 
           <Form<{ username: string, password: string }>
             form={form}
@@ -214,16 +216,16 @@ export function AuthForm(props: AuthFormProps) {
                   </Checkbox>
                 </Form.Item>
 
-                {rememberLogin && (
-                  <Form.Item label="登录状态时长">
-                    <Select
-                      options={rememberDayOptions}
-                      style={{ width: 120 }}
-                      value={rememberDays}
-                      onChange={(v) => { setRememberDays(v) }}
-                    />
-                  </Form.Item>
-                )}
+                {/* 常驻渲染，未勾选时禁用——避免条件插入导致卡片高度跳动 */}
+                <Form.Item label="登录状态时长">
+                  <Select
+                    disabled={!rememberLogin}
+                    options={rememberDayOptions}
+                    style={{ width: 120 }}
+                    value={rememberDays}
+                    onChange={(v) => { setRememberDays(v) }}
+                  />
+                </Form.Item>
 
                 <Typography.Text className="block text-xs" type="secondary">
                   “记住账号密码”会在本机保存凭据；“保持登录状态”会延长会话有效期。
@@ -251,9 +253,13 @@ export function AuthForm(props: AuthFormProps) {
           <Typography.Text type="secondary">
             {mode === 'login' ? '没有账号？' : '已有账号？'}
             {' '}
-            <Link style={{ color: token.colorPrimary }} to={peerAuthPath}>
+            <Typography.Link
+              onClick={() => {
+                setMode(mode === 'login' ? 'register' : 'login')
+              }}
+            >
               {mode === 'login' ? '去注册' : '去登录'}
-            </Link>
+            </Typography.Link>
           </Typography.Text>
         </div>
       </div>
