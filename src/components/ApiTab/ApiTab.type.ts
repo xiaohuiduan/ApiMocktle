@@ -4,7 +4,8 @@ import type { TabContentType } from '@/types'
 
 import type { PageTabStatus } from './ApiTab.enum'
 
-export type EditStatus = 'changed' | 'saved'
+/** 页签编辑状态：changed=有未保存修改，saving=保存中，saved=已保存，error=保存失败 */
+export type EditStatus = 'changed' | 'saved' | 'saving' | 'error'
 
 export type Tab = NonNullable<TabsProps['items']>[0]
 

@@ -226,6 +226,9 @@ export function ApiDocEditing() {
     }
     else {
       try {
+        // 提交前进入「保存中」，成功/失败后分别落到 saved / error
+        setTabItemEditStatus({ key: tabData.key }, 'saving')
+
         await updateMenuItem({
           id: tabData.key,
           name: menuName,
@@ -236,6 +239,7 @@ export function ApiDocEditing() {
         messageApi.success('保存成功')
       }
       catch (err) {
+        setTabItemEditStatus({ key: tabData.key }, 'error')
         messageApi.error((err as Error).message || '保存失败，请检查权限')
       }
     }

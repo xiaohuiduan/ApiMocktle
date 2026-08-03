@@ -99,8 +99,10 @@ export function ApiTab(props: TabsProps) {
 
   const handleItemRemove = useEvent((key: CatalogId, forceClose?: boolean) => {
     const item = getTabItem({ key })
+    const editStatus = item?.data?.editStatus
 
-    if (forceClose !== true && item?.data?.editStatus === 'changed') {
+    // 有未保存修改（changed）或保存失败（error）时需二次确认
+    if (forceClose !== true && (editStatus === 'changed' || editStatus === 'error')) {
       setConfirmKey(key)
     }
     else {
@@ -130,7 +132,7 @@ export function ApiTab(props: TabsProps) {
             icon={<BadgeInfoIcon />}
             okText="确认关闭"
             okType="danger"
-            open={tabItem.data?.editStatus === 'changed' && confirmKey === tabItem.key}
+            open={confirmKey === tabItem.key && (tabItem.data?.editStatus === 'changed' || tabItem.data?.editStatus === 'error')}
             title="有修改的内容未保存！"
             onCancel={(ev) => {
               ev?.stopPropagation()

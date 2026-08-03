@@ -1,4 +1,4 @@
-import { theme } from 'antd'
+import { Spin, theme } from 'antd'
 
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
@@ -19,9 +19,13 @@ export function ApiTabLabel(props: ApiTabLabelProps) {
   const { menuData, tabItem } = props
   const { token } = theme.useToken()
 
-  // 未保存标记：编辑中或新建中的标签显示黄色 *（与参数有内容的绿色 * 区分）
-  const hasUnsaved = tabItem.data?.editStatus === 'changed'
-    || tabItem.data?.tabStatus === PageTabStatus.Create
+  const editStatus = tabItem.data?.editStatus
+
+  // 状态标记优先级：保存中 > 保存失败 > 未保存（黄色 *，与参数有内容的绿色 * 区分）
+  const showSaving = editStatus === 'saving'
+  const showError = editStatus === 'error'
+  const showUnsaved = !showSaving && !showError
+    && (editStatus === 'changed' || tabItem.data?.tabStatus === PageTabStatus.Create)
 
   return (
     <span className="ui-tabs-tab-label flex items-center gap-1">
@@ -51,7 +55,24 @@ export function ApiTabLabel(props: ApiTabLabelProps) {
               />
             )}
       <span>{menuData?.name ?? tabItem.label}</span>
-      {hasUnsaved && (
+      {showSaving && (
+        <Spin
+          aria-label="保存中"
+          className="ml-0.5"
+          size="small"
+          style={{ color: token.colorPrimary }}
+        />
+      )}
+      {showError && (
+        <span
+          aria-label="保存失败"
+          className="ml-0.5 text-xs font-bold"
+          style={{ color: token.colorError }}
+        >
+          !
+        </span>
+      )}
+      {showUnsaved && (
         <span
           aria-label="有未保存修改"
           className="ml-0.5 text-xs"
