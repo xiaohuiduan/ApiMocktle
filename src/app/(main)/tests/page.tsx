@@ -8,6 +8,8 @@ import {
   PlusOutlined } from '@ant-design/icons'
 import { Button, Dropdown, Empty, Form, Input, message, Modal, Popconfirm, Space, Switch, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import dayjs from 'dayjs'
+import { ListTodo } from 'lucide-react'
 
 import { useTestFolders, useTestTask } from '@/hooks/useTestTask'
 import type { CreateTestTaskPayload, TestFolder, TestTask, UpdateTestTaskPayload } from '@/types'
@@ -34,6 +36,8 @@ export default function TestTaskListPage() {
   const [editingTask, setEditingTask] = useState<TestTask | null>(null)
   const [createForm] = Form.useForm()
   const [editForm] = Form.useForm()
+  const [folderModalOpen, setFolderModalOpen] = useState(false)
+  const [folderForm] = Form.useForm<{ name: string }>()
 
   // Folder editing
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
@@ -138,14 +142,25 @@ export default function TestTaskListPage() {
   }
 
   // ===== Folder CRUD =====
-  const handleAddFolder = async () => {
-    const name = prompt('请输入文件夹名称')
+  const handleAddFolder = () => {
+    folderForm.resetFields()
+    setFolderModalOpen(true)
+  }
 
-    if (!name?.trim()) { return }
+  const handleCreateFolder = async () => {
+    try {
+      const values = await folderForm.validateFields()
+      const folder = await createFolder(values.name.trim())
 
-    const folder = await createFolder(name.trim())
-
-    if (folder) { message.success('文件夹已创建') }
+      if (folder) {
+        message.success('文件夹已创建')
+        setFolderModalOpen(false)
+        folderForm.resetFields()
+      }
+    }
+    catch {
+      // validation error
+    }
   }
 
   const handleRenameFolder = async (folderId: string) => {
@@ -216,7 +231,10 @@ export default function TestTaskListPage() {
       title: '描述',
       dataIndex: 'description',
       key: 'description',
-      ellipsis: true,
+      ellipsis: { showTitle: false },
+      render: (text: string) => (
+        <Tooltip title={text}>{text || '-'}</Tooltip>
+      ),
     },
     {
       title: '状态',
@@ -228,7 +246,7 @@ export default function TestTaskListPage() {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (text) => new Date(text).toLocaleString(),
+      render: (text: string) => (text ? dayjs(text).format('YYYY-MM-DD HH:mm') : '-'),
     },
     {
       title: '操作',
@@ -315,7 +333,7 @@ export default function TestTaskListPage() {
                 icon={<FolderAddOutlined />}
                 size="small"
                 type="text"
-                onClick={() => { void handleAddFolder() }}
+                onClick={handleAddFolder}
               />
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -345,7 +363,7 @@ export default function TestTaskListPage() {
                           )
                         : item.key === ALL_KEY
                           ? (
-                              <span className="shrink-0 text-xs">📋</span>
+                              <ListTodo className="shrink-0" size={14} style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} />
                             )
                           : (
                               <FolderOutlined className="shrink-0 text-xs" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} />
@@ -400,7 +418,7 @@ export default function TestTaskListPage() {
               <Space>
                 <Button
                   icon={<FolderAddOutlined />}
-                  onClick={() => { void handleAddFolder() }}
+                  onClick={handleAddFolder}
                 >
                   新建文件夹
                 </Button>
@@ -434,6 +452,7 @@ export default function TestTaskListPage() {
                     columns={columns}
                     dataSource={filteredTasks}
                     loading={tasksLoading}
+                    pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 条` }}
                     rowKey="id"
                   />
                 )}
@@ -500,6 +519,29 @@ export default function TestTaskListPage() {
           </Form.Item>
           <Form.Item label="失败即停" name="failFast" valuePropName="checked">
             <Switch />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 新建文件夹 Modal */}
+      <Modal
+        cancelText="取消"
+        okText="创建"
+        open={folderModalOpen}
+        title="新建文件夹"
+        onCancel={() => {
+          setFolderModalOpen(false)
+          folderForm.resetFields()
+        }}
+        onOk={() => { void handleCreateFolder() }}
+      >
+        <Form form={folderForm} layout="vertical">
+          <Form.Item
+            label="文件夹名称"
+            name="name"
+            rules={[{ required: true, whitespace: true, message: '请输入文件夹名称' }]}
+          >
+            <Input autoFocus placeholder="请输入文件夹名称" onPressEnter={() => { void handleCreateFolder() }} />
           </Form.Item>
         </Form>
       </Modal>
