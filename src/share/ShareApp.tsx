@@ -251,11 +251,15 @@ export function ShareApp() {
       })
       .catch(() => {
         clearToken()
-        // token 失效时若链接带 pwd，仍尝试自动登录
+        // token 失效时若链接带 pwd，仍尝试自动登录；无 pwd 也尝试空密码
+        // （无密码分享自动放行；有密码分享静默落到密码页）
         const pwd = parseSharePwd()
 
         if (shareId && pwd) {
           void autoLogin(pwd)
+        }
+        else if (shareId) {
+          void autoLogin('', true)
         }
         else {
           setPhase('login')
