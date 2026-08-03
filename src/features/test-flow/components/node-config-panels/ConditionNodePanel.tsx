@@ -265,7 +265,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
                 {data.conditions!.map((condition, index) => (
                   <div
                     key={condition.id}
-                    className="space-y-2 rounded-md border border-[color:var(--ds-node-border-color,#e5e7eb)] bg-[color:var(--ds-node-bg-elevated,#f9fafb)] p-3"
+                    className="space-y-2 rounded-md border border-[color:var(--ds-node-border-color)] bg-[color:var(--ds-node-bg-elevated)] p-3"
                   >
                     <div className="flex items-center justify-between">
                       <Text strong className="text-xs">
@@ -301,7 +301,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
                 ))}
 
                 {/* 默认分支 */}
-                <div className="rounded-md border border-dashed border-[color:var(--ds-node-border-color,#d1d5db)] bg-[color:var(--ds-node-bg,#f3f4f6)] p-3">
+                <div className="rounded-md border border-dashed border-[color:var(--ds-node-border-color)] bg-[color:var(--ds-node-bg)] p-3">
                   <Text className="mb-2 block text-xs" type="secondary">
                     默认分支（当所有条件都不满足时）
                   </Text>

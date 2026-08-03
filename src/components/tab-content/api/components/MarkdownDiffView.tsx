@@ -95,18 +95,18 @@ export function MarkdownDiffView({ leftText, rightText, leftTitle, rightTitle }:
         const text = side === 'left' ? row.left : row.right
 
         if (text === undefined) {
-          return <div key={idx} style={{ height: 20, backgroundColor: 'var(--ds-bg-elevated, #fafafa)' }} />
+          return <div key={idx} style={{ height: 20, backgroundColor: 'var(--ds-bg-elevated)' }} />
         }
 
         const bg = row.type === 'same'
           ? 'transparent'
           : row.type === 'removed'
-            ? 'color-mix(in srgb, var(--ds-error-color, #ef4444) 10%, transparent)'
-            : 'color-mix(in srgb, var(--ds-success-color, #22c55e) 10%, transparent)'
-        const color = row.type === 'removed' ? 'var(--ds-error-color, #c0392b)' : row.type === 'added' ? 'var(--ds-success-color, #1e8449)' : undefined
+            ? 'color-mix(in srgb, var(--ds-error-color) 10%, transparent)'
+            : 'color-mix(in srgb, var(--ds-success-color) 10%, transparent)'
+        const color = row.type === 'removed' ? 'var(--ds-error-color)' : row.type === 'added' ? 'var(--ds-success-color)' : undefined
 
         return (
-          <div key={idx} style={{ backgroundColor: bg, color, padding: '0 8px', whiteSpace: 'pre', borderBottom: '1px solid var(--ds-divider-color, #f0f0f0)' }}>
+          <div key={idx} style={{ backgroundColor: bg, color, padding: '0 8px', whiteSpace: 'pre', borderBottom: '1px solid var(--ds-divider-color)' }}>
             {text || ' '}
           </div>
         )

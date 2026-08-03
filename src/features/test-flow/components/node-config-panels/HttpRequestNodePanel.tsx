@@ -25,7 +25,7 @@ function LabelWithBadge({ label, hasData }: { label: string, hasData: boolean })
   return (
     <span>
       {label}
-      {hasData && <span style={{ color: 'var(--ds-success-color, #22c55e)', marginLeft: 3, fontSize: 14, lineHeight: 1 }}>*</span>}
+      {hasData && <span style={{ color: 'var(--ds-success-color)', marginLeft: 3, fontSize: 14, lineHeight: 1 }}>*</span>}
     </span>
   )
 }

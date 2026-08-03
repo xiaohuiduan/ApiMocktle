@@ -150,7 +150,7 @@ export function useMenuData(): MenuState {
 
               return (
                 <span
-                  className={`inline-flex size-full items-center justify-center ${item.customData.catalog.type === MenuItemType.ApiSchema ? 'text-[color:var(--ds-highlight-selected,#3b82f6)]' : ''}`}
+                  className={`inline-flex size-full items-center justify-center ${item.customData.catalog.type === MenuItemType.ApiSchema ? 'text-[color:var(--ds-highlight-selected)]' : ''}`}
                 >
                   <FileIcon
                     size={15}

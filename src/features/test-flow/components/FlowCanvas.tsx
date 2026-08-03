@@ -404,18 +404,18 @@ function FlowCanvasInner() {
         width: '100%',
         height: '100%',
         // 画布背景跟随设计风格（玻璃/拟物/新拟态各有专属背景与渐变素材）
-        background: 'var(--ds-canvas-bg, #fafafa)',
+        background: 'var(--ds-canvas-bg)',
       }}
     >
       {/* 节点高亮样式 */}
       <style>{`
         .react-flow__node.selected {
-          box-shadow: 0 0 0 2px var(--ds-highlight-selected, #3b82f6) !important;
+          box-shadow: 0 0 0 2px var(--ds-highlight-selected) !important;
           border-radius: 8px;
         }
         @keyframes node-running-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ds-highlight-selected, #3b82f6) 40%, transparent); }
-          50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--ds-highlight-selected, #3b82f6) 0%, transparent); }
+          0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ds-highlight-selected) 40%, transparent); }
+          50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--ds-highlight-selected) 0%, transparent); }
         }
         .react-flow__node[data-exec-status="running"] {
           animation: node-running-pulse 1.5s ease-in-out infinite;
@@ -423,37 +423,37 @@ function FlowCanvasInner() {
         }
         /* 控件条（缩放/适应视图）跟随主题 */
         .react-flow__controls {
-          background: var(--ds-panel-bg, #fafafa);
+          background: var(--ds-panel-bg);
           border: var(--ds-border, none);
           box-shadow: var(--ds-shadow-sm, 0 1px 3px rgba(0,0,0,0.1));
           border-radius: 8px;
           overflow: hidden;
         }
         .react-flow__controls-button {
-          background: var(--ds-node-bg, #fff);
-          border-bottom: 1px solid var(--ds-divider-color, #e5e7eb);
-          color: var(--ds-node-text-primary, #1f2937);
-          fill: var(--ds-node-text-primary, #1f2937);
+          background: var(--ds-node-bg);
+          border-bottom: 1px solid var(--ds-divider-color);
+          color: var(--ds-node-text-primary);
+          fill: var(--ds-node-text-primary);
         }
         .react-flow__controls-button:hover {
-          background: var(--ds-bg-elevated, #f8fafc);
+          background: var(--ds-bg-elevated);
         }
         .react-flow__controls-button:last-child {
           border-bottom: none;
         }
         /* 小地图遮罩与背景跟随主题 */
         .react-flow__minimap {
-          background: var(--ds-panel-bg, #fafafa);
+          background: var(--ds-panel-bg);
           border: var(--ds-border, none);
           border-radius: 8px;
         }
         .react-flow__node[data-exec-status="passed"] {
-          box-shadow: 0 0 0 2px var(--ds-success-color, #22c55e) !important;
+          box-shadow: 0 0 0 2px var(--ds-success-color) !important;
           border-radius: 8px;
         }
         .react-flow__node[data-exec-status="failed"],
         .react-flow__node[data-exec-status="error"] {
-          box-shadow: 0 0 0 2px var(--ds-error-color, #ef4444) !important;
+          box-shadow: 0 0 0 2px var(--ds-error-color) !important;
           border-radius: 8px;
         }
         /* 路径高亮 */
@@ -470,7 +470,7 @@ function FlowCanvasInner() {
           transition: opacity 0.2s ease;
         }
         .react-flow__node.path-highlight-current {
-          box-shadow: 0 0 0 3px var(--ds-highlight-selected, #3b82f6), 0 0 12px color-mix(in srgb, var(--ds-highlight-selected, #3b82f6) 40%, transparent) !important;
+          box-shadow: 0 0 0 3px var(--ds-highlight-selected), 0 0 12px color-mix(in srgb, var(--ds-highlight-selected) 40%, transparent) !important;
           border-radius: 8px;
           opacity: 1;
         }
@@ -480,7 +480,7 @@ function FlowCanvasInner() {
         }
         .react-flow__node.path-preview.path-highlight-current {
           opacity: 0.6;
-          box-shadow: 0 0 0 2px color-mix(in srgb, var(--ds-highlight-selected, #3b82f6) 40%, transparent) !important;
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--ds-highlight-selected) 40%, transparent) !important;
         }
         .react-flow__edge.path-dimmed {
           opacity: 0.15 !important;
@@ -523,7 +523,7 @@ function FlowCanvasInner() {
 
             return getCssVar('--ds-node-border-color', '#ddd')
           }}
-          style={{ background: 'var(--ds-panel-bg, #fafafa)' }}
+          style={{ background: 'var(--ds-panel-bg)' }}
         />
         <Controls />
       </ReactFlow>
@@ -536,7 +536,7 @@ function FlowCanvasInner() {
             left: contextMenu.x,
             top: contextMenu.y,
             zIndex: 10000,
-            background: 'var(--ds-node-bg, #fff)',
+            background: 'var(--ds-node-bg)',
             borderRadius: 6,
             boxShadow: 'var(--ds-shadow-md, 0 2px 12px rgba(0,0,0,0.15))',
             border: 'var(--ds-border, none)',
@@ -550,13 +550,13 @@ function FlowCanvasInner() {
               padding: '6px 16px',
               fontSize: 13,
               cursor: 'pointer',
-              color: 'var(--ds-error-color, #ef4444)',
+              color: 'var(--ds-error-color)',
               display: 'flex',
               alignItems: 'center',
               gap: 6,
             }}
             onClick={handleDeleteFromMenu}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ds-bg-elevated, #fef2f2)')}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ds-bg-elevated)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
             🗑 删除{contextMenu.type === 'node' ? '节点' : '连线'}

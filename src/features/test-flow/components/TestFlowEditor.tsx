@@ -173,8 +173,8 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
         title: `流程校验失败 (${errors.length} 个错误)`,
         content: (
           <div>
-            {errors.map((e, i) => <div key={i} style={{ color: 'var(--ds-error-color, #ef4444)' }}>✗ {e}</div>)}
-            {warnings.map((w, i) => <div key={`w${i}`} style={{ color: 'var(--ds-warning-color, #f59e0b)' }}>⚠ {w}</div>)}
+            {errors.map((e, i) => <div key={i} style={{ color: 'var(--ds-error-color)' }}>✗ {e}</div>)}
+            {warnings.map((w, i) => <div key={`w${i}`} style={{ color: 'var(--ds-warning-color)' }}>⚠ {w}</div>)}
           </div>
         ),
       })
@@ -188,7 +188,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
         title: `校验通过，但有 ${warnings.length} 个警告`,
         content: (
           <div>
-            {warnings.map((w, i) => <div key={i} style={{ color: 'var(--ds-warning-color, #f59e0b)' }}>⚠ {w}</div>)}
+            {warnings.map((w, i) => <div key={i} style={{ color: 'var(--ds-warning-color)' }}>⚠ {w}</div>)}
           </div>
         ),
       })
@@ -358,7 +358,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
             <PanelGroup autoSaveId="test-flow-left-panel" direction="horizontal">
               {/* 左侧面板：节点 + 变量 Tab */}
               <Panel defaultSize={8} maxSize={40} minSize={8}>
-                <div style={{ height: '100%', borderRight: 'var(--ds-panel-border, 1px solid #f0f0f0)', background: 'var(--ds-panel-bg, #fafafa)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ height: '100%', borderRight: 'var(--ds-panel-border)', background: 'var(--ds-panel-bg)', display: 'flex', flexDirection: 'column' }}>
                   <Tabs
                     defaultActiveKey="nodes"
                     items={[
@@ -414,7 +414,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
                 </div>
               </Panel>
 
-              <PanelResizeHandle className="w-px transition-colors hover:bg-[color:var(--ds-highlight-selected,#3b82f6)]" style={{ background: 'var(--ds-divider-color, #e5e7eb)' }} />
+              <PanelResizeHandle className="w-px transition-colors hover:bg-[color:var(--ds-highlight-selected)]" style={{ background: 'var(--ds-divider-color)' }} />
 
               {/* 中间画布 */}
               <Panel>

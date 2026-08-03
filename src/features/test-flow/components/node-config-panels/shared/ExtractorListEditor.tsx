@@ -94,7 +94,7 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
               {extractors.map((extractor, index) => (
                 <div
                   key={index}
-                  className="space-y-2 rounded-md border border-[color:var(--ds-node-border-color,#e5e7eb)] bg-[color:var(--ds-node-bg-elevated,#f9fafb)] p-2"
+                  className="space-y-2 rounded-md border border-[color:var(--ds-node-border-color)] bg-[color:var(--ds-node-bg-elevated)] p-2"
                 >
                   {/* 第一行：类型、路径/名称 */}
                   <Space.Compact block>

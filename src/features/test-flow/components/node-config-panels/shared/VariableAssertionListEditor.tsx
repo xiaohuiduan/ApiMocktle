@@ -135,7 +135,7 @@ export default function VariableAssertionListEditor({ assertions, onChange }: Va
         : (
             <div className="space-y-2">
               {assertions.map((a, index) => (
-                <div key={index} className="rounded-md border border-[color:var(--ds-node-border-color,#e5e7eb)] bg-[color:var(--ds-node-bg-elevated,#f9fafb)] p-2">
+                <div key={index} className="rounded-md border border-[color:var(--ds-node-border-color)] bg-[color:var(--ds-node-bg-elevated)] p-2">
                   <Space.Compact block>
                     <Select
                       allowClear
@@ -144,7 +144,7 @@ export default function VariableAssertionListEditor({ assertions, onChange }: Va
                         <>
                           {menu}
                           {knownVars.length === 0 && (
-                            <div style={{ padding: '4px 8px', color: 'var(--ds-node-text-muted, #9ca3af)', fontSize: 11 }}>
+                            <div style={{ padding: '4px 8px', color: 'var(--ds-node-text-muted)', fontSize: 11 }}>
                               暂无已知变量，请手动输入
                             </div>
                           )}

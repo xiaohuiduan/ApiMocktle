@@ -60,7 +60,7 @@ export default function AssertNodePanel({ data, onChange }: PanelProps<AssertNod
             value={data.script ?? ''}
             onChange={handleScriptChange}
           />
-          <Text className="mt-2 block text-xs" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} type="secondary">
+          <Text className="mt-2 block text-xs" style={{ color: 'var(--ds-node-text-muted)' }} type="secondary">
             示例: pm.test('token已获取', () =&gt; {'{'} pm.expect(variables.token).toBeDefined() {'}'})
           </Text>
         </div>

@@ -91,6 +91,7 @@
 
   --ds-panel-bg: #1a2332;
   --ds-panel-border: 1px solid #2a3444;
+  --ds-border-subtle: 1px solid #2a3444;
   --ds-divider-color: #2a3444;
   --ds-toolbar-bg: #1a2332;
   --ds-toolbar-border: 1px solid #2a3444;
@@ -387,6 +388,8 @@
   --ds-canvas-dot: rgba(70, 80, 85, 0.3);
 
   --ds-panel-bg: #2d3436;
+  --ds-panel-border: none;
+  --ds-border-subtle: none;
   --ds-divider-color: transparent;
   --ds-toolbar-bg: #2d3436;
 }

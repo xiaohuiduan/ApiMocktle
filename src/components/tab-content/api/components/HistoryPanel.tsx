@@ -208,7 +208,7 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
                           <Typography.Text className="mt-0.5 block truncate text-[11px]" title={item.requestJson.url} type="secondary">
                             {item.requestJson.url}
                           </Typography.Text>
-                          <Typography.Text className="block text-[10px]" type="secondary">{formatTime(item.createdAt)}</Typography.Text>
+                          <Typography.Text className="block text-[11px]" type="secondary">{formatTime(item.createdAt)}</Typography.Text>
                         </div>
                       </div>
                     )}

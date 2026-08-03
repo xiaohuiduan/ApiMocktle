@@ -22,8 +22,8 @@ const { Text } = Typography
 // ==================== 样式 ====================
 
 const resultBlockClass = css`
-  background: var(--ds-node-bg-elevated, #f8fafc);
-  border: 1px solid var(--ds-node-border-color, #e2e8f0);
+  background: var(--ds-node-bg-elevated);
+  border: 1px solid var(--ds-node-border-color);
   border-radius: 6px;
   padding: var(--ds-pad-md);
   font-size: 12px;
@@ -39,13 +39,13 @@ const resizeHandleClass = css`
   z-index: 10;
   transition: background 0.15s;
   &:hover, &:active {
-    background: var(--ds-highlight-selected, #91caff);
+    background: var(--ds-highlight-selected);
   }
 `
 
 const codeBlockClass = css`
-  background: var(--ds-code-bg, #1e1e1e);
-  color: var(--ds-code-color, #d4d4d4);
+  background: var(--ds-code-bg);
+  color: var(--ds-code-color);
   border-radius: 4px;
   padding: var(--ds-pad-sm) 10px;
   font-family: 'Cascadia Code', 'Fira Code', monospace;
@@ -661,7 +661,7 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
 
       {/* 错误信息 */}
       {error && (
-        <div className={resultBlockClass} style={{ borderColor: 'var(--ds-error-color, #fca5a5)', background: 'rgba(239, 68, 68, 0.08)', marginBottom: 'var(--ds-pad-sm)' }}>
+        <div className={resultBlockClass} style={{ borderColor: 'var(--ds-error-color)', background: 'rgba(239, 68, 68, 0.08)', marginBottom: 'var(--ds-pad-sm)' }}>
           <Text style={{ fontSize: 12 }} type="danger">{error}</Text>
         </div>
       )}
@@ -793,7 +793,7 @@ function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
         flexWrap: 'wrap',
         gap: 2,
         fontSize: 12,
-        color: 'var(--ds-node-text-secondary, #6b7280)',
+        color: 'var(--ds-node-text-secondary)',
         padding: 'var(--ds-list-gap) 0',
       }}
     >
@@ -805,7 +805,7 @@ function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
           <span key={item.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
             {/* 分隔符 */}
             {!isFirst && (
-              <span style={{ margin: '0 4px', color: 'var(--ds-divider-color, #d1d5db)' }}>→</span>
+              <span style={{ margin: '0 4px', color: 'var(--ds-divider-color)' }}>→</span>
             )}
 
             {item.isEllipsis
@@ -813,12 +813,12 @@ function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
                   <span
                     style={{
                       cursor: 'pointer',
-                      color: 'var(--ds-node-text-muted, #9ca3af)',
+                      color: 'var(--ds-node-text-muted)',
                       padding: '0 2px',
                     }}
                     onClick={() => { setExpanded(true) }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--ds-highlight-selected, #3b82f6)' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--ds-node-text-muted, #9ca3af)' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--ds-highlight-selected)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--ds-node-text-muted)' }}
                   >
                     ⋯
                   </span>
@@ -827,15 +827,15 @@ function PathBreadcrumb({ items, currentId, onSelect }: PathBreadcrumbProps) {
                   <span
                     style={{
                       fontWeight: isCurrent ? 600 : 400,
-                      color: isCurrent ? 'var(--ds-highlight-selected, #3b82f6)' : 'var(--ds-node-text-secondary, #6b7280)',
+                      color: isCurrent ? 'var(--ds-highlight-selected)' : 'var(--ds-node-text-secondary)',
                       cursor: isCurrent ? 'default' : 'pointer',
                       padding: '0 2px',
                       borderRadius: 2,
                       transition: 'color 0.15s',
                     }}
                     onClick={() => { if (!isCurrent) { onSelect(item.id) } }}
-                    onMouseEnter={(e) => { if (!isCurrent) { e.currentTarget.style.color = 'var(--ds-highlight-selected, #3b82f6)' } }}
-                    onMouseLeave={(e) => { if (!isCurrent) { e.currentTarget.style.color = 'var(--ds-node-text-secondary, #6b7280)' } }}
+                    onMouseEnter={(e) => { if (!isCurrent) { e.currentTarget.style.color = 'var(--ds-highlight-selected)' } }}
+                    onMouseLeave={(e) => { if (!isCurrent) { e.currentTarget.style.color = 'var(--ds-node-text-secondary)' } }}
                   >
                     {isCurrent ? `[${item.label}]` : item.label}
                   </span>

@@ -45,11 +45,11 @@ const NODE_ICONS: Record<string, LucideIcon> = {
 
 const STATUS_COLORS: Record<NodeExecStatus, string> = {
   idle: '',
-  running: 'var(--ds-highlight-selected, #3b82f6)',
-  passed: 'var(--ds-success-color, #22c55e)',
-  failed: 'var(--ds-error-color, #ef4444)',
-  skipped: 'var(--ds-node-text-muted, #9ca3af)',
-  error: 'var(--ds-error-color, #ef4444)',
+  running: 'var(--ds-highlight-selected)',
+  passed: 'var(--ds-success-color)',
+  failed: 'var(--ds-error-color)',
+  skipped: 'var(--ds-node-text-muted)',
+  error: 'var(--ds-error-color)',
 }
 
 const STATUS_LABELS: Record<NodeExecStatus, string> = {
@@ -68,10 +68,10 @@ const nodeClass = css`
   display: flex;
   align-items: stretch;
   min-width: 180px;
-  background: var(--ds-node-bg, #fff);
+  background: var(--ds-node-bg);
   border-radius: 8px;
   box-shadow: var(--ds-node-shadow, 0 1px 3px rgba(0, 0, 0, 0.12));
-  border: 1px solid var(--ds-node-border-color, #e5e7eb);
+  border: 1px solid var(--ds-node-border-color);
   overflow: hidden;
   font-size: 13px;
   transition: box-shadow 0.2s ease;
@@ -103,7 +103,7 @@ const iconClass = css`
 
 const labelClass = css`
   font-weight: 600;
-  color: var(--ds-node-text-primary, #1f2937);
+  color: var(--ds-node-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -111,7 +111,7 @@ const labelClass = css`
 
 const descClass = css`
   font-size: 11px;
-  color: var(--ds-node-text-secondary, #6b7280);
+  color: var(--ds-node-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -138,7 +138,7 @@ const badgeClass = css`
 const handleLabelClass = css`
   position: absolute;
   font-size: 9px;
-  color: var(--ds-node-text-muted, #9ca3af);
+  color: var(--ds-node-text-muted);
   white-space: nowrap;
   pointer-events: none;
   line-height: 1;
@@ -254,7 +254,7 @@ function BaseNodeInner({
           <span
             style={{
               fontSize: 10,
-              color: execStatus === 'passed' ? 'var(--ds-success-color, #16a34a)' : execStatus === 'skipped' ? 'var(--ds-node-text-muted, #9ca3af)' : 'var(--ds-error-color, #dc2626)',
+              color: execStatus === 'passed' ? 'var(--ds-success-color)' : execStatus === 'skipped' ? 'var(--ds-node-text-muted)' : 'var(--ds-error-color)',
               lineHeight: 1.3,
               overflow: 'hidden',
               textOverflow: 'ellipsis',

@@ -326,9 +326,9 @@ export default function TestTaskListPage() {
       <PanelGroup autoSaveId="tests-folder-sidebar" direction="horizontal">
         {/* Left: Folder sidebar */}
         <Panel defaultSize={20} maxSize={35} minSize={15}>
-          <div className="flex h-full flex-col border-r border-[color:var(--ds-panel-border,#f0f0f0)] bg-[color:var(--ds-panel-bg,#fafafa)]">
-            <div className="flex items-center justify-between border-b border-[color:var(--ds-divider-color,#e5e7eb)] px-3 py-2">
-              <span className="text-xs font-medium text-[color:var(--ds-node-text-secondary,#6b7280)]">文件夹</span>
+          <div className="flex h-full flex-col border-r border-[color:var(--ds-panel-border)] bg-[color:var(--ds-panel-bg)]">
+            <div className="flex items-center justify-between border-b border-[color:var(--ds-divider-color)] px-3 py-2">
+              <span className="text-xs font-medium text-[color:var(--ds-node-text-secondary)]">文件夹</span>
               <Button
                 icon={<FolderAddOutlined />}
                 size="small"
@@ -346,11 +346,11 @@ export default function TestTaskListPage() {
                   <div
                     key={item.key}
                     className={`group flex cursor-pointer items-center justify-between px-3 py-1.5 text-sm transition-colors ${
-                      isSelected ? 'font-medium' : 'hover:bg-[color:var(--ds-bg-elevated,#f8fafc)]'
+                      isSelected ? 'font-medium' : 'hover:bg-[color:var(--ds-bg-elevated)]'
                     }`}
                     style={{
-                      background: isSelected ? 'var(--ds-highlight-selected, #3b82f6)' : undefined,
-                      color: isSelected ? '#fff' : 'var(--ds-node-text-primary, #1f2937)',
+                      background: isSelected ? 'var(--ds-highlight-selected)' : undefined,
+                      color: isSelected ? '#fff' : 'var(--ds-node-text-primary)',
                     }}
                     onClick={() => {
                       if (!isEditing) { setSelectedFolderKey(item.key) }
@@ -359,14 +359,14 @@ export default function TestTaskListPage() {
                     <div className="flex min-w-0 flex-1 items-center gap-1.5">
                       {isFolder
                         ? (
-                            <FolderOutlined className="shrink-0 text-xs" style={{ color: 'var(--ds-warning-color, #f59e0b)' }} />
+                            <FolderOutlined className="shrink-0 text-xs" style={{ color: 'var(--ds-warning-color)' }} />
                           )
                         : item.key === ALL_KEY
                           ? (
-                              <ListTodo className="shrink-0" size={14} style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} />
+                              <ListTodo className="shrink-0" size={14} style={{ color: 'var(--ds-node-text-muted)' }} />
                             )
                           : (
-                              <FolderOutlined className="shrink-0 text-xs" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} />
+                              <FolderOutlined className="shrink-0 text-xs" style={{ color: 'var(--ds-node-text-muted)' }} />
                             )}
                       {isEditing
                         ? (
@@ -388,11 +388,11 @@ export default function TestTaskListPage() {
                           )}
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-[color:var(--ds-node-text-muted,#9ca3af)]">{item.count}</span>
+                      <span className="text-[11px] text-[color:var(--ds-node-text-muted)]">{item.count}</span>
                       {isFolder && !isEditing && (
                         <Dropdown menu={getFolderMenuItems(folders.find((f) => f.id === item.key)!)} trigger={['click']}>
                           <Button
-                            className="!h-4 !w-4 !text-[10px] opacity-0 group-hover:opacity-100"
+                            className="!h-4 !w-4 !text-[11px] opacity-0 group-hover:opacity-100"
                             icon={<MoreOutlined />}
                             size="small"
                             type="text"
@@ -408,7 +408,7 @@ export default function TestTaskListPage() {
           </div>
         </Panel>
 
-        <PanelResizeHandle className="w-px bg-[color:var(--ds-divider-color,#e5e7eb)] transition-colors hover:bg-[color:var(--ds-highlight-selected,#3b82f6)]" />
+        <PanelResizeHandle className="w-px bg-[color:var(--ds-divider-color)] transition-colors hover:bg-[color:var(--ds-highlight-selected)]" />
 
         {/* Right: Task table */}
         <Panel>

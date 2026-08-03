@@ -40,12 +40,12 @@ const STATUS_ICON: Record<NodeExecStatus, typeof Circle> = {
 }
 
 const STATUS_COLOR: Record<NodeExecStatus, string> = {
-  idle: 'var(--ds-node-text-muted, #9ca3af)',
-  running: 'var(--ds-highlight-selected, #3b82f6)',
-  passed: 'var(--ds-success-color, #22c55e)',
-  failed: 'var(--ds-error-color, #ef4444)',
-  skipped: 'var(--ds-node-text-muted, #9ca3af)',
-  error: 'var(--ds-error-color, #ef4444)',
+  idle: 'var(--ds-node-text-muted)',
+  running: 'var(--ds-highlight-selected)',
+  passed: 'var(--ds-success-color)',
+  failed: 'var(--ds-error-color)',
+  skipped: 'var(--ds-node-text-muted)',
+  error: 'var(--ds-error-color)',
 }
 
 // ==================== 组件 ====================
@@ -114,7 +114,7 @@ export default function NodeOutlinePanel() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 4px' }}>
         {groupedNodes.length === 0
           ? (
-              <div style={{ padding: 16, textAlign: 'center', color: 'var(--ds-node-text-muted, #9ca3af)', fontSize: 12 }}>
+              <div style={{ padding: 16, textAlign: 'center', color: 'var(--ds-node-text-muted)', fontSize: 12 }}>
                 {nodes.length === 0 ? '画布为空' : '无匹配节点'}
               </div>
             )
@@ -125,7 +125,7 @@ export default function NodeOutlinePanel() {
                     style={{
                       fontSize: 11,
                       fontWeight: 600,
-                      color: 'var(--ds-node-text-secondary, #6b7280)',
+                      color: 'var(--ds-node-text-secondary)',
                       padding: '4px 6px',
                       display: 'flex',
                       alignItems: 'center',
@@ -133,7 +133,7 @@ export default function NodeOutlinePanel() {
                     }}
                   >
                     {NODE_TYPE_LABELS[type]}
-                    <Badge count={items.length} size="small" style={{ backgroundColor: 'var(--ds-node-text-muted, #9ca3af)' }} />
+                    <Badge count={items.length} size="small" style={{ backgroundColor: 'var(--ds-node-text-muted)' }} />
                   </div>
                   {items.map((node) => {
                     const label = (node.data?.label) ?? node.id
@@ -154,7 +154,7 @@ export default function NodeOutlinePanel() {
                           transition: 'background 0.15s',
                         }}
                         onClick={() => { handleNodeClick(node.id) }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--ds-bg-elevated, #f0f0f0)' }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--ds-bg-elevated)' }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                       >
                         <StatusIcon color={STATUS_COLOR[execStatus]} size={10} style={{ flexShrink: 0 }} />
@@ -177,7 +177,7 @@ export default function NodeOutlinePanel() {
             )}
       </div>
 
-      <div style={{ padding: '4px 8px', fontSize: 11, color: 'var(--ds-node-text-muted, #9ca3af)', borderTop: 'var(--ds-divider-color, 1px solid #f0f0f0)' }}>
+      <div style={{ padding: '4px 8px', fontSize: 11, color: 'var(--ds-node-text-muted)', borderTop: 'var(--ds-divider-color, 1px solid #f0f0f0)' }}>
         共 {nodes.length} 个节点{search && ` · 显示 ${totalFiltered} 个`}
       </div>
     </div>

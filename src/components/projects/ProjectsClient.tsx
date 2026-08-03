@@ -71,9 +71,9 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
         <div className="mb-1.5 px-1">
           <Input
             placeholder="搜索..."
-            prefix={<SearchOutlined style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }} />}
+            prefix={<SearchOutlined style={{ color: 'var(--ds-node-text-muted)' }} />}
             size="small"
-            style={{ background: 'var(--ds-bg-elevated, #f3f4f6)', borderRadius: 6, padding: '0 8px' }}
+            style={{ background: 'var(--ds-bg-elevated)', borderRadius: 6, padding: '0 8px' }}
             value={searchText}
             variant="borderless"
             onChange={(e) => { setSearchText(e.target.value) }}
@@ -84,18 +84,18 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
             style={{
               display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 10px',
               textAlign: 'left', fontSize: 12, transition: 'background 0.15s',
-              background: category === '全部' ? 'var(--ds-highlight-selected, #3b82f6)' + '15' : 'transparent',
-              color: category === '全部' ? 'var(--ds-highlight-selected, #2563eb)' : 'var(--ds-node-text-secondary, #6b7280)',
+              background: category === '全部' ? 'color-mix(in srgb, var(--ds-highlight-selected) 15%, transparent)' : 'transparent',
+              color: category === '全部' ? 'var(--ds-highlight-selected)' : 'var(--ds-node-text-secondary)',
               fontWeight: category === '全部' ? 600 : 400,
               border: 'none', cursor: 'pointer', borderRadius: 4,
             }}
             type="button"
             onClick={() => { setCategory('全部'); setSearchText('') }}
-            onMouseEnter={(e) => { if (category !== '全部') { e.currentTarget.style.background = 'var(--ds-bg-elevated, #f3f4f6)' } }}
+            onMouseEnter={(e) => { if (category !== '全部') { e.currentTarget.style.background = 'var(--ds-bg-elevated)' } }}
             onMouseLeave={(e) => { if (category !== '全部') { e.currentTarget.style.background = 'transparent' } }}
           >
             <span style={{ flex: 1 }}>全部</span>
-            <span style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums', color: 'var(--ds-node-text-muted, #9ca3af)' }}>
+            <span style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums', color: 'var(--ds-node-text-muted)' }}>
               {ICON_OPTIONS.length}
             </span>
           </button>
@@ -110,18 +110,18 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
                 style={{
                   display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 10px',
                   textAlign: 'left', fontSize: 12, transition: 'background 0.15s',
-                  background: category === cat.label ? 'var(--ds-highlight-selected, #3b82f6)' + '15' : 'transparent',
-                  color: category === cat.label ? 'var(--ds-highlight-selected, #2563eb)' : 'var(--ds-node-text-secondary, #6b7280)',
+                  background: category === cat.label ? 'color-mix(in srgb, var(--ds-highlight-selected) 15%, transparent)' : 'transparent',
+                  color: category === cat.label ? 'var(--ds-highlight-selected)' : 'var(--ds-node-text-secondary)',
                   fontWeight: category === cat.label ? 600 : 400,
                   border: 'none', cursor: 'pointer', borderRadius: 4,
                 }}
                 type="button"
                 onClick={() => { setCategory(cat.label) }}
-                onMouseEnter={(e) => { if (category !== cat.label) { e.currentTarget.style.background = 'var(--ds-bg-elevated, #f3f4f6)' } }}
+                onMouseEnter={(e) => { if (category !== cat.label) { e.currentTarget.style.background = 'var(--ds-bg-elevated)' } }}
                 onMouseLeave={(e) => { if (category !== cat.label) { e.currentTarget.style.background = 'transparent' } }}
               >
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.label}</span>
-                <span style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums', color: 'var(--ds-node-text-muted, #9ca3af)' }}>
+                <span style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums', color: 'var(--ds-node-text-muted)' }}>
                   {availableInMap}
                 </span>
               </button>
@@ -131,10 +131,10 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
       </div>
 
       {/* 右侧图标网格 */}
-      <div className="flex-1 rounded-lg p-2.5" style={{ minHeight: 260, maxHeight: 340, background: 'var(--ds-bg-elevated, #f3f4f6)' }}>
+      <div className="flex-1 rounded-lg p-2.5" style={{ minHeight: 260, maxHeight: 340, background: 'var(--ds-bg-elevated)' }}>
         {shownIcons.length === 0
           ? (
-              <div className="flex h-full items-center justify-center text-xs" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }}>暂无图标</div>
+              <div className="flex h-full items-center justify-center text-xs" style={{ color: 'var(--ds-node-text-muted)' }}>暂无图标</div>
             )
           : (
               <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
@@ -149,7 +149,7 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
                         className="relative flex size-9 cursor-pointer items-center justify-center rounded-lg border-2 transition-all duration-150 hover:scale-110 hover:shadow-md"
                         style={{
                           borderColor: isSelected ? iconColor : 'transparent',
-                          backgroundColor: isSelected ? `${iconColor}0f` : 'var(--ds-node-bg, #f5f5f5)',
+                          backgroundColor: isSelected ? `${iconColor}0f` : 'var(--ds-node-bg)',
                         }}
                         title={name}
                         type="button"
@@ -358,11 +358,11 @@ export function ProjectsClient() {
 
                     const cardBaseStyle: React.CSSProperties = isGlassStyle
                       ? {
-                          backgroundColor: `color-mix(in srgb, ${iconColor} 10%, var(--ds-node-bg, rgba(255,255,255,0.1)))`,
-                          backdropFilter: 'blur(var(--ds-blur, 20px)) saturate(var(--ds-saturate, 150%))',
-                          WebkitBackdropFilter: 'blur(var(--ds-blur, 20px)) saturate(var(--ds-saturate, 150%))',
-                          border: 'var(--ds-border-subtle, 1px solid rgba(255,255,255,0.2))',
-                          boxShadow: 'var(--ds-shadow-md, 0 4px 16px rgba(0,0,0,0.06))',
+                          backgroundColor: `color-mix(in srgb, ${iconColor} 10%, var(--ds-node-bg))`,
+                          backdropFilter: 'blur(var(--ds-blur)) saturate(var(--ds-saturate))',
+                          WebkitBackdropFilter: 'blur(var(--ds-blur)) saturate(var(--ds-saturate))',
+                          border: 'var(--ds-border-subtle)',
+                          boxShadow: 'var(--ds-shadow-md)',
                         }
                       : isNeumorphism
                         ? {
@@ -407,7 +407,7 @@ export function ProjectsClient() {
                         onMouseLeave={(e) => {
                           if (!isNeumorphism) {
                             (e.currentTarget as HTMLElement).style.backgroundColor = isGlassStyle
-                              ? `color-mix(in srgb, ${iconColor} 10%, rgba(255,255,255,0.1))`
+                              ? `color-mix(in srgb, ${iconColor} 10%, var(--ds-node-bg))`
                               : `${iconColor}12`
                           }
                         }}
@@ -464,13 +464,13 @@ export function ProjectsClient() {
                             <Typography.Text className="text-xs" type="secondary">
                               {roleText[project.role]}
                             </Typography.Text>
-                            <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--ds-node-text-muted, #9ca3af)' }}>
+                            <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--ds-node-text-muted)' }}>
                               <span>API {project.apiCount}</span>
-                              <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
+                              <span style={{ color: 'var(--ds-divider-color)' }}>|</span>
                               <span>模型 {project.schemaCount}</span>
-                              <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
+                              <span style={{ color: 'var(--ds-divider-color)' }}>|</span>
                               <span>快捷请求 {project.requestCount}</span>
-                              <span style={{ color: 'var(--ds-divider-color, #d1d5db)' }}>|</span>
+                              <span style={{ color: 'var(--ds-divider-color)' }}>|</span>
                               <span>自测 {project.testCount}</span>
                             </div>
                           </div>

@@ -230,7 +230,7 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
   return (
     <div
       style={{
-        border: '1px solid var(--ds-node-border-color, #e5e7eb)',
+        border: '1px solid var(--ds-node-border-color)',
         borderRadius: 6,
         overflow: 'hidden',
       }}
@@ -242,7 +242,7 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
           alignItems: 'center',
           gap: 8,
           padding: '6px 10px',
-          background: rule.enabled ? 'var(--ds-node-bg-elevated, #f9fafb)' : 'var(--ds-node-bg, #f3f4f6)',
+          background: rule.enabled ? 'var(--ds-node-bg-elevated)' : 'var(--ds-node-bg)',
           cursor: 'pointer',
           opacity: rule.enabled ? 1 : 0.6,
         }}
@@ -281,7 +281,7 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
 
       {/* 展开编辑区 */}
       {expanded && (
-        <div style={{ padding: '8px 10px', borderTop: '1px solid var(--ds-divider-color, #e5e7eb)' }}>
+        <div style={{ padding: '8px 10px', borderTop: '1px solid var(--ds-divider-color)' }}>
           <div className="space-y-2">
             {/* 目标类型 */}
             <div>

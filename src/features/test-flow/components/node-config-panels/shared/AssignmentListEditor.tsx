@@ -90,7 +90,7 @@ export default function AssignmentListEditor({ assignments, onChange }: Assignme
               {assignments.map((assignment, index) => (
                 <div
                   key={index}
-                  className="rounded-md border border-[color:var(--ds-node-border-color,#e5e7eb)] bg-[color:var(--ds-node-bg-elevated,#f9fafb)] p-2"
+                  className="rounded-md border border-[color:var(--ds-node-border-color)] bg-[color:var(--ds-node-bg-elevated)] p-2"
                 >
                   <Space.Compact block>
                     <Input

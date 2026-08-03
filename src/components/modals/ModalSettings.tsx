@@ -126,7 +126,7 @@ function AboutContent() {
     <div>
       <Viewer value={PROJECT_ABOUT_MARKDOWN} />
       {version && (
-        <div className="mt-4 text-sm" style={{ color: 'var(--ds-node-text-secondary, #6b7280)' }}>版本 {version}</div>
+        <div className="mt-4 text-sm" style={{ color: 'var(--ds-node-text-secondary)' }}>版本 {version}</div>
       )}
     </div>
   )

@@ -184,13 +184,13 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
           <div className="mt-0.5 flex flex-wrap items-center gap-1">
             {definedVars.map((v) => (
               <Tooltip key={v} title={`实际生效值：${varMap.get(v) ?? '—'}`}>
-                <Tag className="text-[10px] leading-none" color="blue">
+                <Tag className="text-[11px] leading-none" color="blue">
                   {v}={varMap.get(v)}
                 </Tag>
               </Tooltip>
             ))}
             {undefinedVars.map((v) => (
-              <Tag key={v} className="text-[10px] leading-none" color="orange">
+              <Tag key={v} className="text-[11px] leading-none" color="orange">
                 {v} 未定义
               </Tag>
             ))}

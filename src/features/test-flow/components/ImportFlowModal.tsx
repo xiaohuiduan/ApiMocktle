@@ -16,31 +16,31 @@ const { Text } = Typography
 const { TextArea } = Input
 
 const mdPreviewClass = css`
-  background: var(--ds-node-bg-elevated, #f6f8fa);
-  border: 1px solid var(--ds-node-border-color, #d0d7de);
+  background: var(--ds-node-bg-elevated);
+  border: 1px solid var(--ds-node-border-color);
   border-radius: 6px;
   padding: var(--ds-pad-lg);
   max-height: 420px;
   overflow: auto;
   font-size: 13px;
   line-height: 1.6;
-  color: var(--ds-node-text-primary, #1f2937);
+  color: var(--ds-node-text-primary);
   h1, h2, h3, h4 { margin: 16px 0 8px; font-weight: 600; }
-  h1 { font-size: 18px; border-bottom: 1px solid var(--ds-divider-color, #e5e7eb); padding-bottom: 6px; }
+  h1 { font-size: 18px; border-bottom: 1px solid var(--ds-divider-color); padding-bottom: 6px; }
   h2 { font-size: 15px; }
   h3 { font-size: 13px; }
   h4 { font-size: 12px; }
   p { margin: 6px 0; }
   ul, ol { padding-left: 20px; margin: 6px 0; }
   li { margin: 2px 0; }
-  code { background: var(--ds-bg-elevated, #e5e7eb); padding: 1px 4px; border-radius: 3px; font-size: 12px; font-family: 'Cascadia Code', 'Fira Code', monospace; }
-  pre { background: var(--ds-code-bg, #1e1e1e); color: var(--ds-code-color, #d4d4d4); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
+  code { background: var(--ds-bg-elevated); padding: 1px 4px; border-radius: 3px; font-size: 12px; font-family: 'Cascadia Code', 'Fira Code', monospace; }
+  pre { background: var(--ds-code-bg); color: var(--ds-code-color); padding: 12px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
   pre code { background: transparent; padding: 0; color: inherit; }
-  blockquote { border-left: 3px solid var(--ds-highlight-selected, #3b82f6); padding-left: 12px; margin: 8px 0; color: var(--ds-node-text-secondary, #4b5563); }
+  blockquote { border-left: 3px solid var(--ds-highlight-selected); padding-left: 12px; margin: 8px 0; color: var(--ds-node-text-secondary); }
   table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
-  th, td { border: 1px solid var(--ds-divider-color, #d1d5db); padding: 4px 8px; text-align: left; }
-  th { background: var(--ds-bg-elevated, #f3f4f6); font-weight: 600; }
-  hr { border: none; border-top: 1px solid var(--ds-divider-color, #e5e7eb); margin: 12px 0; }
+  th, td { border: 1px solid var(--ds-divider-color); padding: 4px 8px; text-align: left; }
+  th { background: var(--ds-bg-elevated); font-weight: 600; }
+  hr { border: none; border-top: 1px solid var(--ds-divider-color); margin: 12px 0; }
   strong { font-weight: 600; }
 `
 
@@ -231,7 +231,7 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
             : (
                 <div className={mdPreviewClass}>
                   <Viewer plugins={[gfm()]} value={promptText} />
-                  <p style={{ color: 'var(--ds-highlight-selected, #3b82f6)', marginTop: 8 }}>
+                  <p style={{ color: 'var(--ds-highlight-selected)', marginTop: 8 }}>
                     <strong>[你的测试需求写在这里]</strong>
                   </p>
                 </div>
