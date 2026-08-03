@@ -2,7 +2,7 @@
 
 import { lazy, Suspense, useEffect, useState } from 'react'
 
-import { Button, ConfigProvider, Dropdown, Flex, theme, Tooltip } from 'antd'
+import { Button, ConfigProvider, Dropdown, Flex, Skeleton, theme, Tooltip } from 'antd'
 import { FilterIcon, PlusIcon } from 'lucide-react'
 
 import { ApiMenuContextProvider } from '@/components/ApiMenu/ApiMenuContext'
@@ -29,7 +29,12 @@ const ApiTab = lazy(async () => {
 })
 
 function LoadingPlaceholder() {
-  return <div className="size-full animate-pulse bg-zinc-50 dark:bg-zinc-900/30" />
+  return (
+    <div className="flex h-full flex-col gap-3 p-4">
+      <Skeleton.Input active block />
+      <Skeleton active paragraph={{ rows: 10 }} title={false} />
+    </div>
+  )
 }
 
 function HomeContent() {

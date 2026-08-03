@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useEvent } from 'react-use-event-hook'
+import { useNavigate, useParams } from 'react-router'
 
-import { Button, ConfigProvider, Modal, Space, Tree, type TreeProps } from 'antd'
+import { Button, ConfigProvider, Empty, Modal, Space, Tree, type TreeProps } from 'antd'
 import useResizeObserver from 'use-resize-observer'
 
 import type { ApiMenuData } from '@/components/ApiMenu'
@@ -10,6 +11,7 @@ import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { CatalogType, MenuItemType } from '@/enums'
 import { isMenuSameGroup } from '@/helpers'
+import { useHelpers } from '@/hooks/useHelpers'
 import { useStyles } from '@/hooks/useStyle'
 import type { TabContentType } from '@/types'
 
@@ -48,15 +50,30 @@ const TREE_MIN_VIEWPORT_HEIGHT = 240
  */
 export function ApiMenu() {
   const { messageApi } = useGlobalContext()
-  const { moveMenuItem, menuRawList, removeMenuItems } = useMenuHelpersContext()
+  const { moveMenuItem, menuRawList, removeMenuItems, menuSearchWord } = useMenuHelpersContext()
   const { expandedMenuKeys, addExpandedMenuKeys, removeExpandedMenuKeys, menuTree }
     = useApiMenuContext()
+  const { createTabItem } = useHelpers()
+  const { projectId } = useParams<{ projectId: string }>()
+  const navigate = useNavigate()
 
   const { tabItems, activeTabKey } = useMenuTabContext()
   const { activeTabItem, addTabItem, removeTabItem } = useMenuTabHelpers()
   const [batchMode, setBatchMode] = useState(false)
   const [checkedKeys, setCheckedKeys] = useState<React.Key[]>([])
   const { ref: treeContainerRef, height: treeContainerHeight } = useResizeObserver<HTMLDivElement>()
+
+  // 空状态判断：非回收站、非搜索过滤状态下，顶级目录没有任何子节点。
+  const hasMenuContent = useMemo(() => {
+    if (menuSearchWord) { return true }
+
+    const topFolders = (menuTree ?? []) as CatalogDataNode[]
+
+    return topFolders.some(
+      (folder) => folder.key !== CatalogType.Recycle
+        && (folder.children?.length ?? 0) > 0,
+    )
+  }, [menuTree, menuSearchWord])
 
   const selectedKeys = activeTabKey ? [activeTabKey] : undefined
   const treeViewportHeight = Math.max(
@@ -244,92 +261,128 @@ export function ApiMenu() {
         </div>
         <div ref={treeContainerRef} className="min-h-0 flex-1 overflow-hidden">
           {!!menuTree && (
-            <Tree.DirectoryTree
-              blockNode
-              showIcon
-              allowDrop={({ dragNode, dropNode }) => {
-                if (batchMode) {
-                  return false
-                }
+            <div className="relative size-full">
+              <Tree.DirectoryTree
+                blockNode
+                showIcon
+                allowDrop={({ dragNode, dropNode }) => {
+                  if (batchMode) {
+                    return false
+                  }
 
-                if (dropNode.className?.includes('top-folder')) {
-                  return false
-                }
+                  if (dropNode.className?.includes('top-folder')) {
+                    return false
+                  }
 
-                // 草稿节点（未入库）不可作为拖拽源或落点，避免触发数据库移动。
-                if (
-                  (dragNode as CatalogDataNode).customData.catalog.__isDraft
-                  || (dropNode as CatalogDataNode).customData.catalog.__isDraft
-                ) {
-                  return false
-                }
+                  // 草稿节点（未入库）不可作为拖拽源或落点，避免触发数据库移动。
+                  if (
+                    (dragNode as CatalogDataNode).customData.catalog.__isDraft
+                    || (dropNode as CatalogDataNode).customData.catalog.__isDraft
+                  ) {
+                    return false
+                  }
 
-                return isMenuSameGroup(
-                  (dragNode as CatalogDataNode).customData.catalog,
-                  (dropNode as CatalogDataNode).customData.catalog,
-                )
-              }}
-              checkable={batchMode}
-              checkedKeys={batchMode ? checkedKeys : undefined}
-              draggable={
-                batchMode
-                  ? false
-                  : {
-                      icon: false,
-                      nodeDraggable: (node) => {
-                        if (node.className?.includes('top-folder')) {
-                          return false
-                        }
-
-                        // 草稿节点禁止拖拽。
-                        if ((node as unknown as CatalogDataNode).customData.catalog.__isDraft) {
-                          return false
-                        }
-
-                        return true
-                      },
-                    }
-              }
-              expandedKeys={expandedMenuKeys}
-              height={treeViewportHeight}
-              rootClassName={styles.menuTree}
-              selectedKeys={selectedKeys}
-              switcherIcon={(node) => {
-                const nodeData = node.data as CatalogDataNode | undefined
-                const hasChildren = nodeData?.children?.length
-
-                if (hasChildren) {
-                  return (
-                    <SwitcherIcon
-                      onClick={() => {
-                        const menuId = nodeData.key
-
-                        if (typeof menuId === 'string') {
-                          switchExpandedKeys(menuId)
-                        }
-                      }}
-                    />
+                  return isMenuSameGroup(
+                    (dragNode as CatalogDataNode).customData.catalog,
+                    (dropNode as CatalogDataNode).customData.catalog,
                   )
-                }
+                }}
+                checkable={batchMode}
+                checkedKeys={batchMode ? checkedKeys : undefined}
+                draggable={
+                  batchMode
+                    ? false
+                    : {
+                        icon: false,
+                        nodeDraggable: (node) => {
+                          if (node.className?.includes('top-folder')) {
+                            return false
+                          }
 
-                return null
-              }}
-              treeData={menuTree}
-              onCheck={batchMode ? handleTreeCheck : undefined}
-              onDoubleClick={(_, node) => {
-                if (batchMode) {
-                  return
-                }
+                          // 草稿节点禁止拖拽。
+                          if ((node as unknown as CatalogDataNode).customData.catalog.__isDraft) {
+                            return false
+                          }
 
-                const menuId = node.key
-
-                if (typeof menuId === 'string' && !node.isLeaf) {
-                  switchExpandedKeys(menuId)
+                          return true
+                        },
+                      }
                 }
-              }}
-              onDrop={handleDrop}
-              onSelect={handleMenuSelect}
-            />
+                expandedKeys={expandedMenuKeys}
+                height={treeViewportHeight}
+                rootClassName={styles.menuTree}
+                selectedKeys={selectedKeys}
+                switcherIcon={(node) => {
+                  const nodeData = node.data as CatalogDataNode | undefined
+                  const hasChildren = nodeData?.children?.length
+
+                  if (hasChildren) {
+                    return (
+                      <SwitcherIcon
+                        onClick={() => {
+                          const menuId = nodeData.key
+
+                          if (typeof menuId === 'string') {
+                            switchExpandedKeys(menuId)
+                          }
+                        }}
+                      />
+                    )
+                  }
+
+                  return null
+                }}
+                treeData={menuTree}
+                onCheck={batchMode ? handleTreeCheck : undefined}
+                onDoubleClick={(_, node) => {
+                  if (batchMode) {
+                    return
+                  }
+
+                  const menuId = node.key
+
+                  if (typeof menuId === 'string' && !node.isLeaf) {
+                    switchExpandedKeys(menuId)
+                  }
+                }}
+                onDrop={handleDrop}
+                onSelect={handleMenuSelect}
+              />
+
+              {/* 空状态引导：没有任何接口/模型/快捷请求时展示 */}
+              {!hasMenuContent && !batchMode && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-4">
+                  <div className="pointer-events-auto">
+                    <Empty
+                      description="还没有接口、模型或快捷请求"
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    >
+                      <Space>
+                        <Button
+                          size="small"
+                          type="primary"
+                          onClick={() => {
+                            createTabItem(MenuItemType.HttpRequest)
+                          }}
+                        >
+                          新建接口
+                        </Button>
+                        <Button
+                          size="small"
+                          onClick={() => {
+                            if (projectId) {
+                              navigate(`/projects/${projectId}/settings?section=import-api`)
+                            }
+                          }}
+                        >
+                          导入 OpenAPI
+                        </Button>
+                      </Space>
+                    </Empty>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

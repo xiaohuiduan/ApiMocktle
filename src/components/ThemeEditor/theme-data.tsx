@@ -284,18 +284,18 @@ export const presetDesignStyles: Record<
 > = {
   default: {
     name: '默认',
-    description: '标准界面风格',
+    description: '经典 Ant Design 风格，简洁高效，适合日常开发',
   },
   glassmorphism: {
     name: '毛玻璃',
-    description: '半透明模糊、细腻边界光感、层次叠加',
+    description: '半透明模糊与光晕背景，质感通透，适合展示与演示',
   },
   skeuomorphism: {
     name: '拟物化',
-    description: '真实材质纹理、复杂光影、立体感',
+    description: '真实材质纹理与立体光影，适合偏好实物质感',
   },
   neumorphism: {
     name: '新拟态',
-    description: '柔和浮雕、低对比投影、微妙平衡',
+    description: '柔和浮雕与低对比投影，视觉温和不刺眼',
   },
 }

@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 
-import { Search } from 'lucide-react'
 import { show } from '@ebay/nice-modal-react'
 import { Button, Card, Empty, Form, Input, message, Modal, Space, Spin, theme, Tooltip, Typography } from 'antd'
-import { SettingsIcon } from 'lucide-react'
+import { Search, SettingsIcon } from 'lucide-react'
 
 import { ModalSettings } from '@/components/modals/ModalSettings'
 import { ParticleCanvas } from '@/components/ParticleCanvas'
@@ -23,6 +22,8 @@ import { UserMenu } from '@/components/UserMenu'
 import { useAuth } from '@/contexts/auth'
 import { useProjectTabsContext } from '@/contexts/project-tabs'
 import { useDesignStyle } from '@/hooks/useDesignStyle'
+
+import { css } from '@emotion/css'
 
 interface ProjectFormValues {
   name: string
@@ -352,9 +353,20 @@ export function ProjectsClient() {
               )
             : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                  {projects.map((project) => {
+                  {projects.map((project, index) => {
                     const iconColor = getIconColor(project.icon ?? '')
                     const IconComp = ICON_MAP[project.icon ?? '']
+
+                    // hover 背景改为纯 CSS（emotion 类，避免 JS 直接改 DOM）
+                    const hoverBg = isGlassStyle
+                      ? `color-mix(in srgb, ${iconColor} 15%, rgba(255,255,255,0.15))`
+                      : `${iconColor}20`
+
+                    const cardHoverClass = css({
+                      '&:hover': {
+                        backgroundColor: hoverBg,
+                      },
+                    })
 
                     const cardBaseStyle: React.CSSProperties = isGlassStyle
                       ? {
@@ -383,10 +395,13 @@ export function ProjectsClient() {
                       <Card
                         key={project.id}
                         hoverable
-                        className="group"
+                        className={`group ${isNeumorphism ? '' : cardHoverClass}`}
                         style={{
                           ...cardBaseStyle,
                           transition: 'all 0.2s',
+                          // 入场 stagger 动画（与登录卡同款 keyframes）
+                          animation: 'card-slide-up 0.4s ease-out both',
+                          animationDelay: `${Math.min(index, 8) * 40}ms`,
                         }}
                         styles={{ body: { padding: '16px' } }}
                         onClick={() => {
@@ -396,20 +411,6 @@ export function ProjectsClient() {
                             icon: project.icon,
                             role: project.role,
                           })
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isNeumorphism) {
-                            (e.currentTarget as HTMLElement).style.backgroundColor = isGlassStyle
-                              ? `color-mix(in srgb, ${iconColor} 15%, rgba(255,255,255,0.15))`
-                              : `${iconColor}20`
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isNeumorphism) {
-                            (e.currentTarget as HTMLElement).style.backgroundColor = isGlassStyle
-                              ? `color-mix(in srgb, ${iconColor} 10%, var(--ds-node-bg))`
-                              : `${iconColor}12`
-                          }
                         }}
                       >
                         <div className="relative">
