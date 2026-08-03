@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router'
 
 import {
+  Alert,
   ConfigProvider,
   Menu,
   type MenuProps,
@@ -207,12 +208,6 @@ export default function SettingsPage() {
     setSelectedSection(SettingsSectionKey.Members)
   }, [search])
 
-  useEffect(() => {
-    if (projectRole && !canManageMembers && isMembersSection) {
-      setSelectedSection(SettingsSectionKey.Environments)
-    }
-  }, [projectRole, canManageMembers, isMembersSection])
-
   return (
     <PanelLayout
       layoutName="项目设置"
@@ -261,14 +256,24 @@ export default function SettingsPage() {
 
           {isMembersSection
             ? (
-                <ProjectMembersSection
-                  canManageMembers={canManageMembers}
-                  loading={loading}
-                  members={members}
-                  projectId={projectId}
-                  projectOwnerId={project?.ownerId}
-                  onRefresh={fetchData}
-                />
+                <>
+                  {!canManageMembers && (
+                    <Alert
+                      className="mb-4"
+                      message="你当前是查看者，仅项目拥有者可以添加或移除成员、调整角色。"
+                      showIcon
+                      type="info"
+                    />
+                  )}
+                  <ProjectMembersSection
+                    canManageMembers={canManageMembers}
+                    loading={loading}
+                    members={members}
+                    projectId={projectId}
+                    projectOwnerId={project?.ownerId}
+                    onRefresh={fetchData}
+                  />
+                </>
               )
             : isEnvironmentsSection
               ? (
