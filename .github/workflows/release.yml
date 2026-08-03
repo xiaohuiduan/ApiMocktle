@@ -85,7 +85,6 @@ jobs:
           name: apimocktle-macos
           path: |
             src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/macos/*.app
 
   # ── Linux ──
   build-linux:
@@ -146,5 +145,12 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          # 精确列出安装包：artifacts/**/* 会递归展开 macOS .app 目录，
+          # 把 Contents/Resources/dist 的 monaco/assets 与二进制都上传到 release
+          files: |
+            artifacts/*/*.msi
+            artifacts/*/*.exe
+            artifacts/*/*.dmg
+            artifacts/*/*.deb
+            artifacts/*/*.AppImage
           generate_release_notes: true
