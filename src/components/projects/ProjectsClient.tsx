@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 
-import { SearchOutlined } from '@ant-design/icons'
+import { Search } from 'lucide-react'
 import { show } from '@ebay/nice-modal-react'
 import { Button, Card, Empty, Form, Input, message, Modal, Space, Spin, theme, Tooltip, Typography } from 'antd'
 import { SettingsIcon } from 'lucide-react'
@@ -71,7 +71,7 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
         <div className="mb-1.5 px-1">
           <Input
             placeholder="搜索..."
-            prefix={<SearchOutlined style={{ color: 'var(--ds-node-text-muted)' }} />}
+            prefix={<Search size={14} style={{ color: 'var(--ds-node-text-muted)' }} />}
             size="small"
             style={{ background: 'var(--ds-bg-elevated)', borderRadius: 6, padding: '0 8px' }}
             value={searchText}

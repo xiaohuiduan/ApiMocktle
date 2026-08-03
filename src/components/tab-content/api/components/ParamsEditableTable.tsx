@@ -1,4 +1,4 @@
-import { CloseCircleFilled } from '@ant-design/icons'
+import { CircleX } from 'lucide-react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { Button, Input, Popconfirm, Select, Switch, theme, Tooltip } from 'antd'
 import { PlusCircleIcon, TrashIcon, XCircleIcon } from 'lucide-react'
@@ -114,7 +114,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
                     title="此列不能重复"
                   >
                     <span className="pr-1">
-                      <CloseCircleFilled style={{ color: token.colorErrorText }} />
+                      <CircleX size={14} style={{ color: token.colorErrorText }} />
                     </span>
                   </Tooltip>
                 )}

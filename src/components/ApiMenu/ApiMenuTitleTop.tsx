@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 
-import { CaretRightFilled } from '@ant-design/icons'
+import { ChevronRight } from 'lucide-react'
 import { show } from '@ebay/nice-modal-react'
 import { Dropdown, type DropdownProps, type MenuProps, theme, Tooltip } from 'antd'
 import {
@@ -87,7 +87,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
           <span
             className={`ml-1 scale-50 ${expandedMenuKeys.includes(topMenuType) ? 'rotate-90' : ''}`}
           >
-            <CaretRightFilled />
+            <ChevronRight size={14} />
           </span>
         )}
       </span>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { CopyOutlined, FileTextOutlined, UploadOutlined } from '@ant-design/icons'
+import { Copy, FileText, Upload } from 'lucide-react'
 import gfm from '@bytemd/plugin-gfm'
 import { Viewer } from '@bytemd/react'
 import { invoke } from '@tauri-apps/api/core'
@@ -154,7 +154,7 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
       key: 'paste',
       label: (
         <span>
-          <FileTextOutlined />
+          <FileText size={14} />
           {' '}
           粘贴 JSON
         </span>
@@ -192,7 +192,7 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
       key: 'file',
       label: (
         <span>
-          <UploadOutlined />
+          <Upload size={14} />
           {' '}
           导入文件
         </span>
@@ -202,7 +202,7 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
           <Text style={{ display: 'block', marginBottom: 16 }} type="secondary">
             选择之前导出的 .json 文件导入
           </Text>
-          <Button icon={<UploadOutlined />} size="large" type="primary" onClick={handleImportFile}>
+          <Button icon={<Upload size={16} />} size="large" type="primary" onClick={handleImportFile}>
             选择 JSON 文件
           </Button>
         </div>
@@ -212,7 +212,7 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
       key: 'prompt',
       label: (
         <span>
-          <CopyOutlined />
+          <Copy size={14} />
           {' '}
           AI Prompt
         </span>
@@ -237,7 +237,7 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
                 </div>
               )}
           <div style={{ marginTop: 12, textAlign: 'right' }}>
-            <Button disabled={promptLoading || !promptText} icon={<CopyOutlined />} type="primary" onClick={() => { void handleCopyPrompt() }}>
+            <Button disabled={promptLoading || !promptText} icon={<Copy size={16} />} type="primary" onClick={() => { void handleCopyPrompt() }}>
               复制 Prompt
             </Button>
           </div>

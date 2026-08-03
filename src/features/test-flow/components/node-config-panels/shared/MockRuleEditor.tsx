@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { ApiOutlined, DeleteOutlined, PlusOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { Cable, Plus, Trash2, Zap } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { Button, Empty, Input, InputNumber, Select, Space, Switch, Tag, Tooltip, Typography } from 'antd'
 import { nanoid } from 'nanoid'
@@ -138,7 +138,7 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
     <div className="space-y-3">
       {/* Agent 连接状态 */}
       <div className="flex items-center gap-2">
-        <Tag color={agentConnected ? 'success' : 'default'} icon={<ApiOutlined />}>
+        <Tag color={agentConnected ? 'success' : 'default'} icon={<Cable size={14} />}>
           {agentConnected ? 'Agent 已连接' : agentUrl ? 'Agent 未连接' : '添加规则后可在顶部工具栏选择 Agent 环境'}
         </Tag>
       </div>
@@ -170,7 +170,7 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
       {/* 添加规则按钮 */}
       <Space>
         <Button
-          icon={<PlusOutlined />}
+          icon={<Plus size={14} />}
           size="small"
           type="dashed"
           onClick={() => { addRule() }}
@@ -189,7 +189,7 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
         {/* 刷新 Agent 发现列表 */}
         {agentUrl && (
           <Button
-            icon={<ThunderboltOutlined />}
+            icon={<Zap size={14} />}
             size="small"
             onClick={() => {
               void (async () => {
@@ -271,7 +271,7 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
         <Tooltip title="删除">
           <Button
             danger
-            icon={<DeleteOutlined />}
+            icon={<Trash2 size={14} />}
             size="small"
             type="text"
             onClick={(e) => { e.stopPropagation(); onDelete() }}

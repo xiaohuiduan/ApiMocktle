@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Radio, Select, Typography } from 'antd'
 
 import type { ConditionBranch, ConditionNodeData } from '../../types/flow.types'
@@ -248,7 +248,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
           {(!data.conditions || data.conditions.length < 8) && (
             <Button
               data-testid="condition-add-branch"
-              icon={<PlusOutlined />}
+              icon={<Plus size={14} />}
               size="small"
               type="dashed"
               onClick={handleAddCondition}
@@ -274,7 +274,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
                       <Button
                         danger
                         data-testid={`condition-remove-branch-${index}`}
-                        icon={<DeleteOutlined />}
+                        icon={<Trash2 size={14} />}
                         size="small"
                         type="text"
                         onClick={() => { handleRemoveCondition(index) }}

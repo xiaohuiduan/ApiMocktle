@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Select, Space, Typography } from 'antd'
 
 import { useFlowStore } from '../../../store/useFlowStore'
@@ -121,7 +121,7 @@ export default function VariableAssertionListEditor({ assertions, onChange }: Va
         <Text className="text-xs" type="secondary">
           变量断言规则（运行时检查变量值）
         </Text>
-        <Button icon={<PlusOutlined />} size="small" type="dashed" onClick={handleAdd}>
+        <Button icon={<Plus size={14} />} size="small" type="dashed" onClick={handleAdd}>
           添加
         </Button>
       </div>
@@ -176,7 +176,7 @@ export default function VariableAssertionListEditor({ assertions, onChange }: Va
                     )}
                     <Button
                       danger
-                      icon={<DeleteOutlined />}
+                      icon={<Trash2 size={14} />}
                       size="small"
                       style={{ width: 28, flexShrink: 0 }}
                       type="text"

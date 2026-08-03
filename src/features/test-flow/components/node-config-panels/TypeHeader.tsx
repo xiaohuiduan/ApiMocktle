@@ -1,15 +1,4 @@
-import {
-  ApartmentOutlined,
-  BranchesOutlined,
-  ClockCircleOutlined,
-  GlobalOutlined,
-  PartitionOutlined,
-  PlayCircleOutlined,
-  ReloadOutlined,
-  SafetyOutlined,
-  SettingOutlined,
-  StopOutlined,
-} from '@ant-design/icons'
+import { Clock, GitBranch, Globe, PlayCircle, RefreshCw, ShieldCheck, Split, Square, Variable, Workflow } from 'lucide-react'
 import { Tag, Typography } from 'antd'
 
 import { NODE_TYPE_COLORS } from '../../nodes/nodeColors'
@@ -20,16 +9,16 @@ const { Text } = Typography
 // ==================== 节点类型图标映射 ====================
 
 const NODE_TYPE_ICONS: Record<string, React.ReactNode> = {
-  start: <PlayCircleOutlined />,
-  end: <StopOutlined />,
-  httpRequest: <GlobalOutlined />,
-  condition: <BranchesOutlined />,
-  loop: <ReloadOutlined />,
-  parallel: <PartitionOutlined />,
-  wait: <ClockCircleOutlined />,
-  subFlow: <ApartmentOutlined />,
-  setVariable: <SettingOutlined />,
-  assert: <SafetyOutlined />,
+  start: <PlayCircle size={16} />,
+  end: <Square size={16} />,
+  httpRequest: <Globe size={16} />,
+  condition: <GitBranch size={16} />,
+  loop: <RefreshCw size={16} />,
+  parallel: <Split size={16} />,
+  wait: <Clock size={16} />,
+  subFlow: <Workflow size={16} />,
+  setVariable: <Variable size={16} />,
+  assert: <ShieldCheck size={16} />,
 }
 
 // ==================== 组件 Props ====================

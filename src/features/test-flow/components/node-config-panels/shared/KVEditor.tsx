@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Typography } from 'antd'
 
 const { Text } = Typography
@@ -88,7 +88,7 @@ export default function KVEditor({
           />
           <Button
             danger
-            icon={<DeleteOutlined />}
+            icon={<Trash2 size={14} />}
             size="small"
             style={{ width: 28, flexShrink: 0 }}
             type="text"
@@ -100,7 +100,7 @@ export default function KVEditor({
       {/* 添加按钮 */}
       <Button
         block
-        icon={<PlusOutlined />}
+        icon={<Plus size={14} />}
         size="small"
         style={{ marginTop: 4 }}
         type="dashed"

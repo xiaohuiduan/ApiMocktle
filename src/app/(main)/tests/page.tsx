@@ -2,14 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { useNavigate, useParams } from 'react-router'
 
-import {
-  DeleteOutlined,
-  EditOutlined, FolderAddOutlined, FolderOutlined, MoreOutlined,
-  PlusOutlined } from '@ant-design/icons'
 import { Button, Dropdown, Empty, Form, Input, message, Modal, Popconfirm, Space, Switch, Table, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
-import { ListTodo } from 'lucide-react'
+import { Folder, FolderPlus, ListTodo, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { useTestFolders, useTestTask } from '@/hooks/useTestTask'
 import type { CreateTestTaskPayload, TestFolder, TestTask, UpdateTestTaskPayload } from '@/types'
@@ -255,7 +251,7 @@ export default function TestTaskListPage() {
       render: (_, record) => (
         <Space size="small">
           <Button
-            icon={<EditOutlined />}
+            icon={<Pencil size={14} />}
             size="small"
             type="link"
             onClick={() => { openEditModal(record) }}
@@ -263,7 +259,7 @@ export default function TestTaskListPage() {
             编辑
           </Button>
           <Dropdown menu={getMoveMenuItems(record)} trigger={['click']}>
-            <Button icon={<FolderOutlined />} size="small" type="link">
+            <Button icon={<Folder size={14} />} size="small" type="link">
               移动
             </Button>
           </Dropdown>
@@ -273,7 +269,7 @@ export default function TestTaskListPage() {
             title="确定要删除这个测试任务吗？"
             onConfirm={() => { void handleDelete(record.id) }}
           >
-            <Button danger icon={<DeleteOutlined />} size="small" type="link">
+            <Button danger icon={<Trash2 size={14} />} size="small" type="link">
               删除
             </Button>
           </Popconfirm>
@@ -330,7 +326,7 @@ export default function TestTaskListPage() {
             <div className="flex items-center justify-between border-b border-[color:var(--ds-divider-color)] px-3 py-2">
               <span className="text-xs font-medium text-[color:var(--ds-node-text-secondary)]">文件夹</span>
               <Button
-                icon={<FolderAddOutlined />}
+                icon={<FolderPlus size={14} />}
                 size="small"
                 type="text"
                 onClick={handleAddFolder}
@@ -359,14 +355,14 @@ export default function TestTaskListPage() {
                     <div className="flex min-w-0 flex-1 items-center gap-1.5">
                       {isFolder
                         ? (
-                            <FolderOutlined className="shrink-0 text-xs" style={{ color: 'var(--ds-warning-color)' }} />
+                            <Folder className="shrink-0" size={14} style={{ color: 'var(--ds-warning-color)' }} />
                           )
                         : item.key === ALL_KEY
                           ? (
                               <ListTodo className="shrink-0" size={14} style={{ color: 'var(--ds-node-text-muted)' }} />
                             )
                           : (
-                              <FolderOutlined className="shrink-0 text-xs" style={{ color: 'var(--ds-node-text-muted)' }} />
+                              <Folder className="shrink-0" size={14} style={{ color: 'var(--ds-node-text-muted)' }} />
                             )}
                       {isEditing
                         ? (
@@ -393,7 +389,7 @@ export default function TestTaskListPage() {
                         <Dropdown menu={getFolderMenuItems(folders.find((f) => f.id === item.key)!)} trigger={['click']}>
                           <Button
                             className="!h-4 !w-4 !text-[11px] opacity-0 group-hover:opacity-100"
-                            icon={<MoreOutlined />}
+                            icon={<MoreHorizontal size={12} />}
                             size="small"
                             type="text"
                             onClick={(e) => { e.stopPropagation() }}
@@ -417,13 +413,13 @@ export default function TestTaskListPage() {
               <h1 className="text-2xl font-bold">{pageTitle}</h1>
               <Space>
                 <Button
-                  icon={<FolderAddOutlined />}
+                  icon={<FolderPlus size={14} />}
                   onClick={handleAddFolder}
                 >
                   新建文件夹
                 </Button>
                 <Button
-                  icon={<PlusOutlined />}
+                  icon={<Plus size={14} />}
                   type="primary"
                   onClick={() => { setCreateModalOpen(true) }}
                 >
@@ -439,7 +435,7 @@ export default function TestTaskListPage() {
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                   >
                     <Button
-                      icon={<PlusOutlined />}
+                      icon={<Plus size={14} />}
                       type="primary"
                       onClick={() => { setCreateModalOpen(true) }}
                     >

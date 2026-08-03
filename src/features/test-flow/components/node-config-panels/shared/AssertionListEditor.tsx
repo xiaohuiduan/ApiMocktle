@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Select, Space, Typography } from 'antd'
 
 import type { TestAssertion } from '@/types'
@@ -93,7 +93,7 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
           断言列表
         </Text>
         <Button
-          icon={<PlusOutlined />}
+          icon={<Plus size={14} />}
           size="small"
           type="dashed"
           onClick={handleAdd}
@@ -170,7 +170,7 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
                     )}
                     <Button
                       danger
-                      icon={<DeleteOutlined />}
+                      icon={<Trash2 size={14} />}
                       size="small"
                       style={{ width: '10%' }}
                       type="text"

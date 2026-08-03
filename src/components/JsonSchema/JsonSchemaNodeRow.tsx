@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { CaretRightOutlined } from '@ant-design/icons'
+import { ChevronRight } from 'lucide-react'
 import { Input, Switch, Tooltip } from 'antd'
 import { omit } from 'lodash-es'
 import { CirclePlusIcon } from 'lucide-react'
@@ -303,7 +303,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
                   onExpand?.(newExpandedKeys)
                 }}
               >
-                <CaretRightOutlined />
+                <ChevronRight size={12} />
               </span>
             )
           : (

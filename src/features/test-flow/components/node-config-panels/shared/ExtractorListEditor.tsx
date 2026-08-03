@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Select, Space, Typography } from 'antd'
 
 import type { TestExtractor } from '@/types'
@@ -74,7 +74,7 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
           提取器列表
         </Text>
         <Button
-          icon={<PlusOutlined />}
+          icon={<Plus size={14} />}
           size="small"
           type="dashed"
           onClick={handleAdd}
@@ -146,7 +146,7 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
                     )}
                     <Button
                       danger
-                      icon={<DeleteOutlined />}
+                      icon={<Trash2 size={14} />}
                       size="small"
                       style={{ width: '10%' }}
                       type="text"
