@@ -25,7 +25,7 @@ export function FooterBar() {
   const { tabItems } = useMenuTabContext()
 
   const currentEnv = projectEnvironments.find((env) => env.id === currentProjectEnvironmentId)
-  const unsavedCount = tabItems.filter((item) => item.data?.editStatus === 'changed').length
+  const unsavedCount = tabItems.filter((item) => item.data?.editStatus === 'changed' || item.data?.editStatus === 'error').length
 
   return (
     <div className="flex h-full items-center gap-3 pl-3 pr-6">
