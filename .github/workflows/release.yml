@@ -145,12 +145,13 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          # 精确列出安装包：artifacts/**/* 会递归展开 macOS .app 目录，
+          # 只上传安装包（递归匹配任意层级：artifact zip 解压后保留 bundle 子目录结构）。
+          # 不能用 artifacts/**/*：会递归展开 macOS .app 目录，
           # 把 Contents/Resources/dist 的 monaco/assets 与二进制都上传到 release
           files: |
-            artifacts/*/*.msi
-            artifacts/*/*.exe
-            artifacts/*/*.dmg
-            artifacts/*/*.deb
-            artifacts/*/*.AppImage
+            artifacts/**/*.msi
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.deb
+            artifacts/**/*.AppImage
           generate_release_notes: true
