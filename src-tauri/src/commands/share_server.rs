@@ -19,15 +19,22 @@ pub struct ShareServerConfig {
     pub port: u16,
 }
 
-/// 解析前端静态目录：打包后取资源目录 dist/，dev 下取项目根 ../dist
+/// 解析前端静态目录。打包后优先取资源目录 dist/（Tauri resources 保留目录名）；
+/// 兜底兼容资源目录展开布局（share.html 直接在资源根）；dev 下取项目根 ../dist。
+/// 以 share.html 实际存在为准（避免解析到空目录导致「分享页面不可用」误报）。
 fn resolve_dist_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
     if let Ok(p) = app.path().resolve("dist", tauri::path::BaseDirectory::Resource) {
-        if p.is_dir() {
+        if p.join("share.html").is_file() {
             return Some(p);
         }
     }
+    if let Ok(root) = app.path().resource_dir() {
+        if root.join("share.html").is_file() {
+            return Some(root);
+        }
+    }
     let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../dist");
-    if dev.is_dir() {
+    if dev.join("share.html").is_file() {
         Some(dev)
     } else {
         None
