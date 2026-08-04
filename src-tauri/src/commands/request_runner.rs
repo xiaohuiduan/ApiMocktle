@@ -266,7 +266,8 @@ pub async fn run_api_request(
         .map(|c| c.to_lowercase().starts_with("multipart/form-data"))
         .unwrap_or(false);
     if is_multipart || !payload.form_data_files.is_empty() {
-        // multipart 请求不需要手动设置 Content-Type，reqwest 会自动生成（含 boundary）
+        // multipart 的 Content-Type（含 boundary）由 reqwest 在构建 form 时生成，
+        // 在 body 段 form 构建后读取并回显（见 Set body 部分）。
     } else if let Some(ct) = &payload.content_type {
         if !has_header("content-type") {
             req = req.header("Content-Type", ct.as_str());
@@ -284,6 +285,12 @@ pub async fn run_api_request(
         if !payload.form_data_files.is_empty() {
             // multipart/form-data with files
             let mut form = reqwest::multipart::Form::new();
+            // 回显实际发出的 multipart Content-Type（boundary 由 reqwest 在构造 form 时生成）
+            effective_headers.push((
+                "Content-Type".to_string(),
+                format!("multipart/form-data; boundary={}", form.boundary()),
+                true,
+            ));
             // 添加普通文本字段
             for pair in payload.body.split('&') {
                 let (key, value) = if let Some((k, v)) = pair.split_once('=') {
@@ -314,6 +321,12 @@ pub async fn run_api_request(
         } else if is_multipart {
             // 无文件的 form-data：body 是 a=1&b=2 格式，需转换为真正的 multipart 发送
             let mut form = reqwest::multipart::Form::new();
+            // 回显实际发出的 multipart Content-Type（boundary 由 reqwest 在构造 form 时生成）
+            effective_headers.push((
+                "Content-Type".to_string(),
+                format!("multipart/form-data; boundary={}", form.boundary()),
+                true,
+            ));
             for pair in payload.body.split('&') {
                 let (key, value) = if let Some((k, v)) = pair.split_once('=') {
                     let decoded_key = urlencoding::decode(k).unwrap_or_default().to_string();
