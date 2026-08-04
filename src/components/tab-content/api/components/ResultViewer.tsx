@@ -23,7 +23,7 @@ import { MonacoEditor } from '@/components/MonacoEditor'
 import { useAuth } from '@/contexts/auth'
 import { useProxyConfig } from '@/contexts/proxy-config'
 import { useStyles } from '@/hooks/useStyle'
-import type { ApiRunResult } from '@/types'
+import type { ApiRunHeader, ApiRunResult } from '@/types'
 
 import { buildMarkdownReport, downloadText } from '../exportMarkdown'
 import type { ResolvedVar } from '../useResolvedVarMap'
@@ -250,7 +250,23 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
       children: result.requestHeaders && result.requestHeaders.length > 0
         ? (
             <Table
-              columns={headerTableColumns}
+              columns={[
+                headerTableColumns[0],
+                {
+                  title: '值',
+                  dataIndex: 'value',
+                  key: 'value',
+                  render: (value: string, record: ApiRunHeader) => (
+                    record.sent === false
+                      ? (
+                          <Tooltip title="常见客户端默认，reqwest 实际未发送">
+                            <span className="italic" style={{ color: token.colorTextTertiary }}>{value}</span>
+                          </Tooltip>
+                        )
+                      : value
+                  ),
+                },
+              ]}
               dataSource={result.requestHeaders}
               pagination={false}
               rowKey="name"

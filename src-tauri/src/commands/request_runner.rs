@@ -200,17 +200,53 @@ pub async fn run_api_request(
         }
     }
 
-    // 实际附加后的请求头（回显用）：payload 输入 + 自动附加项（cookie jar / Content-Type），
-    // 使前端响应区的「请求头」tab 能看到真实发出的默认请求头。
-    let mut effective_headers: Vec<(String, String)> = payload.headers
-        .iter()
-        .filter(|h| !h.name.is_empty())
-        .map(|h| (h.name.clone(), h.value.clone()))
-        .collect();
+    // ---- 回显用请求头集合（前端「请求头」tab 展示） ----
+    // 三元组 (name, value, sent)：sent=false 表示「常见客户端默认值，reqwest 实际未发送」，
+    // 前端以灰显标注展示，避免误导调试。
+    let mut effective_headers: Vec<(String, String, bool)> = Vec::new();
+    let has_header = |name: &str| payload.headers.iter().any(|h| h.name.to_lowercase() == name);
+
+    // Host：hyper 发送时按 URL 生成（此处计算展示，用户显式 Host 时跳过）
+    if !has_header("host") {
+        if let Ok(parsed) = reqwest::Url::parse(url) {
+            if let Some(host) = parsed.host_str() {
+                let host_header = match parsed.port() {
+                    Some(port) => format!("{}:{}", host, port),
+                    None => host.to_string(),
+                };
+                effective_headers.push(("Host".to_string(), host_header, true));
+            }
+        }
+    }
+
+    // User-Agent：reqwest 客户端默认（版本与 Cargo.lock 中 reqwest 保持一致）
+    if !has_header("user-agent") {
+        effective_headers.push(("User-Agent".to_string(), "reqwest/0.12.28".to_string(), true));
+    }
+
+    // 常见 HTTP 客户端默认头：reqwest 实际不发送，仅供展示参考（用户显式设置后跳过）
+    if !has_header("accept") {
+        effective_headers.push(("Accept".to_string(), "*/*".to_string(), false));
+    }
+
+    if !has_header("accept-encoding") {
+        effective_headers.push(("Accept-Encoding".to_string(), "gzip, deflate, br".to_string(), false));
+    }
+
+    if !has_header("connection") {
+        effective_headers.push(("Connection".to_string(), "keep-alive".to_string(), false));
+    }
+
+    // payload 输入
+    for h in &payload.headers {
+        if !h.name.is_empty() {
+            effective_headers.push((h.name.clone(), h.value.clone(), true));
+        }
+    }
 
     // Cookie jar：自动附加匹配域名的 cookie（手动 Cookie header 存在时不附加）
     let cookie_enabled = cookie_jar_enabled(&config);
-    if cookie_enabled && !payload.headers.iter().any(|h| h.name.to_lowercase() == "cookie") {
+    if cookie_enabled && !has_header("cookie") {
         if let Ok(jar_cookies) = cookie_repo::list_cookies_for_url(&db, &user.id, url) {
             if !jar_cookies.is_empty() {
                 let cookie_str = jar_cookies
@@ -219,7 +255,7 @@ pub async fn run_api_request(
                     .collect::<Vec<_>>()
                     .join("; ");
                 req = req.header("Cookie", cookie_str.clone());
-                effective_headers.push(("Cookie".to_string(), cookie_str));
+                effective_headers.push(("Cookie".to_string(), cookie_str, true));
             }
         }
     }
@@ -232,10 +268,15 @@ pub async fn run_api_request(
     if is_multipart || !payload.form_data_files.is_empty() {
         // multipart 请求不需要手动设置 Content-Type，reqwest 会自动生成（含 boundary）
     } else if let Some(ct) = &payload.content_type {
-        if !payload.headers.iter().any(|h| h.name.to_lowercase() == "content-type") {
+        if !has_header("content-type") {
             req = req.header("Content-Type", ct.as_str());
-            effective_headers.push(("Content-Type".to_string(), ct.clone()));
+            effective_headers.push(("Content-Type".to_string(), ct.clone(), true));
         }
+    }
+
+    // Content-Length：text body 按字节计算（multipart 的 boundary 长度无法精确，跳过）
+    if !payload.body.is_empty() && method != "GET" && !is_multipart && payload.form_data_files.is_empty() {
+        effective_headers.push(("Content-Length".to_string(), payload.body.len().to_string(), true));
     }
 
     // Set body
@@ -353,7 +394,7 @@ pub async fn run_api_request(
             let duration_ms = start.elapsed().as_millis() as u64;
 
             let req_headers_json: Vec<serde_json::Value> = effective_headers.iter()
-                .map(|(n, v)| serde_json::json!({ "name": n, "value": v }))
+                .map(|(n, v, sent)| serde_json::json!({ "name": n, "value": v, "sent": sent }))
                 .collect();
 
             Ok(ApiResult::success(serde_json::json!({

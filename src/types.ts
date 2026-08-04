@@ -65,6 +65,8 @@ export interface ApiRequestBody {
 export interface ApiRunHeader {
   name: string
   value: string
+  /** 是否实际发送。false = 常见客户端默认值，reqwest 实际未发送（前端灰显标注） */
+  sent?: boolean
 }
 
 export interface ApiEnvironmentValue {
