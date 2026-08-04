@@ -180,15 +180,22 @@ export function ProjectTabsProvider(props: React.PropsWithChildren) {
       setActiveProjectIdState(id)
 
       if (id) {
+        // 深链进入（URL 已携带该项目的子路径，如 /tests、/settings）时保持当前子路径，
+        // 避免自动打开项目时被回退到 /home 导致刷新/分享链接失效。
+        const parts = pathname.split('/').filter(Boolean)
+        const urlSubPath = parts[0] === 'projects' && parts[1] === id && parts[2]
+          ? '/' + parts.slice(2).join('/')
+          : undefined
+
         const tab = openTabs.find((t) => t.info.projectId === id)
-        const subPath = tab?.lastSubPath ?? '/home'
+        const subPath = urlSubPath ?? tab?.lastSubPath ?? '/home'
         navigate(`/projects/${id}${subPath}`, { replace: true })
       }
       else {
         navigate('/projects', { replace: true })
       }
     },
-    [navigate, openTabs],
+    [navigate, openTabs, pathname],
   )
 
   // 监听 URL 变化：跟踪子页面路由 + 同步 activeProjectId
