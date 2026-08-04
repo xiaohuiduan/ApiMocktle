@@ -242,43 +242,41 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
     },
     {
       key: 'reqHeaders',
-      label: `请求头${requestVars
-        ? (requestVars.headers.length ? ` (${requestVars.headers.length})` : '')
-        : (result.requestHeaders?.length ? ` (${result.requestHeaders.length})` : '')}`,
-      children: requestVars
+      // 优先展示实际发出的请求头（后端回显，含自动附加的 Content-Type / cookie jar Cookie）；
+      // 无回显时回退到构建快照 requestVars（保留变量高亮）。
+      label: `请求头${result.requestHeaders?.length
+        ? ` (${result.requestHeaders.length})`
+        : (requestVars?.headers.length ? ` (${requestVars.headers.length})` : '')}`,
+      children: result.requestHeaders && result.requestHeaders.length > 0
         ? (
-            requestVars.headers.length > 0
-              ? (
-                  <Table
-                    columns={[
-                      ...headerTableColumns.slice(0, 1),
-                      {
-                        title: '值',
-                        dataIndex: 'value',
-                        key: 'value',
-                        render: (_: unknown, __: unknown, index: number) => {
-                          const f = requestVars.headers[index]
-
-                          return f ? renderVarHighlight(f.resolved, f.vars, `req-hdr-${index}`) : null
-                        },
-                      },
-                    ]}
-                    dataSource={requestVars.headers.map((f, i) => ({
-                      name: f?.name ?? result.requestHeaders?.[i]?.name ?? '',
-                      value: f?.resolved ?? result.requestHeaders?.[i]?.value ?? '',
-                    }))}
-                    pagination={false}
-                    rowKey="name"
-                    size="small"
-                  />
-                )
-              : <Typography.Text className="text-xs" type="secondary">无请求头</Typography.Text>
+            <Table
+              columns={headerTableColumns}
+              dataSource={result.requestHeaders}
+              pagination={false}
+              rowKey="name"
+              size="small"
+            />
           )
-        : result.requestHeaders && result.requestHeaders.length > 0
+        : requestVars && requestVars.headers.length > 0
           ? (
               <Table
-                columns={headerTableColumns}
-                dataSource={result.requestHeaders}
+                columns={[
+                  ...headerTableColumns.slice(0, 1),
+                  {
+                    title: '值',
+                    dataIndex: 'value',
+                    key: 'value',
+                    render: (_: unknown, __: unknown, index: number) => {
+                      const f = requestVars.headers[index]
+
+                      return f ? renderVarHighlight(f.resolved, f.vars, `req-hdr-${index}`) : null
+                    },
+                  },
+                ]}
+                dataSource={requestVars.headers.map((f, i) => ({
+                  name: f?.name ?? result.requestHeaders?.[i]?.name ?? '',
+                  value: f?.resolved ?? result.requestHeaders?.[i]?.value ?? '',
+                }))}
                 pagination={false}
                 rowKey="name"
                 size="small"

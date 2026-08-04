@@ -200,6 +200,14 @@ pub async fn run_api_request(
         }
     }
 
+    // 实际附加后的请求头（回显用）：payload 输入 + 自动附加项（cookie jar / Content-Type），
+    // 使前端响应区的「请求头」tab 能看到真实发出的默认请求头。
+    let mut effective_headers: Vec<(String, String)> = payload.headers
+        .iter()
+        .filter(|h| !h.name.is_empty())
+        .map(|h| (h.name.clone(), h.value.clone()))
+        .collect();
+
     // Cookie jar：自动附加匹配域名的 cookie（手动 Cookie header 存在时不附加）
     let cookie_enabled = cookie_jar_enabled(&config);
     if cookie_enabled && !payload.headers.iter().any(|h| h.name.to_lowercase() == "cookie") {
@@ -210,7 +218,8 @@ pub async fn run_api_request(
                     .map(|(n, v)| format!("{}={}", n, v))
                     .collect::<Vec<_>>()
                     .join("; ");
-                req = req.header("Cookie", cookie_str);
+                req = req.header("Cookie", cookie_str.clone());
+                effective_headers.push(("Cookie".to_string(), cookie_str));
             }
         }
     }
@@ -225,6 +234,7 @@ pub async fn run_api_request(
     } else if let Some(ct) = &payload.content_type {
         if !payload.headers.iter().any(|h| h.name.to_lowercase() == "content-type") {
             req = req.header("Content-Type", ct.as_str());
+            effective_headers.push(("Content-Type".to_string(), ct.clone()));
         }
     }
 
@@ -342,8 +352,8 @@ pub async fn run_api_request(
 
             let duration_ms = start.elapsed().as_millis() as u64;
 
-            let req_headers_json: Vec<serde_json::Value> = payload.headers.iter()
-                .map(|h| serde_json::json!({ "name": h.name, "value": h.value }))
+            let req_headers_json: Vec<serde_json::Value> = effective_headers.iter()
+                .map(|(n, v)| serde_json::json!({ "name": n, "value": v }))
                 .collect();
 
             Ok(ApiResult::success(serde_json::json!({
