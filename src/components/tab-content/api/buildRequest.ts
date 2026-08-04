@@ -97,7 +97,9 @@ export async function buildRequest(ctx: BuildRequestContext): Promise<BuildReque
     ...queryList.map((p) => toText(p.example)),
     ...headerList.map((h) => toText(h.example)),
     ...cookieList.map((c) => toText(c.example)),
-    bodyRaw,
+    // bodyRaw 仅在 Json/Xml/Raw 时占位（消费侧也只在该分支取它）；form-data/url-encoded 不占位，
+    // 否则 bodyParams 取值会整体错位一位，导致最后一个参数的值丢失。
+    ...(isJsonXmlRaw ? [bodyRaw] : []),
     ...bodyParams.map((p) => toText(p.example)),
   ]
   const resolvedFields = await resolveTemplateBatch(fields)
