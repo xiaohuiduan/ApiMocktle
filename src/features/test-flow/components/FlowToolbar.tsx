@@ -1,7 +1,8 @@
-import { Button, Popconfirm, Select, Space, Tooltip } from 'antd'
+import { Button, Divider, Popconfirm, Popover, Select, Space, Tooltip } from 'antd'
 import {
   Download,
   LayoutGrid,
+  MoreHorizontal,
   Play,
   Redo2,
   Save,
@@ -59,6 +60,13 @@ const dividerClass = css`
   margin: 0 var(--ds-pad-xs);
 `
 
+const popoverPanelClass = css`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 300px;
+`
+
 // ==================== 组件 ====================
 
 export default function FlowToolbar({
@@ -113,7 +121,7 @@ export default function FlowToolbar({
       )}
       <div className={dividerClass} />
       <Space size={4}>
-        {/* 执行组 */}
+        {/* 主操作：运行 / 中止 / 保存 */}
         <Tooltip title="运行">
           <Button
             data-testid="toolbar-run"
@@ -138,36 +146,7 @@ export default function FlowToolbar({
             中止
           </Button>
         </Tooltip>
-        <Tooltip title="自动布局">
-          <Button
-            data-testid="toolbar-auto-layout"
-            icon={<LayoutGrid size={14} />}
-            size="small"
-            onClick={onAutoLayout}
-          />
-        </Tooltip>
-
         <div className={dividerClass} />
-
-        {/* 历史组 */}
-        <Tooltip title="撤销">
-          <Button
-            data-testid="toolbar-undo"
-            disabled={!canUndo}
-            icon={<Undo2 size={14} />}
-            size="small"
-            onClick={onUndo}
-          />
-        </Tooltip>
-        <Tooltip title="重做">
-          <Button
-            data-testid="toolbar-redo"
-            disabled={!canRedo}
-            icon={<Redo2 size={14} />}
-            size="small"
-            onClick={onRedo}
-          />
-        </Tooltip>
         <Tooltip title={isDirty ? '保存 (Ctrl+S)' : '已保存'}>
           <Button
             data-testid="toolbar-save"
@@ -179,62 +158,106 @@ export default function FlowToolbar({
             onClick={onSave}
           />
         </Tooltip>
-
-        <div className={dividerClass} />
-
-        {/* 文件组 */}
-        <Tooltip title="导出">
-          <Button
-            data-testid="toolbar-export"
-            icon={<Download size={14} />}
-            size="small"
-            onClick={onExport}
-          />
-        </Tooltip>
-        <Tooltip title="导入">
-          <Button
-            data-testid="toolbar-import"
-            icon={<Upload size={14} />}
-            size="small"
-            onClick={onImport}
-          />
-        </Tooltip>
-        <Tooltip title="校验流程">
-          <Button
-            data-testid="toolbar-validate"
-            icon={<ShieldCheck size={14} />}
-            size="small"
-            onClick={onValidate}
-          />
-        </Tooltip>
-        <Popconfirm
-          cancelText="取消"
-          description="将删除所有节点和连线，且不可撤销。确定清空？"
-          okButtonProps={{ danger: true }}
-          okText="清空"
-          title="清空画布"
-          onConfirm={onClear}
-        >
-          <Button
-            danger
-            data-testid="toolbar-clear"
-            icon={<Trash2 size={14} />}
-            size="small"
-          />
-        </Popconfirm>
       </Space>
 
-      {/* 右侧：Mock Agent 地址 */}
+      {/* 右侧：更多操作（高级功能收进弹出层） */}
       <div style={{ flex: 1 }} />
-      <Select
-        allowClear
-        options={agentUrlOptions}
-        placeholder="Mock Agent 地址"
-        size="small"
-        style={{ minWidth: 240 }}
-        value={agentUrl || undefined}
-        onChange={onAgentUrlChange}
-      />
+      <Popover
+        placement="bottomRight"
+        trigger="click"
+        content={(
+          <div className={popoverPanelClass}>
+            <Space size={4} wrap>
+              <Tooltip title="撤销">
+                <Button
+                  data-testid="toolbar-undo"
+                  disabled={!canUndo}
+                  icon={<Undo2 size={14} />}
+                  size="small"
+                  onClick={onUndo}
+                />
+              </Tooltip>
+              <Tooltip title="重做">
+                <Button
+                  data-testid="toolbar-redo"
+                  disabled={!canRedo}
+                  icon={<Redo2 size={14} />}
+                  size="small"
+                  onClick={onRedo}
+                />
+              </Tooltip>
+              <Tooltip title="自动布局">
+                <Button
+                  data-testid="toolbar-auto-layout"
+                  icon={<LayoutGrid size={14} />}
+                  size="small"
+                  onClick={onAutoLayout}
+                />
+              </Tooltip>
+              <Tooltip title="校验流程">
+                <Button
+                  data-testid="toolbar-validate"
+                  icon={<ShieldCheck size={14} />}
+                  size="small"
+                  onClick={onValidate}
+                />
+              </Tooltip>
+              <Tooltip title="导出">
+                <Button
+                  data-testid="toolbar-export"
+                  icon={<Download size={14} />}
+                  size="small"
+                  onClick={onExport}
+                />
+              </Tooltip>
+              <Tooltip title="导入">
+                <Button
+                  data-testid="toolbar-import"
+                  icon={<Upload size={14} />}
+                  size="small"
+                  onClick={onImport}
+                />
+              </Tooltip>
+              <Tooltip title="清空画布">
+                <Popconfirm
+                  cancelText="取消"
+                  description="将删除所有节点和连线，且不可撤销。确定清空？"
+                  okButtonProps={{ danger: true }}
+                  okText="清空"
+                  title="清空画布"
+                  onConfirm={onClear}
+                >
+                  <Button
+                    danger
+                    data-testid="toolbar-clear"
+                    icon={<Trash2 size={14} />}
+                    size="small"
+                  />
+                </Popconfirm>
+              </Tooltip>
+            </Space>
+            <Divider style={{ margin: 0 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--ds-node-text-secondary)', whiteSpace: 'nowrap' }}>
+                Mock Agent 地址
+              </span>
+              <Select
+                allowClear
+                options={agentUrlOptions}
+                placeholder="选择或粘贴 Agent 地址"
+                size="small"
+                style={{ minWidth: 180, flex: 1 }}
+                value={agentUrl || undefined}
+                onChange={onAgentUrlChange}
+              />
+            </div>
+          </div>
+        )}
+      >
+        <Button data-testid="toolbar-more" icon={<MoreHorizontal size={14} />}>
+          更多
+        </Button>
+      </Popover>
     </div>
   )
 }

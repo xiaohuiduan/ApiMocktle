@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import { Collapse } from 'antd'
 import {
   CircleStop,
   GitBranch,
@@ -38,6 +39,23 @@ const PALETTE_NODES: PaletteNodeItem[] = [
   { type: FlowNodeType.Wait, label: NODE_TYPE_LABELS[FlowNodeType.Wait], description: '延迟执行', icon: Timer, color: NODE_TYPE_COLORS[FlowNodeType.Wait] },
   { type: FlowNodeType.SetVariable, label: NODE_TYPE_LABELS[FlowNodeType.SetVariable], description: '设置变量', icon: Variable, color: NODE_TYPE_COLORS[FlowNodeType.SetVariable] },
   { type: FlowNodeType.Assert, label: NODE_TYPE_LABELS[FlowNodeType.Assert], description: '验证变量', icon: ShieldCheck, color: NODE_TYPE_COLORS[FlowNodeType.Assert] },
+]
+
+/** 新手常用节点：放前面 */
+const BASIC_NODE_TYPES: FlowNodeType[] = [
+  FlowNodeType.Start,
+  FlowNodeType.End,
+  FlowNodeType.HttpRequest,
+  FlowNodeType.Assert,
+]
+
+/** 进阶节点：默认折叠，按需展开 */
+const ADVANCED_NODE_TYPES: FlowNodeType[] = [
+  FlowNodeType.Condition,
+  FlowNodeType.Loop,
+  FlowNodeType.Parallel,
+  FlowNodeType.Wait,
+  FlowNodeType.SetVariable,
 ]
 
 // ==================== 样式 ====================
@@ -117,6 +135,18 @@ const cardDescClass = css`
   text-overflow: ellipsis;
 `
 
+const groupClass = css`
+  .ant-collapse-header {
+    font-size: 12px;
+    color: var(--ds-node-text-muted) !important;
+    padding: var(--ds-pad-xs) var(--ds-pad-sm) !important;
+    align-items: center;
+  }
+  .ant-collapse-content-box {
+    padding: 0 !important;
+  }
+`
+
 // ==================== 组件 ====================
 
 export default function NodePalette() {
@@ -151,40 +181,64 @@ export default function NodePalette() {
     }
   }, [])
 
+  const renderCard = (item: PaletteNodeItem) => {
+    const Icon = item.icon
+    const isDragging = draggingType === item.type
+
+    return (
+      <div
+        key={item.type}
+        className={cardClass}
+        data-node-type={item.type}
+        data-testid={`palette-node-${item.type}`}
+        style={{
+          opacity: isDragging ? 0.5 : 1,
+          border: isDragging ? '2px solid var(--ds-primary-color)' : undefined,
+        }}
+        onMouseDown={(e) => { handleMouseDown(e, item.type) }}
+      >
+        <div
+          className={colorBarClass}
+          style={{ backgroundColor: item.color }}
+        />
+        <div className={cardContentClass}>
+          <Icon color={item.color} size={16} />
+          <div className={cardTextClass}>
+            <span className={cardLabelClass}>{item.label}</span>
+            <span className={cardDescClass}>{item.description}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className={panelClass} data-testid="node-palette">
         <div className={titleClass}>节点面板（点住拖到画布）</div>
-        {PALETTE_NODES.map((item) => {
-          const Icon = item.icon
-          const isDragging = draggingType === item.type
-
-          return (
-            <div
-              key={item.type}
-              className={cardClass}
-              data-node-type={item.type}
-              data-testid={`palette-node-${item.type}`}
-              style={{
-                opacity: isDragging ? 0.5 : 1,
-                border: isDragging ? '2px solid var(--ds-primary-color)' : undefined,
-              }}
-              onMouseDown={(e) => { handleMouseDown(e, item.type) }}
-            >
-              <div
-                className={colorBarClass}
-                style={{ backgroundColor: item.color }}
-              />
-              <div className={cardContentClass}>
-                <Icon color={item.color} size={16} />
-                <div className={cardTextClass}>
-                  <span className={cardLabelClass}>{item.label}</span>
-                  <span className={cardDescClass}>{item.description}</span>
-                </div>
-              </div>
-            </div>
-          )
+        {BASIC_NODE_TYPES.map((type) => {
+          const item = PALETTE_NODES.find((n) => n.type === type)!
+          return renderCard(item)
         })}
+        <Collapse
+          className={groupClass}
+          ghost
+          items={[
+            {
+              key: 'advanced',
+              label: '高级节点（按需使用）',
+              children: (
+                <div>
+                  {ADVANCED_NODE_TYPES.map((type) => {
+                    const item = PALETTE_NODES.find((n) => n.type === type)!
+                    return renderCard(item)
+                  })}
+                </div>
+              ),
+            },
+          ]}
+          size="small"
+        />
       </div>
 
       {/* 拖动时的幽灵节点，跟随鼠标 */}

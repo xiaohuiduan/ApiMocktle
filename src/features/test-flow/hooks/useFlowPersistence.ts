@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 
 import { useFlowStore } from '../store/useFlowStore'
 import type { FlowGraph } from '../types/flow.types'
+import { createInitialGraph } from '../utils/flow-templates'
 
 const DEBOUNCE_MS = 2000
 
@@ -34,7 +35,15 @@ export function useFlowPersistence(taskId: string) {
       )
 
       if (result.ok && result.data) {
-        loadGraph(result.data)
+        if (result.data.nodes.length === 0) {
+          // 空流程预置 开始/结束 节点，引导新手从连线开始
+          loadGraph(createInitialGraph())
+          // 标记为未保存，触发自动保存，让预置流程持久化
+          useFlowStore.setState({ isDirty: true })
+        }
+        else {
+          loadGraph(result.data)
+        }
       }
     }
     catch (err) {

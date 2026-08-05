@@ -188,6 +188,83 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
   // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- falsy 链语义（长度 0 也回退到 body）
   const hasOverride = !!(override.headers?.length || override.queryParams?.length || override.pathParams?.length || override.body)
 
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- falsy 链语义（空字符串不算已配置）
+  const hasAdvanced = !!(data.preScript || data.postScript || (data.assertions?.length ?? 0) > 0 || (data.extractors?.length ?? 0) > 0 || (data.mockRules?.length ?? 0) > 0)
+
+  const advancedItems = [
+    {
+      key: 'preScript',
+      label: <LabelWithBadge hasData={!!data.preScript} label="前置脚本（可选）" />,
+      children: (
+        <div>
+          <Text className="mb-2 block text-xs" type="secondary">
+            请求发送前执行的 JavaScript 脚本
+          </Text>
+          <MonacoEditor
+            height="150px"
+            language="javascript"
+            options={{ minimap: { enabled: false }, lineNumbers: 'on' }}
+            value={data.preScript ?? ''}
+            onChange={handlePreScriptChange}
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'postScript',
+      label: <LabelWithBadge hasData={!!data.postScript} label="后置脚本（可选）" />,
+      children: (
+        <div>
+          <Text className="mb-2 block text-xs" type="secondary">
+            请求完成后执行。可用: pm.variables.set('key', value)、pm.response.json()、pm.response.status
+          </Text>
+          <MonacoEditor
+            height="150px"
+            language="javascript"
+            options={{ minimap: { enabled: false }, lineNumbers: 'on' }}
+            value={data.postScript ?? ''}
+            onChange={handlePostScriptChange}
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'assertions',
+      label: <LabelWithBadge hasData={(data.assertions?.length ?? 0) > 0} label="断言（可选）" />,
+      children: (
+        <AssertionListEditor
+          assertions={data.assertions ?? []}
+          onChange={handleAssertionsChange}
+        />
+      ),
+    },
+    {
+      key: 'extractors',
+      label: <LabelWithBadge hasData={(data.extractors?.length ?? 0) > 0} label="提取器（可选）" />,
+      children: (
+        <ExtractorListEditor
+          extractors={data.extractors ?? []}
+          onChange={handleExtractorsChange}
+        />
+      ),
+    },
+    {
+      key: 'mockRules',
+      label: <LabelWithBadge hasData={(data.mockRules?.length ?? 0) > 0} label={'Mock 依赖（可选）' + (data.mockRules?.length ? ` · ${data.mockRules.length} 条` : '')} />,
+      children: (
+        <div>
+          <Text className="mb-2 block text-xs" type="secondary">
+            拦截此请求触发的 Feign/Mapper 调用，返回模拟数据
+          </Text>
+          <MockRuleEditor
+            rules={data.mockRules ?? []}
+            onChange={handleMockRulesChange}
+          />
+        </div>
+      ),
+    },
+  ]
+
   const collapseItems = [
     {
       key: 'requestOverride',
@@ -264,78 +341,17 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
       ),
     },
     {
-      key: 'preScript',
-      label: <LabelWithBadge hasData={!!data.preScript} label="前置脚本（可选）" />,
+      key: 'advanced',
+      label: <LabelWithBadge hasData={hasAdvanced} label="高级配置（脚本/断言/提取器/Mock）" />,
       children: (
-        <div>
-          <Text className="mb-2 block text-xs" type="secondary">
-            请求发送前执行的 JavaScript 脚本
-          </Text>
-          <MonacoEditor
-            height="150px"
-            language="javascript"
-            options={{ minimap: { enabled: false }, lineNumbers: 'on' }}
-            value={data.preScript ?? ''}
-            onChange={handlePreScriptChange}
-          />
-        </div>
-      ),
-    },
-    {
-      key: 'postScript',
-      label: <LabelWithBadge hasData={!!data.postScript} label="后置脚本（可选）" />,
-      children: (
-        <div>
-          <Text className="mb-2 block text-xs" type="secondary">
-            请求完成后执行。可用: pm.variables.set('key', value)、pm.response.json()、pm.response.status
-          </Text>
-          <MonacoEditor
-            height="150px"
-            language="javascript"
-            options={{ minimap: { enabled: false }, lineNumbers: 'on' }}
-            value={data.postScript ?? ''}
-            onChange={handlePostScriptChange}
-          />
-        </div>
-      ),
-    },
-    {
-      key: 'assertions',
-      label: <LabelWithBadge hasData={(data.assertions?.length ?? 0) > 0} label="断言（可选）" />,
-      children: (
-        <AssertionListEditor
-          assertions={data.assertions ?? []}
-          onChange={handleAssertionsChange}
+        <Collapse
+          defaultActiveKey={[]}
+          items={advancedItems}
+          size="small"
         />
-      ),
-    },
-    {
-      key: 'extractors',
-      label: <LabelWithBadge hasData={(data.extractors?.length ?? 0) > 0} label="提取器（可选）" />,
-      children: (
-        <ExtractorListEditor
-          extractors={data.extractors ?? []}
-          onChange={handleExtractorsChange}
-        />
-      ),
-    },
-    {
-      key: 'mockRules',
-      label: <LabelWithBadge hasData={(data.mockRules?.length ?? 0) > 0} label={`Mock 依赖（可选）${data.mockRules?.length ? ` · ${data.mockRules.length} 条` : ''}`} />,
-      children: (
-        <div>
-          <Text className="mb-2 block text-xs" type="secondary">
-            拦截此请求触发的 Feign/Mapper 调用，返回模拟数据
-          </Text>
-          <MockRuleEditor
-            rules={data.mockRules ?? []}
-            onChange={handleMockRulesChange}
-          />
-        </div>
       ),
     },
   ]
-
   return (
     <div className="space-y-4">
       <Text className="block text-xs" type="secondary">

@@ -16,6 +16,9 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 
+import { Button, Space } from 'antd'
+import { Wand2 } from 'lucide-react'
+
 import { useDesignStyle } from '@/hooks/useDesignStyle'
 
 import { FlowInstanceContext, globalFlowInstanceRef } from '../contexts/FlowInstanceContext'
@@ -23,7 +26,8 @@ import { usePathHighlightContext } from '../contexts/PathHighlightContext'
 import { NODE_TYPE_COLORS } from '../nodes/nodeColors'
 import { getDefaultNodeData, getNodeTypes } from '../nodes/nodeRegistry'
 import { useFlowStore } from '../store/useFlowStore'
-import { type FlowEdge, type FlowNode, FlowNodeType } from '../types/flow.types'
+import { type FlowEdge, type FlowGraph, type FlowNode, FlowNodeType } from '../types/flow.types'
+import { createInitialGraph, createRequestAssertTemplate } from '../utils/flow-templates'
 
 import '@xyflow/react/dist/style.css'
 
@@ -244,6 +248,15 @@ function FlowCanvasInner() {
     onPanePathClick()
   }, [selectNode, onPanePathClick])
 
+  // 应用模板/预置流程（空画布引导用）
+  const applyTemplate = useCallback((graph: FlowGraph) => {
+    useFlowStore.getState().loadGraph(graph)
+    // 标记为未保存，触发自动保存，让模板持久化
+    useFlowStore.setState({ isDirty: true })
+    // 等 ReactFlow 同步新节点后再适应视图
+    setTimeout(() => { void reactFlow.fitView({ padding: 0.2 }) }, 0)
+  }, [reactFlow])
+
   const handleDeleteFromMenu = useCallback(() => {
     if (!contextMenu) { return }
 
@@ -403,6 +416,7 @@ function FlowCanvasInner() {
       style={{
         width: '100%',
         height: '100%',
+        position: 'relative',
         // 画布背景跟随设计风格（玻璃/拟物/新拟态各有专属背景与渐变素材）
         background: 'var(--ds-canvas-bg)',
       }}
@@ -527,6 +541,57 @@ function FlowCanvasInner() {
         />
         <Controls />
       </ReactFlow>
+
+      {/* 空画布引导 */}
+      {nodes.length === 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            zIndex: 5,
+          }}
+        >
+          <div
+            style={{
+              textAlign: 'center',
+              pointerEvents: 'auto',
+              background: 'var(--ds-panel-bg)',
+              border: 'var(--ds-border, none)',
+              borderRadius: 12,
+              boxShadow: 'var(--ds-shadow-md, 0 2px 12px rgba(0,0,0,0.15))',
+              padding: '28px 36px',
+              maxWidth: 420,
+            }}
+          >
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ds-node-text-primary)' }}>
+              从零开始搭建测试流程
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ds-node-text-muted)', margin: '8px 0 20px' }}>
+              从左侧拖入节点，或用模板快速开始
+            </div>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Button
+                block
+                icon={<Wand2 size={14} />}
+                type="primary"
+                onClick={() => { applyTemplate(createRequestAssertTemplate()) }}
+              >
+                一键模板：请求 + 断言
+              </Button>
+              <Button
+                block
+                onClick={() => { applyTemplate(createInitialGraph()) }}
+              >
+                空白流程（开始/结束）
+              </Button>
+            </Space>
+          </div>
+        </div>
+      )}
 
       {/* 右键菜单 */}
       {contextMenu && (

@@ -102,28 +102,28 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
   const handleValidate = useCallback(() => {
     const currentNodes = useFlowStore.getState().nodes
     const currentEdges = useFlowStore.getState().edges
-    const errors: string[] = []
-    const warnings: string[] = []
+    const errors: { message: string, nodeId?: string }[] = []
+    const warnings: { message: string, nodeId?: string }[] = []
 
     // 1. 检查起止节点
     const startNodes = currentNodes.filter((n) => n.type === NT.Start)
     const endNodes = currentNodes.filter((n) => n.type === NT.End)
 
-    if (startNodes.length === 0) { errors.push('缺少 Start 节点') }
+    if (startNodes.length === 0) { errors.push({ message: '缺少 Start 节点' }) }
 
-    if (startNodes.length > 1) { errors.push(`有 ${startNodes.length} 个 Start 节点（应只有 1 个）`) }
+    if (startNodes.length > 1) { errors.push({ message: `有 ${startNodes.length} 个 Start 节点（应只有 1 个）`, nodeId: startNodes[0].id }) }
 
-    if (endNodes.length === 0) { errors.push('缺少 End 节点') }
+    if (endNodes.length === 0) { errors.push({ message: '缺少 End 节点' }) }
 
-    if (endNodes.length > 1) { warnings.push(`有 ${endNodes.length} 个 End 节点`) }
+    if (endNodes.length > 1) { warnings.push({ message: `有 ${endNodes.length} 个 End 节点`, nodeId: endNodes[0].id }) }
 
     // 2. 边引用有效性
     const nodeIds = new Set(currentNodes.map((n) => n.id))
 
     for (const edge of currentEdges) {
-      if (!nodeIds.has(edge.source)) { errors.push(`边引用了不存在的源节点: ${edge.source}`) }
+      if (!nodeIds.has(edge.source)) { errors.push({ message: `边引用了不存在的源节点: ${edge.source}` }) }
 
-      if (!nodeIds.has(edge.target)) { errors.push(`边引用了不存在的目标节点: ${edge.target}`) }
+      if (!nodeIds.has(edge.target)) { errors.push({ message: `边引用了不存在的目标节点: ${edge.target}` }) }
     }
 
     // 3. 孤立节点检查
@@ -132,20 +132,20 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
 
     for (const node of currentNodes) {
       if (node.type === NT.Start && !hasOutgoing.has(node.id)) {
-        warnings.push(`Start 节点「${(node.data?.label) || node.id}」没有出边`)
+        warnings.push({ message: `Start 节点「${(node.data?.label) || node.id}」没有出边`, nodeId: node.id })
       }
 
       if (node.type === NT.End && !hasIncoming.has(node.id)) {
-        warnings.push(`End 节点「${(node.data?.label) || node.id}」没有入边`)
+        warnings.push({ message: `End 节点「${(node.data?.label) || node.id}」没有入边`, nodeId: node.id })
       }
 
       if (node.type !== NT.Start && node.type !== NT.End) {
         if (!hasIncoming.has(node.id)) {
-          warnings.push(`节点「${(node.data?.label) || node.id}」没有入边`)
+          warnings.push({ message: `节点「${(node.data?.label) || node.id}」没有入边`, nodeId: node.id })
         }
 
         if (!hasOutgoing.has(node.id)) {
-          warnings.push(`节点「${(node.data?.label) || node.id}」没有出边`)
+          warnings.push({ message: `节点「${(node.data?.label) || node.id}」没有出边`, nodeId: node.id })
         }
       }
     }
@@ -153,42 +153,67 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
     // 4. httpRequest 节点的 menuItemId
     for (const node of currentNodes) {
       if (node.type === NT.HttpRequest && !(node.data?.menuItemId as string)) {
-        errors.push(`HTTP 请求节点「${(node.data?.label) || node.id}」未选择 API`)
+        errors.push({ message: `HTTP 请求节点「${(node.data?.label) || node.id}」未选择 API`, nodeId: node.id })
       }
     }
-
-    // 5. 定位到第一个有问题的节点
-    const firstProblemNode = currentNodes.find((n) => {
-      if (n.type === NT.HttpRequest && !(n.data?.menuItemId as string)) { return true }
-
-      return false
-    })
 
     // 结果展示
     if (errors.length === 0 && warnings.length === 0) {
       message.success('流程校验通过 ✓')
+
+      return
     }
-    else if (errors.length > 0) {
-      Modal.error({
+
+    // 点击问题项可定位到对应节点
+    const renderItem = (
+      item: { message: string, nodeId?: string },
+      index: number,
+      kind: 'error' | 'warning',
+      modal: { destroy: () => void },
+    ) => (
+      <div
+        key={kind === 'error' ? index : `w${index}`}
+        style={{
+          color: kind === 'error' ? 'var(--ds-error-color)' : 'var(--ds-warning-color)',
+          cursor: item.nodeId ? 'pointer' : 'default',
+          padding: '2px 0',
+        }}
+        onClick={() => {
+          if (item.nodeId) {
+            useFlowStore.getState().selectNode(item.nodeId)
+            modal.destroy()
+          }
+        }}
+      >
+        {kind === 'error' ? '✗' : '⚠'} {item.message}{item.nodeId ? '（点击定位）' : ''}
+      </div>
+    )
+
+    if (errors.length > 0) {
+      const modal = Modal.error({
         title: `流程校验失败 (${errors.length} 个错误)`,
         content: (
           <div>
-            {errors.map((e, i) => <div key={i} style={{ color: 'var(--ds-error-color)' }}>✗ {e}</div>)}
-            {warnings.map((w, i) => <div key={`w${i}`} style={{ color: 'var(--ds-warning-color)' }}>⚠ {w}</div>)}
+            {errors.map((e, i) => renderItem(e, i, 'error', modal))}
+            {warnings.map((w, i) => renderItem(w, i, 'warning', modal))}
           </div>
         ),
       })
 
+      // 自动定位到第一个有问题的节点
+      const firstProblemNode = errors.find((e) => e.nodeId)?.nodeId
+        ?? warnings.find((w) => w.nodeId)?.nodeId
+
       if (firstProblemNode) {
-        useFlowStore.getState().selectNode(firstProblemNode.id)
+        useFlowStore.getState().selectNode(firstProblemNode)
       }
     }
     else {
-      Modal.warning({
+      const modal = Modal.warning({
         title: `校验通过，但有 ${warnings.length} 个警告`,
         content: (
           <div>
-            {warnings.map((w, i) => <div key={i} style={{ color: 'var(--ds-warning-color)' }}>⚠ {w}</div>)}
+            {warnings.map((w, i) => renderItem(w, i, 'warning', modal))}
           </div>
         ),
       })
