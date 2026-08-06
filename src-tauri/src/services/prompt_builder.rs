@@ -3,14 +3,23 @@ use serde_json::Value as JsonValue;
 
 use crate::db::menu_repo;
 use crate::db::client::Db;
+use crate::models::ProjectEnvironmentConfig;
 
 /// 为指定项目生成完整的 AI Prompt（markdown 格式）
-pub fn generate_flow_prompt(db: &Db, project_id: &str) -> Result<String, String> {
+/// 为指定项目生成完整的 AI Prompt（markdown 格式）
+/// - mode: "full"（完整 API 文档，默认）或 "brief"（仅接口目录）
+/// - query: 可选关键词，过滤接口名称/路径/方法（不区分大小写）
+pub fn generate_flow_prompt(
+    db: &Db,
+    project_id: &str,
+    mode: &str,
+    query: Option<&str>,
+) -> Result<String, String> {
     // 1. 获取所有菜单项
     let items = menu_repo::list_menu_items(db, project_id)
         .map_err(|e| format!("获取菜单项失败: {}", e))?;
 
-    // 2. 构建 $ref schema 查找表
+    // 2. 构建 $ref schema 查找表（仅 full 模式需要）
     let mut schema_map: HashMap<String, JsonValue> = HashMap::new();
     for item in &items {
         if item.menu_type != "apiSchema" { continue; }
@@ -25,6 +34,8 @@ pub fn generate_flow_prompt(db: &Db, project_id: &str) -> Result<String, String>
     }
 
     // 3. 为每个 apiDetail 生成接口文档
+    let brief = mode == "brief";
+    let query_lower = query.map(|q| q.to_lowercase());
     let mut api_docs = String::new();
     let mut idx = 0;
     for item in &items {
@@ -33,11 +44,28 @@ pub fn generate_flow_prompt(db: &Db, project_id: &str) -> Result<String, String>
             Some(v) => v,
             None => continue,
         };
+
+        // 关键词过滤（名称/路径/方法）
+        if let Some(ql) = &query_lower {
+            let name = item.name.to_lowercase();
+            let path = d.get("path").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
+            let method = d.get("method").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
+            if !name.contains(ql) && !path.contains(ql) && !method.contains(ql) { continue; }
+        }
+
         idx += 1;
         let method = d.get("method").and_then(|v| v.as_str()).unwrap_or("GET");
         let path = d.get("path").and_then(|v| v.as_str()).unwrap_or("");
         let desc = d.get("description").or_else(|| d.get("desc"))
             .and_then(|v| v.as_str()).unwrap_or("");
+
+        if brief {
+            api_docs.push_str(&format!("- menuItemId: `{}` | {} | {} {}\n", item.id, item.name, method.to_uppercase(), path));
+            if !desc.is_empty() {
+                api_docs.push_str(&format!("  说明：{}\n", desc));
+            }
+            continue;
+        }
 
         api_docs.push_str(&format!("### {}. {}\n\n", idx, item.name));
         api_docs.push_str(&format!("- menuItemId: `{}`\n", item.id));
@@ -69,6 +97,7 @@ pub fn generate_flow_prompt(db: &Db, project_id: &str) -> Result<String, String>
         if let Some(params) = d.get("parameters") {
             if let Some(sections) = format_openapi_params(params, &schema_map) {
                 api_docs.push_str(&sections);
+                if !sections.ends_with('\n') { api_docs.push('\n'); }
             }
         }
 
@@ -86,13 +115,99 @@ pub fn generate_flow_prompt(db: &Db, project_id: &str) -> Result<String, String>
     }
 
     if api_docs.is_empty() {
-        api_docs = "（当前项目暂无 API 接口，请在项目中先添加 API 定义）".to_string();
+        if query_lower.is_some() {
+            api_docs = format!("（没有匹配 query「{}」的接口，可去掉 query 查看全部）", query.unwrap_or(""));
+        } else {
+            api_docs = "（当前项目暂无 API 接口，请在项目中先添加 API 定义）".to_string();
+        }
     }
 
-    // 4. 填充模板
-    Ok(PROMPT_TEMPLATE.replace("{{apiDocs}}", &api_docs))
-}
+    // 4. 环境与变量上下文
+    let env_context = build_env_context(db, project_id)?;
 
+    // 5. 填充模板
+    // 5. 填充模板（brief 只给目录与环境；full 给完整节点定义与示例）
+    let template = if brief { BRIEF_TEMPLATE } else { PROMPT_TEMPLATE };
+    Ok(template
+        .replace("{{envContext}}", &env_context)
+        .replace("{{apiDocs}}", &api_docs))
+}
+/// 生成项目环境与变量上下文（供 AI 选择 environmentId 与变量名）
+fn build_env_context(db: &Db, project_id: &str) -> Result<String, String> {
+    let conn = db.0.lock().map_err(|e| format!("数据库锁失败: {}", e))?;
+    let config_str: Option<String> = conn
+        .query_row(
+            "SELECT value FROM meta WHERE project_id = ?1 AND key = 'environmentConfig'",
+            rusqlite::params![project_id],
+            |row| row.get(0),
+        )
+        .ok();
+    drop(conn);
+
+    let Some(config_str) = config_str else {
+        return Ok("当前项目未配置环境与变量。创建任务时可不填 environmentId，但相对路径请求将无法解析 Base URL，建议先在项目设置中配置环境。".to_string());
+    };
+
+    let config: ProjectEnvironmentConfig = serde_json::from_str(&config_str)
+        .map_err(|e| format!("解析环境配置失败: {}", e))?;
+
+    let mut out = String::new();
+
+    // 全局变量（仅列出启用的名称，值可在运行时通过 get_variables 查询）
+    let global_vars: Vec<String> = config.global_variables.iter().filter_map(|v| {
+        let name = v.get("name").and_then(|x| x.as_str())?;
+        let enabled = v.get("enable").and_then(|x| x.as_bool()).unwrap_or(true);
+        if enabled { Some(name.to_string()) } else { None }
+    }).collect();
+    if !global_vars.is_empty() {
+        out.push_str(&format!("- 全局变量：{}\n", global_vars.join(", ")));
+    }
+
+    if config.environments.is_empty() {
+        if out.is_empty() {
+            out.push_str("当前项目未配置环境。");
+        }
+        return Ok(out);
+    }
+
+    out.push_str("- 环境列表：\n");
+    for env in &config.environments {
+        let id = env.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        let name = env.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let base_url = env.get("baseUrls")
+            .and_then(|v| v.as_array())
+            .and_then(|arr| arr.iter().find(|b| b.get("url").and_then(|u| u.as_str()).map(|s| !s.is_empty()).unwrap_or(false)))
+            .and_then(|b| b.get("url").and_then(|u| u.as_str()))
+            .or_else(|| env.get("url").and_then(|v| v.as_str()))
+            .unwrap_or("");
+        let has_agent = env.get("agentUrl").and_then(|v| v.as_str()).map(|s| !s.is_empty()).unwrap_or(false);
+        let env_vars: Vec<String> = env.get("variables")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter().filter_map(|v| {
+                    let n = v.get("name").and_then(|x| x.as_str())?;
+                    let enabled = v.get("enable").and_then(|x| x.as_bool()).unwrap_or(true);
+                    if enabled { Some(n.to_string()) } else { None }
+                }).collect()
+            })
+            .unwrap_or_default();
+
+        let mut line = format!("  - id: `{}` | 名称: {}", id, name);
+        if !base_url.is_empty() {
+            line.push_str(&format!(" | Base URL: {}", base_url));
+        }
+        if has_agent {
+            line.push_str(" | 已配置 Mock Agent");
+        }
+        if !env_vars.is_empty() {
+            line.push_str(&format!(" | 环境变量: {}", env_vars.join(", ")));
+        }
+        out.push_str(&line);
+        out.push('\n');
+    }
+
+    Ok(out)
+}
 // ==================== Schema 解析 ====================
 
 fn resolve_schema(schema: &JsonValue, schema_map: &HashMap<String, JsonValue>, visited: &mut std::collections::HashSet<String>) -> JsonValue {
@@ -361,6 +476,10 @@ const PROMPT_TEMPLATE: &str = r#"你是一个测试流程设计专家。你的�
 
 ---
 
+# 〇、项目环境与可用变量
+
+{{envContext}}
+
 # 一、当前项目的可用 API 接口
 
 {{apiDocs}}
@@ -586,8 +705,9 @@ script API: pm.test(name, fn) / pm.expect(x).toBe/.toEqual/.toBeTruthy/.toBeDefi
 |------|------|------|------|
 | label | string | 是 | 节点名称 |
 | enabled | boolean | 是 | 是否启用 |
-| branchCount | number | 是 | 并行分支数（2-6） |
+| branchCount | number | 是 | 并行分支数（>=2） |
 | waitAll | boolean | 是 | true=等待所有，false=任一完成即继续 |
+| timeoutMs | number | 否 | 整体超时（毫秒），不设则不限制 |
 
 ## 10. subFlow — 子流程
 
@@ -669,7 +789,22 @@ script API: pm.test(name, fn) / pm.expect(x).toBe/.toEqual/.toBeTruthy/.toBeDefi
 
 ---
 
-# 八、用户需求
+# 八、生成方式
 
-请根据以下需求生成测试流程 JSON（只输出 JSON，不要其他内容）：
+请基于以上节点定义与接口文档，通过 MCP 工具 api-test.create_task_with_flow 创建测试任务：把构造好的 graphJson 直接作为该工具的 graphJson 参数传入。不要直接向用户输出 JSON 文本。
 "#;
+const BRIEF_TEMPLATE: &str = r#"你是一个测试流程设计专家。你将通过 MCP 工具创建测试流程，而不是直接输出 JSON。
+
+---
+
+# 〇、项目环境与可用变量
+
+{{envContext}}
+
+# 一、当前项目的可用 API 接口（目录）
+
+{{apiDocs}}
+
+说明：以上仅为接口目录。要获取完整的节点类型定义、接口参数/请求体/响应体结构以及完整示例流程图，请调用 api-test.get_flow_prompt(mode=full) 后再构造 graphJson。
+"#;
+

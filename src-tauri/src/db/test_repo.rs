@@ -16,7 +16,7 @@ pub fn create_folder(db: &Db, payload: &CreateTestFolderPayload) -> Result<TestF
         .query_row(
             "SELECT COALESCE(MAX(sort_order), -1) FROM test_folders WHERE project_id = ?1",
             params![payload.project_id],
-            |row| row.get(0),
+            |row| row.get::<_, i32>(0),
         )
         .unwrap_or(-1);
 
@@ -253,10 +253,23 @@ pub fn get_task_variables(db: &Db, task_id: &str) -> Result<Option<serde_json::V
 }
 
 pub fn set_task_variables(db: &Db, task_id: &str, variables: &serde_json::Value) -> Result<serde_json::Value, AppError> {
-    let task = get_task(db, task_id)?.ok_or_else(|| AppError::NotFound("Task not found".to_string()))?;
+    // 单锁内完成 读-合并-写，避免并发 set_variables 丢更新
+    let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;
 
-    let mut merged = match task.variables_json {
-        Some(serde_json::Value::Object(existing)) => existing,
+    let existing: Option<String> = conn
+        .query_row(
+            "SELECT variables_json FROM test_tasks WHERE id = ?1",
+            rusqlite::params![task_id],
+            |row| row.get::<_, Option<String>>(0),
+        )
+        .or_else(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            other => Err(AppError::from(other)),
+        })?;
+
+    let existing_val = existing.as_deref().and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok());
+    let mut merged = match existing_val {
+        Some(serde_json::Value::Object(map)) => map,
         _ => serde_json::Map::new(),
     };
 
@@ -267,20 +280,17 @@ pub fn set_task_variables(db: &Db, task_id: &str, variables: &serde_json::Value)
     }
 
     let merged_json = serde_json::Value::Object(merged);
-    let payload = UpdateTestTaskPayload {
-        name: None,
-        description: None,
-        folder_id: None,
-        environment_id: None,
-        variables_json: Some(merged_json.clone()),
-        fail_fast: None,
-    };
-
-    update_task(db, task_id, &payload)?;
+    let now = chrono::Utc::now().to_rfc3339();
+    let affected = conn.execute(
+        "UPDATE test_tasks SET variables_json = ?1, updated_at = ?2 WHERE id = ?3",
+        rusqlite::params![serde_json::to_string(&merged_json).map_err(|e| AppError::Internal(e.to_string()))?, now, task_id],
+    )
+    .map_err(|e| AppError::Internal(e.to_string()))?;
+    if affected == 0 {
+        return Err(AppError::NotFound("Task not found".to_string()));
+    }
     Ok(merged_json)
 }
-
-// ==================== Test Steps ====================
 
 pub fn create_step(db: &Db, payload: &CreateTestStepPayload) -> Result<TestStep, AppError> {
     let conn = db.0.lock().map_err(|e| AppError::Internal(e.to_string()))?;

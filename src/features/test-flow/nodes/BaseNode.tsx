@@ -72,7 +72,6 @@ const nodeClass = css`
   border-radius: 8px;
   box-shadow: var(--ds-node-shadow, 0 1px 3px rgba(0, 0, 0, 0.12));
   border: 1px solid var(--ds-node-border-color);
-  overflow: hidden;
   font-size: 13px;
   transition: box-shadow 0.2s ease;
 `

@@ -15,7 +15,7 @@ function ParallelNodeInner({ id, data, type }: NodeProps<FlowNode>) {
         id: `branch-${i}`,
         label: `#${i + 1}`,
       })),
-      { id: 'out', label: '续' },
+      { id: 'out', label: '汇合出口', color: 'var(--ds-success-color)' },
     ]
   }, [branchCount])
 

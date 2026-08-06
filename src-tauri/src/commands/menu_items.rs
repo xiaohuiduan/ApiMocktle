@@ -102,7 +102,7 @@ pub fn get_flow_prompt(db: State<Arc<Db>>, session_id: String, project_id: Strin
         Err(e) => return e.into(),
     };
 
-    match crate::services::prompt_builder::generate_flow_prompt(&db, &project_id) {
+    match crate::services::prompt_builder::generate_flow_prompt(&db, &project_id, "full", None) {
         Ok(prompt) => ApiResult::success(serde_json::json!({ "prompt": prompt })),
         Err(e) => crate::errors::AppError::Internal(e).into(),
     }
