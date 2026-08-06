@@ -102,7 +102,7 @@ export interface LoopNodeData extends BaseNodeData {
 }
 
 export interface ParallelNodeData extends BaseNodeData {
-  branchCount: number // how many parallel branches (2-6)
+  branchCount: number // how many parallel branches (>=2)
   waitAll: boolean // true = wait all, false = wait first
   timeoutMs?: number // overall timeout for all branches
 }

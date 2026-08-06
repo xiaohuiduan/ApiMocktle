@@ -9,7 +9,7 @@ import { create } from 'zustand'
 
 import { getInputHandleIds, getOutputHandleIds } from '../nodes/handleUtils'
 import { migrateGraph } from '../nodes/migrations'
-import type { FlowEdge, FlowGraph, FlowNode, FlowNodeData } from '../types/flow.types'
+import { FlowNodeType, type FlowEdge, type FlowGraph, type FlowNode, type FlowNodeData } from '../types/flow.types'
 
 // ==================== 接口定义 ====================
 
@@ -389,11 +389,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST',
         'elk.padding': '[40, 40, 40, 40]',
       },
-      children: nodes.map((node) => ({
-        id: node.id,
-        width: NODE_WIDTH,
-        height: NODE_HEIGHT,
-      })),
+      children: nodes.map((node) => {
+        const branchCount = Number((node.data as Record<string, unknown>).branchCount ?? 2)
+        const parallelWidth = Math.max(NODE_WIDTH, (branchCount + 2) * 36)
+
+        return {
+          id: node.id,
+          width: node.type === FlowNodeType.Parallel ? parallelWidth : NODE_WIDTH,
+          height: NODE_HEIGHT,
+        }
+      }),
       edges: edges.map((edge) => ({
         id: edge.id,
         sources: [edge.source],

@@ -19,6 +19,8 @@ function ParallelNodeInner({ id, data, type }: NodeProps<FlowNode>) {
     ]
   }, [branchCount])
 
+  // 分支多时加宽节点，避免输出 handle 与标签挤在一起
+  const minWidth = Math.max(180, (branchCount + 2) * 36)
   const summary = `${branchCount} 并行分支`
 
   return (
@@ -28,6 +30,7 @@ function ParallelNodeInner({ id, data, type }: NodeProps<FlowNode>) {
       inputHandles={['in']}
       outputHandles={outputHandles}
       summary={summary}
+      minWidth={minWidth}
       type={type ?? FlowNodeType.Parallel}
     />
   )

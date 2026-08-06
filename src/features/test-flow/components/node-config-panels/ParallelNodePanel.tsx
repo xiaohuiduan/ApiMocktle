@@ -46,11 +46,10 @@ export default function ParallelNodePanel({ data, onChange }: PanelProps<Paralle
       {/* 分支数量 */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          并行分支数 (2-6)
+          并行分支数
         </Text>
         <InputNumber
           data-testid="parallel-branch-count"
-          max={6}
           min={2}
           size="small"
           style={{ width: '100%' }}
