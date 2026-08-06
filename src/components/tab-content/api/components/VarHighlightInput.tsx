@@ -166,7 +166,7 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
         if (!v) { setShowDropdown(false) }
       }}
     >
-      <div className="relative" style={{ minWidth: 0 }}>
+      <div className="relative" style={{ minWidth: 0, width: '100%' }}>
         <Input
           ref={inputRef}
           disabled={disabled}

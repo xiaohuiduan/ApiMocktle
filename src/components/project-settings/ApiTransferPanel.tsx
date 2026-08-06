@@ -9,6 +9,7 @@ import type { DataNode } from 'antd/es/tree'
 
 import { api } from '@/api-client'
 import type { ApiMenuData } from '@/components/ApiMenu'
+import { ApiTreeTitle } from '@/components/project-settings/ApiTreeTitle'
 import { ExportPanel } from '@/components/project-settings/ExportPanel'
 import { useAuth } from '@/contexts/auth'
 import { type ProjectStateSnapshot, useMenuHelpersContext } from '@/contexts/menu-helpers'
@@ -110,7 +111,7 @@ export function ApiTransferPanel() {
     function buildNodes(items: ApiMenuData[]): DataNode[] {
       return items.map((item) => ({
         key: item.id,
-        title: `${(item.data as { method?: string }).method ?? 'GET'} ${(item.data as { path?: string }).path ?? item.name}`,
+        title: <ApiTreeTitle item={item} />,
       }))
     }
 

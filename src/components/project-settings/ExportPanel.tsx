@@ -7,6 +7,7 @@ import { DownloadIcon, GlobeIcon } from 'lucide-react'
 
 import { api } from '@/api-client'
 import type { ApiMenuData } from '@/components/ApiMenu'
+import { ApiTreeTitle } from '@/components/project-settings/ApiTreeTitle'
 import { useAuth } from '@/contexts/auth'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { MenuItemType } from '@/enums'
@@ -52,7 +53,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
     function buildNodes(items: ApiMenuData[]): DataNode[] {
       return items.map((item) => ({
         key: item.id,
-        title: `${(item.data as { method?: string } | undefined)?.method ?? 'GET'} ${(item.data as { path?: string } | undefined)?.path ?? item.name}`,
+        title: <ApiTreeTitle item={item} />,
       }))
     }
 

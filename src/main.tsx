@@ -26,6 +26,9 @@ import { appRoutes } from './routes'
 
 import '@/styles/globals.css'
 
+// 桌面应用：阻止浏览器默认右键菜单（刷新/另存为等）
+document.addEventListener('contextmenu', (e) => { e.preventDefault() })
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <HashRouter>
