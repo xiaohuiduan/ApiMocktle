@@ -108,6 +108,12 @@ export function AuthForm(props: AuthFormProps) {
             >
               本地 API 管理工具
             </div>
+            <div
+              className="mt-1 text-xs leading-5"
+              style={{ color: token.colorTextTertiary }}
+            >
+              本软件为纯本地应用，你的所有数据（包括账号）仅保存在这台电脑上，不会上传到任何服务器。
+            </div>
           </div>
         </div>
 
