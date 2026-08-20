@@ -129,7 +129,7 @@ jobs:
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
 
-  # ── Linux (legacy) - Ubuntu 22.04 / webkit 4.0 / soup2.4 兼容老系统 ──
+  # ── Linux (legacy) - Ubuntu 22.04 / webkit 4.1 / soup3 (glibc 2.35 兼容老系统) ──
   build-linux-legacy:
     runs-on: ubuntu-22.04
     steps:
@@ -148,7 +148,7 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf libsoup2.4-dev libjavascriptcoregtk-4.0-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
 
       - run: pnpm install --frozen-lockfile
 
@@ -204,3 +204,5 @@ jobs:
             artifacts/**/*.deb
             artifacts/**/*.AppImage
           generate_release_notes: true
+
+
