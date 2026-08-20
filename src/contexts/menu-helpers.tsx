@@ -1,4 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+
+import { listen } from '@tauri-apps/api/event'
+import { Button, notification } from 'antd'
 
 import { api } from '@/api-client'
 import type { ApiMenuData } from '@/components/ApiMenu'
@@ -23,6 +26,13 @@ import type {
   RecycleData,
   RecycleDataItem,
 } from '@/types'
+import {
+  buildYapiPushNotificationContent,
+  getYapiPushNotificationKey,
+  YAPI_PUSH_DEBOUNCE_MS,
+  YAPI_PUSH_EVENT,
+  type YapiPushPayload,
+} from '@/utils/yapi-push-notify'
 
 interface MenuHelpers {
   addMenuItem: (menuData: ApiMenuData) => void
@@ -236,6 +246,8 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
     activeTabState,
     updateProjectHelpersState,
     openProject,
+    isProjectOpen,
+    setActiveProjectId,
   } = useProjectTabsContext()
 
   // ----- 从 ProjectTabsContext 派生状态 -----
@@ -361,6 +373,120 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
       console.error(error)
     }
   }, [activeProjectId, sessionId, applyState])
+
+  // ----- YAPI 推送通知：右上角常驻，合并防抖 -----
+  const [notificationApi, notificationHolder] = notification.useNotification({ placement: 'topRight' })
+  const pendingRef = useRef<Map<string, { projectName: string, count: number, timer: number }>>(new Map())
+  const visibleRef = useRef<Map<string, number>>(new Map())
+  const activeProjectIdRef = useRef(activeProjectId)
+  const reloadStateRef = useRef(reloadState)
+  const openProjectRef = useRef(openProject)
+  const isProjectOpenRef = useRef(isProjectOpen)
+  const setActiveProjectIdRef = useRef(setActiveProjectId)
+
+  useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
+  useEffect(() => { reloadStateRef.current = reloadState }, [reloadState])
+  useEffect(() => { openProjectRef.current = openProject }, [openProject])
+  useEffect(() => { isProjectOpenRef.current = isProjectOpen }, [isProjectOpen])
+  useEffect(() => { setActiveProjectIdRef.current = setActiveProjectId }, [setActiveProjectId])
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    let cancelled = false
+
+    const flush = (projectId: string) => {
+      const entry = pendingRef.current.get(projectId)
+
+      if (!entry) { return }
+
+      pendingRef.current.delete(projectId)
+      const { projectName, count } = entry
+      const prevVisible = visibleRef.current.get(projectId) ?? 0
+      const total = prevVisible > 0 ? prevVisible + count : count
+      visibleRef.current.set(projectId, total)
+      const isActive = activeProjectIdRef.current === projectId
+      const key = getYapiPushNotificationKey(projectId)
+      const { title, description } = buildYapiPushNotificationContent(projectName, total)
+      notificationApi.info({
+        key,
+        message: title,
+        description,
+        duration: 0,
+        btn: (
+          <Button
+            size="small"
+            type="primary"
+            onClick={() => {
+              notificationApi.destroy(key)
+              visibleRef.current.delete(projectId)
+
+              if (isActive) {
+                void reloadStateRef.current()
+              }
+              else {
+                const targetId = projectId
+                const name = projectName
+
+                if (isProjectOpenRef.current(targetId)) {
+                  setActiveProjectIdRef.current(targetId)
+                }
+                else {
+                  openProjectRef.current({ projectId: targetId, name, role: 'viewer' })
+                }
+              }
+            }}
+          >
+            {isActive ? '立即刷新' : '去查看'}
+          </Button>
+        ),
+        onClose: () => {
+          visibleRef.current.delete(projectId)
+        },
+      })
+    }
+
+    const setup = async () => {
+      try {
+        unlisten = await listen<YapiPushPayload>(YAPI_PUSH_EVENT, (event) => {
+          const payload = event.payload
+
+          if (!payload?.projectId) { return }
+
+          const existing = pendingRef.current.get(payload.projectId)
+
+          if (existing) {
+            window.clearTimeout(existing.timer)
+            const newCount = existing.count + (payload.count || 1)
+            const timer = window.setTimeout(() => { flush(payload.projectId) }, YAPI_PUSH_DEBOUNCE_MS)
+            pendingRef.current.set(payload.projectId, { projectName: payload.projectName || existing.projectName, count: newCount, timer: timer as unknown as number })
+          }
+          else {
+            const timer = window.setTimeout(() => { flush(payload.projectId) }, YAPI_PUSH_DEBOUNCE_MS)
+            pendingRef.current.set(payload.projectId, { projectName: payload.projectName || payload.projectId, count: payload.count || 1, timer: timer as unknown as number })
+          }
+        })
+
+        if (cancelled && unlisten) {
+          unlisten()
+          unlisten = undefined
+        }
+      }
+      catch (error) {
+        console.error('[yapi-push] listen failed', error)
+      }
+    }
+
+    void setup()
+
+    return () => {
+      cancelled = true
+
+      if (unlisten) { unlisten() }
+
+      pendingRef.current.forEach((v) => { window.clearTimeout(v.timer) })
+      pendingRef.current.clear()
+    }
+  }, [notificationApi])
 
   // ----- 当 activeProjectId 变化时：自动打开未在标签栏中的项目，加载缓存 + 刷新 -----
   useEffect(() => {
@@ -609,6 +735,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
       }}
     >
       {children}
+      {notificationHolder}
     </MenuHelpersContext.Provider>
   )
 }

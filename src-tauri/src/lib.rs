@@ -33,8 +33,9 @@ pub fn run() {
             // Start YApi HTTP server for EasyAPI plugin
             let yapi_handle = Arc::new(http::yapi_server::YApiServerHandle::new());
             let yapi_handle_clone = yapi_handle.clone();
+            let yapi_app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                http::yapi_server::start_yapi_server(db_http, yapi_handle_clone, 14202).await;
+                http::yapi_server::start_yapi_server(db_http, yapi_handle_clone, 14202, yapi_app_handle).await;
             });
             app.manage(yapi_handle);
 

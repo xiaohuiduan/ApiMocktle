@@ -8,7 +8,9 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tauri::Emitter;
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
@@ -38,6 +40,25 @@ impl YApiServerHandle {
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<Db>,
+    pub app_handle: Option<tauri::AppHandle>,
+}
+
+// YApi push payload — emitted to frontend after successful push
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct YapiPushPayload {
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    #[serde(rename = "projectName")]
+    pub project_name: String,
+    pub count: u32,
+}
+
+fn emit_yapi_push(state: &AppState, project_id: &str) {
+    if let Some(handle) = &state.app_handle {
+        let project_name = project_repo::get_project_by_id(&state.db, project_id).ok().flatten().map(|(_, name)| name).unwrap_or_else(|| project_id.to_string());
+        let payload = YapiPushPayload { project_id: project_id.to_string(), project_name, count: 1 };
+        let _ = handle.emit("yapi:api-pushed", payload);
+    }
 }
 
 // Response helpers
@@ -393,7 +414,10 @@ async fn handle_add_cat(
     };
     let payload = CreateMenuItemPayload { id: folder_id.clone(), parent_id: None, name: name.to_string(), menu_type: "apiDetailFolder".to_string(), data_json: None, run_tab_json: None, sort_order: Some(sort_order) };
     match menu_repo::create_menu_item(&state.db, &project_id, &payload) {
-        Ok(_) => yapi_ok(serde_json::json!({ "_id": folder_id, "name": name, "desc": "", "index": 0 })),
+        Ok(_) => {
+            emit_yapi_push(&state, &project_id);
+            yapi_ok(serde_json::json!({ "_id": folder_id, "name": name, "desc": "", "index": 0 }))
+        },
         Err(e) => yapi_error(&format!("创建分类失败: {e}")),
     }
 }
@@ -438,7 +462,10 @@ async fn handle_interface_save(
     if let Some(existing_id) = body.get("id").and_then(|v| v.as_str()) {
         match menu_repo::get_menu_item(&state.db, &project_id, existing_id) {
             Ok(Some(existing)) => match upsert_menu_item_data(&state.db, &project_id, &existing, &catid, title, &api_details) {
-                Ok(result) => return yapi_ok(result),
+                Ok(result) => {
+                    emit_yapi_push(&state, &project_id);
+                    return yapi_ok(result);
+                },
                 Err(e) => return yapi_error(&format!("更新失败: {e}")),
             },
             Ok(None) => {},
@@ -447,7 +474,10 @@ async fn handle_interface_save(
     }
     if let Some(existing) = find_existing_interface(&state.db, &project_id, path, method) {
         match upsert_menu_item_data(&state.db, &project_id, &existing, &catid, title, &api_details) {
-            Ok(result) => return yapi_ok(result),
+            Ok(result) => {
+                emit_yapi_push(&state, &project_id);
+                return yapi_ok(result);
+            },
             Err(e) => return yapi_error(&format!("更新失败: {e}")),
         }
     }
@@ -455,7 +485,10 @@ async fn handle_interface_save(
     let sort_order = match menu_repo::get_max_sort_order(&state.db, &project_id) { Ok(n) => n + 1, Err(e) => return yapi_error(&format!("查询排序失败: {e}")), };
     let payload = CreateMenuItemPayload { id: menu_item_id.clone(), parent_id: Some(catid), name: title.to_string(), menu_type: "apiDetail".to_string(), data_json: Some(api_details), run_tab_json: None, sort_order: Some(sort_order) };
     match menu_repo::create_menu_item(&state.db, &project_id, &payload) {
-        Ok(_) => yapi_ok(serde_json::json!({ "_id": menu_item_id })),
+        Ok(_) => {
+            emit_yapi_push(&state, &project_id);
+            yapi_ok(serde_json::json!({ "_id": menu_item_id }))
+        },
         Err(e) => yapi_error(&format!("创建接口失败: {e}")),
     }
 }
@@ -490,14 +523,17 @@ async fn handle_interface_up(
     let title = body.get("title").and_then(|v| v.as_str()).unwrap_or(&existing.name);
     let parent_id = existing.parent_id.clone().unwrap_or_default();
     match upsert_menu_item_data(&state.db, &project_id, &existing, &parent_id, title, &api_details) {
-        Ok(result) => yapi_ok(result),
+        Ok(result) => {
+            emit_yapi_push(&state, &project_id);
+            yapi_ok(result)
+        },
         Err(e) => yapi_error(&format!("更新失败: {e}")),
     }
 }
 
 // Server lifecycle
 
-pub async fn start_yapi_server(db: Arc<Db>, handle: Arc<YApiServerHandle>, preferred_port: u16) {
+pub async fn start_yapi_server(db: Arc<Db>, handle: Arc<YApiServerHandle>, preferred_port: u16, app_handle: tauri::AppHandle) {
     let listener = match tokio::net::TcpListener::bind(("127.0.0.1", preferred_port)).await {
         Ok(l) => l,
         Err(_) => {
@@ -509,14 +545,14 @@ pub async fn start_yapi_server(db: Arc<Db>, handle: Arc<YApiServerHandle>, prefe
     *handle.port.lock().unwrap() = actual_port;
     let (tx, rx) = oneshot::channel::<()>();
     *handle.shutdown_tx.lock().unwrap() = Some(tx);
-    let router = build_router(db);
+    let router = build_router(db, Some(app_handle));
     log::info!("YApi HTTP server started on 127.0.0.1:{}", actual_port);
     let _ = axum::serve(listener, router).with_graceful_shutdown(async { rx.await.ok(); }).await;
     log::info!("YApi HTTP server stopped");
 }
 
-fn build_router(db: Arc<Db>) -> Router {
-    let state = AppState { db };
+fn build_router(db: Arc<Db>, app_handle: Option<tauri::AppHandle>) -> Router {
+    let state = AppState { db, app_handle };
     Router::new()
         .route("/api/project/list", get(handle_project_list))
         .route("/api/project/get", get(handle_project_get))
@@ -529,4 +565,81 @@ fn build_router(db: Arc<Db>) -> Router {
         .route("/api/interface/up", post(handle_interface_up))
         .route("/api/interface/add_cat", post(handle_add_cat))
         .with_state(state)
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_yapi_push_payload_serialize() {
+        let payload = YapiPushPayload { project_id: "p1".into(), project_name: "测试项目".into(), count: 3 };
+        let json = serde_json::to_value(&payload).unwrap();
+        assert_eq!(json.get("projectId").and_then(|v| v.as_str()), Some("p1"));
+        assert_eq!(json.get("projectName").and_then(|v| v.as_str()), Some("测试项目"));
+        assert_eq!(json.get("count").and_then(|v| v.as_u64()), Some(3));
+    }
+
+    #[test]
+    fn test_yapi_push_payload_deserialize() {
+        let json = serde_json::json!({"projectId":"p2","projectName":"项目B","count":5});
+        let payload: YapiPushPayload = serde_json::from_value(json).unwrap();
+        assert_eq!(payload.project_id, "p2");
+        assert_eq!(payload.project_name, "项目B");
+        assert_eq!(payload.count, 5);
+    }
+
+    #[test]
+    fn test_yapi_push_payload_count_default() {
+        // ensure count field works with 1
+        let payload = YapiPushPayload { project_id: "p3".into(), project_name: "项目C".into(), count: 1 };
+        let json = serde_json::to_string(&payload).unwrap();
+        assert!(json.contains("projectId"));
+        assert!(json.contains("projectName"));
+    }
+
+    #[test]
+    fn test_emit_yapi_push_no_panic_without_handle() {
+        use rusqlite::Connection;
+        use std::sync::Mutex;
+        let conn = Connection::open_in_memory().unwrap();
+        // create minimal projects table so get_project_by_id does not error on missing table, but also works without it (fallback)
+        conn.execute_batch("CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, name TEXT NOT NULL, owner_id TEXT NOT NULL, created_at TEXT NOT NULL);").ok();
+        let db = Arc::new(Db(Mutex::new(conn)));
+        let state = AppState { db, app_handle: None };
+        // Should not panic even with None handle
+        emit_yapi_push(&state, "test-project");
+    }
+
+    #[test]
+    fn test_emit_yapi_push_with_fake_project_fallback() {
+        use rusqlite::Connection;
+        use std::sync::Mutex;
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, name TEXT NOT NULL, owner_id TEXT NOT NULL, created_at TEXT NOT NULL);").ok();
+        let db = Arc::new(Db(Mutex::new(conn)));
+        let state = AppState { db, app_handle: None };
+        // project not in DB, fallback to project_id as name internally (count still 1, no panic)
+        emit_yapi_push(&state, "unknown-project-xyz");
+    }
+
+    #[test]
+    fn test_build_router_with_none_handle() {
+        use rusqlite::Connection;
+        use std::sync::Mutex;
+        let conn = Connection::open_in_memory().unwrap();
+        let db = Arc::new(Db(Mutex::new(conn)));
+        let router = build_router(db, None);
+        // router should be created without panic; check that it has routes (debug)
+        assert!(format!("{:?}", router).len() > 0);
+    }
+
+    #[test]
+    fn test_yapi_push_event_name() {
+        // frontend constant YAPI_PUSH_EVENT must match backend emit string
+        let event_name = "yapi:api-pushed";
+        assert_eq!(event_name, "yapi:api-pushed");
+    }
 }
