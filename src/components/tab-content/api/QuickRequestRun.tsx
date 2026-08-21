@@ -278,10 +278,11 @@ export function QuickRequestRun() {
       id: tabData.key,
       name: menuName,
       type: MenuItemType.HttpRequest,
+      parentId: tabData.data?.parentId as string | undefined,
       data: { ...data, name: menuName },
       runTabInfo: buildRunTabInfo(data),
     } as ApiMenuData
-  }, [tabData.key, buildRunTabInfo])
+  }, [tabData.key, tabData.data?.parentId, buildRunTabInfo])
 
   // 将当前编辑内容写入 localStorage 草稿（新建始终写；已入库项按是否变更写覆盖层/清覆盖层）。
   const persistDraft = useEvent(() => {

@@ -80,6 +80,7 @@ export function Schema() {
                 id: menuItemId,
                 name: menuName,
                 type: MenuItemType.ApiSchema,
+                parentId: tabData.data?.parentId as string | undefined,
                 data: values,
               })
 

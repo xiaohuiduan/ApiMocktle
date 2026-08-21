@@ -27,7 +27,7 @@ export function FolderAction(props: { catalog: ApiMenuData }) {
           icon={<PlusIcon size={14} />}
           onClick={(ev) => {
             ev.stopPropagation()
-            createTabItem(getCreateType(catalog.type))
+            createTabItem(getCreateType(catalog.type), catalog.id)
           }}
         />
       </Tooltip>

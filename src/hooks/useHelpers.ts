@@ -37,6 +37,7 @@ export function useHelpers() {
   const createApiDetails = (
     payload?: Partial<ApiTabItem>,
     config?: { autoActive?: boolean, replaceTab?: ApiTabItem['key'] },
+    parentId?: string,
   ) => {
     const { newLabel } = API_MENU_CONFIG[CatalogType.Http]
     // 用同一个 id 作为 tab key / 草稿 id / 将来入库的 DB id，保证全程一致。
@@ -47,6 +48,7 @@ export function useHelpers() {
       id,
       name: newLabel,
       type: MenuItemType.ApiDetail,
+      ...(parentId ? { parentId } : {}),
       data: { ...initialCreateApiDetailsData, id, name: newLabel },
     } as ApiMenuData
     saveDraft(draftItem, true)
@@ -57,7 +59,7 @@ export function useHelpers() {
         key: id,
         label: newLabel,
         contentType: MenuItemType.ApiDetail,
-        data: { tabStatus: PageTabStatus.Create },
+        data: { tabStatus: PageTabStatus.Create, ...(parentId ? { parentId } : {}) },
       },
       { autoActive: true, ...config },
     )
@@ -66,6 +68,7 @@ export function useHelpers() {
   const createApiRequest = (
     payload?: Partial<ApiTabItem>,
     config?: { autoActive?: boolean, replaceTab?: ApiTabItem['key'] },
+    parentId?: string,
   ) => {
     const { newLabel } = API_MENU_CONFIG[CatalogType.Request]
     // 用同一个 id 作为 tab key / 草稿 id / 将来入库的 DB id，保证全程一致。
@@ -76,6 +79,7 @@ export function useHelpers() {
       id,
       name: newLabel,
       type: MenuItemType.HttpRequest,
+      ...(parentId ? { parentId } : {}),
       data: createEmptyRequestDetails(newLabel, id),
     } as ApiMenuData
     saveDraft(draftItem, true)
@@ -86,7 +90,7 @@ export function useHelpers() {
         key: id,
         label: newLabel,
         contentType: MenuItemType.HttpRequest,
-        data: { tabStatus: PageTabStatus.Create },
+        data: { tabStatus: PageTabStatus.Create, ...(parentId ? { parentId } : {}) },
       },
       { autoActive: true, ...config },
     )
@@ -95,6 +99,7 @@ export function useHelpers() {
   const createDoc = (
     payload?: Partial<ApiTabItem>,
     config?: { autoActive?: boolean, replaceTab?: ApiTabItem['key'] },
+    parentId?: string,
   ) => {
     addTabItem(
       {
@@ -102,7 +107,7 @@ export function useHelpers() {
         key: nanoid(6),
         label: '新建 Markdown',
         contentType: MenuItemType.Doc,
-        data: { tabStatus: PageTabStatus.Create },
+        data: { tabStatus: PageTabStatus.Create, ...(parentId ? { parentId } : {}) },
       },
       config,
     )
@@ -111,6 +116,7 @@ export function useHelpers() {
   const createApiSchema = (
     payload?: Partial<ApiTabItem>,
     config?: { autoActive?: boolean, replaceTab?: ApiTabItem['key'] },
+    parentId?: string,
   ) => {
     const { newLabel } = API_MENU_CONFIG[CatalogType.Schema]
 
@@ -120,7 +126,7 @@ export function useHelpers() {
         key: nanoid(6),
         label: newLabel,
         contentType: MenuItemType.ApiSchema,
-        data: { tabStatus: PageTabStatus.Create },
+        data: { tabStatus: PageTabStatus.Create, ...(parentId ? { parentId } : {}) },
       },
       config,
     )
@@ -132,22 +138,22 @@ export function useHelpers() {
     createDoc,
     createApiSchema,
 
-    createTabItem: (t: MenuItemType) => {
+    createTabItem: (t: MenuItemType, parentId?: string) => {
       switch (t) {
         case MenuItemType.ApiDetail:
-          createApiDetails()
+          createApiDetails(undefined, undefined, parentId)
           break
 
         case MenuItemType.HttpRequest:
-          createApiRequest()
+          createApiRequest(undefined, undefined, parentId)
           break
 
         case MenuItemType.Doc:
-          createDoc()
+          createDoc(undefined, undefined, parentId)
           break
 
         case MenuItemType.ApiSchema:
-          createApiSchema()
+          createApiSchema(undefined, undefined, parentId)
           break
       }
     },

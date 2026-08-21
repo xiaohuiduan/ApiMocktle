@@ -117,7 +117,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
       icon: <FileIcon size={14} style={{ color: token.colorPrimary }} type={createType} />,
       onClick: (ev) => {
         ev.domEvent.stopPropagation()
-        createTabItem(createType)
+        createTabItem(createType, catalog.id)
       },
     },
     ...(catalog.type === MenuItemType.ApiDetailFolder || catalog.type === MenuItemType.RequestFolder

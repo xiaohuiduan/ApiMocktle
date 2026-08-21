@@ -53,6 +53,7 @@ export function Doc() {
         id: menuItemId,
         name: name ?? DEFAULT_DOC_NAME,
         type: MenuItemType.Doc,
+        parentId: tabData.data?.parentId as string | undefined,
         data: values,
       })
 

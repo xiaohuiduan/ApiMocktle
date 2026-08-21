@@ -217,6 +217,7 @@ export function ApiDocEditing() {
         id: tabData.key,
         name: menuName,
         type: createType,
+        parentId: tabData.data?.parentId as string | undefined,
         data: { ...values, name: menuName },
       })
       discardDraft(tabData.key)
