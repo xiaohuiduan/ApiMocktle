@@ -239,12 +239,120 @@ describe('generateCurl', () => {
     expect(linux).toBe('curl -X POST -H \'X-Token: abc\' -b \'sid=s1\' -F \'name=turtle\' "https://example.com/api/form?page=2"')
   })
 
-  it('windows 与 linux 输出一致', () => {
+  it('windows 与 linux 使用不同引号（windows 双引号、linux 单引号）', () => {
     const input = buildInput({
       method: 'POST',
       body: { type: BodyType.Json, rawText: '{}' },
     })
     const { windows, linux } = generateCurl(input)
-    expect(windows).toBe(linux)
+    expect(linux).toBe('curl -X POST -H \'Content-Type: application/json\' -d \'{}\' "https://echo.apifox.com/post"')
+    expect(windows).toBe('curl -X POST -H "Content-Type: application/json" -d "{}" "https://echo.apifox.com/post"')
+    expect(windows).not.toBe(linux)
+  })
+
+  it('windows：headers 输出 -H 用双引号', () => {
+    const { windows } = generateCurl(buildInput({
+      headers: [{ name: 'X-Token', example: 'abc' }],
+    }))
+    expect(windows).toBe('curl -X GET -H "X-Token: abc" "https://echo.apifox.com/post"')
+  })
+
+  it('windows：cookie 输出 -b 用双引号', () => {
+    const { windows } = generateCurl(buildInput({
+      cookie: [{ name: 'sid', example: 'abc' }],
+    }))
+    expect(windows).toBe('curl -X GET -b "sid=abc" "https://echo.apifox.com/post"')
+  })
+
+  it('windows：POST json 用双引号并转义内部双引号', () => {
+    const { windows } = generateCurl(buildInput({
+      method: 'POST',
+      body: { type: BodyType.Json, rawText: '{"a":"1"}' },
+    }))
+    expect(windows).toContain('-H "Content-Type: application/json"')
+    expect(windows).toContain('-d "')
+    expect(windows).not.toContain("'Content-Type")
+  })
+
+  it('windows：-d 内容含双引号时正确转义', () => {
+    const { windows } = generateCurl(buildInput({
+      method: 'POST',
+      body: { type: BodyType.Raw, rawText: 'a"b\\c' },
+    }))
+    expect(windows).toBe('curl -X POST -H "Content-Type: text/plain" -d "a\\"b\\\\c" "https://echo.apifox.com/post"')
+  })
+
+  it('windows：form-data 用双引号', () => {
+    const { windows } = generateCurl(buildInput({
+      method: 'POST',
+      body: { type: BodyType.FormData, parameters: [{ name: 'username', example: 'turtle' }] },
+    }))
+    expect(windows).toBe('curl -X POST -F "username=turtle" "https://echo.apifox.com/post"')
+  })
+
+  it('重复 Content-Type 去重：header 已含 Content-Type 时不再自动添加', () => {
+    const { linux, windows } = generateCurl(buildInput({
+      method: 'POST',
+      headers: [{ name: 'Content-Type', example: 'application/json' }],
+      body: { type: BodyType.Json, rawText: '{}' },
+    }))
+    expect(linux).toBe('curl -X POST -H \'Content-Type: application/json\' -d \'{}\' "https://echo.apifox.com/post"')
+    expect(windows).toBe('curl -X POST -H "Content-Type: application/json" -d "{}" "https://echo.apifox.com/post"')
+    // 确保只出现一次 Content-Type
+    expect((linux.match(/Content-Type/g) ?? []).length).toBe(1)
+    expect((windows.match(/Content-Type/g) ?? []).length).toBe(1)
+  })
+
+  it('重复 Content-Type 去重：大小写不敏感', () => {
+    const { linux } = generateCurl(buildInput({
+      method: 'POST',
+      headers: [{ name: 'content-type', example: 'application/json' }],
+      body: { type: BodyType.Json, rawText: '{}' },
+    }))
+    expect((linux.match(/content-type/gi) ?? []).length).toBe(1)
+    expect(linux.toLowerCase()).toContain('content-type: application/json')
+  })
+
+  it('url-encoded 重复 Content-Type 去重', () => {
+    const { linux } = generateCurl(buildInput({
+      method: 'POST',
+      headers: [{ name: 'Content-Type', example: 'custom/type' }],
+      body: { type: BodyType.UrlEncoded, parameters: [{ name: 'a', example: '1' }] },
+    }))
+    expect(linux).toBe('curl -X POST -H \'Content-Type: custom/type\' -d \'a=1\' "https://echo.apifox.com/post"')
+  })
+
+  it('完整组合 windows 版本', () => {
+    const { windows } = generateCurl(buildInput({
+      method: 'POST',
+      url: 'https://example.com/api/form',
+      query: [{ name: 'page', example: '2' }],
+      headers: [{ name: 'X-Token', example: 'abc' }],
+      cookie: [{ name: 'sid', example: 's1' }],
+      body: { type: BodyType.FormData, parameters: [{ name: 'name', example: 'turtle' }] },
+    }))
+    expect(windows).toBe('curl -X POST -H "X-Token: abc" -b "sid=s1" -F "name=turtle" "https://example.com/api/form?page=2"')
+  })
+
+  it('示例：X-Request-Id + JSON 不重复 Content-Type（回归用户报告用例）', () => {
+    const { linux, windows } = generateCurl(buildInput({
+      method: 'POST',
+      url: 'https://echo.apifox.com/api/users',
+      headers: [
+        { name: 'X-Request-Id', example: '{{uuid}}' },
+        { name: 'Content-Type', example: 'application/json' },
+      ],
+      body: {
+        type: BodyType.Json,
+        rawText: '{\n\"username\": \"string\",\n\"email\": \"string\",\n\"age\": 0\n}',
+      },
+    }))
+    // linux 单引号，windows 双引号，均只含一次 Content-Type
+    expect((linux.match(/Content-Type/g) ?? []).length).toBe(1)
+    expect((windows.match(/Content-Type/g) ?? []).length).toBe(1)
+    expect(linux).toContain('X-Request-Id: {{uuid}}')
+    expect(windows).toContain('X-Request-Id: {{uuid}}')
+    expect(linux).toContain('username')
+    expect(windows).toContain('username')
   })
 })

@@ -39,9 +39,14 @@ function enabledParams(params: CurlParam[] | undefined): CurlParam[] {
   return (params ?? []).filter((p) => p.name && p.enable !== false)
 }
 
-/** 单引号包裹并转义（linux/macOS 风格；与原有实现保持一致，Windows 也输出同一命令） */
+/** 单引号包裹并转义（linux/macOS 风格） */
 function quoteSingle(s: string): string {
-  return `'${s.replace(/'/g, '\'\\\'\'')}'`
+  return `'${s.replace(/'/g, "'\\''")}'`
+}
+
+/** 双引号包裹（Windows CMD/PowerShell 风格）：转义反斜杠与双引号 */
+function quoteWindows(s: string): string {
+  return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
 
 /** 双引号包裹 URL（URL 中不应含引号，这里做基本转义防御） */
@@ -57,14 +62,18 @@ function contentTypeForBody(type: BodyType): string {
   return 'application/json'
 }
 
+function hasContentType(headers: CurlParam[]): boolean {
+  return headers.some((h) => h.name?.toLowerCase() === 'content-type')
+}
+
 /**
- * 生成 cURL 命令（Windows/Linux 各一份，内容一致）。
+ * 生成 cURL 命令（Windows 与 Linux 分别用不同引号策略）。
  *
  * 规则：
  * - query 参数拼到 URL；
  * - header 输出 -H，cookie 输出 -b；
- * - json/xml/raw：仅当 rawText 有内容才输出 -d 和 Content-Type（空 body 不生成示例数据）；
- * - url-encoded：启用字段拼成 k=v&… 输出 -d；
+ * - json/xml/raw：仅当 rawText 有内容才输出 -d 和 Content-Type（空 body 不生成示例数据）；若 headers 已含 Content-Type 则不重复添加；
+ * - url-encoded：启用字段拼成 k=v&… 输出 -d；同样去重 Content-Type；
  * - form-data：每个启用字段输出 -F "k=v"；
  * - none / binary / 空 body：不带任何 body 参数。
  */
@@ -83,21 +92,26 @@ export function generateCurl(input: CurlInput): CurlOutput {
     url += `${url.includes('?') ? '&' : '?'}${queryStr}`
   }
 
-  const args: string[] = ['curl', '-X', method]
+  const linuxArgs: string[] = ['curl', '-X', method]
+  const windowsArgs: string[] = ['curl', '-X', method]
 
   for (const h of headers) {
-    args.push('-H', quoteSingle(`${h.name}: ${toText(h.example)}`))
+    const hv = `${h.name}: ${toText(h.example)}`
+    linuxArgs.push('-H', quoteSingle(hv))
+    windowsArgs.push('-H', quoteWindows(hv))
   }
 
   if (cookie.length > 0) {
     const cookieStr = cookie
       .map((c) => `${encodeURIComponent(c.name!)}=${encodeURIComponent(toText(c.example))}`)
       .join('; ')
-    args.push('-b', quoteSingle(cookieStr))
+    linuxArgs.push('-b', quoteSingle(cookieStr))
+    windowsArgs.push('-b', quoteWindows(cookieStr))
   }
 
   const body = input.body
   const bodyType = body?.type
+  const hasCT = hasContentType(headers)
 
   if (bodyType === BodyType.Json || bodyType === BodyType.Xml || bodyType === BodyType.Raw) {
     // JSON 允许注释，cURL 输出前剥离，避免复制出的命令带注释失效
@@ -109,9 +123,26 @@ export function generateCurl(input: CurlInput): CurlOutput {
     if (payload) {
       const contentType = bodyType === BodyType.Raw && body?.rawContentType
         ? body.rawContentType
-        : contentTypeForBody(bodyType)
-      args.push('-H', quoteSingle(`Content-Type: ${contentType}`))
-      args.push('-d', quoteSingle(payload))
+        : contentTypeForBody(bodyType!)
+      if (!hasCT) {
+        linuxArgs.push('-H', quoteSingle(`Content-Type: ${contentType}`))
+        windowsArgs.push('-H', quoteWindows(`Content-Type: ${contentType}`))
+      }
+      linuxArgs.push('-d', quoteSingle(payload))
+      // Windows CMD 不支持双引号内换行，payload 压为单行
+      let payloadForWindows = payload
+      if (payloadForWindows.includes('\n')) {
+        if (bodyType === BodyType.Json) {
+          try {
+            payloadForWindows = JSON.stringify(JSON.parse(payloadForWindows))
+          } catch {
+            payloadForWindows = payloadForWindows.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim()
+          }
+        } else {
+          payloadForWindows = payloadForWindows.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim()
+        }
+      }
+      windowsArgs.push('-d', quoteWindows(payloadForWindows))
     }
   }
   else if (bodyType === BodyType.UrlEncoded) {
@@ -119,8 +150,12 @@ export function generateCurl(input: CurlInput): CurlOutput {
       .map((p) => `${encodeURIComponent(p.name!)}=${encodeURIComponent(toText(p.example))}`)
 
     if (pairs.length > 0) {
-      args.push('-H', quoteSingle('Content-Type: application/x-www-form-urlencoded'))
-      args.push('-d', quoteSingle(pairs.join('&')))
+      if (!hasCT) {
+        linuxArgs.push('-H', quoteSingle('Content-Type: application/x-www-form-urlencoded'))
+        windowsArgs.push('-H', quoteWindows('Content-Type: application/x-www-form-urlencoded'))
+      }
+      linuxArgs.push('-d', quoteSingle(pairs.join('&')))
+      windowsArgs.push('-d', quoteWindows(pairs.join('&')))
     }
   }
   else if (bodyType === BodyType.FormData) {
@@ -128,13 +163,15 @@ export function generateCurl(input: CurlInput): CurlOutput {
 
     if (fields.length > 0) {
       for (const f of fields) {
-        args.push('-F', quoteSingle(`${f.name}=${toText(f.example)}`))
+        const fv = `${f.name}=${toText(f.example)}`
+        linuxArgs.push('-F', quoteSingle(fv))
+        windowsArgs.push('-F', quoteWindows(fv))
       }
     }
   }
 
-  args.push(quoteDouble(url))
-  const cmd = args.join(' ')
+  linuxArgs.push(quoteDouble(url))
+  windowsArgs.push(quoteDouble(url))
 
-  return { windows: cmd, linux: cmd }
+  return { windows: windowsArgs.join(' '), linux: linuxArgs.join(' ') }
 }
