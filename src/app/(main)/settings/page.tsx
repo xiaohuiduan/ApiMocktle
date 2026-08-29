@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router'
+import { useLocation, useSearchParams } from 'react-router'
 
 import {
   Alert,
@@ -118,24 +118,26 @@ function roleText(role: Role) {
 
 export default function SettingsPage() {
   const { token } = theme.useToken()
-  const { pathname, search } = useLocation()
+  const { pathname } = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { sessionId } = useAuth()
   const [msgApi, contextHolder] = message.useMessage()
   const [loading, setLoading] = useState(false)
-  const [selectedSection, setSelectedSection] = useState<SettingsSectionKey>(() => {
-    const params = new URLSearchParams(search)
-    const section = params.get('section')
 
-    if (section === SettingsSectionKey.Environments) {
-      return SettingsSectionKey.Environments
-    }
+  // 分区以 URL ?section= 为单一数据源:深链接直达任意分区,菜单点击回写 URL(刷新/后退不丢)
+  const selectedSection = useMemo<SettingsSectionKey>(() => {
+    const section = searchParams.get('section')
 
-    if (section === SettingsSectionKey.ImportApi) {
-      return SettingsSectionKey.ImportApi
+    if (
+      section === SettingsSectionKey.Environments
+      || section === SettingsSectionKey.ImportApi
+      || section === SettingsSectionKey.Share
+    ) {
+      return section
     }
 
     return SettingsSectionKey.Members
-  })
+  }, [searchParams])
   const [members, setMembers] = useState<MemberItem[]>([])
   const [project, setProject] = useState<ProjectInfo>()
   const [projectRole, setProjectRole] = useState<Role>()
@@ -189,25 +191,6 @@ export default function SettingsPage() {
     void fetchData()
   }, [fetchData])
 
-  useEffect(() => {
-    const params = new URLSearchParams(search)
-    const section = params.get('section')
-
-    if (section === SettingsSectionKey.Environments) {
-      setSelectedSection(SettingsSectionKey.Environments)
-
-      return
-    }
-
-    if (section === SettingsSectionKey.ImportApi) {
-      setSelectedSection(SettingsSectionKey.ImportApi)
-
-      return
-    }
-
-    setSelectedSection(SettingsSectionKey.Members)
-  }, [search])
-
   return (
     <PanelLayout
       layoutName="项目设置"
@@ -231,7 +214,10 @@ export default function SettingsPage() {
               mode="inline"
               selectedKeys={[selectedSection]}
               onClick={({ key }) => {
-                setSelectedSection(key as SettingsSectionKey)
+                setSearchParams(
+                  key === SettingsSectionKey.Members ? {} : { section: key },
+                  { replace: true },
+                )
               }}
             />
           </ConfigProvider>

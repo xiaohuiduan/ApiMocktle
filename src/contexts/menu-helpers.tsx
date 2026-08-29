@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
 import { listen } from '@tauri-apps/api/event'
-import { Button, notification } from 'antd'
+import { Button, message, notification } from 'antd'
 
 import { api } from '@/api-client'
 import type { ApiMenuData } from '@/components/ApiMenu'
@@ -35,9 +35,9 @@ import {
 } from '@/utils/yapi-push-notify'
 
 interface MenuHelpers {
-  addMenuItem: (menuData: ApiMenuData) => void
-  removeMenuItem: (menuData: Pick<ApiMenuData, 'id'>) => void
-  removeMenuItems: (menuIds: ApiMenuData['id'][]) => Promise<void>
+  addMenuItem: (menuData: ApiMenuData) => Promise<boolean>
+  removeMenuItem: (menuData: Pick<ApiMenuData, 'id'>) => Promise<boolean>
+  removeMenuItems: (menuIds: ApiMenuData['id'][]) => Promise<boolean>
   updateMenuItem: (menuData: Partial<ApiMenuData> & Pick<ApiMenuData, 'id'>) => Promise<void>
   restoreMenuItem: (menuData: { restoreId: RecycleDataItem['id'] }) => void
   restoreMenuItems: (recycleIds: RecycleDataItem['id'][]) => void
@@ -590,6 +590,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         )
           .then(() => reloadState())
           .catch((error: unknown) => {
+            message.error('还原失败,请重试')
             console.error(error)
           })
       }
@@ -601,6 +602,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         })
           .then(() => reloadState())
           .catch((error: unknown) => {
+            message.error('删除失败,请重试')
             console.error(error)
           })
       }
@@ -611,53 +613,77 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
       reloadState,
       saveDraft,
       discardDraft,
-      addMenuItem: (menuData) => {
+      addMenuItem: async (menuData) => {
         const id = guardProject()
 
         if (!id || !sessionId) {
-          return
+          return false
         }
 
-        void api<unknown>('create_menu_item', {
-          sessionId,
-          projectId: id,
-          payload: menuData,
-        })
-          .then(() => reloadState())
-          .catch((error: unknown) => {
-            console.error(error)
+        try {
+          await api<unknown>('create_menu_item', {
+            sessionId,
+            projectId: id,
+            payload: menuData,
           })
+          await reloadState()
+
+          return true
+        }
+        catch (error: unknown) {
+          message.error('新增失败,请重试')
+          console.error(error)
+
+          return false
+        }
       },
-      removeMenuItem: ({ id: menuId }) => {
+      removeMenuItem: async ({ id: menuId }) => {
         const id = guardProject()
 
         if (!id || !sessionId) {
-          return
+          return false
         }
 
-        void api<unknown>('delete_menu_item', {
-          sessionId,
-          projectId: id,
-          menuId,
-        })
-          .then(() => reloadState())
-          .catch((error: unknown) => {
-            console.error(error)
+        try {
+          await api<unknown>('delete_menu_item', {
+            sessionId,
+            projectId: id,
+            menuId,
           })
+          await reloadState()
+
+          return true
+        }
+        catch (error: unknown) {
+          message.error('删除失败,请重试')
+          console.error(error)
+
+          return false
+        }
       },
       removeMenuItems: async (menuIds) => {
         const id = guardProject()
 
         if (!id || menuIds.length === 0 || !sessionId) {
-          return
+          return false
         }
 
-        await api<unknown>('batch_delete_menu_items', {
-          sessionId,
-          projectId: id,
-          payload: { menuIds },
-        })
-        await reloadState()
+        try {
+          await api<unknown>('batch_delete_menu_items', {
+            sessionId,
+            projectId: id,
+            payload: { menuIds },
+          })
+          await reloadState()
+
+          return true
+        }
+        catch (error: unknown) {
+          message.error('删除失败,请重试')
+          console.error(error)
+
+          return false
+        }
       },
       updateMenuItem: async ({ id: menuId, ...rest }) => {
         const id = guardProject()
@@ -697,6 +723,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         })
           .then(() => reloadState())
           .catch((error: unknown) => {
+            message.error(typeof error === 'object' && error !== null && 'message' in error && String((error as Error).message).includes('不能将') ? (error as Error).message : '移动失败,请重试')
             console.error(error)
           })
       },

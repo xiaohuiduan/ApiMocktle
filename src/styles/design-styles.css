@@ -62,6 +62,7 @@
 
   /* 高亮色（功能色，跨风格一致） */
   --ds-highlight-selected: #3b82f6;
+  --ds-highlight-selected-text: #111827;
   --ds-highlight-upstream: #f59e0b;
   --ds-highlight-downstream: #10b981;
 
@@ -153,6 +154,7 @@
 
   /* 高亮色 */
   --ds-highlight-selected: #6366f1;
+  --ds-highlight-selected-text: #111827;
   --ds-highlight-upstream: #f59e0b;
   --ds-highlight-downstream: #10b981;
 
@@ -249,6 +251,7 @@
 
   /* 高亮色 */
   --ds-highlight-selected: #b8860b;
+  --ds-highlight-selected-text: #241800;
   --ds-highlight-upstream: #d4a017;
   --ds-highlight-downstream: #6b8e23;
 
@@ -350,6 +353,7 @@
 
   /* 高亮色 */
   --ds-highlight-selected: #5b8fa8;
+  --ds-highlight-selected-text: #0d1f28;
   --ds-highlight-upstream: #e2a048;
   --ds-highlight-downstream: #5fad8b;
 

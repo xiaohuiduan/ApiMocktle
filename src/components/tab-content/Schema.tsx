@@ -14,6 +14,7 @@ import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { initialCreateApiSchemaData } from '@/data/remote'
 import { MenuItemType } from '@/enums'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
+import { useTabSaveBridge } from '@/hooks/useTabSaveBridge'
 import type { ApiSchema } from '@/types'
 
 type ApiSchemaForm = ApiSchema & { name?: ApiMenuData['name'] }
@@ -32,6 +33,7 @@ export function Schema() {
   const initialLoadKey = useRef<string | undefined>()
 
   useCtrlSave(() => { form.submit() })
+  useTabSaveBridge(tabData.key, () => { form.submit() })
 
   const isCreating = tabData.data?.tabStatus === PageTabStatus.Create
 

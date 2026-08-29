@@ -41,7 +41,7 @@ function enabledParams(params: CurlParam[] | undefined): CurlParam[] {
 
 /** 单引号包裹并转义（linux/macOS 风格） */
 function quoteSingle(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`
+  return `'${s.replace(/'/g, `'\\''`)}'`
 }
 
 /** 双引号包裹（Windows CMD/PowerShell 风格）：转义反斜杠与双引号 */
@@ -123,7 +123,7 @@ export function generateCurl(input: CurlInput): CurlOutput {
     if (payload) {
       const contentType = bodyType === BodyType.Raw && body?.rawContentType
         ? body.rawContentType
-        : contentTypeForBody(bodyType!)
+        : contentTypeForBody(bodyType)
       if (!hasCT) {
         linuxArgs.push('-H', quoteSingle(`Content-Type: ${contentType}`))
         windowsArgs.push('-H', quoteWindows(`Content-Type: ${contentType}`))
@@ -135,10 +135,12 @@ export function generateCurl(input: CurlInput): CurlOutput {
         if (bodyType === BodyType.Json) {
           try {
             payloadForWindows = JSON.stringify(JSON.parse(payloadForWindows))
-          } catch {
+          }
+          catch {
             payloadForWindows = payloadForWindows.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim()
           }
-        } else {
+        }
+        else {
           payloadForWindows = payloadForWindows.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim()
         }
       }

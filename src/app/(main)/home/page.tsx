@@ -2,8 +2,8 @@
 
 import { lazy, Suspense, useEffect, useState } from 'react'
 
-import { Button, ConfigProvider, Dropdown, Flex, Skeleton, theme, Tooltip } from 'antd'
-import { FilterIcon, PlusIcon } from 'lucide-react'
+import { Button, ConfigProvider, Dropdown, Flex, Skeleton, theme } from 'antd'
+import { PlusIcon } from 'lucide-react'
 
 import { ApiMenuContextProvider } from '@/components/ApiMenu/ApiMenuContext'
 import { FileIcon } from '@/components/icons/FileIcon'
@@ -71,12 +71,6 @@ function HomeContent() {
                 },
               }}
             >
-              <Tooltip title="显示筛选条件">
-                <Button>
-                  <IconText icon={<FilterIcon size={16} />} />
-                </Button>
-              </Tooltip>
-
               <Dropdown
                 menu={{
                   items: [

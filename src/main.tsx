@@ -26,8 +26,17 @@ import { appRoutes } from './routes'
 
 import '@/styles/globals.css'
 
-// 桌面应用：阻止浏览器默认右键菜单（刷新/另存为等）
-document.addEventListener('contextmenu', (e) => { e.preventDefault() })
+// 桌面应用：阻止浏览器默认右键菜单（刷新/另存为等），
+// 但放行文本输入区（接口路径、Body 编辑器等高频粘贴/撤销场景）
+document.addEventListener('contextmenu', (e) => {
+  const target = e.target as HTMLElement | null
+
+  if (target?.closest('input, textarea, [contenteditable="true"], [contenteditable=""], .monaco-editor')) {
+    return
+  }
+
+  e.preventDefault()
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -13,6 +13,7 @@ import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { MenuItemType } from '@/enums'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
+import { useTabSaveBridge } from '@/hooks/useTabSaveBridge'
 import type { ApiDoc } from '@/types'
 
 const DEFAULT_DOC_NAME = '未命名文档'
@@ -79,6 +80,7 @@ export function Doc() {
   }
 
   useCtrlSave(handleDocSave)
+  useTabSaveBridge(tabData.key, handleDocSave)
 
   const isCreating = tabData.data?.tabStatus === PageTabStatus.Create
   const [editing, setEditing] = useState(isCreating)

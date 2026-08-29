@@ -17,8 +17,15 @@ fn check_access(db: &Db, session_id: &str, project_id: &str) -> Result<(), crate
 
 #[tauri::command]
 pub fn get_project_environments(db: State<Arc<Db>>, session_id: String, project_id: String) -> ApiResult<serde_json::Value> {
-    let _user = auth_repo::get_valid_session_user(&db, &session_id)
-        .ok_or_else(|| crate::errors::AppError::Unauthorized("未登录".into()));
+    let user = match auth_repo::get_valid_session_user(&db, &session_id) {
+        Some(u) => u,
+        None => return crate::errors::AppError::Unauthorized("未登录".into()).into(),
+    };
+
+    // 读取环境允许任何项目成员(含 viewer);写入由 check_access 限定 owner/editor
+    if project_repo::get_project_member_role(&db, &project_id, &user.id).is_none() {
+        return crate::errors::AppError::Forbidden("无权限".into()).into();
+    }
 
     match project_repo::get_project_state(&db, &project_id) {
         Ok(state) => ApiResult::success(serde_json::json!({

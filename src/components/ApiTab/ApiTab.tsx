@@ -1,4 +1,4 @@
-import { cloneElement, type PointerEvent, useMemo, useState } from 'react'
+import { cloneElement, useEffect, type PointerEvent, useMemo, useState } from 'react'
 import { useEvent } from 'react-use-event-hook'
 
 import {
@@ -14,8 +14,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ConfigProvider, Dropdown, Popconfirm, Tabs, type TabsProps, theme } from 'antd'
-import { BadgeInfoIcon, XIcon } from 'lucide-react'
+import { Button, ConfigProvider, Dropdown, Modal, Tabs, type TabsProps, theme } from 'antd'
+import { XIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import type { CatalogId } from '@/components/ApiMenu'
@@ -91,6 +91,8 @@ const DraggableTabNode = (props: DraggableTabPaneProps) => {
  */
 export function ApiTab(props: TabsProps) {
   const [confirmKey, setConfirmKey] = useState<CatalogId>()
+  // 「保存并关闭」进行中的页签：保存成功(editStatus → saved)后自动关闭,失败则保留页签
+  const [saveCloseKey, setSaveCloseKey] = useState<CatalogId>()
 
   const { menuRawList, discardDraft } = useMenuHelpersContext()
   const { tabItems, setTabItems, activeTabKey } = useMenuTabContext()
@@ -119,6 +121,35 @@ export function ApiTab(props: TabsProps) {
     }
   })
 
+  // 保存并关闭：监听目标页签的保存结果
+  useEffect(() => {
+    if (!saveCloseKey) { return }
+
+    const item = getTabItem({ key: saveCloseKey })
+    const editStatus = item?.data?.editStatus
+
+    if (editStatus === 'saved') {
+      setSaveCloseKey(undefined)
+      handleItemRemove(saveCloseKey, true)
+    }
+    else if (editStatus === 'error') {
+      // 保存失败：保留页签让用户处理,错误信息已由内容组件提示
+      setSaveCloseKey(undefined)
+    }
+  }, [saveCloseKey, tabItems, getTabItem, handleItemRemove])
+
+  const confirmTabItem = useMemo(() => tabItems.find((i) => i.key === confirmKey), [tabItems, confirmKey])
+  const confirmMenuData = menuRawList?.find((it) => it.id === confirmKey)
+
+  const handleSaveAndClose = useEvent(() => {
+    if (!confirmKey) { return }
+
+    const key = confirmKey
+    setConfirmKey(undefined)
+    setSaveCloseKey(key)
+    window.dispatchEvent(new CustomEvent('api-tab-save', { detail: { key } }))
+  })
+
   const items: Tab[] = useMemo(() => {
     return tabItems.map((tabItem) => {
       const menuData = menuRawList?.find((it) => it.id === tabItem.key)
@@ -128,44 +159,31 @@ export function ApiTab(props: TabsProps) {
         label: <ApiTabLabel menuData={menuData} tabItem={tabItem} />,
         className: 'group',
         closeIcon: (
-          <Popconfirm
-            icon={<BadgeInfoIcon />}
-            okText="确认关闭"
-            okType="danger"
-            open={confirmKey === tabItem.key && (tabItem.data?.editStatus === 'changed' || tabItem.data?.editStatus === 'error')}
-            title="有修改的内容未保存！"
-            onCancel={(ev) => {
-              ev?.stopPropagation()
-              setConfirmKey(undefined)
-            }}
-            onConfirm={(ev) => {
-              ev?.stopPropagation()
-              handleItemRemove(tabItem.key, true)
+          <span
+            className={`main-tabs-tab-close-icon flex size-full items-center justify-center text-[15px] opacity-0 group-focus-within:opacity-100 focus-visible:opacity-100 ${tabItem.data?.editStatus === 'changed'
+              ? 'group relative overflow-hidden rounded-full after:absolute after:size-2 after:rounded-full after:content-[""] hover:overflow-auto hover:bg-transparent hover:after:hidden'
+              : ''
+            }`}
+            data-no-dnd="true" // 「关闭」按钮不允许触发拖拽。
+            role="button"
+            aria-label="关闭页签"
+            tabIndex={0}
+            onKeyDown={(ev) => {
+              if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault()
+                ev.currentTarget.click()
+              }
             }}
           >
-            <span
-              className={`main-tabs-tab-close-icon flex size-full items-center justify-center text-[15px] opacity-0 focus-visible:opacity-100 ${tabItem.data?.editStatus === 'changed'
-                ? 'group relative overflow-hidden rounded-full after:absolute after:size-2 after:rounded-full after:content-[""] hover:overflow-auto hover:bg-transparent hover:after:hidden'
-                : ''
-              }`}
-              data-no-dnd="true" // 「关闭」按钮不允许触发拖拽。
-              role="button"
-              tabIndex={0}
-              onKeyDown={(ev) => {
-                if (ev.key === 'Enter' || ev.key === ' ') {
-                  ev.preventDefault()
-                  ev.currentTarget.click()
-                }
-              }}
-            >
-              <XIcon
-                className={
-                  tabItem.data?.editStatus === 'changed' ? '!invisible group-hover:!visible' : ''
-                }
-                size={18}
-              />
-            </span>
-          </Popconfirm>
+            <XIcon
+              className={
+                tabItem.data?.editStatus === 'changed'
+                  ? 'invisible group-hover:visible group-focus-within:visible'
+                  : 'invisible group-hover:visible'
+              }
+              size={18}
+            />
+          </span>
         ),
         children: (
           <TabContentProvider tabData={tabItem}>
@@ -174,7 +192,7 @@ export function ApiTab(props: TabsProps) {
         ),
       }
     })
-  }, [tabItems, menuRawList, confirmKey, handleItemRemove])
+  }, [tabItems, menuRawList])
 
   const sensor = useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
 
@@ -273,6 +291,46 @@ export function ApiTab(props: TabsProps) {
         }}
         {...props}
       />
+
+      {/* 未保存页签关闭确认:提供「保存并关闭」选项,替代原先只有丢弃/取消的 Popconfirm */}
+      <Modal
+        cancelText="取消"
+        okButtonProps={{ danger: true }}
+        okText="直接关闭"
+        open={Boolean(confirmKey) && (confirmTabItem?.data?.editStatus === 'changed' || confirmTabItem?.data?.editStatus === 'error')}
+        title="有修改的内容未保存"
+        onCancel={() => {
+          setConfirmKey(undefined)
+        }}
+        onOk={() => {
+          if (confirmKey) {
+            handleItemRemove(confirmKey, true)
+          }
+        }}
+        footer={(_, { OkBtn, CancelBtn }) => (
+          <>
+            <CancelBtn />
+            <OkBtn />
+            {/* 保存事件经由当前挂载的内容组件桥接触发,仅激活页签可达 */}
+            <Button
+              type="primary"
+              disabled={confirmKey !== activeTabKey}
+              title={confirmKey !== activeTabKey ? '请先切换到该页签后再保存' : undefined}
+              onClick={() => {
+                handleSaveAndClose()
+              }}
+            >
+              保存并关闭
+            </Button>
+          </>
+        )}
+      >
+        修改内容会自动保留为本地草稿（重新打开页签可继续编辑），
+        {confirmMenuData && !confirmMenuData.__isDraft
+          ? '但尚未同步到服务器文档。'
+          : '该内容还未创建。'}
+        是否先保存？
+      </Modal>
     </ConfigProvider>
   )
 }

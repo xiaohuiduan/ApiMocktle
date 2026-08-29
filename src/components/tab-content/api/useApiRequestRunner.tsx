@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useParams } from 'react-router'
 
 import { api } from '@/api-client'
@@ -11,6 +11,11 @@ export function useApiRequestRunner() {
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<ApiRunResult>()
   const [error, setError] = useState<string>()
+
+  // 并发运行守卫:仅最后一次调用允许写入结果;running 用计数器,
+  // 避免先返回的慢请求把新请求的状态/结果覆盖掉
+  const requestIdRef = useRef(0)
+  const runningCountRef = useRef(0)
 
   const { proxyConfig } = useProxyConfig()
   const { projectId } = useParams()
@@ -36,9 +41,20 @@ export function useApiRequestRunner() {
       return
     }
 
+    const requestId = ++requestIdRef.current
+    runningCountRef.current += 1
     setRunning(true)
     setError(undefined)
     setResult(undefined)
+
+    const isStale = () => requestId !== requestIdRef.current
+    const finish = () => {
+      runningCountRef.current = Math.max(0, runningCountRef.current - 1)
+
+      if (runningCountRef.current === 0) {
+        setRunning(false)
+      }
+    }
 
     try {
       const payload: Record<string, unknown> = {
@@ -55,6 +71,13 @@ export function useApiRequestRunner() {
       }
 
       const apiResult = await api<ApiRunResult>('run_api_request', payload)
+
+      if (isStale()) {
+        finish()
+
+        return apiResult
+      }
+
       setResult(apiResult)
 
       // Save history (fire-and-forget)；二进制 body 不落库（bodyBase64 可能很大）
@@ -72,12 +95,17 @@ export function useApiRequestRunner() {
         }).catch(() => { /* noop */ })
       }
 
+      finish()
+
       return apiResult
     }
     catch (err) {
       const msg = err instanceof Error ? err.message : '运行失败'
-      messageApi.error({ content: msg, duration: 4 })
-      setError(msg)
+
+      if (!isStale()) {
+        messageApi.error({ content: msg, duration: 4 })
+        setError(msg)
+      }
 
       // Save error history
       if (menuItemId && projectId && sessionId) {
@@ -132,10 +160,9 @@ export function useApiRequestRunner() {
         }).catch(() => { /* noop */ })
       }
 
+      finish()
+
       return undefined
-    }
-    finally {
-      setRunning(false)
     }
   }, [messageApi, projectId, sessionId, proxyConfig])
 

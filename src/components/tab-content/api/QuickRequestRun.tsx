@@ -30,6 +30,7 @@ import { useProxyConfig } from '@/contexts/proxy-config'
 import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { BodyType, MenuItemType, ParamType } from '@/enums'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
+import { useTabSaveBridge } from '@/hooks/useTabSaveBridge'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 import { type ApiDetails, type RunTabInfo, type ScriptConsoleEntry, type ScriptTestResult } from '@/types'
 
@@ -417,6 +418,10 @@ export function QuickRequestRun() {
     const { url, headers, bodyText } = built
     setLastBuilt(built)
 
+    if (built.bodyWarning) {
+      messageApi.warning({ content: built.bodyWarning, duration: 6 })
+    }
+
     // ====== 前置脚本执行 ======
     if (workCopy.preScript?.trim()) {
       setPreScriptConsole([])
@@ -558,6 +563,7 @@ export function QuickRequestRun() {
   }
 
   useCtrlSave(() => { void handleSave() }, activeTabKey === tabData.key)
+  useTabSaveBridge(tabData.key, () => { void handleSave() }, activeTabKey === tabData.key)
 
   const handleFillBody = () => {
     const text = fillWithComments

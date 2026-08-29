@@ -18,6 +18,7 @@ import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { initialCreateApiDetailsData } from '@/data/remote'
 import { MenuItemType, ParamType } from '@/enums'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
+import { useTabSaveBridge } from '@/hooks/useTabSaveBridge'
 import type { ApiDetails } from '@/types'
 
 import { BaseFormItems } from './components/BaseFormItems'
@@ -85,6 +86,7 @@ export function ApiDocEditing() {
   }, [menuRawList, tabData.key])
 
   useCtrlSave(() => { form.submit() }, isCreating || subTabKey === 'docEdit')
+  useTabSaveBridge(tabData.key, () => { form.submit() }, isCreating || subTabKey === 'docEdit')
 
   // 挂载/切换页签时从合并列表（含草稿）加载初值：
   // - 新建接口：加载 createApiDetails 写入的草稿（含用户之前的编辑），无草稿时退回默认模板。
@@ -213,13 +215,23 @@ export function ApiDocEditing() {
 
     if (isCreating) {
       // 单一 id 原地翻转：复用当前 tab.key 作为 DB id，入库后清草稿并把页签从「新建」翻转为「已保存」。
-      addMenuItem({
+      // 入库失败时保持 Create 状态并保留草稿，避免「假成功」导致内容丢失。
+      const ok = await addMenuItem({
         id: tabData.key,
         name: menuName,
         type: createType,
         parentId: tabData.data?.parentId as string | undefined,
         data: { ...values, name: menuName },
       })
+
+      if (!ok) {
+        hasEditedRef.current = true
+        persistDraft()
+        setTabItemEditStatus({ key: tabData.key }, 'error')
+
+        return
+      }
+
       discardDraft(tabData.key)
       setTabItemStatus({ key: tabData.key }, PageTabStatus.Update)
       setTabItemEditStatus({ key: tabData.key }, 'saved')

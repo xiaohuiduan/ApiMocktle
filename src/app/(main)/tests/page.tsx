@@ -346,7 +346,7 @@ export default function TestTaskListPage() {
                     }`}
                     style={{
                       background: isSelected ? 'var(--ds-highlight-selected)' : undefined,
-                      color: isSelected ? '#fff' : 'var(--ds-node-text-primary)',
+                      color: isSelected ? 'var(--ds-highlight-selected-text)' : 'var(--ds-node-text-primary)',
                     }}
                     onClick={() => {
                       if (!isEditing) { setSelectedFolderKey(item.key) }

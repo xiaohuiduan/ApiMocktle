@@ -402,8 +402,23 @@ export function ProjectsClient() {
                           // 入场 stagger 动画（与登录卡同款 keyframes）
                           animation: 'card-slide-up 0.4s ease-out both',
                           animationDelay: `${Math.min(index, 8) * 40}ms`,
+                          cursor: 'pointer',
                         }}
                         styles={{ body: { padding: '16px' } }}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`打开项目 ${project.name}`}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            openProject({
+                              projectId: project.id,
+                              name: project.name,
+                              icon: project.icon,
+                              role: project.role,
+                            })
+                          }
+                        }}
                         onClick={() => {
                           openProject({
                             projectId: project.id,

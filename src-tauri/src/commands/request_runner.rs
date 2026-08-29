@@ -190,7 +190,16 @@ pub async fn run_api_request(
         "PUT" => client.put(url),
         "PATCH" => client.patch(url),
         "DELETE" => client.delete(url),
-        _ => client.get(url),
+        "HEAD" => client.head(url),
+        "OPTIONS" => client.request(reqwest::Method::OPTIONS, url),
+        "TRACE" => client.request(reqwest::Method::TRACE, url),
+        "GET" => client.get(url),
+        other => {
+            match reqwest::Method::from_bytes(other.as_bytes()) {
+                Ok(m) => client.request(m, url),
+                Err(_) => client.get(url),
+            }
+        }
     };
 
     // Set headers from payload

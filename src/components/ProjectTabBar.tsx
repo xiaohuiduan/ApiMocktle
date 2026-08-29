@@ -146,6 +146,9 @@ function TabItem({
     <Dropdown menu={{ items: menuItems }} trigger={['contextMenu']}>
       <div
         className="group relative flex shrink-0 cursor-pointer select-none items-center gap-1.5"
+        role="tab"
+        aria-selected={isActive}
+        tabIndex={0}
         style={{
           height: 38,
           padding: '0 10px',
@@ -164,6 +167,12 @@ function TabItem({
           }
         }}
         onClick={onSelect}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onSelect()
+          }
+        }}
         onMouseEnter={(e) => {
           if (!isActive) {
             e.currentTarget.style.backgroundColor = token.colorFillTertiary

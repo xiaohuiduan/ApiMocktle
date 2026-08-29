@@ -46,6 +46,8 @@ export interface BuildRequestResult {
   contentType: string | undefined
   formDataFiles: { name: string, path: string }[] | undefined
   insecureSkipVerify: boolean
+  /** 非致命告警（如 GET/HEAD 携带 Body 被忽略），由调用方提示用户 */
+  bodyWarning?: string
   /** 展示区高亮：字段级变量位置映射（基于各字段解析后文本） */
   requestVars: {
     /** base（普通文本，无高亮） */
@@ -183,6 +185,19 @@ export async function buildRequest(ctx: BuildRequestContext): Promise<BuildReque
     }
   }
 
+  // GET/HEAD 不支持携带请求体（后端亦会丢弃），显式剔除并提示，避免「以为发了 body」的调试误导
+  const upperMethod = method.toUpperCase()
+  const isBodylessMethod = upperMethod === 'GET' || upperMethod === 'HEAD'
+  const bodyWarning = isBodylessMethod && (bodyText !== '' || formDataFiles)
+    ? 'GET/HEAD 请求不支持携带请求体，已忽略 Body（如需携带请改用 POST，或把参数放进 Query）'
+    : undefined
+
+  if (isBodylessMethod) {
+    bodyText = ''
+    contentType = undefined
+    formDataFiles = undefined
+  }
+
   return {
     url,
     method,
@@ -191,6 +206,7 @@ export async function buildRequest(ctx: BuildRequestContext): Promise<BuildReque
     contentType,
     formDataFiles,
     insecureSkipVerify,
+    bodyWarning,
     requestVars: {
       urlBase: base,
       urlPath: pathField,

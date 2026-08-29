@@ -11,7 +11,7 @@ pub fn get_db_path(app_data_dir: &PathBuf) -> PathBuf {
     db_dir.join("apimocktle.sqlite")
 }
 
-fn create_tables(conn: &Connection) {
+pub(crate) fn create_tables(conn: &Connection) {
     conn.execute_batch(
         "
         PRAGMA journal_mode = WAL;

@@ -55,7 +55,9 @@ export function NavMenu() {
     <Space direction="vertical" size={14}>
       <Link to={homePath}>
         <NavItem
-          active={pathname === homePath}
+          active={projectId
+            ? pathname === `/projects/${projectId}` || pathname.startsWith(homePath)
+            : pathname === NavPath.Projects}
           icon={<FileStack className="size-6" />}
           name="接口管理"
         />
@@ -71,7 +73,7 @@ export function NavMenu() {
 
       <Link to={settingsPath}>
         <NavItem
-          active={pathname === settingsPath}
+          active={pathname.startsWith(settingsPath)}
           icon={<Settings className="size-6" />}
           name="项目配置"
         />

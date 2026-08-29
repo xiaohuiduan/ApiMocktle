@@ -50,7 +50,7 @@ const TREE_MIN_VIEWPORT_HEIGHT = 240
  */
 export function ApiMenu() {
   const { messageApi } = useGlobalContext()
-  const { moveMenuItem, menuRawList, removeMenuItems, menuSearchWord } = useMenuHelpersContext()
+  const { moveMenuItem, menuRawList, removeMenuItems, menuSearchWord, setMenuSearchWord, discardDraft } = useMenuHelpersContext()
   const { expandedMenuKeys, addExpandedMenuKeys, removeExpandedMenuKeys, menuTree }
     = useApiMenuContext()
   const { createTabItem } = useHelpers()
@@ -70,6 +70,18 @@ export function ApiMenu() {
     const topFolders = (menuTree ?? []) as CatalogDataNode[]
 
     return topFolders.some(
+      (folder) => folder.key !== CatalogType.Recycle
+        && (folder.children?.length ?? 0) > 0,
+    )
+  }, [menuTree, menuSearchWord])
+
+  // 搜索无匹配：过滤后所有非回收站分组都为空，需要给出明确反馈而非一片空白。
+  const isSearchNoMatch = useMemo(() => {
+    if (!menuSearchWord) { return false }
+
+    const topFolders = (menuTree ?? []) as CatalogDataNode[]
+
+    return !topFolders.some(
       (folder) => folder.key !== CatalogType.Recycle
         && (folder.children?.length ?? 0) > 0,
     )
@@ -112,8 +124,14 @@ export function ApiMenu() {
       maskClosable: true,
       onOk: async () => {
         try {
-          await removeMenuItems(ids)
+          const ok = await removeMenuItems(ids)
+
+          if (!ok) {
+            return
+          }
+
           ids.forEach((key) => {
+            discardDraft(key)
             removeTabItem({ key })
           })
           exitBatchMode()
@@ -378,6 +396,26 @@ export function ApiMenu() {
                           导入 OpenAPI
                         </Button>
                       </Space>
+                    </Empty>
+                  </div>
+                </div>
+              )}
+              {/* 搜索无匹配：给出明确反馈与清除入口，避免一片空白 */}
+              {isSearchNoMatch && !batchMode && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-4">
+                  <div className="pointer-events-auto">
+                    <Empty
+                      description={`未找到与 “${menuSearchWord}” 匹配的内容`}
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    >
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          setMenuSearchWord?.('')
+                        }}
+                      >
+                        清除搜索
+                      </Button>
                     </Empty>
                   </div>
                 </div>

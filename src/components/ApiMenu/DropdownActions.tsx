@@ -197,9 +197,13 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
           okText: '删除',
           okButtonProps: { danger: true },
           maskClosable: true,
-          onOk: () => {
-            removeMenuItem({ id: catalog.id })
-            notifyDeleted()
+          onOk: async () => {
+            const ok = await removeMenuItem({ id: catalog.id })
+
+            if (ok) {
+              discardDraft(catalog.id)
+              notifyDeleted()
+            }
           },
         })
       },
@@ -238,9 +242,13 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
           okText: '删除',
           okButtonProps: { danger: true },
           maskClosable: true,
-          onOk: () => {
-            removeMenuItem({ id: catalog.id })
-            notifyDeleted()
+          onOk: async () => {
+            const ok = await removeMenuItem({ id: catalog.id })
+
+            if (ok) {
+              discardDraft(catalog.id)
+              notifyDeleted()
+            }
           },
         })
       },

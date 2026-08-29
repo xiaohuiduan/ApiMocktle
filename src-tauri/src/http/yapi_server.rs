@@ -151,10 +151,15 @@ fn upsert_menu_item_data(
     let next_data = if let Value::Object(ref cur) = current_data {
         let mut merged = cur.clone();
         if let Value::Object(ref detail) = api_details {
-            for (k, v) in detail { merged.insert(k.clone(), v.clone()); }
+            for (k, v) in detail {
+                // 插件推送的 id/createdAt 是每次生成的临时值,不覆盖已入库的稳定标识与创建时间
+                if (k == "id" || k == "createdAt") && merged.contains_key(k) {
+                    continue;
+                }
+                merged.insert(k.clone(), v.clone());
+            }
         }
-        let detail_id = api_details.get("id").and_then(|v| v.as_str()).unwrap_or("");
-        if !detail_id.is_empty() { merged.insert("id".to_string(), Value::String(detail_id.to_string())); }
+        merged.insert("updatedAt".to_string(), Value::String(chrono::Utc::now().to_rfc3339()));
         Value::Object(merged)
     } else { api_details.clone() };
 
@@ -451,10 +456,30 @@ async fn handle_interface_save(
     let catid = match body.get("catid") {
         Some(v) => {
             let s = if v.is_number() { v.to_string() } else { v.as_str().unwrap_or("").to_string() };
-            if s.is_empty() { ensure_default_folder(&state.db, &project_id).unwrap_or_default() } else { s }
+            if s.is_empty() {
+                match ensure_default_folder(&state.db, &project_id) {
+                    Ok(id) => id,
+                    Err(e) => return yapi_error(&format!("获取默认分类失败: {e}")),
+                }
+            } else {
+                s
+            }
         }
-        None => ensure_default_folder(&state.db, &project_id).unwrap_or_default(),
+        None => match ensure_default_folder(&state.db, &project_id) {
+            Ok(id) => id,
+            Err(e) => return yapi_error(&format!("获取默认分类失败: {e}")),
+        },
     };
+
+    // catid 必须是该项目下真实存在的目录,防止拼出悬挂引用
+    let cat_valid = match menu_repo::get_menu_item(&state.db, &project_id, &catid) {
+        Ok(Some(item)) => item.menu_type == "apiDetailFolder",
+        Ok(None) => false,
+        Err(e) => return yapi_error(&format!("校验分类失败: {e}")),
+    };
+    if !cat_valid {
+        return yapi_error("分类(catid)不存在或不属于该项目");
+    }
 
     let yapi_data = build_yapi_from_save_body(&body);
     let api_details = yapi_service::yapi_to_api_details(&yapi_data);
@@ -580,6 +605,56 @@ mod tests {
         assert_eq!(json.get("projectId").and_then(|v| v.as_str()), Some("p1"));
         assert_eq!(json.get("projectName").and_then(|v| v.as_str()), Some("测试项目"));
         assert_eq!(json.get("count").and_then(|v| v.as_u64()), Some(3));
+    }
+
+    #[test]
+    fn test_upsert_preserves_stable_id_and_created_at() {
+        use rusqlite::Connection;
+        use std::sync::Mutex;
+
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::client::create_tables(&conn);
+        conn.execute("INSERT INTO users (id, username, password_hash, created_at) VALUES ('u1','t','x','2026-01-01')", []).unwrap();
+        conn.execute("INSERT INTO projects (id, name, owner_id, created_at) VALUES ('p1','demo','u1','2026-01-01')", []).unwrap();
+        let db = Arc::new(Db(Mutex::new(conn)));
+
+        let original_id = "stable-id-001";
+        let original_created = "2026-01-02T00:00:00Z";
+        let payload = CreateMenuItemPayload {
+            id: "menu-1".into(),
+            parent_id: None,
+            name: "旧名称".into(),
+            menu_type: "apiDetail".into(),
+            data_json: Some(serde_json::json!({
+                "id": original_id,
+                "method": "GET",
+                "path": "/old",
+                "createdAt": original_created,
+                "updatedAt": "2026-01-02T00:00:00Z",
+            })),
+            run_tab_json: None,
+            sort_order: Some(0),
+        };
+        menu_repo::create_menu_item(&db, "p1", &payload).unwrap();
+        let existing = menu_repo::get_menu_item(&db, "p1", "menu-1").unwrap().unwrap();
+
+        let pushed = serde_json::json!({
+            "id": "fresh-temp-id",
+            "method": "GET",
+            "path": "/new",
+            "name": "新名称",
+            "createdAt": "2099-01-01T00:00:00Z",
+            "updatedAt": "2099-01-01T00:00:00Z",
+        });
+        upsert_menu_item_data(&db, "p1", &existing, "folder-x", "新名称", &pushed).unwrap();
+
+        let updated = menu_repo::get_menu_item(&db, "p1", "menu-1").unwrap().unwrap();
+        let data = updated.data_json.unwrap();
+        assert_eq!(data.get("id").and_then(|v| v.as_str()), Some(original_id), "data.id 不被插件推送覆盖");
+        assert_eq!(data.get("createdAt").and_then(|v| v.as_str()), Some(original_created), "createdAt 保留原值");
+        assert_eq!(data.get("path").and_then(|v| v.as_str()), Some("/new"), "业务字段正常更新");
+        assert_eq!(updated.name, "新名称");
+        assert_ne!(data.get("updatedAt").and_then(|v| v.as_str()), Some("2099-01-01T00:00:00Z"));
     }
 
     #[test]

@@ -132,7 +132,7 @@ export function RunTab() {
   const { token } = theme.useToken()
   const { tabData } = useTabContentContext()
 
-  const { messageApi } = useGlobalContext()
+  const { messageApi, modal } = useGlobalContext()
   const {
     menuRawList,
     projectEnvironments,
@@ -541,6 +541,10 @@ export function RunTab() {
     const { url, headers, bodyText } = built
     setLastBuilt(built)
 
+    if (built.bodyWarning) {
+      messageApi.warning({ content: built.bodyWarning, duration: 6 })
+    }
+
     // 请求级超时（毫秒）；未设置时 Rust 端回落到全局默认
     const timeoutMs = timeoutSeconds ? Math.round(timeoutSeconds * 1000) : undefined
 
@@ -629,6 +633,17 @@ export function RunTab() {
     catch (err) {
       messageApi.error(err instanceof Error ? err.message : '保存失败')
     }
+  }
+
+  // 「保存到文档」会覆盖文档定义,先列出将覆盖的字段再执行
+  const confirmSaveToDoc = () => {
+    modal.confirm({
+      title: '保存到接口文档？',
+      content: '将用当前运行时配置覆盖文档定义:Query/Header/Cookie 参数、请求体、前置/后置脚本与超时设置。',
+      okText: '覆盖保存',
+      okButtonProps: { danger: true },
+      onOk: () => handleSaveToDoc(),
+    })
   }
 
   const handleApplyHistory = (item: RequestHistoryItem) => {
@@ -816,10 +831,10 @@ export function RunTab() {
         )}
 
         {(/^https:\/\//i.test(workCopy.path ?? '') || /^https:\/\//i.test(envBaseUrl)) && (
-          <Tooltip title={insecureSkipVerify ? 'HTTPS 证书验证已关闭，不推荐用于生产环境' : '开启后将验证 HTTPS 证书，关闭可调试自签名证书接口'}>
+          <Tooltip title={insecureSkipVerify ? '不校验 HTTPS 证书：可调试自签名证书接口，但不推荐用于生产环境' : '校验 HTTPS 证书：验证服务器证书有效性'}>
             <label className="flex shrink-0 cursor-pointer items-center gap-1.5" style={{ userSelect: 'none' }}>
               <span className="text-xs" style={{ color: insecureSkipVerify ? 'var(--ant-color-warning)' : 'var(--ant-color-success)' }}>
-                SSL
+                校验证书
               </span>
               <Switch
                 checked={!insecureSkipVerify}
@@ -845,12 +860,15 @@ export function RunTab() {
         </Tooltip>
 
         <Space className="shrink-0" style={{ marginLeft: 'auto' }}>
-          <Button icon={<ClockIcon size={14} />} title="历史记录" onClick={() => { setHistoryOpen(true) }} />
-          <Button
-            icon={<SaveIcon size={14} />}
-            title="保存到文档"
-            onClick={() => void handleSaveToDoc()}
-          />
+          <Tooltip title="历史记录">
+            <Button icon={<ClockIcon size={14} />} onClick={() => { setHistoryOpen(true) }} />
+          </Tooltip>
+          <Tooltip title="保存到文档">
+            <Button
+              icon={<SaveIcon size={14} />}
+              onClick={() => { confirmSaveToDoc() }}
+            />
+          </Tooltip>
           <Button
             icon={<PlayIcon size={14} />}
             loading={running}

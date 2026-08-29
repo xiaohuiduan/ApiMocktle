@@ -8,6 +8,7 @@ import { ROOT_CATALOG } from '@/configs/static'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { MenuItemType } from '@/enums'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
+import { useTabSaveBridge } from '@/hooks/useTabSaveBridge'
 import type { ApiFolder } from '@/types'
 
 export function FolderSetting() {
@@ -17,6 +18,7 @@ export function FolderSetting() {
   const [form] = Form.useForm<ApiFolder>()
 
   useCtrlSave(() => { form.submit() })
+  useTabSaveBridge(tabData.key, () => { form.submit() })
 
   const apiFolder = useMemo(() => {
     if (menuRawList) {

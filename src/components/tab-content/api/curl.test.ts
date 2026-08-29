@@ -271,7 +271,7 @@ describe('generateCurl', () => {
     }))
     expect(windows).toContain('-H "Content-Type: application/json"')
     expect(windows).toContain('-d "')
-    expect(windows).not.toContain("'Content-Type")
+    expect(windows).not.toContain(`'Content-Type`)
   })
 
   it('windows：-d 内容含双引号时正确转义', () => {

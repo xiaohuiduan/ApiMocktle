@@ -135,9 +135,14 @@ export function mergeDraftsIntoList(
       // 已入库项的未保存修改覆盖层
       result[idx] = { ...item, __isDraft: false }
     }
-    else {
+    else if (isNew) {
       // 新建未入库草稿
       result.push({ ...item, __isDraft: isNew })
+    }
+    else {
+      // 覆盖层草稿对应的接口已从数据库删除:孤儿草稿直接清理,
+      // 否则会以「幽灵节点」复活且保存必失败
+      removeDraftById(projectId, item.id)
     }
   }
 
