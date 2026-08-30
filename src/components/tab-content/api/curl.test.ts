@@ -344,7 +344,7 @@ describe('generateCurl', () => {
       ],
       body: {
         type: BodyType.Json,
-        rawText: '{\n\"username\": \"string\",\n\"email\": \"string\",\n\"age\": 0\n}',
+        rawText: '{\n"username": "string",\n"email": "string",\n"age": 0\n}',
       },
     }))
     // linux 单引号，windows 双引号，均只含一次 Content-Type

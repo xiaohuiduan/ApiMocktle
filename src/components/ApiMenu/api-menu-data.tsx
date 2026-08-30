@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 
 import type { TreeProps } from 'antd'
 import arrayToTree from 'array-to-tree'
-import { FolderClosedIcon, FolderOpenIcon } from 'lucide-react'
+import { FolderClosedIcon, FolderOpenIcon, GripVerticalIcon } from 'lucide-react'
 
 import { FileIcon } from '@/components/icons/FileIcon'
 import { FolderIcon } from '@/components/icons/FolderIcon'
@@ -133,30 +133,46 @@ export function useMenuData(): MenuState {
         const catalog = item.customData.catalog
         const isHttp
           = catalog.type === MenuItemType.ApiDetail || catalog.type === MenuItemType.HttpRequest
+        const isDraft = catalog.__isDraft === true
+
+        // 类型图标(GET/POST 徽标、文件图标、目录图标):
+        // 可拖节点时移入 title 内(把手占据 icon 槽),草稿节点仍留在 icon 槽
+        const accentColor = API_MENU_CONFIG[getCatalogType(catalog.type)].accentColor
+        const typeIcon = isHttp
+          ? (
+              <span className="inline-block w-[29px] whitespace-nowrap text-left text-xs/none font-semibold">
+                <HttpMethodText method={catalog.data?.method} />
+              </span>
+            )
+          : item.isLeaf
+            ? (
+                <FileIcon
+                  size={15}
+                  style={{ color: hasAccentColor(catalog.type) ? accentColor : undefined }}
+                  type={catalog.type}
+                />
+              )
+            : <FolderIcon size={14} type={catalog.type} />
 
         return {
           ...item,
           icon: ({ expanded }) => {
+            // 可拖节点:icon 槽渲染拖拽把手(位于 GET/POST 等类型图标左侧)
+            if (!isDraft) {
+              return (
+                <span className="drag-handle">
+                  <GripVerticalIcon size={12} />
+                </span>
+              )
+            }
+
+            // 草稿(未入库,不可拖)保留原图标
             if (item.isLeaf) {
-              if (isHttp) {
-                return (
-                  <span className="mr-1 inline-block w-[29px] whitespace-nowrap text-left text-xs/none font-semibold">
-                    <HttpMethodText method={catalog.data?.method} />
-                  </span>
-                )
-              }
-
-              const { accentColor } = API_MENU_CONFIG[getCatalogType(catalog.type)]
-
               return (
                 <span
-                  className={`inline-flex size-full items-center justify-center ${item.customData.catalog.type === MenuItemType.ApiSchema ? 'text-[color:var(--ds-highlight-selected)]' : ''}`}
+                  className={`inline-flex size-full items-center justify-center ${isHttp ? 'w-[29px] whitespace-nowrap text-left text-xs/none font-semibold' : catalog.type === MenuItemType.ApiSchema ? 'text-[color:var(--ds-highlight-selected)]' : ''}`}
                 >
-                  <FileIcon
-                    size={15}
-                    style={{ color: hasAccentColor(catalog.type) ? accentColor : undefined }}
-                    type={catalog.type}
-                  />
+                  {isHttp ? <HttpMethodText method={catalog.data?.method} /> : typeIcon}
                 </span>
               )
             }
@@ -169,6 +185,7 @@ export function useMenuData(): MenuState {
           },
           title: (node) => (
             <ApiMenuTitle
+              leadingIcon={!isDraft ? typeIcon : undefined}
               actions={
                 item.isLeaf ? <FileAction catalog={catalog} /> : <FolderAction catalog={catalog} />
               }

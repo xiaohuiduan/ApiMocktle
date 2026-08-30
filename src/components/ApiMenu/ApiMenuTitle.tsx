@@ -1,5 +1,4 @@
 import { theme, Tooltip } from 'antd'
-import { GripVerticalIcon } from 'lucide-react'
 
 import { AppMenuControls } from '@/components/ApiMenu/AppMenuControls'
 import { DropdownActions } from '@/components/ApiMenu/DropdownActions'
@@ -10,6 +9,8 @@ import type { CatalogDataNode } from './ApiMenu.type'
 interface ApiMenuTitleProps {
   node: CatalogDataNode
   name: string
+  /** 类型图标(GET/POST 徽标、文件图标等):可拖节点时由 icon 槽移入此处,渲染在名称左侧 */
+  leadingIcon?: React.ReactNode
   actions?: React.ReactNode
 }
 
@@ -19,7 +20,7 @@ interface ApiMenuTitleProps {
 export function ApiMenuTitle(props: ApiMenuTitleProps) {
   const { token } = theme.useToken()
 
-  const { node, name, actions } = props
+  const { node, name, leadingIcon, actions } = props
 
   const catalog = node.customData.catalog
   const isFolder = isMenuFolder(catalog.type)
@@ -30,14 +31,7 @@ export function ApiMenuTitle(props: ApiMenuTitleProps) {
   return (
     <DropdownActions catalog={catalog} isFolder={isFolder} trigger={['contextMenu']}>
       <span className="flex w-full items-center truncate">
-        {/* 拖拽把手:固定占位,悬停行时浮现;草稿节点不可拖,不渲染 */}
-        {!isDraft && (
-          <Tooltip title="拖拽排序">
-            <span className="drag-handle">
-              <GripVerticalIcon size={12} />
-            </span>
-          </Tooltip>
-        )}
+        {leadingIcon}
 
         <span className="flex items-center truncate pr-1">
           <span className="truncate">{name}</span>

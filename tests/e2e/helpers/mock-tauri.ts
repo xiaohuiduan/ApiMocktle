@@ -22,7 +22,11 @@ export async function mockTauriInvoke(page: Page, mockData: MockResponseData) {
     ;(window as any).__E2E_MOCK_DATA__ = data
 
     window.__TAURI_INTERNALS__ = {
-      invoke: async (cmd: string, _args?: Record<string, unknown>, _options?: unknown) => {
+      invoke: async (cmd: string, args?: Record<string, unknown>, _options?: unknown) => {
+        // 记录每次 invoke 调用,供测试断言(如 move_menu_items 是否被触发)
+        ;(window as any).__E2E_INVOKED__ = ((window as any).__E2E_INVOKED__ || [])
+        ;(window as any).__E2E_INVOKED__.push({ cmd, args })
+
         const mocks = (window as any).__E2E_MOCK_DATA__ as Record<string, unknown>
         if (cmd in mocks) {
           return mocks[cmd]
