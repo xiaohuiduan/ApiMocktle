@@ -212,6 +212,30 @@ export function ApiMenu() {
         },
 
       },
+
+      // 拖拽把手:固定占位、悬停浮现,按住把手才可拖拽
+      '.drag-handle': {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        width: 16,
+        height: 20,
+        marginRight: 2,
+        borderRadius: token.borderRadiusSM,
+        color: token.colorTextTertiary,
+        cursor: 'grab',
+        opacity: 0,
+        transition: 'opacity 0.12s',
+
+        '&:active': {
+          cursor: 'grabbing',
+        },
+      },
+
+      '.ant-tree-treenode:hover .drag-handle': {
+        opacity: 1,
+      },
     }),
   }))
 
@@ -224,6 +248,19 @@ export function ApiMenu() {
     const dragKey = info.dragNode.key
     const dropPos = info.node.pos.split('-')
     const dropPosition = info.dropPosition - Number(dropPos[dropPos.length - 1])
+
+    // 跨分组拖拽:allowDrop 已放行以便拖拽过程中可自由移动,松手时明确拒绝并提示
+    const dragCatalog = (info.dragNode as unknown as CatalogDataNode).customData.catalog
+    const dropCatalog = (info.node as unknown as CatalogDataNode).customData.catalog
+
+    if (!isMenuSameGroup(dragCatalog, dropCatalog)) {
+      messageApi.warning({
+        content: `「${dragCatalog.name}」不能移入「${dropCatalog.name}」所在分组`,
+        duration: 4,
+      })
+
+      return
+    }
 
     if (
       typeof dragKey === 'string'
@@ -279,7 +316,20 @@ export function ApiMenu() {
         </div>
         <div ref={treeContainerRef} className="min-h-0 flex-1 overflow-hidden">
           {!!menuTree && (
-            <div className="relative size-full">
+            <div
+              className="relative size-full"
+              onMouseDown={(e) => {
+                // 按住把手才允许拖拽:非把手区域(左键)阻止树节点进入 drag 流程,
+                // 避免与单击选中/双击重命名/右键菜单冲突。批量模式(checkbox)不拦截。
+                if (batchMode || e.button !== 0) {
+                  return
+                }
+
+                if (!(e.target as HTMLElement).closest('.drag-handle')) {
+                  e.preventDefault()
+                }
+              }}
+            >
               <Tree.DirectoryTree
                 blockNode
                 showIcon
@@ -300,10 +350,8 @@ export function ApiMenu() {
                     return false
                   }
 
-                  return isMenuSameGroup(
-                    (dragNode as CatalogDataNode).customData.catalog,
-                    (dropNode as CatalogDataNode).customData.catalog,
-                  )
+                  // 跨分组校验移至 onDrop:放行拖拽过程,松手时提示拒绝原因
+                  return true
                 }}
                 checkable={batchMode}
                 checkedKeys={batchMode ? checkedKeys : undefined}

@@ -1,4 +1,5 @@
 import { theme, Tooltip } from 'antd'
+import { GripVerticalIcon } from 'lucide-react'
 
 import { AppMenuControls } from '@/components/ApiMenu/AppMenuControls'
 import { DropdownActions } from '@/components/ApiMenu/DropdownActions'
@@ -29,6 +30,15 @@ export function ApiMenuTitle(props: ApiMenuTitleProps) {
   return (
     <DropdownActions catalog={catalog} isFolder={isFolder} trigger={['contextMenu']}>
       <span className="flex w-full items-center truncate">
+        {/* 拖拽把手:固定占位,悬停行时浮现;草稿节点不可拖,不渲染 */}
+        {!isDraft && (
+          <Tooltip title="拖拽排序">
+            <span className="drag-handle">
+              <GripVerticalIcon size={12} />
+            </span>
+          </Tooltip>
+        )}
+
         <span className="flex items-center truncate pr-1">
           <span className="truncate">{name}</span>
 
