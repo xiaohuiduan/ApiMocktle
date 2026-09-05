@@ -157,7 +157,6 @@ export function ApiTab(props: TabsProps) {
       return {
         key: tabItem.key,
         label: <ApiTabLabel menuData={menuData} tabItem={tabItem} />,
-        className: 'group',
         closeIcon: (
           <span
             className={`main-tabs-tab-close-icon flex size-full items-center justify-center text-[15px] opacity-0 group-focus-within:opacity-100 focus-visible:opacity-100 ${tabItem.data?.editStatus === 'changed'
@@ -179,7 +178,7 @@ export function ApiTab(props: TabsProps) {
               className={
                 tabItem.data?.editStatus === 'changed'
                   ? 'invisible group-hover:visible group-focus-within:visible'
-                  : 'invisible group-hover:visible'
+                  : undefined
               }
               size={18}
             />
