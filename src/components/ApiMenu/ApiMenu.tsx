@@ -213,15 +213,19 @@ export function ApiMenu() {
 
       },
 
-      // 拖拽把手:固定占位、悬停浮现,按住把手才可拖拽
+      // 拖拽把手:悬停浮现于行首缩进区,绝对定位故不占横向空间。
+      // 若参与布局,空槽会把标题整体推向右侧,「箭头 → 内容」凭空多出十几像素。
       '.drag-handle': {
+        position: 'absolute',
+        left: 0,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        zIndex: 1,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        flexShrink: 0,
-        width: 16,
+        width: 14,
         height: 20,
-        marginRight: 2,
         borderRadius: token.borderRadiusSM,
         color: token.colorTextTertiary,
         cursor: 'grab',
@@ -235,6 +239,11 @@ export function ApiMenu() {
 
       '.ant-tree-treenode:hover .drag-handle': {
         opacity: 1,
+      },
+
+      // 选中行背景为品牌色,把手跟随行文本色以保证对比度
+      '.ant-tree-treenode-selected .drag-handle': {
+        color: 'currentColor',
       },
     }),
   }))

@@ -31,7 +31,9 @@ export function ApiMenuTitle(props: ApiMenuTitleProps) {
   return (
     <DropdownActions catalog={catalog} isFolder={isFolder} trigger={['contextMenu']}>
       <span className="flex w-full items-center truncate">
-        {leadingIcon}
+        {/* 类型图标与名称之间留一点呼吸空间:图标紧贴文字会显得拥挤。
+            图标本身宽度不一(文件夹 14、模型 15、方法徽标 29),统一由包裹层给间距。 */}
+        {!!leadingIcon && <span className="mr-1 flex shrink-0 items-center">{leadingIcon}</span>}
 
         <span className="flex items-center truncate pr-1">
           <span className="truncate">{name}</span>

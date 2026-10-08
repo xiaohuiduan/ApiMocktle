@@ -224,8 +224,10 @@ html:not(.theme-ready) * {
 
 .ui-menu {
   .ant-tree.ant-tree-directory {
+    /* 拖拽把手已改为绝对定位(见 ApiMenu.tsx),不参与布局。
+       箭头右侧留白由 switcher 外边距 2px + 内容左内边距 4px 合成 6px。 */
     .ant-tree-switcher {
-      @apply flex justify-center items-center w-[15px];
+      @apply flex justify-center items-center w-[15px] mr-0.5;
     }
 
     .ant-tree-indent .ant-tree-indent-unit {
@@ -250,8 +252,21 @@ html:not(.theme-ready) * {
         }
       }
 
+      /* 子项行:内容默认左内边距 6px 偏大,收窄为 4px 与箭头间距共同构成 6px */
+      &:not(.top-folder) > .ant-tree-node-content-wrapper {
+        @apply pl-1;
+      }
+
       .ant-tree-icon__customize {
         @apply w-auto mr-1;
+
+        /* 可拖节点:槽内把手需锚定到整行(.ant-tree-treenode)才能浮于行首缩进区,
+           而 antd 会给内容子元素统一加 position: relative,故此处退回 static 让出定位基准。
+           槽本身宽为 0(把手绝对定位),无需再留右间距。 */
+        &:has(.drag-handle) {
+          @apply mr-0;
+          position: static !important;
+        }
       }
     }
 
