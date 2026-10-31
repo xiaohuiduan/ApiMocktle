@@ -704,12 +704,46 @@ export function ApiDoc() {
               '无'
             )
           : (
-              <Card className={styles.card} title={docValue.requestBody.type}>
+              <Card
+                className={styles.card}
+                title={(
+                  <span>
+                    {docValue.requestBody.type}
+                    {docValue.requestBody.required && (
+                      <span style={{ marginLeft: 6, color: token.colorError }}>必填</span>
+                    )}
+                  </span>
+                )}
+              >
                 {docValue.requestBody.parameters && docValue.requestBody.parameters.length > 0 && (
                   <div className="mb-3 flex flex-col gap-3">
                     {docValue.requestBody.parameters.map((param) => (
                       <ApiParameter key={param.id} param={param} />
                     ))}
+                  </div>
+                )}
+
+                {docValue.requestBody.examples && docValue.requestBody.examples.length > 0 && (
+                  <div className="mb-3">
+                    <div className="mb-1 text-xs" style={{ color: token.colorTextSecondary }}>
+                      Body 示例
+                    </div>
+                    {docValue.requestBody.examples.map((example, idx) => {
+                      return (
+                        <div key={idx} className="mb-2">
+                          {example.name && (
+                            <div className="text-xs" style={{ color: token.colorTextTertiary }}>
+                              {example.name}
+                            </div>
+                          )}
+                          <pre className="schema-code">
+                            {typeof example.value === 'string'
+                              ? example.value
+                              : JSON.stringify(example.value, null, 2)}
+                          </pre>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 
@@ -794,6 +828,26 @@ export function ApiDoc() {
                         <span>{res.contentType}</span>
                       </span>
                     </div>
+
+                    {res.description && (
+                      <div className="px-3 pb-3 text-xs" style={{ color: token.colorTextSecondary }}>
+                        <span>响应说明：</span>
+                        <span>{res.description}</span>
+                      </div>
+                    )}
+
+                    {res.example !== undefined && res.example !== null && (
+                      <div className="px-3 pb-3">
+                        <div className="mb-1 text-xs" style={{ color: token.colorTextSecondary }}>
+                          响应示例
+                        </div>
+                        <pre className="schema-code">
+                          {typeof res.example === 'string'
+                            ? res.example
+                            : JSON.stringify(res.example, null, 2)}
+                        </pre>
+                      </div>
+                    )}
 
                     {displayResSchema !== undefined && displayResSchema !== null && (
                       <div className={styles.requestBodySchema}>

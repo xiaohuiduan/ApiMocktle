@@ -1,16 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
-import { Button, Checkbox, message, Modal, Tree, Typography } from 'antd'
-import type { CheckboxChangeEvent } from 'antd/es/checkbox'
-import type { DataNode } from 'antd/es/tree'
+import { Button, message, Modal, Typography } from 'antd'
 import { DownloadIcon, GlobeIcon } from 'lucide-react'
 
 import { api } from '@/api-client'
-import type { ApiMenuData } from '@/components/ApiMenu'
-import { ApiTreeTitle } from '@/components/project-settings/ApiTreeTitle'
+import { ExportTreeSelect } from '@/components/project-settings/ExportTreeSelect'
 import { useAuth } from '@/contexts/auth'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { MenuItemType } from '@/enums'
+import { getAllApiIds } from '@/helpers'
 import type { ApiDetails } from '@/types'
 import { downloadMarkdown, type ExportTreeInput } from '@/utils/api-doc-markdown'
 import { downloadMhtml } from '@/utils/api-doc-mhtml'
@@ -29,76 +27,6 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
   const [exportFormat, setExportFormat] = useState<'markdown' | 'mhtml'>('markdown')
   const [checkedApiIds, setCheckedApiIds] = useState<Set<string>>(new Set())
   const [exporting, setExporting] = useState(false)
-
-  const apiTreeData = useMemo((): DataNode[] => {
-    if (!menuRawList) {
-      return []
-    }
-
-    const apis = menuRawList.filter((item) => item.type === MenuItemType.ApiDetail)
-    const childrenMap = new Map<string, ApiMenuData[]>()
-    const topLevel: ApiMenuData[] = []
-
-    for (const api of apis) {
-      if (api.parentId) {
-        const children = childrenMap.get(api.parentId) ?? []
-        children.push(api)
-        childrenMap.set(api.parentId, children)
-      }
-      else {
-        topLevel.push(api)
-      }
-    }
-
-    function buildNodes(items: ApiMenuData[]): DataNode[] {
-      return items.map((item) => ({
-        key: item.id,
-        title: <ApiTreeTitle item={item} />,
-      }))
-    }
-
-    const folders = menuRawList.filter((f) => f.type === MenuItemType.ApiDetailFolder)
-    const folderNodes = folders.map((folder) => ({
-      key: folder.id,
-      title: folder.name,
-      selectable: false,
-      children: buildNodes(childrenMap.get(folder.id) ?? []),
-    }))
-
-    return [...folderNodes, ...buildNodes(topLevel)]
-  }, [menuRawList])
-
-  const allApiIds = useMemo(() => {
-    if (!menuRawList) {
-      return []
-    }
-
-    return menuRawList.filter((i) => i.type === MenuItemType.ApiDetail).map((i) => i.id)
-  }, [menuRawList])
-
-  const normalizeCheckedIds = (keys: React.Key[]) => {
-    const result = new Set<string>()
-
-    for (const key of keys) {
-      const folder = menuRawList?.some(
-        (f) => f.type === MenuItemType.ApiDetailFolder && f.id === key,
-      )
-
-      if (folder) {
-        menuRawList
-          ?.filter((a) => a.type === MenuItemType.ApiDetail && a.parentId === key)
-          .forEach((a) => result.add(a.id))
-      }
-      else {
-        result.add(String(key))
-      }
-    }
-
-    return result
-  }
-
-  const isAllChecked = allApiIds.length > 0 && checkedApiIds.size === allApiIds.length
-  const isIndeterminate = checkedApiIds.size > 0 && checkedApiIds.size < allApiIds.length
 
   const handleExport = async (format: 'markdown' | 'mhtml') => {
     if (!projectId || !sessionId) {
@@ -177,7 +105,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
 
   const openExportModal = (format: 'markdown' | 'mhtml') => {
     setExportFormat(format)
-    setCheckedApiIds(new Set(allApiIds))
+    setCheckedApiIds(new Set(getAllApiIds(menuRawList ?? [])))
     setExportModalOpen(true)
   }
 
@@ -207,37 +135,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
         <div className="flex flex-col gap-4">
           <div>
             <Typography.Text className="mb-2 block text-sm">选择要导出的接口</Typography.Text>
-            <div className="mb-2">
-              <Checkbox
-                checked={isAllChecked}
-                indeterminate={isIndeterminate}
-                onChange={(e: CheckboxChangeEvent) => {
-                  setCheckedApiIds(e.target.checked ? new Set(allApiIds) : new Set())
-                }}
-              >
-                全选 / 取消全选
-              </Checkbox>
-            </div>
-            {apiTreeData.length > 0
-              ? (
-                  <Tree
-                    blockNode
-                    checkable
-                    defaultExpandAll
-                    checkedKeys={Array.from(checkedApiIds)}
-                    style={{ maxHeight: 300, overflow: 'auto' }}
-                    treeData={apiTreeData}
-                    onCheck={(checkedKeys) => {
-                      const keys = Array.isArray(checkedKeys)
-                        ? checkedKeys
-                        : checkedKeys.checked
-                      setCheckedApiIds(normalizeCheckedIds(keys))
-                    }}
-                  />
-                )
-              : (
-                  <Typography.Text type="secondary">暂无接口数据</Typography.Text>
-                )}
+            <ExportTreeSelect checkedApiIds={checkedApiIds} onChange={setCheckedApiIds} />
           </div>
         </div>
       </Modal>

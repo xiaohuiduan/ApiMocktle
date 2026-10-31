@@ -1,5 +1,6 @@
 use tauri::State;
 use crate::db::client::Db;
+use std::collections::HashMap;
 use std::sync::Arc;
 use crate::db::project_repo;
 use crate::models::*;
@@ -7,6 +8,16 @@ use crate::models::*;
 #[tauri::command]
 pub fn write_export_file(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+/// 透传可空标记（读取归一化会把联合类型 `["string","null"]` 转成 `type + nullable`）。
+fn copy_nullable(
+    src: &serde_json::Map<String, serde_json::Value>,
+    out: &mut serde_json::Map<String, serde_json::Value>,
+) {
+    if src.get("nullable").and_then(|v| v.as_bool()) == Some(true) {
+        out.insert("nullable".into(), serde_json::Value::Bool(true));
+    }
 }
 
 /// 将内部 JSON Schema 转回标准格式（properties 数组 → object map, type:ref → $ref）
@@ -65,6 +76,7 @@ fn denormalize_json_schema(schema: &serde_json::Value) -> serde_json::Value {
         if let Some(t) = obj.get("title").and_then(|v| v.as_str()) {
             if !t.is_empty() { out.insert("title".into(), serde_json::Value::String(t.into())); }
         }
+        copy_nullable(obj, &mut out);
         return serde_json::Value::Object(out);
     }
 
@@ -78,6 +90,7 @@ fn denormalize_json_schema(schema: &serde_json::Value) -> serde_json::Value {
         if let Some(d) = obj.get("description").and_then(|v| v.as_str()) {
             if !d.is_empty() { out.insert("description".into(), serde_json::Value::String(d.into())); }
         }
+        copy_nullable(obj, &mut out);
         return serde_json::Value::Object(out);
     }
 
@@ -101,6 +114,7 @@ fn denormalize_json_schema(schema: &serde_json::Value) -> serde_json::Value {
     if let Some(e) = obj.get("example") {
         out.insert("example".into(), e.clone());
     }
+    copy_nullable(obj, &mut out);
     serde_json::Value::Object(out)
 }
 
@@ -188,11 +202,51 @@ fn build_swagger2_response_schema(json_schema: &serde_json::Value) -> Option<ser
     Some(serde_json::json!({ "schema": denorm }))
 }
 
+/// 内部 `ContentType` 枚举值 → OpenAPI 媒体类型。
+/// 旧数据可能已是媒体类型（如 `application/json`），此时原样透传，避免导出出现非法的 `"json": {...}` 键。
+fn response_media_type(content_type: &str) -> &str {
+    match content_type {
+        "json" => "application/json",
+        "xml" => "application/xml",
+        "html" => "text/html",
+        "binary" => "application/octet-stream",
+        "raw" => "text/plain",
+        other => other,
+    }
+}
+
+/// 沿 parent_id 链收集 apiDetailFolder 名称，拼成 Apifox 的 `A/B/C` 形态。
+fn folder_path_of(by_id: &HashMap<&str, &ApiMenuData>, item: &ApiMenuData) -> Option<String> {
+    let mut names: Vec<String> = Vec::new();
+    let mut current = item.parent_id.as_deref();
+    // 防御父子关系成环
+    let mut depth = 0;
+    while let Some(id) = current {
+        if depth >= 32 {
+            break;
+        }
+        depth += 1;
+        let Some(parent) = by_id.get(id) else {
+            break;
+        };
+        if parent.menu_type == "apiDetailFolder" {
+            names.push(parent.name.clone());
+        }
+        current = parent.parent_id.as_deref();
+    }
+    if names.is_empty() {
+        return None;
+    }
+    names.reverse();
+    Some(names.join("/"))
+}
+
 /// 从菜单数据构建 OpenAPI 3.0 / Swagger 2.0 规范文档（纯函数，便于单元测试）。
-fn build_export_spec(items: &[ApiMenuData], is_openapi3: bool, filter_ids: Option<&[&str]>) -> serde_json::Value {
+pub(crate) fn build_export_spec(items: &[ApiMenuData], is_openapi3: bool, filter_ids: Option<&[&str]>) -> serde_json::Value {
     // 收集 definitions/components.schemas
     let mut definitions = serde_json::Map::new();
     let mut paths = serde_json::Map::new();
+    let by_id: HashMap<&str, &ApiMenuData> = items.iter().map(|i| (i.id.as_str(), i)).collect();
 
     for item in items {
         let mtype = &item.menu_type;
@@ -241,6 +295,20 @@ fn build_export_spec(items: &[ApiMenuData], is_openapi3: bool, filter_ids: Optio
         }
         if !tags.is_empty() {
             operation.insert("tags".into(), serde_json::Value::Array(tags));
+        }
+        // Apifox 扩展：目录路径与接口状态，供导入侧无损还原
+        if let Some(folder) = folder_path_of(&by_id, item) {
+            operation.insert("x-apifox-folder".into(), serde_json::Value::String(folder));
+        }
+        if let Some(status) = data
+            .get("status")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+        {
+            operation.insert(
+                "x-apifox-status".into(),
+                serde_json::Value::String(status.to_string()),
+            );
         }
 
         // parameters（含 Swagger 2.0 的 body/formData 参数，均在末尾统一插入，避免覆盖）
@@ -305,15 +373,31 @@ fn build_export_spec(items: &[ApiMenuData], is_openapi3: bool, filter_ids: Optio
         if let Some(resps) = data.get("responses").and_then(|v| v.as_array()) {
             for resp in resps {
                 let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(200);
-                let desc = resp.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                let name = resp.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                // description 独立存储；缺失时回退到名称，保持旧导出可读
+                let desc = resp
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or(name);
                 let mut resp_obj = serde_json::Map::new();
-                resp_obj.insert("description".into(), serde_json::Value::String(desc.to_string()));
+                resp_obj.insert(
+                    "description".into(),
+                    serde_json::Value::String(desc.to_string()),
+                );
+                if !name.is_empty() {
+                    resp_obj.insert(
+                        "x-apifox-name".into(),
+                        serde_json::Value::String(name.to_string()),
+                    );
+                }
 
                 if let Some(schema) = resp.get("jsonSchema") {
                     if is_openapi3 {
                         if let Some(sc) = build_openapi3_schema(schema) {
                             let media_type = resp.get("contentType")
                                 .and_then(|v| v.as_str())
+                                .map(response_media_type)
                                 .unwrap_or("application/json");
                             resp_obj.insert("content".into(), serde_json::json!({ media_type: sc }));
                         }
@@ -658,5 +742,68 @@ mod tests {
 
         assert!(spec["paths"]["/keep"]["get"].is_object());
         assert!(spec["paths"].get("/drop").is_none());
+    }
+
+    #[test]
+    fn export_adds_apifox_folder_status_and_response_name() {
+        let folder_a = menu_item("f1", "A", "apiDetailFolder", serde_json::json!({}));
+        let mut folder_b = menu_item("f2", "B", "apiDetailFolder", serde_json::json!({}));
+        folder_b.parent_id = Some("f1".to_string());
+        let mut api = api_detail("api1", "创建", "post", "/x", serde_json::json!({}), None);
+        api.parent_id = Some("f2".to_string());
+        let data = api.data_json.as_mut().unwrap();
+        data["status"] = serde_json::json!("released");
+        data["responses"] = serde_json::json!([
+            { "code": 200, "name": "成功", "description": "成功描述", "contentType": "json" }
+        ]);
+
+        let spec = build_export_spec(&[folder_a, folder_b, api], true, None);
+        let op = &spec["paths"]["/x"]["post"];
+        assert_eq!(op["x-apifox-folder"], "A/B");
+        assert_eq!(op["x-apifox-status"], "released");
+        assert_eq!(op["responses"]["200"]["x-apifox-name"], "成功");
+        assert_eq!(op["responses"]["200"]["description"], "成功描述");
+    }
+
+    #[test]
+    fn export_maps_content_type_enum_to_media_type() {
+        let mut api = api_detail("api1", "查", "get", "/a", serde_json::json!({}), None);
+        let data = api.data_json.as_mut().unwrap();
+        data["responses"] = serde_json::json!([
+            { "code": 200, "name": "成功", "contentType": "json", "jsonSchema": { "type": "object" } },
+            { "code": 400, "name": "旧数据", "contentType": "application/json", "jsonSchema": { "type": "object" } }
+        ]);
+
+        let spec = build_export_spec(&[api], true, None);
+        // 枚举值必须转成媒体类型，旧数据已是媒体类型时原样透传
+        assert!(spec["paths"]["/a"]["get"]["responses"]["200"]["content"]
+            .get("application/json")
+            .is_some());
+        assert!(spec["paths"]["/a"]["get"]["responses"]["400"]["content"]
+            .get("application/json")
+            .is_some());
+    }
+
+    #[test]
+    fn export_without_folder_omits_apifox_folder() {
+        let api = api_detail("api1", "查", "get", "/a", serde_json::json!({}), None);
+        let spec = build_export_spec(&[api], true, None);
+        assert!(spec["paths"]["/a"]["get"].get("x-apifox-folder").is_none());
+    }
+
+    #[test]
+    fn denormalize_keeps_nullable_flag() {
+        let schema = serde_json::json!({ "type": "string", "nullable": true });
+        let denorm = denormalize_json_schema(&schema);
+        assert_eq!(denorm["type"], "string");
+        assert_eq!(denorm["nullable"], true);
+
+        // 对象形态同样透传
+        let obj = serde_json::json!({
+            "type": "object",
+            "nullable": true,
+            "properties": [{ "name": "a", "type": "string" }]
+        });
+        assert_eq!(denormalize_json_schema(&obj)["nullable"], true);
     }
 }

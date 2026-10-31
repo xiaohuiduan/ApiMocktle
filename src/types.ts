@@ -53,6 +53,10 @@ export interface ApiDetailsResponse {
   /** 内容格式 */
   contentType?: ContentType
   jsonSchema?: JsonSchema
+  /** 响应描述 */
+  description?: string
+  /** 响应示例 */
+  example?: unknown
 }
 
 export interface ApiRequestBody {
@@ -60,6 +64,10 @@ export interface ApiRequestBody {
   parameters?: Parameter[]
   jsonSchema?: JsonSchema
   rawText?: string
+  /** 请求体是否必填 */
+  required?: boolean
+  /** 请求体示例 */
+  examples?: { name?: string, value: unknown }[]
 }
 
 export interface ApiRunHeader {

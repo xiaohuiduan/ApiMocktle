@@ -3,6 +3,7 @@ pub mod db;
 mod errors;
 pub mod http;
 pub mod models;
+mod portable;
 pub mod services;
 
 
@@ -14,21 +15,29 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 便携版：WebView2 的 localStorage 也要进 <exe>/data，须在建环境前设置
+    portable::apply_webview2_user_data_folder();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
+            // 便携版只认 <exe 同级>/data，不回退 app_data_dir，避免读到安装版数据
+            #[cfg(feature = "portable")]
+            let app_data_dir = portable::base_data_dir()
+                .expect("便携版无法创建 exe 同级 data 目录（所在目录只读或无权限），请把程序放到可写目录下");
+            #[cfg(not(feature = "portable"))]
             let app_data_dir = app.path().app_data_dir().expect("Failed to get app data dir");
             let db = Arc::new(init_database(&app_data_dir));
             // 内置动态变量 seed（幂等）+ 引擎定义缓存；失败不阻断启动，IPC 保存时也会刷新
             db::dynamic_variables_repo::ensure_seed(&db).ok();
             services::dynamic_variables::refresh_defs(&db).ok();
             let db_http = db.clone();
+            let db_mcp = db.clone();
             app.manage(db);
 
             let app_config = Arc::new(AppConfigService::new(&app_data_dir));
-            app.manage(app_config);
 
             // Start YApi HTTP server for EasyAPI plugin
             let yapi_handle = Arc::new(http::yapi_server::YApiServerHandle::new());
@@ -41,7 +50,33 @@ pub fn run() {
 
             // MCP Server handle
             let mcp_handle = Arc::new(http::mcp_server::McpServerHandle::new());
-            app.manage(mcp_handle);
+            app.manage(mcp_handle.clone());
+
+            // MCP 上次是被手动打开的就自动拉起：它是 agent 写文档的入口，
+            // 每次开程序都要手动点一次太别扭。
+            let mcp_auto_start = app_config
+                .get("mcp_auto_start")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if mcp_auto_start {
+                let port = app_config
+                    .get("mcp_port")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(14203) as u16;
+                // 默认 0.0.0.0：WSL / 局域网里的 agent 走宿主 IP 连不了回环地址。
+                // 绑非回环时 MCP 全部工具都要求个人令牌（见 McpServerState::require_auth）。
+                let host = app_config
+                    .get("mcp_host")
+                    .and_then(|v| v.as_str().map(str::to_string))
+                    .unwrap_or_else(|| "0.0.0.0".to_string());
+                let db_mcp = db_mcp.clone();
+                let handle_mcp = mcp_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    http::mcp_server::start_mcp_server(db_mcp, handle_mcp, port, &host).await;
+                });
+            }
+
+            app.manage(app_config);
 
             // Share Server handle（不自动启动，由前端命令启动）
             let share_handle = Arc::new(http::share_server::ShareServerHandle::new());

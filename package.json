@@ -16,7 +16,8 @@
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",
     "build:icons": "node scripts/build-icons.mjs",
     "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "portable:win": "node scripts/build-portable.mjs"
   },
   "dependencies": {
     "@ant-design/cssinjs": "^1.21.1",

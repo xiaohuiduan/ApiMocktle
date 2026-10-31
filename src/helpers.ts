@@ -190,7 +190,7 @@ export function menuItemMatchesSearch(item: ApiMenuData, rawQuery: string): bool
     return true
   }
 
-  if (item.name.includes(q)) {
+  if (item.name.toLowerCase().includes(q.toLowerCase())) {
     return true
   }
 
@@ -249,6 +249,13 @@ export function filterMenuItemsBySearch(
   }
 
   return menuRawList.filter((it) => matches.has(it.id))
+}
+
+/** 取全部接口项的 id（不含目录），供「全选」类批量操作使用。 */
+export function getAllApiIds(menuRawList: ApiMenuData[]): string[] {
+  return menuRawList
+    .filter((item) => item.type === MenuItemType.ApiDetail)
+    .map((item) => item.id)
 }
 
 export function hasAccentColor(type: UnsafeAny): boolean {

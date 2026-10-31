@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use axum::{
+    body::Bytes,
     extract::{Query, State},
     http::HeaderMap,
     response::Json,
@@ -130,17 +131,15 @@ fn ensure_default_folder(db: &Db, project_id: &str) -> Result<String, crate::err
     Ok(folder_id)
 }
 
-fn find_existing_interface(db: &Db, project_id: &str, path: &str, method: &str) -> Option<ApiMenuData> {
-    let items = menu_repo::list_menu_items(db, project_id).ok()?;
-    let upper_method = method.to_uppercase();
-    items.into_iter().find(|item| {
-        if item.menu_type != "apiDetail" { return false; }
-        item.data_json.as_ref().is_some_and(|data| {
-            let p = data.get("path").and_then(|v| v.as_str()).unwrap_or("");
-            let m = data.get("method").and_then(|v| v.as_str()).unwrap_or("");
-            p == path && m.to_uppercase() == upper_method
-        })
-    })
+fn find_existing_interface(
+    db: &Db,
+    project_id: &str,
+    path: &str,
+    method: &str,
+) -> Option<ApiMenuData> {
+    menu_repo::find_api_by_path_method(db, project_id, path, method)
+        .ok()
+        .flatten()
 }
 
 fn upsert_menu_item_data(
@@ -199,11 +198,144 @@ fn build_yapi_from_save_body(body: &Value) -> YApiInterface {
         res_body_type: body.get("res_body_type").and_then(|v| v.as_str()).map(|s| s.to_string()),
         res_body: body.get("res_body").and_then(|v| if v.is_string() { Some(v.as_str().unwrap().to_string()) } else { Some(v.to_string()) }),
         res_body_is_json_schema: body.get("res_body_is_json_schema").and_then(|v| v.as_bool()),
+        responses: serde_json::from_value(body.get("responses").cloned().unwrap_or(Value::Null)).ok(),
+        req_body_required: body.get("req_body_required").and_then(|v| v.as_bool()),
+        req_body_examples: serde_json::from_value(body.get("req_body_examples").cloned().unwrap_or(Value::Null)).ok(),
+        operation_id: body.get("operationId").and_then(|v| v.as_str()).map(|s| s.to_string()),
     }
+}
+
+/// 解析 YApi 客户端的请求体。
+///
+/// 兼容三种形状：
+/// 1. JSON body，接口字段平铺在顶层（当前实现支持的形状）
+/// 2. JSON body，接口定义包在 `api_data`（JSON 字符串）里 —— Apifox 的同步工具用这种
+/// 3. `application/x-www-form-urlencoded` body（YApi 客户端常见），同样可能带 `api_data`
+///
+/// `api_data` 里的字段优先于顶层同名字段。
+fn parse_yapi_body(headers: &HeaderMap, body: &[u8]) -> Result<Value, String> {
+    let content_type = headers
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    let mut obj: serde_json::Map<String, Value> = if content_type
+        .contains("application/x-www-form-urlencoded")
+    {
+        let text = String::from_utf8_lossy(body);
+        let mut map = serde_json::Map::new();
+        for pair in text.split('&') {
+            if pair.is_empty() {
+                continue;
+            }
+            let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
+            let key = urlencoding::decode(k).map(|s| s.into_owned()).unwrap_or_else(|_| k.to_string());
+            let val = urlencoding::decode(v).map(|s| s.into_owned()).unwrap_or_else(|_| v.to_string());
+            map.insert(key, Value::String(val));
+        }
+        map
+    } else {
+        match serde_json::from_slice::<Value>(body) {
+            Ok(Value::Object(map)) => map,
+            Ok(_) => return Err("请求体必须是 JSON 对象".into()),
+            Err(e) => return Err(format!("JSON 解析失败: {e}")),
+        }
+    };
+
+    // api_data：内嵌的接口定义，优先于顶层同名字段
+    if let Some(api_data) = obj.get("api_data").and_then(|v| v.as_str()) {
+        let decoded = urlencoding::decode(api_data)
+            .map(|s| s.into_owned())
+            .unwrap_or_else(|_| api_data.to_string());
+        if let Ok(Value::Object(inner)) = serde_json::from_str::<Value>(&decoded) {
+            for (k, v) in inner {
+                obj.insert(k, v);
+            }
+        }
+    }
+
+    Ok(Value::Object(obj))
 }
 
 fn qtoken(query: &HashMap<String, String>) -> Option<&str> {
     query.get("token").map(|s| s.as_str())
+}
+
+/// 读取请求体中的父目录 id：兼容 parent_id / parentId，空值视为未指定。
+fn read_parent_id(body: &Value) -> Option<String> {
+    body.get("parent_id")
+        .or_else(|| body.get("parentId"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+}
+
+/// 校验父目录存在且是接口目录。
+fn ensure_parent_folder(
+    db: &Db,
+    project_id: &str,
+    parent_id: &str,
+) -> Result<(), crate::errors::AppError> {
+    match menu_repo::get_menu_item(db, project_id, parent_id)? {
+        Some(item) if item.menu_type == "apiDetailFolder" => Ok(()),
+        _ => Err(crate::errors::AppError::BadRequest(
+            "父目录不存在或不是目录".into(),
+        )),
+    }
+}
+
+/// 目录改名 / 移动。移动时目标父级不能是自身或其子孙（防环）。
+fn update_folder(
+    db: &Db,
+    project_id: &str,
+    catid: &str,
+    name: Option<&str>,
+    parent_id: Option<&str>,
+) -> Result<ApiMenuData, crate::errors::AppError> {
+    let existing = menu_repo::get_menu_item(db, project_id, catid)?
+        .ok_or_else(|| crate::errors::AppError::NotFound(format!("目录不存在: {catid}")))?;
+    if existing.menu_type != "apiDetailFolder" {
+        return Err(crate::errors::AppError::BadRequest(
+            "目标不是接口目录".into(),
+        ));
+    }
+
+    let mut updates = serde_json::Map::new();
+    if let Some(name) = name {
+        if name.trim().is_empty() {
+            return Err(crate::errors::AppError::BadRequest(
+                "目录名不能为空".into(),
+            ));
+        }
+        updates.insert("name".to_string(), serde_json::Value::String(name.to_string()));
+    }
+    if let Some(parent_id) = parent_id {
+        if parent_id == catid {
+            return Err(crate::errors::AppError::BadRequest(
+                "不能将目录移动到自身内".into(),
+            ));
+        }
+        ensure_parent_folder(db, project_id, parent_id)?;
+        {
+            // 锁只覆盖查询，避免与 update_menu_item 内部取锁死锁
+            let conn = db.0.lock().unwrap();
+            if menu_repo::is_descendant_of(&conn, project_id, catid, parent_id)? {
+                return Err(crate::errors::AppError::BadRequest(
+                    "不能将目录移动到其自身或其子级内".into(),
+                ));
+            }
+        }
+        updates.insert(
+            "parentId".to_string(),
+            serde_json::Value::String(parent_id.to_string()),
+        );
+    }
+
+    if updates.is_empty() {
+        return Ok(existing);
+    }
+    menu_repo::update_menu_item(db, project_id, catid, &serde_json::Value::Object(updates))
 }
 
 fn get_project_id(q: &HashMap<String, String>, body: &Option<&Value>) -> Option<String> {
@@ -413,11 +545,17 @@ async fn handle_add_cat(
         return yapi_error("无权访问该项目");
     }
     let name = match body.get("name").and_then(|v| v.as_str()) { Some(n) => n, None => return yapi_error("缺少必要参数: name") };
+    let parent_id = read_parent_id(&body);
+    if let Some(ref pid) = parent_id {
+        if let Err(e) = ensure_parent_folder(&state.db, &project_id, pid) {
+            return yapi_error(&format!("校验父目录失败: {e}"));
+        }
+    }
     let folder_id = Uuid::new_v4().to_string();
     let sort_order = match menu_repo::get_max_sort_order(&state.db, &project_id) {
         Ok(n) => n + 1, Err(e) => return yapi_error(&format!("查询排序失败: {e}")),
     };
-    let payload = CreateMenuItemPayload { id: folder_id.clone(), parent_id: None, name: name.to_string(), menu_type: "apiDetailFolder".to_string(), data_json: None, run_tab_json: None, sort_order: Some(sort_order) };
+    let payload = CreateMenuItemPayload { id: folder_id.clone(), parent_id, name: name.to_string(), menu_type: "apiDetailFolder".to_string(), data_json: None, run_tab_json: None, sort_order: Some(sort_order) };
     match menu_repo::create_menu_item(&state.db, &project_id, &payload) {
         Ok(_) => {
             emit_yapi_push(&state, &project_id);
@@ -432,8 +570,12 @@ async fn handle_interface_save(
     State(state): State<AppState>,
     headers: HeaderMap,
     Query(query): Query<HashMap<String, String>>,
-    Json(body): Json<Value>,
+    body: Bytes,
 ) -> Json<Value> {
+    let body = match parse_yapi_body(&headers, &body) {
+        Ok(v) => v,
+        Err(e) => return yapi_error(&e),
+    };
     let body_token = body.get("token").and_then(|v| v.as_str());
     let user_id = match resolve_user_id(&state, &headers, qtoken(&query), body_token) {
         Some(id) => id,
@@ -523,8 +665,12 @@ async fn handle_interface_up(
     State(state): State<AppState>,
     headers: HeaderMap,
     Query(query): Query<HashMap<String, String>>,
-    Json(body): Json<Value>,
+    body: Bytes,
 ) -> Json<Value> {
+    let body = match parse_yapi_body(&headers, &body) {
+        Ok(v) => v,
+        Err(e) => return yapi_error(&e),
+    };
     let body_token = body.get("token").and_then(|v| v.as_str());
     let user_id = match resolve_user_id(&state, &headers, qtoken(&query), body_token) {
         Some(id) => id,
@@ -553,6 +699,137 @@ async fn handle_interface_up(
             yapi_ok(result)
         },
         Err(e) => yapi_error(&format!("更新失败: {e}")),
+    }
+}
+
+// POST /api/interface/update_cat
+async fn handle_update_cat(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+    Json(body): Json<Value>,
+) -> Json<Value> {
+    let body_token = body.get("token").and_then(|v| v.as_str());
+    let user_id = match resolve_user_id(&state, &headers, qtoken(&query), body_token) {
+        Some(id) => id,
+        None => return yapi_error("token 无效"),
+    };
+    let project_id = match get_project_id(&query, &Some(&body)) {
+        Some(id) => id,
+        None => return yapi_error("缺少参数: project_id"),
+    };
+    {
+        let role = project_repo::get_project_member_role(&state.db, &project_id, &user_id);
+        if role.as_deref() != Some("owner") && role.as_deref() != Some("editor") {
+            return yapi_error("无权修改该项目");
+        }
+    }
+    let catid = match body
+        .get("catid")
+        .or_else(|| body.get("id"))
+        .and_then(|v| v.as_str())
+    {
+        Some(v) if !v.is_empty() => v.to_string(),
+        _ => return yapi_error("缺少必要参数: catid"),
+    };
+    let name = body.get("name").and_then(|v| v.as_str());
+    let parent_id = read_parent_id(&body);
+    match update_folder(&state.db, &project_id, &catid, name, parent_id.as_deref()) {
+        Ok(item) => {
+            emit_yapi_push(&state, &project_id);
+            yapi_ok(
+                serde_json::json!({ "_id": item.id, "name": item.name, "catid": item.parent_id }),
+            )
+        }
+        Err(e) => yapi_error(&format!("更新目录失败: {e}")),
+    }
+}
+
+// POST /api/interface/del_cat
+async fn handle_del_cat(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+    Json(body): Json<Value>,
+) -> Json<Value> {
+    let body_token = body.get("token").and_then(|v| v.as_str());
+    let user_id = match resolve_user_id(&state, &headers, qtoken(&query), body_token) {
+        Some(id) => id,
+        None => return yapi_error("token 无效"),
+    };
+    let project_id = match get_project_id(&query, &Some(&body)) {
+        Some(id) => id,
+        None => return yapi_error("缺少参数: project_id"),
+    };
+    {
+        let role = project_repo::get_project_member_role(&state.db, &project_id, &user_id);
+        if role.as_deref() != Some("owner") && role.as_deref() != Some("editor") {
+            return yapi_error("无权修改该项目");
+        }
+    }
+    let catid = match body
+        .get("catid")
+        .or_else(|| body.get("id"))
+        .and_then(|v| v.as_str())
+    {
+        Some(v) if !v.is_empty() => v.to_string(),
+        _ => return yapi_error("缺少必要参数: catid"),
+    };
+    match menu_repo::get_menu_item(&state.db, &project_id, &catid) {
+        Ok(Some(item)) if item.menu_type == "apiDetailFolder" => {}
+        Ok(_) => return yapi_error("目录不存在或不是目录"),
+        Err(e) => return yapi_error(&format!("查询失败: {e}")),
+    }
+    match menu_repo::delete_menu_item(&state.db, &project_id, &catid) {
+        Ok(_) => {
+            emit_yapi_push(&state, &project_id);
+            yapi_ok(serde_json::json!({ "_id": catid }))
+        }
+        Err(e) => yapi_error(&format!("删除目录失败: {e}")),
+    }
+}
+
+// POST /api/interface/del
+async fn handle_del(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+    Json(body): Json<Value>,
+) -> Json<Value> {
+    let body_token = body.get("token").and_then(|v| v.as_str());
+    let user_id = match resolve_user_id(&state, &headers, qtoken(&query), body_token) {
+        Some(id) => id,
+        None => return yapi_error("token 无效"),
+    };
+    let project_id = match get_project_id(&query, &Some(&body)) {
+        Some(id) => id,
+        None => return yapi_error("缺少参数: project_id"),
+    };
+    {
+        let role = project_repo::get_project_member_role(&state.db, &project_id, &user_id);
+        if role.as_deref() != Some("owner") && role.as_deref() != Some("editor") {
+            return yapi_error("无权修改该项目");
+        }
+    }
+    let id = match body
+        .get("id")
+        .or_else(|| body.get("catid"))
+        .and_then(|v| v.as_str())
+    {
+        Some(v) if !v.is_empty() => v.to_string(),
+        _ => return yapi_error("缺少必要参数: id"),
+    };
+    match menu_repo::get_menu_item(&state.db, &project_id, &id) {
+        Ok(Some(item)) if item.menu_type == "apiDetail" => {}
+        Ok(_) => return yapi_error("接口不存在"),
+        Err(e) => return yapi_error(&format!("查询失败: {e}")),
+    }
+    match menu_repo::delete_menu_item(&state.db, &project_id, &id) {
+        Ok(_) => {
+            emit_yapi_push(&state, &project_id);
+            yapi_ok(serde_json::json!({ "_id": id }))
+        }
+        Err(e) => yapi_error(&format!("删除接口失败: {e}")),
     }
 }
 
@@ -589,11 +866,50 @@ fn build_router(db: Arc<Db>, app_handle: Option<tauri::AppHandle>) -> Router {
         .route("/api/interface/save", post(handle_interface_save))
         .route("/api/interface/up", post(handle_interface_up))
         .route("/api/interface/add_cat", post(handle_add_cat))
+        .route("/api/interface/update_cat", post(handle_update_cat))
+        // YApi 标准协议的改目录路由名是 up_cat（update_cat 是本实现的扩展名）
+        .route("/api/interface/up_cat", post(handle_update_cat))
+        .route("/api/interface/del_cat", post(handle_del_cat))
+        .route("/api/interface/del", post(handle_del))
         .with_state(state)
 }
 
 
 
+#[cfg(test)]
+mod body_compat_tests {
+    use super::*;
+
+    /// YApi 客户端的三种请求体形状都要能解析：
+    /// 平铺 JSON、api_data 包裹的 JSON、form-urlencoded。
+    #[test]
+    fn parse_yapi_body_supports_three_shapes() {
+        let mut headers = HeaderMap::new();
+
+        // 1) 平铺 JSON
+        let body = parse_yapi_body(&headers, br#"{"title":"A","path":"/a","method":"GET"}"#).unwrap();
+        assert_eq!(body["title"], "A");
+
+        // 2) api_data 包裹（Apifox 同步工具的形状）
+        let inner = r#"{"title":"B","path":"/b","method":"POST"}"#;
+        let payload = format!(r#"{{"token":"t","api_data":{}}}"#, serde_json::to_string(inner).unwrap());
+        let body = parse_yapi_body(&headers, payload.as_bytes()).unwrap();
+        assert_eq!(body["title"], "B");
+        assert_eq!(body["method"], "POST");
+        assert_eq!(body["token"], "t");
+
+        // 3) form-urlencoded（api_data 需再做一次 percent 解码）
+        headers.insert(
+            axum::http::header::CONTENT_TYPE,
+            axum::http::HeaderValue::from_static("application/x-www-form-urlencoded"),
+        );
+        let encoded = urlencoding::encode(inner);
+        let payload = format!("token=t&api_data={encoded}");
+        let body = parse_yapi_body(&headers, payload.as_bytes()).unwrap();
+        assert_eq!(body["title"], "B");
+        assert_eq!(body["path"], "/b");
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -716,5 +1032,322 @@ mod tests {
         // frontend constant YAPI_PUSH_EVENT must match backend emit string
         let event_name = "yapi:api-pushed";
         assert_eq!(event_name, "yapi:api-pushed");
+    }
+
+    // ---- 目录嵌套 / 增删改路由 ----
+
+    fn setup_yapi_db() -> (Arc<Db>, HeaderMap) {
+        use rusqlite::Connection;
+        use std::sync::Mutex;
+
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::client::create_tables(&conn);
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, created_at) VALUES ('u1','tester','x','2026-01-01')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO projects (id, name, owner_id, created_at) VALUES ('p1','demo','u1','2026-01-01')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO project_members (project_id, user_id, role, created_at) VALUES ('p1','u1','owner','2026-01-01')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO personal_tokens (id, user_id, token, name, created_at) VALUES ('tk1','u1','tok-1','default','2026-01-01')",
+            [],
+        )
+        .unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert("x-yapi-token", "tok-1".parse().unwrap());
+        (Arc::new(Db(Mutex::new(conn))), headers)
+    }
+
+    fn project_query() -> Query<HashMap<String, String>> {
+        Query(HashMap::from([(
+            "project_id".to_string(),
+            "p1".to_string(),
+        )]))
+    }
+
+    fn data_id(res: &Json<Value>) -> String {
+        res.0
+            .get("data")
+            .and_then(|d| d.get("_id"))
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string()
+    }
+
+    fn errcode(res: &Json<Value>) -> i64 {
+        res.0.get("errcode").and_then(|v| v.as_i64()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn add_cat_with_parent_id_creates_nested_folder() {
+        let (db, headers) = setup_yapi_db();
+        let state = AppState {
+            db: db.clone(),
+            app_handle: None,
+        };
+
+        let root = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "根目录" })),
+        )
+        .await;
+        assert_eq!(errcode(&root), 0);
+        let root_id = data_id(&root);
+
+        let child = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "子目录", "parent_id": root_id })),
+        )
+        .await;
+        assert_eq!(errcode(&child), 0);
+        let child_id = data_id(&child);
+
+        let item = menu_repo::get_menu_item(&db, "p1", &child_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(item.menu_type, "apiDetailFolder");
+        assert_eq!(
+            item.parent_id.as_deref(),
+            Some(root_id.as_str()),
+            "子目录应挂在父目录下"
+        );
+    }
+
+    #[tokio::test]
+    async fn add_cat_accepts_camel_case_parent_id() {
+        let (db, headers) = setup_yapi_db();
+        let state = AppState {
+            db: db.clone(),
+            app_handle: None,
+        };
+
+        let root = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "根目录" })),
+        )
+        .await;
+        let root_id = data_id(&root);
+
+        let child = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "子目录", "parentId": root_id })),
+        )
+        .await;
+        assert_eq!(errcode(&child), 0);
+        let child_id = data_id(&child);
+
+        let item = menu_repo::get_menu_item(&db, "p1", &child_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(item.parent_id.as_deref(), Some(root_id.as_str()));
+    }
+
+    #[tokio::test]
+    async fn add_cat_with_unknown_parent_is_rejected() {
+        let (db, headers) = setup_yapi_db();
+        let state = AppState {
+            db: db.clone(),
+            app_handle: None,
+        };
+
+        let res = handle_add_cat(
+            State(state),
+            headers,
+            project_query(),
+            Json(serde_json::json!({ "name": "子目录", "parent_id": "not-exist" })),
+        )
+        .await;
+        assert_eq!(errcode(&res), 1, "父目录不存在应报错");
+        assert!(res
+            .0
+            .get("errmsg")
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .contains("父目录"));
+    }
+
+    #[tokio::test]
+    async fn update_cat_renames_and_moves_folder() {
+        let (db, headers) = setup_yapi_db();
+        let state = AppState {
+            db: db.clone(),
+            app_handle: None,
+        };
+
+        let root = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "根目录" })),
+        )
+        .await;
+        let root_id = data_id(&root);
+        let other = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "其它目录" })),
+        )
+        .await;
+        let other_id = data_id(&other);
+        let child = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "子目录", "parent_id": root_id })),
+        )
+        .await;
+        let child_id = data_id(&child);
+
+        let res = handle_update_cat(
+            State(state),
+            headers,
+            project_query(),
+            Json(serde_json::json!({ "catid": child_id, "name": "改名后", "parent_id": other_id })),
+        )
+        .await;
+        assert_eq!(errcode(&res), 0);
+
+        let item = menu_repo::get_menu_item(&db, "p1", &child_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(item.name, "改名后");
+        assert_eq!(item.parent_id.as_deref(), Some(other_id.as_str()));
+    }
+
+    #[tokio::test]
+    async fn update_cat_moving_into_own_descendant_is_rejected() {
+        let (db, headers) = setup_yapi_db();
+        let state = AppState {
+            db: db.clone(),
+            app_handle: None,
+        };
+
+        let a = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "A" })),
+        )
+        .await;
+        let a_id = data_id(&a);
+        let b = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "B", "parent_id": a_id })),
+        )
+        .await;
+        let b_id = data_id(&b);
+        let c = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "C", "parent_id": b_id })),
+        )
+        .await;
+        let c_id = data_id(&c);
+
+        // A 移到自己的孙子 C 下 → 必须拒绝，且 A 的父级不变
+        let res = handle_update_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "catid": a_id, "parent_id": c_id })),
+        )
+        .await;
+        assert_eq!(errcode(&res), 1, "移动到自身子孙下应报错");
+        let item = menu_repo::get_menu_item(&db, "p1", &a_id).unwrap().unwrap();
+        assert_eq!(item.parent_id, None, "A 的父级不应被改动");
+
+        // A 移到自身下 → 同样拒绝
+        let res = handle_update_cat(
+            State(state),
+            headers,
+            project_query(),
+            Json(serde_json::json!({ "catid": a_id, "parent_id": a_id })),
+        )
+        .await;
+        assert_eq!(errcode(&res), 1, "移动到自身下应报错");
+    }
+
+    #[tokio::test]
+    async fn del_cat_removes_folder_and_children() {
+        let (db, headers) = setup_yapi_db();
+        let state = AppState {
+            db: db.clone(),
+            app_handle: None,
+        };
+
+        let root = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "根目录" })),
+        )
+        .await;
+        let root_id = data_id(&root);
+        let child = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "子目录", "parent_id": root_id })),
+        )
+        .await;
+        let child_id = data_id(&child);
+
+        let res = handle_del_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "catid": child_id })),
+        )
+        .await;
+        assert_eq!(errcode(&res), 0);
+        assert!(menu_repo::get_menu_item(&db, "p1", &child_id)
+            .unwrap()
+            .is_none());
+
+        // 接口删除
+        let payload = CreateMenuItemPayload {
+            id: "api-1".into(),
+            parent_id: Some(root_id.clone()),
+            name: "接口A".into(),
+            menu_type: "apiDetail".into(),
+            data_json: Some(serde_json::json!({ "method": "GET", "path": "/a" })),
+            run_tab_json: None,
+            sort_order: Some(1),
+        };
+        menu_repo::create_menu_item(&db, "p1", &payload).unwrap();
+
+        let res = handle_del(
+            State(state),
+            headers,
+            project_query(),
+            Json(serde_json::json!({ "id": "api-1" })),
+        )
+        .await;
+        assert_eq!(errcode(&res), 0);
+        assert!(menu_repo::get_menu_item(&db, "p1", "api-1")
+            .unwrap()
+            .is_none());
     }
 }

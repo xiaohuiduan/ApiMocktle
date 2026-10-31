@@ -237,6 +237,12 @@ pub struct UpdateMemberRolePayload {
 pub struct ImportPayload {
     pub format: String,
     pub content: String,
+    /// 来源标识（通常是文件名或上游项目名）。
+    ///
+    /// 参与幂等键：不同来源的同名接口 / 目录 / 模型互不覆盖。缺省时为空串，
+    /// 行为与「不区分来源」一致。
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 // Request Runner

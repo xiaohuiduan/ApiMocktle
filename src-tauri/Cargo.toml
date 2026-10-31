@@ -7,6 +7,10 @@ edition = "2021"
 name = "apimocktle_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
+[features]
+# 便携版：数据只读写 <exe 同级>/data，不回退 app_data_dir。见 src/portable.rs
+portable = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

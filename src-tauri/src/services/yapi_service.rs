@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct YApiInterface {
     #[serde(rename = "_id", default)]
@@ -42,6 +41,39 @@ pub struct YApiInterface {
     pub res_body: Option<String>,
     #[serde(rename = "res_body_is_json_schema", default)]
     pub res_body_is_json_schema: Option<bool>,
+    // 以下均为可选字段：老 payload 不带这些键时行为与改造前完全一致
+    #[serde(default)]
+    pub responses: Option<Vec<YApiResponse>>,
+    #[serde(rename = "req_body_required", default)]
+    pub req_body_required: Option<bool>,
+    #[serde(rename = "req_body_examples", default)]
+    pub req_body_examples: Option<Vec<YApiExample>>,
+    #[serde(rename = "operationId", default)]
+    pub operation_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct YApiResponse {
+    #[serde(default)]
+    pub code: Option<i64>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(rename = "contentType", default)]
+    pub content_type: Option<String>,
+    #[serde(rename = "jsonSchema", default)]
+    pub json_schema: Option<Value>,
+    #[serde(default)]
+    pub example: Option<Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct YApiExample {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub value: Option<Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -220,37 +252,88 @@ fn convert_request_body(yapi: &YApiInterface) -> Option<Value> {
         return Some(serde_json::json!({"type": "none"}));
     }
 
-    if body_type == "json" {
+    let mut body = if body_type == "json" {
         let json_schema = if yapi.req_body_is_json_schema.unwrap_or(false) {
             parse_json_schema_safe(&yapi.req_body_other)
         } else {
             None
         };
-        return Some(serde_json::json!({
+        serde_json::json!({
             "type": "application/json",
             "jsonSchema": json_schema,
             "rawText": yapi.req_body_other,
-        }));
-    }
-
-    if body_type == "form" {
-        return Some(serde_json::json!({
+        })
+    } else if body_type == "form" {
+        serde_json::json!({
             "type": "multipart/form-data",
             "parameters": convert_form_params(&yapi.req_body_form),
-        }));
-    }
-
-    if body_type == "raw" {
-        return Some(serde_json::json!({
+        })
+    } else if body_type == "raw" {
+        serde_json::json!({
             "type": "text/plain",
             "rawText": yapi.req_body_other,
-        }));
+        })
+    } else {
+        serde_json::json!({"type": "none"})
+    };
+
+    // 仅当 payload 显式提供时才写这两个键，避免污染老数据
+    if let Some(obj) = body.as_object_mut() {
+        if let Some(required) = yapi.req_body_required {
+            obj.insert("required".to_string(), Value::Bool(required));
+        }
+        if let Some(examples) = &yapi.req_body_examples {
+            let items: Vec<Value> = examples
+                .iter()
+                .map(|e| serde_json::json!({"name": e.name, "value": e.value}))
+                .collect();
+            obj.insert("examples".to_string(), Value::Array(items));
+        }
     }
 
-    Some(serde_json::json!({"type": "none"}))
+    Some(body)
+}
+
+fn convert_response_object(res: &YApiResponse) -> Value {
+    let mut obj = serde_json::Map::new();
+    obj.insert("id".to_string(), Value::String(short_id()));
+    obj.insert(
+        "code".to_string(),
+        serde_json::json!(res.code.unwrap_or(200)),
+    );
+    obj.insert(
+        "name".to_string(),
+        serde_json::json!(res.name.clone().unwrap_or_else(|| "成功".to_string())),
+    );
+    obj.insert(
+        "contentType".to_string(),
+        serde_json::json!(res
+            .content_type
+            .clone()
+            .unwrap_or_else(|| "json".to_string())),
+    );
+    if let Some(description) = &res.description {
+        obj.insert("description".to_string(), serde_json::json!(description));
+    }
+    if let Some(json_schema) = &res.json_schema {
+        obj.insert("jsonSchema".to_string(), json_schema.clone());
+    }
+    if let Some(example) = &res.example {
+        obj.insert("example".to_string(), example.clone());
+    }
+    Value::Object(obj)
 }
 
 fn convert_responses(yapi: &YApiInterface) -> Option<Value> {
+    // 多响应优先；未提供或为空时回退到既有单 res_body 逻辑
+    if let Some(responses) = &yapi.responses {
+        if !responses.is_empty() {
+            return Some(Value::Array(
+                responses.iter().map(convert_response_object).collect(),
+            ));
+        }
+    }
+
     if yapi.res_body.is_none() {
         return None;
     }
@@ -302,6 +385,7 @@ pub fn yapi_to_api_details(yapi: &YApiInterface) -> Value {
         "parameters": if parameters.is_empty() { Value::Null } else { Value::Object(parameters) },
         "requestBody": convert_request_body(yapi),
         "responses": convert_responses(yapi),
+        "operationId": yapi.operation_id,
         "createdAt": now,
         "updatedAt": now,
     });
@@ -348,6 +432,10 @@ pub fn api_details_to_yapi(details: &Value, menu_item_id: &str, menu_name: &str)
         "status": yapi_status,
         "tag": tags,
     });
+
+    if let Some(operation_id) = details.get("operationId").and_then(|v| v.as_str()) {
+        result["operationId"] = Value::String(operation_id.to_string());
+    }
 
     // Convert parameters
     if let Some(params) = details.get("parameters") {
@@ -408,6 +496,22 @@ pub fn api_details_to_yapi(details: &Value, menu_item_id: &str, menu_name: &str)
     if let Some(req_body) = details.get("requestBody") {
         let body_type = req_body.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
+        if let Some(required) = req_body.get("required").and_then(|v| v.as_bool()) {
+            result["req_body_required"] = Value::Bool(required);
+        }
+        if let Some(examples) = req_body.get("examples").and_then(|v| v.as_array()) {
+            let yapi_examples: Vec<Value> = examples
+                .iter()
+                .map(|e| {
+                    serde_json::json!({
+                        "name": e.get("name").and_then(|v| v.as_str()),
+                        "value": e.get("value"),
+                    })
+                })
+                .collect();
+            result["req_body_examples"] = Value::Array(yapi_examples);
+        }
+
         if body_type.contains("json") {
             result["req_body_type"] = Value::String("json".to_string());
             result["req_body_is_json_schema"] = Value::Bool(true);
@@ -445,9 +549,40 @@ pub fn api_details_to_yapi(details: &Value, menu_item_id: &str, menu_name: &str)
     }
 
     if let Some(responses) = details.get("responses").and_then(|v| v.as_array()) {
+        // 多响应：优先输出 responses 数组（与写入侧对称）
+        if !responses.is_empty() {
+            let yapi_responses: Vec<Value> = responses
+                .iter()
+                .map(|res| {
+                    let mut obj = serde_json::Map::new();
+                    for key in [
+                        "code",
+                        "name",
+                        "description",
+                        "contentType",
+                        "jsonSchema",
+                        "example",
+                    ] {
+                        if let Some(value) = res.get(key) {
+                            if !value.is_null() {
+                                obj.insert(key.to_string(), value.clone());
+                            }
+                        }
+                    }
+                    Value::Object(obj)
+                })
+                .collect();
+            result["responses"] = Value::Array(yapi_responses);
+        }
+
+        // 同时保留首响应的老字段，老 YApi 客户端仍可从 res_body 读取
         if let Some(first_res) = responses.first() {
-            let ct = first_res.get("contentType").and_then(|v| v.as_str()).unwrap_or("json");
-            result["res_body_type"] = Value::String(if ct == "json" { "json" } else { "raw" }.to_string());
+            let ct = first_res
+                .get("contentType")
+                .and_then(|v| v.as_str())
+                .unwrap_or("json");
+            result["res_body_type"] =
+                Value::String(if ct == "json" { "json" } else { "raw" }.to_string());
             result["res_body_is_json_schema"] = Value::Bool(true);
             if let Some(schema) = first_res.get("jsonSchema") {
                 result["res_body"] = Value::String(schema.to_string());
@@ -461,4 +596,127 @@ pub fn api_details_to_yapi(details: &Value, menu_item_id: &str, menu_name: &str)
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(json: Value) -> YApiInterface {
+        serde_json::from_value(json).expect("YApiInterface 反序列化失败")
+    }
+
+    #[test]
+    fn 多响应数组逐条映射且保留字段() {
+        let yapi = parse(serde_json::json!({
+            "title": "接口",
+            "path": "/a",
+            "method": "get",
+            "responses": [
+                {"code": 200, "name": "成功", "contentType": "json", "jsonSchema": {"type": "object"}},
+                {"code": 401, "name": "Unauthorized", "description": "未授权", "jsonSchema": {"type": "string"}}
+            ]
+        }));
+
+        let details = yapi_to_api_details(&yapi);
+        let responses = details.get("responses").and_then(|v| v.as_array()).unwrap();
+
+        assert_eq!(responses.len(), 2);
+        assert_eq!(responses[0]["code"].as_i64(), Some(200));
+        assert_eq!(responses[0]["name"].as_str(), Some("成功"));
+        assert_eq!(responses[0]["jsonSchema"]["type"].as_str(), Some("object"));
+        assert_eq!(responses[1]["code"].as_i64(), Some(401));
+        assert_eq!(responses[1]["name"].as_str(), Some("Unauthorized"));
+        assert_eq!(responses[1]["description"].as_str(), Some("未授权"));
+        assert_eq!(responses[1]["jsonSchema"]["type"].as_str(), Some("string"));
+    }
+
+    #[test]
+    fn 请求体必填与示例被转换() {
+        let yapi = parse(serde_json::json!({
+            "title": "接口",
+            "path": "/a",
+            "method": "post",
+            "req_body_type": "json",
+            "req_body_other": "{\"type\":\"object\"}",
+            "req_body_is_json_schema": true,
+            "req_body_required": true,
+            "req_body_examples": [{"name": "示例1", "value": {"a": 1}}]
+        }));
+
+        let details = yapi_to_api_details(&yapi);
+        let body = details.get("requestBody").unwrap();
+
+        assert_eq!(body["required"].as_bool(), Some(true));
+        let examples = body.get("examples").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(examples.len(), 1);
+        assert_eq!(examples[0]["name"].as_str(), Some("示例1"));
+        assert_eq!(examples[0]["value"]["a"].as_i64(), Some(1));
+    }
+
+    #[test]
+    fn operation_id_写入与回读一致() {
+        let yapi = parse(serde_json::json!({
+            "title": "接口",
+            "path": "/a",
+            "method": "get",
+            "operationId": "newFamilyMember"
+        }));
+
+        let details = yapi_to_api_details(&yapi);
+        assert_eq!(details["operationId"].as_str(), Some("newFamilyMember"));
+
+        let back = api_details_to_yapi(&details, "m1", "接口");
+        assert_eq!(back["operationId"].as_str(), Some("newFamilyMember"));
+    }
+
+    #[test]
+    fn 老_payload_仅有_res_body_时回退为单响应() {
+        let yapi = parse(serde_json::json!({
+            "title": "接口",
+            "path": "/a",
+            "method": "get",
+            "res_body_type": "json",
+            "res_body": "{\"type\":\"object\"}",
+            "res_body_is_json_schema": true
+        }));
+
+        let details = yapi_to_api_details(&yapi);
+        let responses = details.get("responses").and_then(|v| v.as_array()).unwrap();
+
+        assert_eq!(responses.len(), 1);
+        assert_eq!(responses[0]["code"].as_i64(), Some(200));
+        assert_eq!(responses[0]["name"].as_str(), Some("成功"));
+        assert_eq!(responses[0]["jsonSchema"]["type"].as_str(), Some("object"));
+    }
+
+    #[test]
+    fn 反向映射输出多响应与请求体扩展字段() {
+        let details = serde_json::json!({
+            "method": "post",
+            "path": "/a",
+            "name": "接口",
+            "operationId": "op1",
+            "requestBody": {
+                "type": "application/json",
+                "jsonSchema": {"type": "object"},
+                "required": true,
+                "examples": [{"name": "示例1", "value": {"a": 1}}]
+            },
+            "responses": [
+                {"id": "r1", "code": 200, "name": "成功", "contentType": "json", "jsonSchema": {"type": "object"}},
+                {"id": "r2", "code": 401, "name": "Unauthorized", "description": "未授权", "jsonSchema": {"type": "string"}}
+            ]
+        });
+
+        let yapi = api_details_to_yapi(&details, "m1", "接口");
+        let responses = yapi.get("responses").and_then(|v| v.as_array()).unwrap();
+
+        assert_eq!(responses.len(), 2);
+        assert_eq!(responses[1]["name"].as_str(), Some("Unauthorized"));
+        assert_eq!(responses[1]["description"].as_str(), Some("未授权"));
+        assert_eq!(yapi["req_body_required"].as_bool(), Some(true));
+        assert_eq!(yapi["req_body_examples"].as_array().unwrap().len(), 1);
+        assert_eq!(yapi["operationId"].as_str(), Some("op1"));
+    }
 }

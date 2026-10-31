@@ -3,16 +3,22 @@ use axum::{
     routing::post,
     Json, Router,
 };
+use axum::http::HeaderMap;
 use axum::response::IntoResponse;
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::{Mutex, oneshot};
+use uuid::Uuid;
 
 use crate::db::client::Db;
 use crate::db::test_repo;
 use crate::db::menu_repo;
 use crate::db::flow_repo;
+use crate::db::personal_token_repo;
+use crate::db::project_repo;
 use crate::models::*;
+use crate::services::import_service::API_STATUSES;
 use crate::services::test_engine::execute_task_full;
 
 // ==================== MCP Protocol Types ====================
@@ -77,6 +83,8 @@ pub struct ToolResultContent {
 pub struct McpServerState {
     pub db: Arc<Db>,
     pub tools: Vec<ToolDefinition>,
+    /// 监听非回环地址时，连只读工具也要令牌 —— 否则局域网内任何人都能读项目与测试数据
+    pub require_auth: bool,
 }
 
 // ==================== MCP Server Handle ====================
@@ -556,6 +564,157 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["graphJson"]
             }),
         },
+        ToolDefinition {
+            name: "api-doc.upsert_endpoint".to_string(),
+            description: "创建或更新接口文档。给了 id 按 id 更新；没给 id 时按 (projectId, method, path) 查重后更新，否则新建。幂等：同 (method, path) 再次调用更新同一条并保留原 id 与 createdAt。参数类型非法值降级 string；状态非法值时沿用原状态（无有效原状态才用 designing）。parameters / requestBody / responses / tags 传入即整体替换该字段（类型不符等同未传），不传才沿用原值；只改描述或状态时不要传这几个字段，要传就必须带全量。删除接口请用 api-doc.delete_endpoint。".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "projectId": { "type": "string", "description": "项目 ID（必填，必须已存在）" },
+                    "method": { "type": "string", "description": "HTTP 方法，如 GET / POST（必填）" },
+                    "path": { "type": "string", "description": "接口路径，如 /api/v1/orders（必填）" },
+                    "name": { "type": "string", "description": "接口名称（必填）" },
+                    "description": { "type": "string", "description": "接口描述（可选，缺省保留原值）" },
+                    "status": { "type": "string", "description": "接口状态，取值 designing/pending/developing/obsolete/integrating/testing/tested/released/deprecated/exception；非法值沿用原状态（无原状态才用 designing）" },
+                    "tags": { "type": "array", "items": { "type": "string" }, "description": "标签（可选）。整体替换：传入即覆盖原有全部标签；不传才沿用原值" },
+                    "parameters": {
+                        "type": ["object", "array"],
+                        "description": "请求参数，按位置分组；每项 {name,type,required?,description?,example?,enable?}。整体替换：传入即覆盖原有全部参数（未列出的旧参数会消失）；不传才沿用原值。也接受扁平数组，每项用 in 标位置（path/query/header/cookie，缺省 query）",
+                        "properties": {
+                            "path": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "type": { "type": "string", "description": "integer/number/boolean/string/array/file，非法值降级 string" }, "required": { "type": "boolean" }, "description": { "type": "string" }, "example": {}, "enable": { "type": "boolean" } } } },
+                            "query": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "type": { "type": "string", "description": "integer/number/boolean/string/array/file，非法值降级 string" }, "required": { "type": "boolean" }, "description": { "type": "string" }, "example": {}, "enable": { "type": "boolean" } } } },
+                            "header": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "type": { "type": "string", "description": "integer/number/boolean/string/array/file，非法值降级 string" }, "required": { "type": "boolean" }, "description": { "type": "string" }, "example": {}, "enable": { "type": "boolean" } } } },
+                            "cookie": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "type": { "type": "string", "description": "integer/number/boolean/string/array/file，非法值降级 string" }, "required": { "type": "boolean" }, "description": { "type": "string" }, "example": {}, "enable": { "type": "boolean" } } } }
+                        },
+                        "items": { "type": "object", "properties": { "name": { "type": "string" }, "in": { "type": "string", "description": "位置：path/query/header/cookie，缺省 query" }, "type": { "type": "string", "description": "integer/number/boolean/string/array/file，非法值降级 string" }, "required": { "type": "boolean" }, "description": { "type": "string" }, "example": {}, "enable": { "type": "boolean" } } }
+                    },
+                    "requestBody": {
+                        "type": "object",
+                        "description": "请求体 {type,parameters?,jsonSchema?,rawText?,required?,examples?}。整体替换：传入即覆盖原有请求体；不传才沿用原值",
+                        "properties": {
+                            "type": { "type": "string", "description": "application/json 等媒体类型；无请求体用 none" },
+                            "contentType": { "type": "string", "description": "type 的别名，type 与 contentType 都不传按 none 处理" },
+                            "parameters": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "type": { "type": "string" }, "required": { "type": "boolean" }, "description": { "type": "string" }, "example": {}, "enable": { "type": "boolean" } } } },
+                            "jsonSchema": {},
+                            "rawText": { "type": "string" },
+                            "required": { "type": "boolean" },
+                            "examples": { "type": "array", "items": { "type": "object" } }
+                        }
+                    },
+                    "responses": {
+                        "type": "array",
+                        "description": "响应列表；整体替换：传入即覆盖原有全部响应；不传则新建时默认一条 200 成功、更新时沿用原响应",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "code": { "type": "integer" },
+                                "name": { "type": "string" },
+                                "contentType": { "type": "string", "description": "json/xml/html/raw/binary" },
+                                "jsonSchema": {},
+                                "description": { "type": "string" },
+                                "example": {}
+                            }
+                        }
+                    },
+                    "parentId": { "type": ["string", "null"], "description": "挂到的接口目录 ID（可选，必须是 apiDetailFolder）；不传则不改变位置，显式传 null 或空串表示移到根级" },
+                    "id": { "type": "string", "description": "已有接口的菜单项 ID（可选，给了就按 id 更新）" }
+                },
+                "required": ["projectId", "method", "path", "name"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-doc.delete_endpoint".to_string(),
+            description: "删除接口（进回收站，可由用户在回收站恢复）。".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "projectId": { "type": "string", "description": "项目 ID" },
+                    "id": { "type": "string", "description": "接口菜单项 ID" }
+                },
+                "required": ["projectId", "id"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-doc.create_folder".to_string(),
+            description: "创建接口目录。parentId 缺省或 null 表示建在根级；给了 parentId 时父级必须存在且是 apiDetailFolder，可建多层目录。".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "projectId": { "type": "string", "description": "项目 ID" },
+                    "name": { "type": "string", "description": "目录名称" },
+                    "parentId": { "type": "string", "description": "父目录 ID（可选，null/缺省表示根级）" }
+                },
+                "required": ["projectId", "name"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-doc.move_folder".to_string(),
+            description: "移动或重命名接口目录。parentId 显式传 null 表示移到根级；防环：目标父级不能是自己或自己的子孙。".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "projectId": { "type": "string", "description": "项目 ID" },
+                    "id": { "type": "string", "description": "要移动的目录 ID" },
+                    "parentId": { "type": ["string", "null"], "description": "新父目录 ID；显式 null 表示移到根级；不传则不改变位置" },
+                    "name": { "type": "string", "description": "新名称（可选，不传则不改名）" }
+                },
+                "required": ["projectId", "id"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-doc.save_schema".to_string(),
+            description: "保存数据模型（apiSchema）。按名称幂等：同名模型覆盖内容并保留原 id，不产生重复项。".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "projectId": { "type": "string", "description": "项目 ID" },
+                    "name": { "type": "string", "description": "模型名称（幂等键）" },
+                    "jsonSchema": { "description": "模型 JSON Schema" },
+                    "parentId": { "type": "string", "description": "模型目录 ID（可选，需为目录类型）" }
+                },
+                "required": ["projectId", "name", "jsonSchema"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-doc.save_environment".to_string(),
+            description: "保存环境与全局变量。按名称合并：同名替换、异名追加，不会清空未提及的已有环境或变量。".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "projectId": { "type": "string", "description": "项目 ID" },
+                    "globalVariables": {
+                        "type": "array",
+                        "description": "全局变量列表",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": { "type": "string" },
+                                "value": { "type": "string" },
+                                "enable": { "type": "boolean" }
+                            },
+                            "required": ["name"]
+                        }
+                    },
+                    "environments": {
+                        "type": "array",
+                        "description": "环境列表",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": { "type": "string", "description": "可选；缺省时同名环境沿用原 id" },
+                                "name": { "type": "string" },
+                                "url": { "type": "string" },
+                                "baseUrls": { "type": "array", "items": { "type": "object" } },
+                                "variables": { "type": "array", "items": { "type": "object" } },
+                                "parameters": { "type": "object" }
+                            },
+                            "required": ["name"]
+                        }
+                    }
+                },
+                "required": ["projectId"]
+            }),
+        },
     ]
 }
 
@@ -789,6 +948,769 @@ fn validate_flow_graph(
     }
 
     (errors, warnings, node_count, edge_count)
+}
+
+// ==================== api-doc 文档写工具 ====================
+
+/// 文档写工具前缀：只有这些工具在 tools/call 时校验个人令牌。
+const DOC_TOOL_PREFIX: &str = "api-doc.";
+
+/// 与前端 `ParamType` / `ContentType` 枚举对齐，非法值一律降级。
+const DOC_PARAM_TYPES: [&str; 6] = ["integer", "number", "boolean", "string", "array", "file"];
+const DOC_CONTENT_TYPES: [&str; 5] = ["json", "xml", "html", "raw", "binary"];
+/// 可作为父级的目录类型。
+const DOC_FOLDER_TYPES: [&str; 2] = ["apiDetailFolder", "apiSchemaFolder"];
+
+fn doc_err(code: i32, message: impl Into<String>) -> JsonRpcError {
+    JsonRpcError {
+        code,
+        message: message.into(),
+        data: None,
+    }
+}
+
+fn doc_db_err(e: impl std::fmt::Display) -> JsonRpcError {
+    doc_err(-32603, format!("数据库错误: {e}"))
+}
+
+fn doc_str_arg<'a>(args: &'a serde_json::Value, key: &str) -> Result<&'a str, JsonRpcError> {
+    args.get(key)
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| doc_err(-32602, format!("缺少参数 {key}")))
+}
+
+fn ensure_project_exists(db: &Db, project_id: &str) -> Result<(), JsonRpcError> {
+    match project_repo::get_project_by_id(db, project_id) {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => Err(doc_err(-32602, format!("项目不存在: {project_id}"))),
+        Err(e) => Err(doc_db_err(e)),
+    }
+}
+
+fn ensure_folder(
+    db: &Db,
+    project_id: &str,
+    folder_id: &str,
+    allowed: &[&str],
+) -> Result<(), JsonRpcError> {
+    match menu_repo::get_menu_item(db, project_id, folder_id) {
+        Ok(Some(item)) if allowed.contains(&item.menu_type.as_str()) => Ok(()),
+        Ok(Some(_)) => Err(doc_err(-32602, format!("父级 {folder_id} 不是目录"))),
+        Ok(None) => Err(doc_err(-32602, format!("父级不存在: {folder_id}"))),
+        Err(e) => Err(doc_db_err(e)),
+    }
+}
+
+/// 从请求头取个人令牌：X-YAPI-TOKEN 优先，其次 Authorization: Bearer。
+fn doc_header_token(headers: &HeaderMap) -> Option<String> {
+    if let Some(token) = headers.get("X-YAPI-TOKEN").and_then(|v| v.to_str().ok()) {
+        let token = token.trim();
+        if !token.is_empty() {
+            return Some(token.to_string());
+        }
+    }
+    let bearer = headers.get("Authorization").and_then(|v| v.to_str().ok())?;
+    let token = bearer
+        .strip_prefix("Bearer ")
+        .or_else(|| bearer.strip_prefix("bearer "))?
+        .trim();
+    if token.is_empty() {
+        None
+    } else {
+        Some(token.to_string())
+    }
+}
+
+/// 只对 api-doc.* 校验令牌：api-test.* 维持原有的无鉴权行为，避免破坏现有用法。
+/// 回环地址只有本机可达，不需要为读工具加令牌；绑到网卡上的地址就得全部鉴权
+fn requires_auth_for_host(host: &str) -> bool {
+    !matches!(host, "127.0.0.1" | "localhost" | "::1")
+}
+
+fn authorize_doc_tool(db: &Db, headers: &HeaderMap) -> Result<(), JsonRpcError> {    let Some(token) = doc_header_token(headers) else {
+        return Err(doc_err(
+            -32001,
+            "api-doc.* 工具需要个人令牌：请在请求头带 X-YAPI-TOKEN 或 Authorization: Bearer <令牌>",
+        ));
+    };
+    if personal_token_repo::find_user_by_personal_token(db, &token).is_none() {
+        return Err(doc_err(
+            -32001,
+            "个人令牌无效或已删除，请在「设置 → 个人令牌」重新创建",
+        ));
+    }
+    Ok(())
+}
+
+fn doc_normalize_param(raw: &serde_json::Value) -> serde_json::Value {
+    let ty = raw.get("type").and_then(|v| v.as_str()).unwrap_or("string");
+    let ty = if DOC_PARAM_TYPES.contains(&ty) { ty } else { "string" };
+    let id = raw
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let mut out = serde_json::json!({
+        "id": id,
+        "name": raw.get("name").and_then(|v| v.as_str()).unwrap_or(""),
+        "type": ty,
+        "description": raw.get("description").and_then(|v| v.as_str()).unwrap_or(""),
+        "required": raw.get("required").and_then(|v| v.as_bool()).unwrap_or(false),
+        "enable": raw.get("enable").and_then(|v| v.as_bool()).unwrap_or(true),
+    });
+    if let Some(example) = raw.get("example") {
+        out["example"] = example.clone();
+    }
+    out
+}
+
+/// parameters 按 path/query/header/cookie 分组；全空时存 null，与导入器一致。
+fn doc_normalize_parameters(raw: &serde_json::Value) -> serde_json::Value {
+    // 也接受扁平数组（每项带 in），否则调用方漏写分组会静默丢掉整批参数
+    if let Some(arr) = raw.as_array() {
+        let mut grouped: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
+        for item in arr {
+            let section = match item.get("in").and_then(|v| v.as_str()) {
+                Some(s @ ("path" | "query" | "header" | "cookie")) => s,
+                _ => "query",
+            };
+            grouped
+                .entry(section.to_string())
+                .or_insert_with(|| serde_json::Value::Array(Vec::new()))
+                .as_array_mut()
+                .expect("value is array")
+                .push(doc_normalize_param(item));
+        }
+        return if grouped.is_empty() {
+            serde_json::Value::Null
+        } else {
+            serde_json::Value::Object(grouped)
+        };
+    }
+    let mut out = serde_json::Map::new();
+    for section in ["path", "query", "header", "cookie"] {
+        if let Some(arr) = raw.get(section).and_then(|v| v.as_array()) {
+            out.insert(
+                section.to_string(),
+                serde_json::Value::Array(arr.iter().map(doc_normalize_param).collect()),
+            );
+        }
+    }
+    if out.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::Value::Object(out)
+    }
+}
+
+fn doc_normalize_request_body(raw: &serde_json::Value) -> serde_json::Value {
+    // contentType 是 Apifox/OpenAPI 的说法，库内字段叫 type，两种都认
+    let body_type = raw
+        .get("type")
+        .or_else(|| raw.get("contentType"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("none");
+    let mut out = serde_json::json!({
+        "type": body_type,
+    });
+    if let Some(params) = raw.get("parameters").and_then(|v| v.as_array()) {
+        out["parameters"] =
+            serde_json::Value::Array(params.iter().map(doc_normalize_param).collect());
+    }
+    for key in ["jsonSchema", "rawText", "examples"] {
+        if let Some(value) = raw.get(key) {
+            out[key] = value.clone();
+        }
+    }
+    if let Some(required) = raw.get("required").and_then(|v| v.as_bool()) {
+        out["required"] = serde_json::Value::Bool(required);
+    }
+    out
+}
+
+fn doc_normalize_response(raw: &serde_json::Value) -> serde_json::Value {
+    let ct = raw.get("contentType").and_then(|v| v.as_str()).unwrap_or("json");
+    let ct = if DOC_CONTENT_TYPES.contains(&ct) { ct } else { "json" };
+    let id = raw
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let mut out = serde_json::json!({
+        "id": id,
+        "code": raw.get("code").and_then(|v| v.as_i64()).unwrap_or(200),
+        "name": raw.get("name").and_then(|v| v.as_str()).unwrap_or("成功"),
+        "contentType": ct,
+    });
+    for key in ["jsonSchema", "description", "example"] {
+        if let Some(value) = raw.get(key) {
+            out[key] = value.clone();
+        }
+    }
+    out
+}
+
+fn doc_normalize_responses(raw: &[serde_json::Value]) -> serde_json::Value {
+    serde_json::Value::Array(raw.iter().map(doc_normalize_response).collect())
+}
+
+fn doc_default_responses() -> serde_json::Value {
+    doc_normalize_responses(&[serde_json::json!({"code": 200, "name": "成功"})])
+}
+
+/// 新建接口时计算排序号；在事务内查询，避免另开锁。
+fn doc_next_sort_order(
+    conn: &rusqlite::Connection,
+    project_id: &str,
+) -> Result<i32, JsonRpcError> {
+    let max: i32 = conn
+        .query_row(
+            "SELECT COALESCE(MAX(sort_order), -1) FROM menu_items WHERE project_id = ?1",
+            params![project_id],
+            |row| row.get(0),
+        )
+        .map_err(doc_db_err)?;
+    Ok(max + 1)
+}
+
+fn doc_upsert_endpoint(
+    db: &Db,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, JsonRpcError> {
+    let project_id = doc_str_arg(args, "projectId")?;
+    let method = doc_str_arg(args, "method")?.to_uppercase();
+    let path = doc_str_arg(args, "path")?;
+    let name = doc_str_arg(args, "name")?;
+    ensure_project_exists(db, project_id)?;
+
+    let explicit_id = args
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let existing = match explicit_id {
+        Some(id) => menu_repo::get_menu_item(db, project_id, id).map_err(doc_db_err)?,
+        None => {
+            menu_repo::find_api_by_path_method(db, project_id, path, &method).map_err(doc_db_err)?
+        }
+    };
+    if let Some(item) = &existing {
+        if item.menu_type != "apiDetail" {
+            return Err(doc_err(-32602, format!("菜单项 {} 不是接口", item.id)));
+        }
+    }
+
+    // parentId：不传 = 不动位置；显式 null / 空串 = 移到根级；字符串 = 挂到该目录
+    let parent_arg = args.get("parentId");
+    let parent_id: Option<Option<String>> = match parent_arg {
+        None => None,
+        Some(serde_json::Value::Null) => Some(None),
+        Some(v) => {
+            let pid = v.as_str().map(str::trim).unwrap_or("");
+            if pid.is_empty() {
+                Some(None)
+            } else {
+                ensure_folder(db, project_id, pid, &["apiDetailFolder"])?;
+                Some(Some(pid.to_string()))
+            }
+        }
+    };
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let prev = existing.as_ref().and_then(|item| item.data_json.as_ref());
+    let prev_str = |key: &str| prev.and_then(|v| v.get(key)).and_then(|v| v.as_str());
+
+    let status = args
+        .get("status")
+        .and_then(|v| v.as_str())
+        .filter(|s| API_STATUSES.contains(s))
+        .map(str::to_string)
+        .unwrap_or_else(|| match prev_str("status") {
+            Some(s) if API_STATUSES.contains(&s) => s.to_string(),
+            _ => "designing".to_string(),
+        });
+
+    let description = args
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+        .or_else(|| prev_str("description").map(str::to_string))
+        .unwrap_or_default();
+
+    let tags = match args.get("tags") {
+        Some(serde_json::Value::Array(arr)) => serde_json::Value::Array(
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| serde_json::Value::String(s.to_string())))
+                .collect(),
+        ),
+        _ => prev
+            .and_then(|v| v.get("tags"))
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!([])),
+    };
+
+    let parameters = match args.get("parameters") {
+        Some(v) if v.is_object() || v.is_array() => doc_normalize_parameters(v),
+        _ => prev
+            .and_then(|v| v.get("parameters"))
+            .cloned()
+            .unwrap_or(serde_json::Value::Null),
+    };
+
+    let request_body = match args.get("requestBody") {
+        Some(v) if v.is_object() => doc_normalize_request_body(v),
+        _ => prev
+            .and_then(|v| v.get("requestBody"))
+            .cloned()
+            .unwrap_or(serde_json::Value::Null),
+    };
+
+    let responses = match args.get("responses").and_then(|v| v.as_array()) {
+        Some(arr) => doc_normalize_responses(arr),
+        None => prev
+            .and_then(|v| v.get("responses"))
+            .cloned()
+            .unwrap_or_else(doc_default_responses),
+    };
+
+    let api_id = existing
+        .as_ref()
+        .map(|item| item.id.clone())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let created_at = prev_str("createdAt")
+        .map(str::to_string)
+        .unwrap_or_else(|| now.clone());
+
+    let mut data = serde_json::json!({
+        "id": api_id,
+        "method": method,
+        "path": path,
+        "name": name,
+        "status": status,
+        "description": description,
+        "tags": tags,
+        "parameters": parameters,
+        "requestBody": request_body,
+        "responses": responses,
+        "createdAt": created_at,
+        "updatedAt": now,
+    });
+    // 保留既有扩展字段（如导入器写入的 source），避免 upsert 抹掉来源维度
+    if let Some(prev_obj) = prev.and_then(|v| v.as_object()) {
+        for (key, value) in prev_obj {
+            if data.get(key).is_none() {
+                data[key] = value.clone();
+            }
+        }
+    }
+
+    let created = existing.is_none();
+    {
+        let mut guard = db
+            .0
+            .lock()
+            .map_err(|_| doc_err(-32603, "数据库锁不可用"))?;
+        let tx = guard.transaction().map_err(doc_db_err)?;
+        match &existing {
+            Some(item) => {
+                let updates = serde_json::json!({ "name": name, "data": data });
+                menu_repo::update_menu_item_conn(&tx, project_id, &item.id, &updates)
+                    .map_err(doc_db_err)?;
+                if let Some(target) = &parent_id {
+                    menu_repo::set_menu_item_parent(&tx, project_id, &item.id, target.as_deref())
+                        .map_err(doc_db_err)?;
+                }
+            }
+            None => {
+                let sort_order = doc_next_sort_order(&tx, project_id)?;
+                let payload = CreateMenuItemPayload {
+                    id: api_id.clone(),
+                    parent_id: parent_id.clone().flatten(),
+                    name: name.to_string(),
+                    menu_type: "apiDetail".to_string(),
+                    data_json: Some(data),
+                    run_tab_json: None,
+                    sort_order: Some(sort_order),
+                };
+                menu_repo::create_menu_item_conn(&tx, project_id, &payload).map_err(doc_db_err)?;
+            }
+        }
+        tx.commit().map_err(doc_db_err)?;
+    }
+
+    Ok(serde_json::json!({ "id": api_id, "created": created }))
+}
+
+fn doc_delete_endpoint(
+    db: &Db,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, JsonRpcError> {
+    let project_id = doc_str_arg(args, "projectId")?;
+    let id = doc_str_arg(args, "id")?;
+    ensure_project_exists(db, project_id)?;
+    match menu_repo::get_menu_item(db, project_id, id).map_err(doc_db_err)? {
+        None => return Err(doc_err(-32602, format!("接口不存在: {id}"))),
+        Some(item) if item.menu_type != "apiDetail" => {
+            return Err(doc_err(-32602, format!("菜单项 {id} 不是接口")));
+        }
+        Some(_) => {}
+    }
+    menu_repo::delete_menu_item(db, project_id, id).map_err(doc_db_err)?;
+    Ok(serde_json::json!({ "id": id, "deleted": true }))
+}
+
+/// 解析可选父级：缺省/null/空串 → 根级，字符串 → 校验后返回。
+fn doc_optional_parent(
+    db: &Db,
+    project_id: &str,
+    args: &serde_json::Value,
+    allowed: &[&str],
+) -> Result<Option<String>, JsonRpcError> {
+    match args.get("parentId") {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(v) => {
+            let pid = v.as_str().map(str::trim).unwrap_or("");
+            if pid.is_empty() {
+                Ok(None)
+            } else {
+                ensure_folder(db, project_id, pid, allowed)?;
+                Ok(Some(pid.to_string()))
+            }
+        }
+    }
+}
+
+fn doc_create_folder(
+    db: &Db,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, JsonRpcError> {
+    let project_id = doc_str_arg(args, "projectId")?;
+    let name = doc_str_arg(args, "name")?;
+    ensure_project_exists(db, project_id)?;
+    let parent_id = doc_optional_parent(db, project_id, args, &["apiDetailFolder"])?;
+
+    let id = Uuid::new_v4().to_string();
+    let max = menu_repo::get_max_sort_order(db, project_id).map_err(doc_db_err)?;
+    let payload = CreateMenuItemPayload {
+        id: id.clone(),
+        parent_id,
+        name: name.to_string(),
+        menu_type: "apiDetailFolder".to_string(),
+        data_json: Some(serde_json::json!({ "name": name })),
+        run_tab_json: None,
+        sort_order: Some(max + 1),
+    };
+    menu_repo::create_menu_item(db, project_id, &payload).map_err(doc_db_err)?;
+    Ok(serde_json::json!({ "id": id, "created": true }))
+}
+
+fn doc_move_folder(
+    db: &Db,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, JsonRpcError> {
+    let project_id = doc_str_arg(args, "projectId")?;
+    let id = doc_str_arg(args, "id")?;
+    ensure_project_exists(db, project_id)?;
+
+    match menu_repo::get_menu_item(db, project_id, id).map_err(doc_db_err)? {
+        None => return Err(doc_err(-32602, format!("目录不存在: {id}"))),
+        Some(item) if item.menu_type != "apiDetailFolder" => {
+            return Err(doc_err(-32602, format!("菜单项 {id} 不是接口目录")));
+        }
+        Some(_) => {}
+    }
+
+    let new_name = args
+        .get("name")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    // 只有显式给出 parentId（含 null）才移动位置
+    let parent_specified = args.get("parentId").is_some();
+    let target_parent = if parent_specified {
+        doc_optional_parent(db, project_id, args, &["apiDetailFolder"])?
+    } else {
+        None
+    };
+
+    {
+        let mut guard = db
+            .0
+            .lock()
+            .map_err(|_| doc_err(-32603, "数据库锁不可用"))?;
+        let tx = guard.transaction().map_err(doc_db_err)?;
+
+        if parent_specified {
+            // 防环：目标父级不能是自身，也不能是自己的子孙
+            if target_parent.as_deref() == Some(id) {
+                return Err(doc_err(-32602, "不能把目录移动到自身之下"));
+            }
+            if let Some(pid) = target_parent.as_deref() {
+                if menu_repo::is_descendant_of(&tx, project_id, id, pid).map_err(doc_db_err)? {
+                    return Err(doc_err(-32602, "不能把目录移动到自己的子孙目录之下"));
+                }
+            }
+            menu_repo::set_menu_item_parent(&tx, project_id, id, target_parent.as_deref())
+                .map_err(doc_db_err)?;
+        }
+        if let Some(name) = new_name {
+            let updates = serde_json::json!({ "name": name });
+            menu_repo::update_menu_item_conn(&tx, project_id, id, &updates).map_err(doc_db_err)?;
+        }
+        tx.commit().map_err(doc_db_err)?;
+    }
+
+    let item = menu_repo::get_menu_item(db, project_id, id).map_err(doc_db_err)?;
+    Ok(serde_json::json!({
+        "id": id,
+        "parentId": item.as_ref().and_then(|i| i.parent_id.clone()),
+        "name": item.map(|i| i.name).unwrap_or_default(),
+    }))
+}
+
+fn doc_save_schema(
+    db: &Db,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, JsonRpcError> {
+    let project_id = doc_str_arg(args, "projectId")?;
+    let name = doc_str_arg(args, "name")?;
+    let schema = args
+        .get("jsonSchema")
+        .ok_or_else(|| doc_err(-32602, "缺少参数 jsonSchema"))?;
+    ensure_project_exists(db, project_id)?;
+    let parent_id = doc_optional_parent(db, project_id, args, &DOC_FOLDER_TYPES)?;
+
+    let items = menu_repo::list_menu_items(db, project_id).map_err(doc_db_err)?;
+    let existing = items
+        .iter()
+        .find(|i| i.menu_type == "apiSchema" && i.name == name);
+
+    let mut data = serde_json::json!({ "jsonSchema": schema });
+    // 保留来源维度，重复导入时仍能命中同一条
+    if let Some(source) = existing
+        .and_then(|i| i.data_json.as_ref())
+        .and_then(|v| v.get("source"))
+    {
+        data["source"] = source.clone();
+    }
+
+    let (id, created) = match existing {
+        Some(item) => {
+            let updates = serde_json::json!({ "name": name, "data": data });
+            menu_repo::update_menu_item(db, project_id, &item.id, &updates)
+                .map_err(doc_db_err)?;
+            (item.id.clone(), false)
+        }
+        None => {
+            let id = Uuid::new_v4().to_string();
+            let max = menu_repo::get_max_sort_order(db, project_id).map_err(doc_db_err)?;
+            let payload = CreateMenuItemPayload {
+                id: id.clone(),
+                parent_id,
+                name: name.to_string(),
+                menu_type: "apiSchema".to_string(),
+                data_json: Some(data),
+                run_tab_json: None,
+                sort_order: Some(max + 1),
+            };
+            menu_repo::create_menu_item(db, project_id, &payload).map_err(doc_db_err)?;
+            (id, true)
+        }
+    };
+
+    Ok(serde_json::json!({ "id": id, "created": created }))
+}
+
+fn doc_default_env_config() -> serde_json::Value {
+    serde_json::json!({
+        "globalParameters": { "header": [], "cookie": [], "query": [], "body": [] },
+        "legacyGlobalParameters": [],
+        "globalVariables": [],
+        "environments": [],
+    })
+}
+
+/// 按 `name` 合并：同名替换（保留原 id），异名追加，未提及的条目原样保留。
+fn doc_merge_by_name(
+    existing: &[serde_json::Value],
+    incoming: &[serde_json::Value],
+    normalize: impl Fn(&serde_json::Value, Option<&serde_json::Value>) -> serde_json::Value,
+) -> Vec<serde_json::Value> {
+    let mut out: Vec<serde_json::Value> = existing.to_vec();
+    for item in incoming {
+        let name = item.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        match out
+            .iter()
+            .position(|e| e.get("name").and_then(|v| v.as_str()) == Some(name))
+        {
+            Some(pos) => {
+                let prev = out[pos].clone();
+                out[pos] = normalize(item, Some(&prev));
+            }
+            None => out.push(normalize(item, None)),
+        }
+    }
+    out
+}
+
+fn doc_normalize_global_variable(
+    raw: &serde_json::Value,
+    prev: Option<&serde_json::Value>,
+) -> serde_json::Value {
+    let id = raw
+        .get("id")
+        .and_then(|v| v.as_str())
+        .or_else(|| prev.and_then(|p| p.get("id")).and_then(|v| v.as_str()))
+        .map(str::to_string)
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let enable = raw
+        .get("enable")
+        .and_then(|v| v.as_bool())
+        .or_else(|| prev.and_then(|p| p.get("enable")).and_then(|v| v.as_bool()))
+        .unwrap_or(true);
+    serde_json::json!({
+        "id": id,
+        "name": raw.get("name").and_then(|v| v.as_str()).unwrap_or(""),
+        "value": raw.get("value").and_then(|v| v.as_str()).unwrap_or(""),
+        "enable": enable,
+    })
+}
+
+/// 环境条目按字段覆盖：未提供的字段（如 agentUrl）沿用原值。
+fn doc_normalize_environment(
+    raw: &serde_json::Value,
+    prev: Option<&serde_json::Value>,
+) -> serde_json::Value {
+    let mut out = match prev {
+        Some(p) if p.is_object() => p.clone(),
+        _ => serde_json::json!({}),
+    };
+    let id = raw
+        .get("id")
+        .and_then(|v| v.as_str())
+        .or_else(|| prev.and_then(|p| p.get("id")).and_then(|v| v.as_str()))
+        .map(str::to_string)
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
+    out["id"] = serde_json::json!(id);
+    out["name"] = serde_json::json!(raw.get("name").and_then(|v| v.as_str()).unwrap_or(""));
+    if let Some(url) = raw.get("url").and_then(|v| v.as_str()) {
+        out["url"] = serde_json::json!(url);
+    } else if out.get("url").is_none() {
+        out["url"] = serde_json::json!("");
+    }
+    if let Some(base_urls) = raw.get("baseUrls").and_then(|v| v.as_array()) {
+        out["baseUrls"] = serde_json::Value::Array(
+            base_urls
+                .iter()
+                .map(|b| {
+                    let mut item = b.clone();
+                    if item.is_object() && item.get("id").and_then(|v| v.as_str()).is_none() {
+                        item["id"] = serde_json::json!(Uuid::new_v4().to_string());
+                    }
+                    item
+                })
+                .collect(),
+        );
+    }
+    if let Some(vars) = raw.get("variables").and_then(|v| v.as_array()) {
+        out["variables"] = serde_json::Value::Array(
+            vars.iter()
+                .map(|v| {
+                    let mut item = v.clone();
+                    if item.is_object() && item.get("id").and_then(|v| v.as_str()).is_none() {
+                        item["id"] = serde_json::json!(Uuid::new_v4().to_string());
+                    }
+                    item
+                })
+                .collect(),
+        );
+    }
+    if let Some(parameters) = raw.get("parameters") {
+        out["parameters"] = parameters.clone();
+    }
+    out
+}
+
+fn doc_save_environment(
+    db: &Db,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, JsonRpcError> {
+    let project_id = doc_str_arg(args, "projectId")?;
+    ensure_project_exists(db, project_id)?;
+
+    // 入参先做一次名称校验，避免把空名条目并进配置
+    for key in ["globalVariables", "environments"] {
+        if let Some(arr) = args.get(key).and_then(|v| v.as_array()) {
+            if arr
+                .iter()
+                .any(|item| item.get("name").and_then(|v| v.as_str()).map(str::trim).unwrap_or("").is_empty())
+            {
+                return Err(doc_err(-32602, format!("{key} 中存在缺少 name 的条目")));
+            }
+        }
+    }
+
+    let mut config = {
+        let conn = db
+            .0
+            .lock()
+            .map_err(|_| doc_err(-32603, "数据库锁不可用"))?;
+        let raw: Option<String> = conn
+            .query_row(
+                "SELECT value FROM meta WHERE project_id = ?1 AND key = 'environmentConfig'",
+                params![project_id],
+                |row| row.get(0),
+            )
+            .ok();
+        raw.and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            .filter(|v| v.is_object())
+            .unwrap_or_else(doc_default_env_config)
+    };
+
+    if let Some(incoming) = args.get("globalVariables").and_then(|v| v.as_array()) {
+        let existing = config
+            .get("globalVariables")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        config["globalVariables"] = serde_json::Value::Array(doc_merge_by_name(
+            &existing,
+            incoming,
+            doc_normalize_global_variable,
+        ));
+    }
+
+    if let Some(incoming) = args.get("environments").and_then(|v| v.as_array()) {
+        let existing = config
+            .get("environments")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        config["environments"] =
+            serde_json::Value::Array(doc_merge_by_name(&existing, incoming, doc_normalize_environment));
+    }
+
+    let config: ProjectEnvironmentConfig = serde_json::from_value(config)
+        .map_err(|e| doc_err(-32603, format!("环境配置格式错误: {e}")))?;
+    menu_repo::save_project_environments(db, project_id, &config).map_err(doc_db_err)?;
+
+    Ok(serde_json::json!({
+        "environments": config.environments.len(),
+        "globalVariables": config.global_variables.len(),
+    }))
+}
+
+fn doc_call_result(result: Result<serde_json::Value, JsonRpcError>) -> Result<ToolResult, JsonRpcError> {
+    let value = result?;
+    Ok(ToolResult {
+        content: vec![ToolResultContent {
+            content_type: "text".to_string(),
+            text: serde_json::to_string_pretty(&value).unwrap_or_default(),
+        }],
+        is_error: None,
+    })
 }
 
 async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Result<ToolResult, JsonRpcError> {
@@ -1884,6 +2806,12 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                 is_error: None,
             })
         }
+        "api-doc.upsert_endpoint" => doc_call_result(doc_upsert_endpoint(db, arguments)),
+        "api-doc.delete_endpoint" => doc_call_result(doc_delete_endpoint(db, arguments)),
+        "api-doc.create_folder" => doc_call_result(doc_create_folder(db, arguments)),
+        "api-doc.move_folder" => doc_call_result(doc_move_folder(db, arguments)),
+        "api-doc.save_schema" => doc_call_result(doc_save_schema(db, arguments)),
+        "api-doc.save_environment" => doc_call_result(doc_save_environment(db, arguments)),
         _ => Err(JsonRpcError {
             code: -32601,
             message: format!("Unknown tool: {}", name),
@@ -1896,6 +2824,7 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
 
 async fn handle_mcp_request(
     AxumState(state): AxumState<Arc<McpServerState>>,
+    headers: HeaderMap,
     Json(request): Json<JsonRpcRequest>,
 ) -> axum::response::Response {
     // JSON-RPC 通知（notifications/*）不应有响应体，返回 202 空响应
@@ -1940,6 +2869,21 @@ async fn handle_mcp_request(
         "tools/call" => {
             match serde_json::from_value::<ToolCallParams>(request.params.clone()) {
                 Ok(params) => {
+                    // 文档写工具始终要求个人令牌；绑非回环地址时全部工具都要
+                    let auth = if state.require_auth || params.name.starts_with(DOC_TOOL_PREFIX) {
+                        authorize_doc_tool(&state.db, &headers)
+                    } else {
+                        Ok(())
+                    };
+                    if let Err(e) = auth {
+                        return Json(JsonRpcResponse {
+                            jsonrpc: "2.0".to_string(),
+                            id: request.id.clone(),
+                            result: None,
+                            error: Some(e),
+                        })
+                        .into_response();
+                    }
                     match execute_tool(&params.name, &params.arguments, &state.db).await {
                         Ok(result) => JsonRpcResponse {
                             jsonrpc: "2.0".to_string(),
@@ -1982,21 +2926,24 @@ async fn handle_mcp_request(
     Json(response).into_response()
 }
 
-pub async fn start_mcp_server(db: Arc<Db>, handle: Arc<McpServerHandle>, preferred_port: u16) {
+pub async fn start_mcp_server(db: Arc<Db>, handle: Arc<McpServerHandle>, preferred_port: u16, host: &str) {
+    // 绑 0.0.0.0 时局域网可达，令牌校验扩到全部工具（见 McpServerState::require_auth）
+    let require_auth = requires_auth_for_host(host);
     let state = Arc::new(McpServerState {
         db,
         tools: get_tool_definitions(),
+        require_auth,
     });
 
     let app = Router::new()
         .route("/", post(handle_mcp_request))
         .with_state(state);
 
-    let listener = match tokio::net::TcpListener::bind(format!("127.0.0.1:{}", preferred_port)).await {
+    let listener = match tokio::net::TcpListener::bind(format!("{}:{}", host, preferred_port)).await {
         Ok(l) => l,
         Err(_) => {
             // Try random port
-            tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("Failed to bind MCP server")
+            tokio::net::TcpListener::bind(format!("{}:0", host)).await.expect("Failed to bind MCP server")
         }
     };
 
@@ -2042,7 +2989,67 @@ mod tests {
     #[test]
     fn test_tool_definitions_count() {
         let tools = get_tool_definitions();
-        assert_eq!(tools.len(), 19, "Expected 18 MCP tools, got {}", tools.len());
+        assert_eq!(tools.len(), 25, "Expected 25 MCP tools, got {}", tools.len());
+    }
+
+    #[test]
+    fn doc_parameters_flat_array_is_grouped_by_in() {
+        let raw = serde_json::json!([
+            {"name": "id", "in": "path", "type": "integer", "required": true},
+            {"name": "page", "in": "query", "type": "integer"},
+            {"name": "X-Trace", "type": "string"}
+        ]);
+        let out = doc_normalize_parameters(&raw);
+        assert_eq!(out["path"].as_array().unwrap().len(), 1);
+        assert_eq!(out["query"].as_array().unwrap().len(), 2, "缺 in 的归 query");
+        assert!(out.get("header").is_none());
+    }
+
+    #[test]
+    fn doc_request_body_accepts_content_type_alias() {
+        let body = doc_normalize_request_body(&serde_json::json!({"contentType": "json"}));
+        assert_eq!(body["type"], "json");
+    }
+
+    #[test]
+    fn auth_required_only_for_non_loopback_host() {
+        assert!(!requires_auth_for_host("127.0.0.1"));
+        assert!(!requires_auth_for_host("localhost"));
+        assert!(!requires_auth_for_host("::1"));
+        assert!(requires_auth_for_host("0.0.0.0"));
+        assert!(requires_auth_for_host("192.168.1.10"));
+    }
+
+    #[test]
+    fn test_doc_tools_defined() {
+        let tools = get_tool_definitions();
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+        for name in [
+            "api-doc.upsert_endpoint",
+            "api-doc.delete_endpoint",
+            "api-doc.create_folder",
+            "api-doc.move_folder",
+            "api-doc.save_schema",
+            "api-doc.save_environment",
+        ] {
+            assert!(names.contains(&name), "missing doc tool: {name}");
+        }
+        let upsert = tools
+            .iter()
+            .find(|t| t.name == "api-doc.upsert_endpoint")
+            .unwrap();
+        let required: Vec<&str> = upsert
+            .input_schema
+            .get("required")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        for field in ["projectId", "method", "path", "name"] {
+            assert!(required.contains(&field), "upsert 应要求 {field}");
+        }
     }
 
     #[test]
@@ -2224,6 +3231,8 @@ mod tests {
             CREATE TABLE test_tasks (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', folder_id TEXT, environment_id TEXT, environment_json TEXT, variables_json TEXT, status TEXT NOT NULL DEFAULT 'idle', fail_fast INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
             CREATE TABLE test_folders (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
             CREATE TABLE test_flow_graphs (id TEXT PRIMARY KEY, task_id TEXT NOT NULL UNIQUE, graph_json TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+            CREATE TABLE personal_tokens (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL);
+            CREATE TABLE recycle_items (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, catalog_type TEXT NOT NULL, deleted_item_json TEXT NOT NULL, creator_json TEXT NOT NULL, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL);
             ",
         )
         .unwrap();
@@ -2272,6 +3281,54 @@ mod tests {
             .unwrap()
             .block_on(execute_tool(name, &args, db))
             .unwrap()
+    }
+
+    fn call_json(db: &Db, name: &str, args: serde_json::Value) -> serde_json::Value {
+        let result = call(db, name, args);
+        serde_json::from_str(&result.content[0].text).unwrap()
+    }
+
+    fn call_err(db: &Db, name: &str, args: serde_json::Value) -> JsonRpcError {
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(execute_tool(name, &args, db))
+            .unwrap_err()
+    }
+
+    fn count_api_detail(db: &Db, path: &str) -> i64 {
+        db.0.lock()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM menu_items WHERE project_id = 'proj-1' AND type = 'apiDetail'
+                   AND json_extract(data_json, '$.path') = ?1",
+                params![path],
+                |r| r.get(0),
+            )
+            .unwrap()
+    }
+
+    fn api_data(db: &Db, id: &str) -> serde_json::Value {
+        let conn = db.0.lock().unwrap();
+        let raw: String = conn
+            .query_row(
+                "SELECT data_json FROM menu_items WHERE project_id = 'proj-1' AND id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        serde_json::from_str(&raw).unwrap()
+    }
+
+    fn env_config(db: &Db) -> serde_json::Value {
+        let conn = db.0.lock().unwrap();
+        let raw: String = conn
+            .query_row(
+                "SELECT value FROM meta WHERE project_id = 'proj-1' AND key = 'environmentConfig'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        serde_json::from_str(&raw).unwrap()
     }
 
     fn valid_graph() -> serde_json::Value {
@@ -2453,15 +3510,15 @@ mod tests {
     #[tokio::test]
     async fn protocol_handles_ping_and_notifications() {
         let db = setup_db();
-        let state = Arc::new(McpServerState { db: db.clone(), tools: get_tool_definitions() });
+        let state = Arc::new(McpServerState { db: db.clone(), tools: get_tool_definitions(), require_auth: false });
         let req1 = JsonRpcRequest { jsonrpc: "2.0".to_string(), id: Some(serde_json::json!(1)), method: "ping".to_string(), params: serde_json::json!({}) };
-        let resp1 = handle_mcp_request(AxumState(state.clone()), Json(req1)).await;
+        let resp1 = handle_mcp_request(AxumState(state.clone()), HeaderMap::new(), Json(req1)).await;
         let body1 = axum::body::to_bytes(resp1.into_body(), 1024 * 1024).await.unwrap();
         let v1: serde_json::Value = serde_json::from_slice(&body1).unwrap();
         assert!(v1.get("result").is_some(), "ping should return a result: {}", v1);
         assert!(v1.get("error").is_none(), "ping should not error");
         let req2 = JsonRpcRequest { jsonrpc: "2.0".to_string(), id: None, method: "notifications/initialized".to_string(), params: serde_json::json!({}) };
-        let resp2 = handle_mcp_request(AxumState(state.clone()), Json(req2)).await;
+        let resp2 = handle_mcp_request(AxumState(state.clone()), HeaderMap::new(), Json(req2)).await;
         assert_eq!(resp2.status(), axum::http::StatusCode::ACCEPTED, "notification should return 202 Accepted");
         let body2 = axum::body::to_bytes(resp2.into_body(), 1024 * 1024).await.unwrap();
         assert!(body2.is_empty(), "notification body should be empty");
@@ -2540,5 +3597,386 @@ mod tests {
         let got = execute_tool("api-test.get_variables", &got_args, &db).await.unwrap();
         let text = &got.content[0].text;
         assert!(text.contains("\"a\"") && text.contains("\"b\"") && text.contains("\"c\""), "no lost updates: {}", text);
+    }
+
+    // ==================== api-doc 文档写工具 ====================
+
+    fn doc_upsert_args(name: &str) -> serde_json::Value {
+        serde_json::json!({
+            "projectId": "proj-1",
+            "method": "post",
+            "path": "/api/v1/orders",
+            "name": name,
+            "status": "developing",
+            "description": "创建订单",
+            "tags": ["订单"],
+            "parameters": {
+                "query": [{"name": "page", "type": "integer", "required": true}],
+                "header": [{"name": "X-Trace", "type": "weird"}]
+            },
+            "requestBody": {
+                "type": "application/json",
+                "jsonSchema": {"type": "object"},
+                "required": true,
+                "examples": [{"name": "示例", "value": {"a": 1}}]
+            },
+            "responses": [
+                {"code": 200, "name": "成功"},
+                {"code": 401, "name": "Unauthorized"}
+            ]
+        })
+    }
+
+    #[test]
+    fn doc_upsert_endpoint_is_idempotent_by_method_and_path() {
+        let db = setup_db();
+
+        let first = call_json(&db, "api-doc.upsert_endpoint", doc_upsert_args("新建订单"));
+        let id = first["id"].as_str().unwrap().to_string();
+        assert_eq!(first["created"], serde_json::json!(true));
+
+        // 同 method+path 再写一次：更新同一条、保留 id 与 createdAt
+        let created_at = api_data(&db, &id)["createdAt"].clone();
+        let second = call_json(&db, "api-doc.upsert_endpoint", doc_upsert_args("改名订单"));
+        assert_eq!(second["id"].as_str().unwrap(), id, "同 (method,path) 应复用同一条");
+        assert_eq!(second["created"], serde_json::json!(false));
+        assert_eq!(count_api_detail(&db, "/api/v1/orders"), 1, "不应产生重复接口");
+
+        let data = api_data(&db, &id);
+        assert_eq!(data["name"], "改名订单");
+        assert_eq!(data["createdAt"], created_at, "createdAt 必须保留");
+        assert_eq!(data["status"], "developing");
+        assert_eq!(data["parameters"]["query"][0]["type"], "integer", "合法类型不应降级");
+        assert_eq!(data["parameters"]["header"][0]["type"], "string", "非法类型降级 string");
+        assert_eq!(data["requestBody"]["required"], serde_json::json!(true));
+        assert_eq!(data["responses"].as_array().unwrap().len(), 2, "多响应必须保留");
+        assert_eq!(data["responses"][1]["code"], 401);
+    }
+
+    #[test]
+    fn doc_upsert_accepts_flat_parameter_array() {
+        let db = setup_db();
+        let res = call_json(
+            &db,
+            "api-doc.upsert_endpoint",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "method": "GET",
+                "path": "/api/v1/flat",
+                "name": "扁平参数",
+                "parameters": [
+                    {"name": "id", "in": "path", "type": "integer"},
+                    {"name": "q", "in": "query", "type": "string"}
+                ]
+            }),
+        );
+        let data = api_data(&db, res["id"].as_str().unwrap());
+        assert_eq!(data["parameters"]["path"][0]["name"], "id");
+        assert_eq!(data["parameters"]["path"][0]["type"], "integer");
+        assert_eq!(data["parameters"]["query"][0]["name"], "q");
+    }
+
+    #[test]
+    fn doc_upsert_endpoint_keeps_existing_when_field_omitted() {
+        let db = setup_db();
+        let first = call_json(&db, "api-doc.upsert_endpoint", doc_upsert_args("新建订单"));
+        let id = first["id"].as_str().unwrap().to_string();
+
+        // 只给必填字段：描述 / 参数 / 响应应沿用原值
+        let second = call_json(
+            &db,
+            "api-doc.upsert_endpoint",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "method": "POST",
+                "path": "/api/v1/orders",
+                "name": "仅改名"
+            }),
+        );
+        assert_eq!(second["id"].as_str().unwrap(), id);
+
+        let data = api_data(&db, &id);
+        assert_eq!(data["description"], "创建订单");
+        assert_eq!(data["responses"].as_array().unwrap().len(), 2);
+        assert_eq!(data["parameters"]["query"][0]["name"], "page");
+        assert_eq!(data["status"], "developing", "未给 status 时沿用原状态");
+    }
+
+    #[test]
+    fn doc_upsert_endpoint_replaces_parameters_when_provided() {
+        let db = setup_db();
+        let first = call_json(&db, "api-doc.upsert_endpoint", doc_upsert_args("新建订单"));
+        let id = first["id"].as_str().unwrap().to_string();
+
+        // 传入 parameters = 整体替换：只给 query 时，原 header 参数应消失
+        let mut args = doc_upsert_args("改名订单");
+        args["parameters"] = serde_json::json!({"query": [{"name": "size", "type": "integer"}]});
+        args["tags"] = serde_json::json!(["新标签"]);
+        let second = call_json(&db, "api-doc.upsert_endpoint", args);
+        assert_eq!(second["id"].as_str().unwrap(), id, "同 (method,path) 应更新同一条");
+
+        let data = api_data(&db, &id);
+        let query = data["parameters"]["query"].as_array().unwrap();
+        assert_eq!(query.len(), 1);
+        assert_eq!(query[0]["name"], "size");
+        assert!(
+            data["parameters"].get("header").is_none(),
+            "parameters 是整体替换而非合并，旧 header 参数不该残留: {}",
+            data["parameters"]
+        );
+        assert_eq!(data["tags"], serde_json::json!(["新标签"]), "tags 同样是整体替换");
+    }
+
+    #[test]
+    fn doc_upsert_endpoint_rejects_unknown_project() {
+        let db = setup_db();
+        let mut args = doc_upsert_args("孤儿接口");
+        args["projectId"] = serde_json::json!("proj-missing");
+        let err = call_err(&db, "api-doc.upsert_endpoint", args);
+        assert_eq!(err.code, -32602);
+        assert!(err.message.contains("项目不存在"), "{}", err.message);
+    }
+
+    #[test]
+    fn doc_delete_endpoint_moves_to_recycle() {
+        let db = setup_db();
+        let created = call_json(&db, "api-doc.upsert_endpoint", doc_upsert_args("待删订单"));
+        let id = created["id"].as_str().unwrap().to_string();
+
+        let deleted = call_json(
+            &db,
+            "api-doc.delete_endpoint",
+            serde_json::json!({"projectId": "proj-1", "id": id}),
+        );
+        assert_eq!(deleted["deleted"], serde_json::json!(true));
+        assert_eq!(count_api_detail(&db, "/api/v1/orders"), 0);
+
+        let recycled: i64 = db
+            .0
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM recycle_items WHERE project_id = 'proj-1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(recycled, 1, "删除的接口应进回收站");
+
+        // 再删同一 id：报不存在
+        let err = call_err(
+            &db,
+            "api-doc.delete_endpoint",
+            serde_json::json!({"projectId": "proj-1", "id": id}),
+        );
+        assert_eq!(err.code, -32602);
+    }
+
+    #[test]
+    fn doc_folder_create_and_move_rejects_cycle() {
+        let db = setup_db();
+        let a = call_json(
+            &db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "A"}),
+        );
+        let a_id = a["id"].as_str().unwrap().to_string();
+
+        let b = call_json(
+            &db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "B", "parentId": a_id}),
+        );
+        let b_id = b["id"].as_str().unwrap().to_string();
+        assert_ne!(a_id, b_id);
+
+        // B 建在 A 下
+        let b_now = call_json(
+            &db,
+            "api-doc.move_folder",
+            serde_json::json!({"projectId": "proj-1", "id": b_id}),
+        );
+        assert_eq!(b_now["parentId"].as_str(), Some(a_id.as_str()));
+
+        // A 移到自己的子孙 B 下：报错
+        let err = call_err(
+            &db,
+            "api-doc.move_folder",
+            serde_json::json!({"projectId": "proj-1", "id": a_id, "parentId": b_id}),
+        );
+        assert_eq!(err.code, -32602);
+        assert!(err.message.contains("子孙"), "{}", err.message);
+
+        // A 移到自己下面：报错
+        let err = call_err(
+            &db,
+            "api-doc.move_folder",
+            serde_json::json!({"projectId": "proj-1", "id": a_id, "parentId": a_id}),
+        );
+        assert_eq!(err.code, -32602);
+
+        // 显式 null：B 移到根级
+        let moved = call_json(
+            &db,
+            "api-doc.move_folder",
+            serde_json::json!({"projectId": "proj-1", "id": b_id, "parentId": null}),
+        );
+        assert!(moved["parentId"].is_null(), "{}", moved);
+
+        // 改名
+        let renamed = call_json(
+            &db,
+            "api-doc.move_folder",
+            serde_json::json!({"projectId": "proj-1", "id": a_id, "name": "A2"}),
+        );
+        assert_eq!(renamed["name"], "A2");
+    }
+
+    #[test]
+    fn doc_create_folder_rejects_non_folder_parent() {
+        let db = setup_db();
+        let err = call_err(
+            &db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "X", "parentId": "api-login"}),
+        );
+        assert_eq!(err.code, -32602);
+        assert!(err.message.contains("不是目录"), "{}", err.message);
+    }
+
+    #[test]
+    fn doc_save_schema_overwrites_same_name() {
+        let db = setup_db();
+        let first = call_json(
+            &db,
+            "api-doc.save_schema",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "name": "Order",
+                "jsonSchema": {"type": "object", "properties": {"a": {"type": "string"}}}
+            }),
+        );
+        let id = first["id"].as_str().unwrap().to_string();
+        assert_eq!(first["created"], serde_json::json!(true));
+
+        let second = call_json(
+            &db,
+            "api-doc.save_schema",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "name": "Order",
+                "jsonSchema": {"type": "object", "properties": {"b": {"type": "integer"}}}
+            }),
+        );
+        assert_eq!(second["id"].as_str().unwrap(), id, "同名模型应复用同一条");
+        assert_eq!(second["created"], serde_json::json!(false));
+
+        let count: i64 = db
+            .0
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM menu_items WHERE project_id = 'proj-1' AND type = 'apiSchema'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+
+        let schema = api_data(&db, &id);
+        assert!(schema["jsonSchema"]["properties"]["b"].is_object(), "同名覆盖为新内容");
+        assert!(schema["jsonSchema"]["properties"]["a"].is_null(), "旧字段应被覆盖");
+    }
+
+    #[test]
+    fn doc_save_environment_merges_by_name() {
+        let db = setup_db();
+
+        let result = call_json(
+            &db,
+            "api-doc.save_environment",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "globalVariables": [
+                    {"name": "apiHost", "value": "https://new-host"},
+                    {"name": "token", "value": "abc"}
+                ],
+                "environments": [
+                    {"name": "测试环境", "url": "http://new-test", "variables": [{"name": "token", "value": "t1"}]},
+                    {"name": "生产环境", "url": "https://prod"}
+                ]
+            }),
+        );
+        assert_eq!(result["environments"], serde_json::json!(2));
+        assert_eq!(result["globalVariables"], serde_json::json!(2));
+
+        let config = env_config(&db);
+        let envs = config["environments"].as_array().unwrap();
+        assert_eq!(envs.len(), 2, "同名替换、异名追加");
+        let test_env = envs
+            .iter()
+            .find(|e| e["name"] == "测试环境")
+            .expect("测试环境应保留");
+        assert_eq!(test_env["id"], "env-test", "同名环境沿用原 id");
+        assert_eq!(test_env["url"], "http://new-test");
+        assert!(test_env["variables"][0]["id"].is_string(), "变量补 id");
+        assert!(envs.iter().any(|e| e["name"] == "生产环境"));
+
+        let globals = config["globalVariables"].as_array().unwrap();
+        assert_eq!(globals.len(), 2);
+        let host = globals
+            .iter()
+            .find(|v| v["name"] == "apiHost")
+            .expect("apiHost 应保留");
+        assert_eq!(host["value"], "https://new-host");
+        assert!(host["id"].is_string(), "全局变量应带上 id");
+        // 未提及的 globalParameters 不应被清空
+        assert!(config.get("globalParameters").is_some());
+    }
+
+    #[test]
+    fn doc_save_environment_rejects_unnamed_entries() {
+        let db = setup_db();
+        let err = call_err(
+            &db,
+            "api-doc.save_environment",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "environments": [{"url": "http://x"}]
+            }),
+        );
+        assert_eq!(err.code, -32602);
+    }
+
+    #[test]
+    fn doc_tools_require_valid_personal_token() {
+        use axum::http::HeaderValue;
+
+        let db = setup_db();
+
+        // 无令牌
+        let empty = HeaderMap::new();
+        assert_eq!(authorize_doc_tool(&db, &empty).unwrap_err().code, -32001);
+
+        // 无效令牌
+        let mut bad = HeaderMap::new();
+        bad.insert("X-YAPI-TOKEN", HeaderValue::from_static("nope"));
+        assert_eq!(authorize_doc_tool(&db, &bad).unwrap_err().code, -32001);
+
+        // 合法令牌：X-YAPI-TOKEN 与 Authorization: Bearer 都要通过
+        let token = personal_token_repo::create_personal_token(&db, "user-1", "mcp").unwrap();
+        let mut header = HeaderMap::new();
+        header.insert(
+            "X-YAPI-TOKEN",
+            HeaderValue::from_str(&token.token).unwrap(),
+        );
+        assert!(authorize_doc_tool(&db, &header).is_ok());
+
+        let mut bearer = HeaderMap::new();
+        bearer.insert(
+            "Authorization",
+            HeaderValue::from_str(&format!("Bearer {}", token.token)).unwrap(),
+        );
+        assert!(authorize_doc_tool(&db, &bearer).is_ok());
     }
 }

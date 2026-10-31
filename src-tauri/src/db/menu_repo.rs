@@ -1,4 +1,5 @@
 use rusqlite::{params, Connection, Transaction};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::db::client::Db;
@@ -13,6 +14,15 @@ pub fn create_menu_item(
     item: &crate::models::CreateMenuItemPayload,
 ) -> Result<ApiMenuData, crate::errors::AppError> {
     let conn = db.0.lock().unwrap();
+    create_menu_item_conn(&conn, project_id, item)
+}
+
+/// 在指定连接（通常是事务）上创建菜单项，供批量导入复用同一事务。
+pub fn create_menu_item_conn(
+    conn: &Connection,
+    project_id: &str,
+    item: &crate::models::CreateMenuItemPayload,
+) -> Result<ApiMenuData, crate::errors::AppError> {
     let now = chrono::Utc::now().to_rfc3339();
     let sort_order = item.sort_order.unwrap_or(0);
     let data_json_str = item.data_json.as_ref().map(|v| v.to_string());
@@ -44,6 +54,19 @@ pub fn update_menu_item(
     updates: &serde_json::Value,
 ) -> Result<ApiMenuData, crate::errors::AppError> {
     let conn = db.0.lock().unwrap();
+    update_menu_item_conn(&conn, project_id, menu_id, updates)
+}
+
+/// 在指定连接（通常是事务）上更新菜单项。
+///
+/// 批量导入走这个版本：整批放进一个事务，只 fsync 一次 —— 逐条提交在慢
+/// fsync 的机器上会把一次导入拖成几十秒。
+pub fn update_menu_item_conn(
+    conn: &Connection,
+    project_id: &str,
+    menu_id: &str,
+    updates: &serde_json::Value,
+) -> Result<ApiMenuData, crate::errors::AppError> {
     let now = chrono::Utc::now().to_rfc3339();
 
     if let Some(name) = updates.get("name").and_then(|v| v.as_str()) {
@@ -237,8 +260,30 @@ fn load_move_row(
     })
 }
 
+/// 把菜单项移动到指定父级（None = 根级），追加到同级末尾。
+///
+/// `update_menu_item_conn` 只能写字符串 parentId，移回根级需要单独一条路径。
+pub fn set_menu_item_parent(
+    conn: &Connection,
+    project_id: &str,
+    menu_id: &str,
+    parent_id: Option<&str>,
+) -> Result<(), crate::errors::AppError> {
+    let max_order: i32 = conn.query_row(
+        "SELECT COALESCE(MAX(sort_order), -1) FROM menu_items WHERE project_id = ?1 AND parent_id IS ?2",
+        params![project_id, parent_id],
+        |row| row.get(0),
+    )?;
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE menu_items SET parent_id = ?1, sort_order = ?2, updated_at = ?3 WHERE project_id = ?4 AND id = ?5",
+        params![parent_id, max_order + 1, now, project_id, menu_id],
+    )?;
+    Ok(())
+}
+
 /// 判断 candidate_id 是否位于 ancestor_id 的子树内(不含自身)。
-fn is_descendant_of(
+pub fn is_descendant_of(
     conn: &Connection,
     project_id: &str,
     ancestor_id: &str,
@@ -471,6 +516,155 @@ pub fn get_menu_item(
         rusqlite::Error::QueryReturnedNoRows => Ok(None),
         other => Err(crate::errors::AppError::from(other)),
     })
+}
+
+/// 按 method + path 查找已存在的接口菜单项。
+/// 导入器与 YApi 通道共用同一判定，避免两处实现漂移。
+pub fn find_api_by_path_method(
+    db: &Db,
+    project_id: &str,
+    path: &str,
+    method: &str,
+) -> Result<Option<ApiMenuData>, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    let mut stmt = conn.prepare(
+        "SELECT id, parent_id, name, type, data_json, run_tab_json, sort_order, created_at, updated_at
+         FROM menu_items
+         WHERE project_id = ?1 AND type = 'apiDetail'
+           AND json_extract(data_json, '$.path') = ?2
+           AND upper(json_extract(data_json, '$.method')) = ?3
+         ORDER BY sort_order LIMIT 1",
+    )?;
+    let mut rows = stmt.query_map(
+        params![project_id, path, method.to_uppercase()],
+        row_to_menu_data,
+    )?;
+    match rows.next() {
+        Some(row) => Ok(Some(row?)),
+        None => Ok(None),
+    }
+}
+
+/// 批量写入用的查重索引。
+///
+/// 逐条调 `find_api_by_path_method` 会让导入 N 条接口退化成 N 次全表扫描、
+/// 外加 N² 次 data_json 解析（data_json 含完整 schema，KB 级）。这里一次扫表、
+/// 在 SQL 层用 `json_extract` 取键，Rust 侧不解析 JSON，查询变成 HashMap 查找。
+#[derive(Default)]
+pub struct MenuIndex {
+    /// (来源, METHOD 大写, path) → (菜单项 id, createdAt)
+    apis: HashMap<(String, String, String), (String, Option<String>)>,
+    /// (来源, parent_id 或空串, 菜单类型, 名称) → 菜单项 id
+    by_name: HashMap<(String, String, String, String), String>,
+}
+
+fn name_key(
+    source: &str,
+    parent_id: Option<&str>,
+    menu_type: &str,
+    name: &str,
+) -> (String, String, String, String) {
+    (
+        source.to_string(),
+        parent_id.unwrap_or_default().to_string(),
+        menu_type.to_string(),
+        name.to_string(),
+    )
+}
+
+impl MenuIndex {
+    /// 查已存在的接口（大小写不敏感的 method）。
+    ///
+    /// `source` 是来源维度：不同来源的同名接口互不覆盖。
+    pub fn api_entry(&self, source: &str, method: &str, path: &str) -> Option<(&str, Option<&str>)> {
+        self.apis
+            .get(&(source.to_string(), method.to_uppercase(), path.to_string()))
+            .map(|(id, created_at)| (id.as_str(), created_at.as_deref()))
+    }
+
+    /// 查同级同名的目录 / 模型。
+    pub fn menu_id(
+        &self,
+        source: &str,
+        parent_id: Option<&str>,
+        menu_type: &str,
+        name: &str,
+    ) -> Option<&str> {
+        self.by_name
+            .get(&name_key(source, parent_id, menu_type, name))
+            .map(String::as_str)
+    }
+
+    /// 新建接口后回写，保证同一份文档里重复的 method+path 也能命中。
+    pub fn remember_api(
+        &mut self,
+        source: &str,
+        method: &str,
+        path: &str,
+        id: &str,
+        created_at: Option<&str>,
+    ) {
+        self.apis
+            .entry((source.to_string(), method.to_uppercase(), path.to_string()))
+            .or_insert_with(|| (id.to_string(), created_at.map(str::to_string)));
+    }
+
+    /// 新建目录 / 模型后回写。
+    pub fn remember_menu(
+        &mut self,
+        source: &str,
+        parent_id: Option<&str>,
+        menu_type: &str,
+        name: &str,
+        id: &str,
+    ) {
+        self.by_name
+            .entry(name_key(source, parent_id, menu_type, name))
+            .or_insert_with(|| id.to_string());
+    }
+}
+
+/// 一次扫描建立查重索引（同键保留 sort_order 最小的那条，与逐条查询语义一致）。
+pub fn build_menu_index(db: &Db, project_id: &str) -> Result<MenuIndex, crate::errors::AppError> {
+    let conn = db.0.lock().unwrap();
+    let mut stmt = conn.prepare(
+        "SELECT id, COALESCE(parent_id, ''), name, type,
+                json_extract(data_json, '$.path')      AS path,
+                json_extract(data_json, '$.method')    AS method,
+                json_extract(data_json, '$.createdAt') AS created_at,
+                COALESCE(json_extract(data_json, '$.source'), '') AS source
+         FROM menu_items WHERE project_id = ?1 ORDER BY sort_order",
+    )?;
+    let rows = stmt.query_map(params![project_id], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, Option<String>>(4)?,
+            row.get::<_, Option<String>>(5)?,
+            row.get::<_, Option<String>>(6)?,
+            row.get::<_, String>(7)?,
+        ))
+    })?;
+
+    let mut index = MenuIndex::default();
+    for row in rows {
+        let (id, parent_id, name, menu_type, path, method, created_at, source) = row?;
+        index.remember_menu(
+            &source,
+            Some(parent_id.as_str()).filter(|s| !s.is_empty()),
+            &menu_type,
+            &name,
+            &id,
+        );
+        if menu_type == "apiDetail" {
+            if let (Some(path), Some(method)) = (path, method) {
+                index.remember_api(&source, &method, &path, &id, created_at.as_deref());
+            }
+        }
+    }
+    Ok(index)
 }
 
 pub fn get_max_sort_order(

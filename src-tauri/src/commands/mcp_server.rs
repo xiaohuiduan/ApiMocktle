@@ -30,10 +30,13 @@ pub async fn get_mcp_server_status(
 pub async fn start_mcp_server(
     db: State<'_, Arc<Db>>,
     handle: State<'_, Arc<McpServerHandle>>,
+    app_config: State<'_, Arc<crate::services::app_config::AppConfigService>>,
     port: Option<u16>,
 ) -> Result<ApiResult<McpServerStatus>, String> {
     // Check if already running
     if handle.is_running().await {
+        // 手动启动过一次就记住，下次开程序自动拉起
+        app_config.set("mcp_auto_start", serde_json::json!(true));
         let current_port = handle.get_port().await;
         return Ok(ApiResult::success(McpServerStatus {
             running: true,
@@ -42,11 +45,15 @@ pub async fn start_mcp_server(
     }
 
     let preferred_port = port.unwrap_or(14203);
+    let host = app_config
+        .get("mcp_host")
+        .and_then(|v| v.as_str().map(str::to_string))
+        .unwrap_or_else(|| "0.0.0.0".to_string());
     let db_clone = db.inner().clone();
     let handle_clone = handle.inner().clone();
 
     tokio::spawn(async move {
-        crate::http::mcp_server::start_mcp_server(db_clone, handle_clone, preferred_port).await;
+        crate::http::mcp_server::start_mcp_server(db_clone, handle_clone, preferred_port, &host).await;
     });
 
     // Wait a bit for the server to start
@@ -54,6 +61,10 @@ pub async fn start_mcp_server(
 
     let running = handle.is_running().await;
     let actual_port = handle.get_port().await;
+
+    if running {
+        app_config.set("mcp_auto_start", serde_json::json!(true));
+    }
 
     Ok(ApiResult::success(McpServerStatus {
         running,
@@ -64,8 +75,11 @@ pub async fn start_mcp_server(
 #[tauri::command]
 pub async fn stop_mcp_server(
     handle: State<'_, Arc<McpServerHandle>>,
+    app_config: State<'_, Arc<crate::services::app_config::AppConfigService>>,
 ) -> Result<ApiResult<McpServerStatus>, String> {
     handle.stop().await;
+    // 手动停掉就记住，下次开程序不再自动拉起
+    app_config.set("mcp_auto_start", serde_json::json!(false));
 
     Ok(ApiResult::success(McpServerStatus {
         running: false,

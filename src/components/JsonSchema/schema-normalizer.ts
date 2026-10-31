@@ -28,7 +28,23 @@ export function normalizeJsonSchema(schema: unknown, parentRequired?: string[]):
     return normalizeJsonSchema({ $ref: s.$ref }, parentRequired)
   }
 
-  // 3. object 类型，properties 为 object map → 转数组
+  // 3. 联合类型（type 为数组，如 ["string","null"]）→ 取首个非 null 类型并标记 nullable
+  if (Array.isArray(s.type)) {
+    const types = (s.type as unknown[]).filter((t): t is string => typeof t === 'string')
+    const nullType = SchemaType.Null as string
+    const primary = types.find((t) => t !== nullType)
+
+    // 全为 null 或没有字符串项 → 原样保留，避免产出无类型节点
+    if (!primary) { return schema }
+
+    const next: Record<string, unknown> = { ...s, type: primary }
+
+    if (types.includes(nullType)) { next.nullable = true }
+
+    return normalizeJsonSchema(next, parentRequired)
+  }
+
+  // 4. object 类型，properties 为 object map → 转数组
   if (s.type === 'object' && s.properties && !Array.isArray(s.properties) && typeof s.properties === 'object') {
     const propsObj = s.properties as Record<string, unknown>
     const reqList: string[] = Array.isArray(s.required) ? s.required as string[] : []
@@ -45,12 +61,19 @@ export function normalizeJsonSchema(schema: unknown, parentRequired?: string[]):
     return result
   }
 
-  // 4. object 类型，properties 已为数组 → 递归归一化
+  // 5. object 类型，properties 已为数组 → 递归归一化
   if (s.type === 'object' && Array.isArray(s.properties)) {
     const reqList: string[] = Array.isArray(s.required) ? s.required as string[] : []
     const result: Record<string, unknown> = {
       ...s,
-      properties: (s.properties as unknown[]).map((prop) => normalizeJsonSchema(prop, reqList)),
+      properties: (s.properties as unknown[]).map((prop) => {
+        const normalized = normalizeJsonSchema(prop, reqList)
+        const record = (normalized && typeof normalized === 'object') ? normalized as Record<string, unknown> : {}
+        const name = typeof record.name === 'string' ? record.name : ''
+
+        // 父级 required[] 是权威来源：object / array 子节点不会消费 parentRequired，需在此补齐
+        return reqList.includes(name) ? { ...record, required: true } : normalized
+      }),
     }
 
     if (s.required) { delete result.required }
@@ -58,12 +81,12 @@ export function normalizeJsonSchema(schema: unknown, parentRequired?: string[]):
     return result
   }
 
-  // 5. array 类型 → 递归归一化 items
+  // 6. array 类型 → 递归归一化 items
   if (s.type === 'array' && s.items) {
     return { ...s, items: normalizeJsonSchema(s.items, parentRequired) }
   }
 
-  // 6. 叶子节点：应用父级 required
+  // 7. 叶子节点：应用父级 required
   if (s.type && s.type !== 'object' && s.type !== 'array' && parentRequired && s.name && parentRequired.includes(s.name as string)) {
     return { ...s, required: true }
   }
@@ -113,12 +136,18 @@ export function denormalizeJsonSchema(schema: unknown): unknown {
 
     if (s.title) { result.title = s.title }
 
+    if (s.nullable !== undefined) { result.nullable = s.nullable }
+
     return result
   }
 
   // array 类型
   if (s.type === 'array' && s.items) {
-    return { type: 'array', items: denormalizeJsonSchema(s.items) }
+    const result: Record<string, unknown> = { type: 'array', items: denormalizeJsonSchema(s.items) }
+
+    if (s.nullable !== undefined) { result.nullable = s.nullable }
+
+    return result
   }
 
   // 叶子节点
@@ -141,6 +170,8 @@ export function denormalizeJsonSchema(schema: unknown): unknown {
   if (s.default !== undefined) { result.default = s.default }
 
   if (s.example !== undefined) { result.example = s.example }
+
+  if (s.nullable !== undefined) { result.nullable = s.nullable }
 
   return result
 }
@@ -248,18 +279,99 @@ function resolveRef(
   return schema
 }
 
+/**
+ * 展开 allOf 组合 schema：把各成员的字段合并成一个 object 视图。
+ * - `$ref` 成员按「$ref 末段匹配模型名」解析，解析不到则跳过该成员（不产出空字段）
+ * - properties 按字段名合并（后者覆盖前者），required[] 去重合并
+ * 只用于展示与示例生成，不改写库中的原始 allOf 结构。
+ */
+export function expandAllOf(schema: JsonSchema, menuRawList?: ApiMenuData[]): JsonSchema {
+  const s = schema as unknown as Record<string, unknown> | null | undefined
+
+  if (!s || !Array.isArray(s.allOf)) { return schema }
+
+  const fields = new Map<string, Record<string, unknown>>()
+  const requiredNames = new Set<string>()
+  let memberDescription = ''
+
+  for (const rawMember of s.allOf as unknown[]) {
+    if (!rawMember || typeof rawMember !== 'object') { continue }
+
+    let member = rawMember as Record<string, unknown>
+
+    // $ref 成员：解析成真实模型；解析不到则跳过，避免产出空字段
+    if (typeof member.$ref === 'string') {
+      const refSchema = { ...member, type: SchemaType.Refer } as unknown as JsonSchema
+      const resolved = resolveRef(refSchema, menuRawList)
+
+      if (resolved.type === SchemaType.Refer) { continue }
+
+      member = resolved as unknown as Record<string, unknown>
+    }
+
+    // 成员缺少 type 但带 properties → 按 object 处理
+    if (!member.type && member.properties) { member = { ...member, type: SchemaType.Object } }
+
+    if (!memberDescription && typeof member.description === 'string') { memberDescription = member.description }
+
+    if (Array.isArray(member.required)) {
+      for (const name of member.required as unknown[]) {
+        if (typeof name === 'string') { requiredNames.add(name) }
+      }
+    }
+
+    const normalized = normalizeJsonSchema(member) as Record<string, unknown>
+    const props = Array.isArray(normalized.properties) ? normalized.properties as unknown[] : []
+
+    for (const prop of props) {
+      if (!prop || typeof prop !== 'object') { continue }
+
+      const record = prop as Record<string, unknown>
+      const name = record.name
+
+      if (typeof name !== 'string' || !name) { continue }
+
+      fields.set(name, record)
+
+      if (record.required) { requiredNames.add(name) }
+    }
+  }
+
+  const properties = Array.from(fields.entries()).map(([name, prop]) => (
+    requiredNames.has(name) ? { ...prop, required: true } : prop
+  ))
+
+  const result: Record<string, unknown> = { type: SchemaType.Object, properties }
+
+  const mergedRequired = properties
+    .map((prop) => prop.name)
+    .filter((name): name is string => typeof name === 'string' && requiredNames.has(name))
+
+  if (mergedRequired.length > 0) { result.required = mergedRequired }
+
+  const description = typeof s.description === 'string' && s.description ? s.description : memberDescription
+
+  if (description) { result.description = description }
+
+  return result as unknown as JsonSchema
+}
+
 export function getTypeLabel(node?: JsonSchema): string {
   if (!node) { return 'unknown' }
 
-  if (node.type === SchemaType.Array) {
-    const itemType = getTypeLabel(node.items)
+  let label: string
 
-    return `array<${itemType}>`
+  if (node.type === SchemaType.Array) {
+    label = `array<${getTypeLabel(node.items)}>`
+  }
+  else if (node.type === SchemaType.Refer) {
+    label = extractRefName(node.$ref)
+  }
+  else {
+    label = node.type ?? 'unknown'
   }
 
-  if (node.type === SchemaType.Refer) { return extractRefName(node.$ref) }
-
-  return node.type ?? 'unknown'
+  return node.nullable ? `${label}（可空）` : label
 }
 
 export function buildSchemaRows(
@@ -270,9 +382,10 @@ export function buildSchemaRows(
   if (!schema) { return [] }
 
   const shouldResolve = options?.resolveRefs !== false
+  const expanded = expandAllOf(schema, menuRawList)
 
-  if (shouldResolve && schema.type === SchemaType.Refer && menuRawList) {
-    const resolved = resolveRef(schema, menuRawList)
+  if (shouldResolve && expanded.type === SchemaType.Refer && menuRawList) {
+    const resolved = resolveRef(expanded, menuRawList)
 
     if (resolved.type !== SchemaType.Refer) {
       return buildSchemaRows(resolved, menuRawList, options)
@@ -281,15 +394,15 @@ export function buildSchemaRows(
     return [
       {
         key: 'ref-root',
-        name: extractRefName(schema.$ref),
-        typeLabel: `→ ${extractRefName(schema.$ref)}`,
+        name: extractRefName(expanded.$ref),
+        typeLabel: `→ ${extractRefName(expanded.$ref)}`,
         description: '引用模型未找到',
         depth: 0,
       },
     ]
   }
 
-  if (schema.type !== SchemaType.Object || !Array.isArray(schema.properties)) { return [] }
+  if (expanded.type !== SchemaType.Object || !Array.isArray(expanded.properties)) { return [] }
 
   const rows: SchemaFieldRow[] = []
 
@@ -336,7 +449,7 @@ export function buildSchemaRows(
     })
   }
 
-  walk(schema.properties, 0)
+  walk(expanded.properties, 0)
 
   return rows
 }
@@ -349,31 +462,33 @@ export function buildSchemaExample(
 ): unknown {
   if (!schema) { return {} }
 
-  if (schema.type === SchemaType.Refer && menuRawList) {
-    const resolved = resolveRef(schema, menuRawList)
+  const expanded = expandAllOf(schema, menuRawList)
+
+  if (expanded.type === SchemaType.Refer && menuRawList) {
+    const resolved = resolveRef(expanded, menuRawList)
 
     if (resolved.type !== SchemaType.Refer) { return buildSchemaExample(resolved, menuRawList) }
 
-    return { $ref: extractRefName(schema.$ref) }
+    return { $ref: extractRefName(expanded.$ref) }
   }
 
-  switch (schema.type) {
-    case SchemaType.String: return schema.example ?? 'string'
+  switch (expanded.type) {
+    case SchemaType.String: return expanded.example ?? 'string'
 
-    case SchemaType.Integer: return schema.example ?? 0
+    case SchemaType.Integer: return expanded.example ?? 0
 
-    case SchemaType.Number: return schema.example ?? 0
+    case SchemaType.Number: return expanded.example ?? 0
 
     case SchemaType.Boolean: return true
 
     case SchemaType.Null: return null
 
     case SchemaType.Array:
-      return [buildSchemaExample(schema.items, menuRawList)]
+      return [buildSchemaExample(expanded.items, menuRawList)]
 
     case SchemaType.Object: {
       const output: Record<string, unknown> = {}
-      schema.properties?.forEach((field, index) => {
+      expanded.properties?.forEach((field, index) => {
         const fieldName = field.name ?? `field_${index + 1}`
         output[fieldName] = buildSchemaExample(field, menuRawList)
       })

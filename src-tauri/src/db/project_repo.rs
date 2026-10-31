@@ -246,6 +246,22 @@ pub fn remove_project_member(
 }
 fn normalize_json_schema(schema: &mut serde_json::Value) {
     if let Some(obj) = schema.as_object_mut() {
+        // 联合类型归一：["string","null"] → type="string" + nullable=true
+        if let Some(serde_json::Value::Array(types)) = obj.get("type").cloned() {
+            if let Some(primary) = types
+                .iter()
+                .filter_map(|t| t.as_str())
+                .find(|t| *t != "null")
+            {
+                obj.insert(
+                    "type".to_string(),
+                    serde_json::Value::String(primary.to_string()),
+                );
+                if types.iter().any(|t| t.as_str() == Some("null")) {
+                    obj.insert("nullable".to_string(), serde_json::Value::Bool(true));
+                }
+            }
+        }
         // $ref-only → 补 type: "ref"
         if obj.contains_key("$ref") && !obj.contains_key("type") {
             obj.insert("type".to_string(), serde_json::Value::String("ref".to_string()));
@@ -274,8 +290,25 @@ fn normalize_json_schema(schema: &mut serde_json::Value) {
                     obj.insert("properties".to_string(), props_val);
                 }
             }
-            // 从 required[] 提取到各字段
-            if let Some(serde_json::Value::Array(_)) = obj.get("required") {
+            // 从 required[] 提取到各字段：先按 name 匹配下放，再删掉顶层数组
+            if let Some(serde_json::Value::Array(required)) = obj.get("required").cloned() {
+                let required_names: Vec<&str> =
+                    required.iter().filter_map(|v| v.as_str()).collect();
+                if let Some(serde_json::Value::Array(props)) = obj.get_mut("properties") {
+                    for prop in props.iter_mut() {
+                        let hit = prop
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .is_some_and(|name| required_names.contains(&name));
+                        if hit {
+                            if let Some(prop_obj) = prop.as_object_mut() {
+                                // required[] 是权威来源：命中即置 true，字段上的 false 不覆盖它
+                                prop_obj
+                                    .insert("required".to_string(), serde_json::Value::Bool(true));
+                            }
+                        }
+                    }
+                }
                 obj.remove("required");
             }
         }
@@ -415,4 +448,217 @@ pub fn get_project_state(
         project_environments,
         project_environment_config,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn normalize(schema: &mut serde_json::Value) {
+        normalize_json_schema(schema);
+    }
+
+    fn prop_required(schema: &serde_json::Value, name: &str) -> Option<bool> {
+        schema
+            .get("properties")
+            .and_then(|v| v.as_array())
+            .and_then(|arr| {
+                arr.iter()
+                    .find(|p| p.get("name").and_then(|n| n.as_str()) == Some(name))
+            })
+            .and_then(|p| p.get("required"))
+            .and_then(|v| v.as_bool())
+    }
+
+    #[test]
+    fn required_array_is_pushed_down_to_fields() {
+        let mut schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "a": { "type": "string" },
+                "b": { "type": "number" },
+                "c": { "type": "boolean" }
+            },
+            "required": ["a", "b"]
+        });
+
+        normalize(&mut schema);
+
+        assert_eq!(prop_required(&schema, "a"), Some(true));
+        assert_eq!(prop_required(&schema, "b"), Some(true));
+        assert_eq!(
+            prop_required(&schema, "c"),
+            None,
+            "未在 required[] 的字段不应被标记"
+        );
+        assert!(
+            schema.get("required").is_none(),
+            "顶层 required 数组应被移除: {schema}"
+        );
+    }
+
+    #[test]
+    fn required_names_without_matching_property_are_ignored() {
+        let mut schema = serde_json::json!({
+            "type": "object",
+            "properties": { "a": { "type": "string" } },
+            "required": ["a", "ghost"]
+        });
+
+        normalize(&mut schema);
+
+        let props = schema.get("properties").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(props.len(), 1, "不产生幽灵字段: {schema}");
+        assert_eq!(prop_required(&schema, "a"), Some(true));
+    }
+
+    #[test]
+    fn nested_objects_keep_their_own_required_lists() {
+        let mut schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "outer": {
+                    "type": "object",
+                    "properties": {
+                        "inner_a": { "type": "string" },
+                        "inner_b": { "type": "string" }
+                    },
+                    "required": ["inner_a"]
+                },
+                "top": { "type": "string" }
+            },
+            "required": ["outer"]
+        });
+
+        normalize(&mut schema);
+
+        assert_eq!(prop_required(&schema, "outer"), Some(true));
+        assert_eq!(prop_required(&schema, "top"), None);
+
+        let outer = schema
+            .get("properties")
+            .and_then(|v| v.as_array())
+            .unwrap()
+            .iter()
+            .find(|p| p.get("name").and_then(|n| n.as_str()) == Some("outer"))
+            .unwrap();
+        assert_eq!(prop_required(outer, "inner_a"), Some(true));
+        assert_eq!(prop_required(outer, "inner_b"), None);
+        // 外层 required[] 已下放到 inner_a；outer 自身的 required 变成父级下放的布尔标记
+        assert_eq!(
+            outer.get("required").and_then(|v| v.as_bool()),
+            Some(true),
+            "嵌套对象的 required 数组应已下放，只剩布尔标记"
+        );
+    }
+
+    #[test]
+    fn union_type_with_null_becomes_nullable() {
+        let mut schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "beat_percent": { "type": ["integer", "null"] },
+                "name": { "type": "string" }
+            }
+        });
+
+        normalize(&mut schema);
+
+        let props = schema.get("properties").and_then(|v| v.as_array()).unwrap();
+        let beat = props
+            .iter()
+            .find(|p| p.get("name").and_then(|n| n.as_str()) == Some("beat_percent"))
+            .unwrap();
+        assert_eq!(beat.get("type").and_then(|v| v.as_str()), Some("integer"));
+        assert_eq!(beat.get("nullable").and_then(|v| v.as_bool()), Some(true));
+
+        let name = props
+            .iter()
+            .find(|p| p.get("name").and_then(|n| n.as_str()) == Some("name"))
+            .unwrap();
+        assert!(name.get("nullable").is_none(), "非联合类型不应带 nullable");
+    }
+
+    #[test]
+    fn all_null_union_type_is_kept_as_is() {
+        let mut schema = serde_json::json!({
+            "type": "object",
+            "properties": { "weird": { "type": ["null"] } }
+        });
+
+        normalize(&mut schema);
+
+        let props = schema.get("properties").and_then(|v| v.as_array()).unwrap();
+        let weird = props
+            .iter()
+            .find(|p| p.get("name").and_then(|n| n.as_str()) == Some("weird"))
+            .unwrap();
+        assert_eq!(
+            weird
+                .get("type")
+                .and_then(|v| v.as_array())
+                .map(|a| a.len()),
+            Some(1),
+            "全 null 的联合类型原样保留: {weird}"
+        );
+        assert!(weird.get("nullable").is_none());
+    }
+
+    /// 读路径端到端：库里存标准格式（object map + required[]），
+    /// 经 get_project_state 读出后必填已下放到字段（AC-1 的判定路径）。
+    #[test]
+    fn get_project_state_pushes_required_down_to_fields() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::client::create_tables(&conn);
+        conn.execute(
+            "INSERT INTO users (id, username, password_hash, created_at) VALUES ('u1', 'tester', 'x', '2026-01-01')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO projects (id, name, owner_id, created_at) VALUES ('p1', 'demo', 'u1', '2026-01-01')",
+            [],
+        )
+        .unwrap();
+        let data = serde_json::json!({
+            "method": "GET",
+            "path": "/demo",
+            "responses": [{
+                "id": "r1",
+                "code": 200,
+                "name": "成功",
+                "contentType": "json",
+                "jsonSchema": {
+                    "type": "object",
+                    "properties": {
+                        "code": { "type": "integer" },
+                        "data": { "type": "string" }
+                    },
+                    "required": ["code"]
+                }
+            }]
+        });
+        conn.execute(
+            "INSERT INTO menu_items (project_id, id, name, type, data_json, sort_order, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, 0, '2026-01-01', '2026-01-01')",
+            params!["p1", "m1", "demo", "apiDetail", data.to_string()],
+        )
+        .unwrap();
+
+        let db = Db(std::sync::Mutex::new(conn));
+        let state = get_project_state(&db, "p1").unwrap();
+        let schema = state.menu_raw_list[0]
+            .data_json
+            .as_ref()
+            .unwrap()
+            .get("responses")
+            .and_then(|v| v.as_array())
+            .unwrap()[0]
+            .get("jsonSchema")
+            .unwrap();
+
+        assert_eq!(prop_required(schema, "code"), Some(true), "必填字段应下放 required: true");
+        assert_eq!(prop_required(schema, "data"), None, "非必填字段不应被标记");
+        assert!(schema.get("required").is_none(), "顶层不应残留 required 数组");
+    }
 }

@@ -3,17 +3,14 @@ import { useLocation } from 'react-router'
 
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
-import { Button, Checkbox, Input, message, Modal, Progress, Space, theme, Tree, Typography } from 'antd'
-import type { CheckboxChangeEvent } from 'antd/es/checkbox'
-import type { DataNode } from 'antd/es/tree'
+import { Button, Input, message, Modal, Progress, Space, theme, Typography } from 'antd'
 
 import { api } from '@/api-client'
-import type { ApiMenuData } from '@/components/ApiMenu'
-import { ApiTreeTitle } from '@/components/project-settings/ApiTreeTitle'
 import { ExportPanel } from '@/components/project-settings/ExportPanel'
+import { ExportTreeSelect } from '@/components/project-settings/ExportTreeSelect'
 import { useAuth } from '@/contexts/auth'
 import { type ProjectStateSnapshot, useMenuHelpersContext } from '@/contexts/menu-helpers'
-import { MenuItemType } from '@/enums'
+import { getAllApiIds } from '@/helpers'
 
 function resolveProjectId(pathname: string) {
   const parts = pathname.split('/').filter(Boolean)
@@ -87,84 +84,9 @@ export function ApiTransferPanel() {
 
   const projectId = useMemo(() => resolveProjectId(pathname), [pathname])
 
-  // 构建 API 接口树
-  const apiTreeData = useMemo((): DataNode[] => {
-    if (!menuRawList) {
-      return []
-    }
-
-    const apis = menuRawList.filter((item) => item.type === MenuItemType.ApiDetail)
-    const childrenMap = new Map<string, ApiMenuData[]>()
-    const topLevel: ApiMenuData[] = []
-
-    for (const api of apis) {
-      if (api.parentId) {
-        const children = childrenMap.get(api.parentId) ?? []
-        children.push(api)
-        childrenMap.set(api.parentId, children)
-      }
-      else {
-        topLevel.push(api)
-      }
-    }
-
-    function buildNodes(items: ApiMenuData[]): DataNode[] {
-      return items.map((item) => ({
-        key: item.id,
-        title: <ApiTreeTitle item={item} />,
-      }))
-    }
-
-    const folders = menuRawList.filter((f) => f.type === MenuItemType.ApiDetailFolder)
-    const folderNodes = folders.map((folder) => ({
-      key: folder.id,
-      title: folder.name,
-      selectable: false,
-      children: buildNodes(childrenMap.get(folder.id) ?? []),
-    }))
-
-    return [...folderNodes, ...buildNodes(topLevel)]
-  }, [menuRawList])
-
-  const allApiIds = useMemo(() => {
-    if (!menuRawList) {
-      return []
-    }
-
-    return menuRawList.filter((i) => i.type === MenuItemType.ApiDetail).map((i) => i.id)
-  }, [menuRawList])
-
-  const normalizeCheckedIds = (keys: React.Key[]) => {
-    const result = new Set<string>()
-
-    for (const key of keys) {
-      const folder = menuRawList?.some(
-        (f) => f.type === MenuItemType.ApiDetailFolder && f.id === key,
-      )
-
-      if (folder) {
-        menuRawList
-          ?.filter((a) => a.type === MenuItemType.ApiDetail && a.parentId === key)
-          .forEach((a) => result.add(a.id))
-      }
-      else {
-        result.add(String(key))
-      }
-    }
-
-    return result
-  }
-
-  const isAllChecked = allApiIds.length > 0 && checkedApiIds.size === allApiIds.length
-  const isIndeterminate = checkedApiIds.size > 0 && checkedApiIds.size < allApiIds.length
-
   const initSelectiveExport = () => {
-    setCheckedApiIds(new Set(allApiIds))
+    setCheckedApiIds(new Set(getAllApiIds(menuRawList ?? [])))
     setSelectModalOpen(true)
-  }
-
-  const handleCheckAll = (e: CheckboxChangeEvent) => {
-    setCheckedApiIds(e.target.checked ? new Set(allApiIds) : new Set())
   }
 
   const handleSelectiveExport = async (specFormat: 'openapi' | 'swagger') => {
@@ -269,10 +191,13 @@ export function ApiTransferPanel() {
           ? 'json'
           : 'auto'
 
+      // 来源标识 = 文件名（不含扩展名）：不同来源的同名接口 / 目录 / 模型互不覆盖
+      const source = file.name.replace(/\.[^.]+$/, '')
+
       const payload = await api<{ imported: { format: string }, state?: ProjectStateSnapshot }>('import_api_document', {
         sessionId,
         projectId,
-        payload: { format, content },
+        payload: { format, content, source },
       })
 
       if (payload.state) {
@@ -384,10 +309,13 @@ export function ApiTransferPanel() {
 
       const content = await response.text()
 
+      // 链接导入：用链接本身当来源标识，避免与其它来源的同名接口互相覆盖
+      const source = trimmed
+
       const payload = await api<{ imported: { format: string }, state?: ProjectStateSnapshot }>('import_api_document', {
         sessionId,
         projectId,
-        payload: { format: 'auto', content },
+        payload: { format: 'auto', content, source },
       })
 
       if (payload.state) {
@@ -556,33 +484,8 @@ export function ApiTransferPanel() {
         onCancel={() => { setSelectModalOpen(false) }}
       >
         <div className="mb-3">
-          <Checkbox
-            checked={isAllChecked}
-            indeterminate={isIndeterminate}
-            onChange={handleCheckAll}
-          >
-            <span className="text-sm">全选 / 取消全选</span>
-          </Checkbox>
+          <ExportTreeSelect checkedApiIds={checkedApiIds} onChange={setCheckedApiIds} />
         </div>
-        {apiTreeData.length > 0
-          ? (
-              <Tree
-                blockNode
-                checkable
-                defaultExpandAll
-                checkedKeys={Array.from(checkedApiIds)}
-                treeData={apiTreeData}
-                onCheck={(checkedKeys) => {
-                  const keys = Array.isArray(checkedKeys)
-                    ? checkedKeys
-                    : checkedKeys.checked
-                  setCheckedApiIds(normalizeCheckedIds(keys))
-                }}
-              />
-            )
-          : (
-              <Typography.Text type="secondary">暂无接口数据</Typography.Text>
-            )}
       </Modal>
     </div>
   )

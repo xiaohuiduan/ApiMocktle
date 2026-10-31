@@ -66,6 +66,9 @@ src-tauri/target-test/
 # Electron/Tauri release output
 /release/
 
+# 便携版产物
+/dist-portable/
+
 # Playwright test output
 /test-results/
 /playwright-report/
@@ -88,3 +91,8 @@ plans/**
 .opencode
 .zcode
 /blog/
+/.codegraph
+/.omp
+/docs/apifox-migration-findings.md
+/.gitattributes
+/src-tauri/gen/schemas/linux-schema.json

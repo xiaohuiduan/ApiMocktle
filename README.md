@@ -209,10 +209,43 @@ pnpm tauri:dev
 pnpm tauri:build
 ```
 
+### 构建 Windows 便携版
+
+产出一个**拷贝即用**的目录，不需要安装，数据跟着目录走。
+
+```sh
+pnpm portable:win
+```
+
+产物在 `dist-portable/ApiMocktle/`：
+
+```
+ApiMocktle/
+├── ApiMocktle.exe   # 主程序
+├── dist/             # 前端静态资源（分享页面用）
+└── data/             # 运行时数据，首次启动自动创建
+```
+
+把整个 `ApiMocktle` 目录拷到目标 Windows 机器，双击 `ApiMocktle.exe` 即可运行。
+数据全部写在同目录 `data/` 下（数据库、配置、WebView2 的 localStorage），
+**与安装版数据互不相通**，便携版不会读写 `%APPDATA%` 里的内容。
+
+> 便携版需放在有写权限的目录下。放在 `Program Files` 等只读位置会启动失败并提示。
+
+构建需要交叉编译工具链：
+
+```sh
+rustup target add x86_64-pc-windows-msvc
+cargo install cargo-xwin
+```
+
+`cargo-xwin` 首次运行会下载 MSVC SDK（约 1GB，需联网），之后可离线使用。
+
 ## 数据库
 
-- 默认位置：`%APPDATA%/com.apimocktle.app/runtime/apimocktle.sqlite`（Windows）
+- 默认位置：`%APPDATA%/com.apimocktle.desktop/runtime/apimocktle.sqlite`（Windows）
 - 启动时自动创建所需表结构
+- 便携版：`<exe 同级>/data/runtime/apimocktle.sqlite`
 - 表包括：users、sessions、projects、project_members、menu_items、recycle_items、meta、share_links、personal_tokens
 
 ## 导入导出说明

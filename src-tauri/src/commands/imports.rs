@@ -29,9 +29,15 @@ pub fn import_api_document(
         Err(e) => return e.into(),
     };
 
-    match import_service::import_api_document(&db, &project_id, &payload.format, &payload.content) {
+    match import_service::import_api_document(
+        &db,
+        &project_id,
+        &payload.format,
+        &payload.content,
+        payload.source.as_deref(),
+    ) {
         Ok(state) => ApiResult::success(serde_json::json!({
-            "imported": { "format": payload.format },
+            "imported": { "format": payload.format, "source": payload.source },
             "state": state,
         })),
         Err(e) => e.into(),

@@ -6,6 +6,8 @@ export interface BaseSchema {
   description?: string
   /** 标准 JSON Schema 扩展：字段标题 */
   title?: string
+  /** 标准 JSON Schema 扩展：是否可空（由 type 联合类型中的 null 归一而来） */
+  nullable?: boolean
   /** 标准 JSON Schema 扩展：是否必填（从父级 required[] 提取） */
   required?: boolean
   /** 标准 JSON Schema 扩展：枚举值 */
