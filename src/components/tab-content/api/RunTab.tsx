@@ -570,16 +570,20 @@ export function RunTab() {
     }
   }
 
-  // 一键填充 Body
+  // 一键填充 Body：优先按 schema 生成示例；无 schema 时回退到文档里写的正文
+  // （文档 rawText 不再自动写入编辑器，只能通过这里显式取用）
   const handleFillBody = () => {
     if (!workCopy) { return }
 
     const text = fillWithComments
       ? buildJsoncBodyFillText(workCopy, menuRawList)
       : buildBodyFillText(workCopy, menuRawList)
+    const docRawText = originalDocRef.current?.requestBody?.rawText ?? ''
+    const finalText = text.trim() ? text : docRawText
+
     const next = {
       ...workCopy,
-      requestBody: { ...(workCopy.requestBody ?? { type: BodyType.None }), rawText: text },
+      requestBody: { ...(workCopy.requestBody ?? { type: BodyType.None }), rawText: finalText },
     }
     setWorkCopy(next)
     persist(next)

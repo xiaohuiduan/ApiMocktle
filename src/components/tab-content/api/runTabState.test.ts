@@ -43,6 +43,27 @@ describe('resolveInitialWorkCopy', () => {
     expect(result.requestBody?.rawText).toBe('{"from":"saved"}')
   })
 
+  it('旧载荷里与文档 rawText 完全相同的正文视为自动填充回显，一次性丢弃', () => {
+    const schemaText = '{"$schema":"http://json-schema.org/draft-04/schema#","type":"object"}'
+    const doc = withBody(makeDoc(), schemaText)
+    // 无 v 标记 = 旧载荷
+    const localCopy = { docUpdatedAt: 'v1', workCopy: withBody(makeDoc(), schemaText) }
+
+    const result = resolveInitialWorkCopy({ docValue: doc, localCopy, docUpdatedAt: 'v1' })
+
+    expect(result.requestBody?.rawText).toBe('')
+  })
+
+  it('v2 载荷里的正文原样保留（即使用户填的与文档相同）', () => {
+    const sameText = '{"amount":1}'
+    const doc = withBody(makeDoc(), sameText)
+    const localCopy = { v: 2, docUpdatedAt: 'v1', workCopy: withBody(makeDoc(), sameText) }
+
+    const result = resolveInitialWorkCopy({ docValue: doc, localCopy, docUpdatedAt: 'v1' })
+
+    expect(result.requestBody?.rawText).toBe(sameText)
+  })
+
   it('本地副本与文档版本一致时保留用户填写的 Body', () => {
     const doc = makeDoc()
     const localCopy = { docUpdatedAt: 'v1', workCopy: withBody(doc, '{"typed":"local"}') }
@@ -61,13 +82,33 @@ describe('resolveInitialWorkCopy', () => {
     expect(result.requestBody?.rawText).toBe('{"typed":"legacy"}')
   })
 
-  it('文档版本变化且文档自身定义了 Body 时以文档为准', () => {
+  it('文档版本变化时正文仍用用户自己的输入，不用文档 rawText 覆盖', () => {
     const doc = withBody(makeDoc(), '{"from":"doc"}')
     const localCopy = { docUpdatedAt: 'v1', workCopy: withBody(makeDoc(), '{"typed":"local"}') }
 
     const result = resolveInitialWorkCopy({ docValue: doc, localCopy, docUpdatedAt: 'v2' })
 
-    expect(result.requestBody?.rawText).toBe('{"from":"doc"}')
+    expect(result.requestBody?.rawText).toBe('{"typed":"local"}')
+  })
+
+  it('文档里存的是 JSON Schema 源码时，首次进入不会把它写进编辑器', () => {
+    const doc = withBody(makeDoc(), '{"$schema":"http://json-schema.org/draft-04/schema#","type":"object","properties":{}}')
+
+    const result = resolveInitialWorkCopy({ docValue: doc, docUpdatedAt: 'v1' })
+
+    expect(result.requestBody?.rawText).toBe('')
+    expect(result.requestBody?.type).toBe(BodyType.Json)
+    // 文档定义的结构仍保留，供「一键填充」使用
+    expect(result.requestBody).toBeDefined()
+  })
+
+  it('本地副本为空正文时，文档 rawText 也不会被填入（用户没填就是空）', () => {
+    const doc = withBody(makeDoc(), '{"$schema":"http://json-schema.org/draft-04/schema#"}')
+    const localCopy = { docUpdatedAt: 'v1', workCopy: withBody(makeDoc(), '') }
+
+    const result = resolveInitialWorkCopy({ docValue: doc, localCopy, docUpdatedAt: 'v2' })
+
+    expect(result.requestBody?.rawText).toBe('')
   })
 
   it('文档版本变化但文档与保存点都没有 Body 时保留本地 Body（不清空）', () => {

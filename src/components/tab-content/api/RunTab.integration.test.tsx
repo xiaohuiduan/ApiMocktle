@@ -256,6 +256,101 @@ describe('运行 Tab：Body 跨挂载回显', () => {
     })
   })
 
+  it('文档定义了 JSON Schema 但 Body 为空时，切页签与重挂载都不会被自动填充示例', async () => {
+    const doc = makeDoc({
+      requestBody: {
+        type: BodyType.Json,
+        jsonSchema: {
+          type: 'object',
+          properties: [{ name: 'amount', type: 'number' }],
+        },
+      } as never,
+    })
+
+    const view = mountWith(doc)
+
+    // 首次进入：编辑器为空，不自动填充 schema 示例
+    expect(bodyEditor(view.container).value).toBe('')
+
+    // 切到 Params 再切回 Body
+    fireEvent.click(screen.getByText('Params'))
+    fireEvent.click(screen.getByText('Body'))
+
+    expect(bodyEditor(view.container).value).toBe('')
+
+    // 空 Body 运行：实际发送空内容（不回退示例）
+    fireEvent.click(screen.getByRole('button', { name: /运\s*行/ }))
+
+    await waitFor(() => {
+      expect(h.state.calls.some((c) => c.action === 'run_api_request')).toBe(true)
+    })
+
+    const runCall = h.state.calls.find((c) => c.action === 'run_api_request')
+
+    expect(runCall?.payload.payload.body).toBe('')
+
+    view.unmount()
+
+    // 重新挂载：仍为空
+    const again = mountWith(doc)
+
+    await waitFor(() => {
+      expect(bodyEditor(again.container).value).toBe('')
+    })
+  })
+
+  it('文档 rawText 是一段 JSON Schema 时，进入与重进都不会把它填进编辑器', async () => {
+    const schemaText = '{"$schema":"http://json-schema.org/draft-04/schema#","type":"object","description":"Map","properties":{"string":{"type":"object","properties":{}}}}'
+    const doc = makeDoc({
+      requestBody: {
+        type: BodyType.Json,
+        rawText: schemaText,
+        jsonSchema: {
+          type: 'object',
+          description: 'Map',
+          properties: [{ name: 'string', type: 'object', properties: [] }],
+        },
+      } as never,
+    })
+
+    const first = mountWith(doc)
+
+    expect(bodyEditor(first.container).value).toBe('')
+
+    first.unmount()
+
+    const second = mountWith(doc)
+
+    await waitFor(() => {
+      expect(bodyEditor(second.container).value).toBe('')
+    })
+
+    // 「一键填充」是显式动作：按 schema 生成示例（而不是把 schema 源码写进编辑器）
+    fireEvent.click(screen.getByRole('button', { name: '一键填充' }))
+
+    await waitFor(() => {
+      expect(bodyEditor(second.container).value).toContain('"string"')
+    })
+
+    expect(bodyEditor(second.container).value).not.toBe(schemaText)
+  })
+
+  it('文档只有 rawText 没有 schema 时，一键填充回退到文档正文', async () => {
+    const doc = makeDoc({
+      requestBody: { type: BodyType.Json, rawText: '{"amount":1}' } as never,
+    })
+
+    const view = mountWith(doc)
+
+    expect(bodyEditor(view.container).value).toBe('')
+
+    fireEvent.click(screen.getByRole('button', { name: '一键填充' }))
+
+    await waitFor(() => {
+      expect(bodyEditor(view.container).value).toBe('{"amount":1}')
+    })
+  })
+
   it('菜单数据晚于首帧到达时仍能恢复本地副本（不因时序丢 Body）', async () => {
     const doc = makeDoc()
 
