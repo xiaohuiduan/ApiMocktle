@@ -1,47 +1,38 @@
 import { useMemo } from 'react'
 
-import { Button, Modal, Switch, Tag, theme, Typography } from 'antd'
+import { Button, Modal, Switch, theme, Typography } from 'antd'
 
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { BodyType } from '@/enums'
 import { useDynamicVariableDefs } from '@/hooks/useDynamicVariableDefs'
 import type { ApiRequestBody, Parameter } from '@/types'
 
+import { type BodySlot, BodyTypeSelect } from '../components/BodyTypeSelect'
 import { DynamicVariablesHelp } from '../components/DynamicVariablesHelp'
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
 
-/** 判断某个 body 类型是否已有内容（用于类型标签的绿标） */
-function bodyTypeHasContent(requestBody: ApiRequestBody | undefined, t: BodyType): boolean {
-  if (!requestBody) {
-    return false
+/**
+ * 计算哪些内容槽位有「将被发送」的内容。
+ *
+ * 运行态只认真正会被 `buildRequest` 读取的载体：`parameters` 表格与 `rawText` 正文。
+ * 刻意不计入 `jsonSchema`——json 发送时只读 `rawText`，文档里的 schema 不参与发送，
+ * 把它算作「有内容」会造成「编辑器空白却标着有内容」。
+ */
+function getFilledSlots(requestBody: ApiRequestBody | undefined): BodySlot[] {
+  if (!requestBody) { return [] }
+
+  const slots: BodySlot[] = []
+
+  if ((requestBody.parameters ?? []).some((p) => p.name && p.enable !== false)) {
+    slots.push('parameters')
   }
 
-  if (t === BodyType.FormData || t === BodyType.UrlEncoded) {
-    return (requestBody.parameters ?? []).some((p) => p.name && p.enable !== false)
+  if (requestBody.rawText?.trim()) {
+    slots.push('raw')
   }
 
-  if (t === BodyType.Json) {
-    const schema = requestBody.jsonSchema as { properties?: unknown[] } | undefined
-
-    return !!(schema?.properties?.length) || !!(requestBody.rawText?.trim())
-  }
-
-  if (t === BodyType.Xml || t === BodyType.Raw || t === BodyType.Binary) {
-    return !!(requestBody.rawText?.trim())
-  }
-
-  return false
+  return slots
 }
-
-const bodyTypeOptions = [
-  { n: 'none', t: BodyType.None },
-  { n: 'form-data', t: BodyType.FormData },
-  { n: 'url-encoded', t: BodyType.UrlEncoded },
-  { n: 'json', t: BodyType.Json },
-  { n: 'xml', t: BodyType.Xml },
-  { n: 'raw', t: BodyType.Raw },
-  { n: 'binary', t: BodyType.Binary },
-]
 
 interface BodyPanelProps {
   requestBody?: ApiRequestBody
@@ -74,6 +65,8 @@ export function BodyPanel(props: BodyPanelProps) {
   // 快捷请求的数据可能没有 requestBody 字段（cURL 导入无请求体、历史数据、示例数据），
   // 此时仍要渲染类型选择器，否则用户永远无法切到 json / form-data。
   const body: ApiRequestBody = requestBody ?? { type: BodyType.None }
+
+  const filledSlots = useMemo(() => getFilledSlots(requestBody), [requestBody])
 
   // 变量补全项：内置动态变量 + 已定义用户变量
   const dynamicDefs = useDynamicVariableDefs()
@@ -125,25 +118,13 @@ export function BodyPanel(props: BodyPanelProps) {
       {/* Body Type 选择器 - 固定高度 */}
       <div className="shrink-0">
         <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1">
-            {bodyTypeOptions.map(({ n, t }) => {
-              const hasContent = bodyTypeHasContent(body, t)
-
-              return (
-                <Tag.CheckableTag
-                  key={t}
-                  checked={body.type === t}
-                  onChange={(checked) => {
-                    if (checked && onBodyTypeChange) {
-                      onBodyTypeChange(t)
-                    }
-                  }}
-                >
-                  {n}
-                  {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
-                </Tag.CheckableTag>
-              )
-            })}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs" style={{ color: token.colorTextSecondary }}>Body 类型</span>
+            <BodyTypeSelect
+              filledSlots={filledSlots}
+              value={body.type}
+              onChange={(type) => { onBodyTypeChange?.(type) }}
+            />
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {showFillButton && onFillBody && (

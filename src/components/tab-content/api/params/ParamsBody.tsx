@@ -1,4 +1,4 @@
-import { Flex, Tag, theme } from 'antd'
+import { Flex, theme } from 'antd'
 
 import { SchemaType } from '@/components/JsonSchema'
 import { JsonSchemaCard } from '@/components/JsonSchemaCard'
@@ -6,49 +6,35 @@ import { BodyType } from '@/enums'
 import { useStyles } from '@/hooks/useStyle'
 import type { ApiDetails, ApiEnvironmentValue } from '@/types'
 
+import { type BodySlot, BodyTypeSelect } from '../components/BodyTypeSelect'
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
 
 import { GlobalParametersNotice } from './GlobalParametersNotice'
 
-function hasBodyTypeContent(value: ApiDetails['requestBody'] | undefined, type: BodyType): boolean {
-  if (!value) { return false }
+/**
+ * 文档编辑态的内容槽位判定。
+ *
+ * 与运行态刻意不同：这一侧 json / xml 的内容载体是 `jsonSchema`（结构化编辑器），
+ * raw / binary 才是 `rawText`。运行态发送时只读 `rawText`，故两处不能共用同一谓词。
+ */
+function getFilledSlots(value: ApiDetails['requestBody'] | undefined): BodySlot[] {
+  if (!value) { return [] }
 
-  switch (type) {
-    case BodyType.FormData:
-      // fallthrough
+  const slots: BodySlot[] = []
 
-    case BodyType.UrlEncoded:
-      return (value.parameters ?? []).some((p) => p.name && p.enable !== false)
-
-    case BodyType.Json:
-      // fallthrough
-
-    case BodyType.Xml:
-      // fallthrough
-      return !!(value.jsonSchema && (
-        (value.jsonSchema as { properties?: unknown[] }).properties?.length
-      ))
-
-    case BodyType.Raw:
-    // fallthrough
-
-    case BodyType.Binary:
-      return !!(value.rawText?.trim())
-
-    default:
-      return false
+  if ((value.parameters ?? []).some((p) => p.name && p.enable !== false)) {
+    slots.push('parameters')
   }
-}
 
-const types = [
-  { name: 'none', type: BodyType.None },
-  { name: 'form-data', type: BodyType.FormData },
-  { name: 'x-www-form-urlencoded', type: BodyType.UrlEncoded },
-  { name: 'json', type: BodyType.Json },
-  { name: 'xml', type: BodyType.Xml },
-  { name: 'raw', type: BodyType.Raw },
-  { name: 'binary', type: BodyType.Binary },
-]
+  const schema = value.jsonSchema as { properties?: unknown[] } | undefined
+  const hasSchema = !!schema?.properties?.length
+
+  if (hasSchema || value.rawText?.trim()) {
+    slots.push('raw')
+  }
+
+  return slots
+}
 
 interface BodyCompProps {
   value?: ApiDetails['requestBody']
@@ -124,28 +110,17 @@ export function ParamsBody(props: ParamsBodyProps) {
       .map((item) => item.name!),
   )
   const supportsGlobalBodyParams = selectedType === BodyType.FormData || selectedType === BodyType.UrlEncoded
+  const filledSlots = getFilledSlots(value)
 
   return (
     <div>
-      <Flex wrap className="p-2" gap={8}>
-        {types.map(({ name, type }) => {
-          return (
-            <Tag.CheckableTag
-              key={type}
-              checked={type === selectedType}
-              onChange={(checked) => {
-                if (checked) {
-                  onChange?.({ ...value, type })
-                }
-              }}
-            >
-              {name}
-              {hasBodyTypeContent(value, type) && (
-                <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>
-              )}
-            </Tag.CheckableTag>
-          )
-        })}
+      <Flex align="center" className="p-2" gap={8}>
+        <span className="text-xs" style={{ color: token.colorTextSecondary }}>Body 类型</span>
+        <BodyTypeSelect
+          filledSlots={filledSlots}
+          value={selectedType}
+          onChange={(type) => { onChange?.({ ...value, type }) }}
+        />
       </Flex>
 
       <div>

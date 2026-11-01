@@ -32,6 +32,7 @@ import { BodyType, ParamType } from '@/enums'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 import { type ApiDetails, type ApiRequestBody, type ApiRunResult, type RunTabInfo, type SavedRequestConfig, type ScriptConsoleEntry, type ScriptTestResult } from '@/types'
 
+import { getBodyTypeLabel } from './components/BodyTypeSelect'
 import { HistoryPanel, type RequestHistoryItem } from './components/HistoryPanel'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
@@ -982,7 +983,9 @@ export function RunTab() {
                       }
 
                       if (oldType && oldType !== type && oldText?.trim()) {
-                        messageApi.info('已保留原 Body 内容，可切换回原类型恢复')
+                        const oldLabel = getBodyTypeLabel(oldType)
+
+                        messageApi.info(`已保留 ${oldLabel} 的内容，切回 ${oldLabel} 可恢复`)
                       }
 
                       const nextText = type === oldType ? oldText : bodyTextsRef.current[type]

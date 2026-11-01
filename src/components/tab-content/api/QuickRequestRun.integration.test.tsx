@@ -151,6 +151,37 @@ function bodyEditor(container: HTMLElement): HTMLTextAreaElement {
   return editor
 }
 
+class ResizeObserverStub {
+  observe() { /* noop */ }
+
+  unobserve() { /* noop */ }
+
+  disconnect() { /* noop */ }
+}
+
+;(globalThis as { ResizeObserver?: unknown }).ResizeObserver ??= ResizeObserverStub
+
+/** 展开 Body 类型下拉（antd Select 在 mouseDown 时打开） */
+function openBodyTypeSelect(container: HTMLElement) {
+  const selector = container.querySelector('[data-testid="body-type-select"] .ant-select-selector')
+
+  if (!selector) { throw new Error('未找到 Body 类型下拉') }
+
+  fireEvent.mouseDown(selector)
+}
+
+/** 按短标签选择 Body 类型（选项 title 保持纯字符串，定位稳定） */
+function chooseBodyType(container: HTMLElement, label: string) {
+  openBodyTypeSelect(container)
+
+  const option = Array.from(document.querySelectorAll('.ant-select-item-option'))
+    .find((node) => node.getAttribute('title') === label)
+
+  if (!option) { throw new Error(`未找到下拉选项：${label}`) }
+
+  fireEvent.click(option)
+}
+
 describe('快捷请求：Body 落库与回显', () => {
   beforeEach(() => {
     h.state.item = { id: 'qr-1', name: '快捷请求', data: makeQuickRequest() }
@@ -195,8 +226,8 @@ describe('快捷请求：Body 落库与回显', () => {
     fireEvent.change(bodyEditor(view.container), { target: { value: '{"a":1}' } })
 
     // 切到 raw，再切回 json
-    fireEvent.click(screen.getByText('raw'))
-    fireEvent.click(screen.getByText('json'))
+    chooseBodyType(view.container, 'raw')
+    chooseBodyType(view.container, 'json')
 
     await waitFor(() => {
       expect(bodyEditor(view.container).value).toBe('{"a":1}')
@@ -224,10 +255,14 @@ describe('快捷请求：Body 落库与回显', () => {
 
     // 旧行为：直接显示「无 Body」，类型标签整行消失，用户无法切换
     expect(screen.queryByText('无 Body')).toBeNull()
-    expect(screen.getByText('form-data')).toBeTruthy()
-    expect(screen.getByText('json')).toBeTruthy()
+    expect(view.container.querySelector('.ant-select-selector')).toBeTruthy()
 
-    fireEvent.click(screen.getByText('json'))
+    openBodyTypeSelect(view.container)
+
+    expect(document.querySelector('.ant-select-item-option[title="form-data"]')).toBeTruthy()
+    expect(document.querySelector('.ant-select-item-option[title="json"]')).toBeTruthy()
+
+    chooseBodyType(view.container, 'json')
 
     await waitFor(() => {
       expect(view.container.querySelector('textarea')).toBeTruthy()
