@@ -158,6 +158,12 @@ fn is_binary_content_type(content_type: &str) -> bool {
     !is_text
 }
 
+/// 读取 binary 请求体文件。失败时返回可直接展示给用户的中文错误（含路径与原因），
+/// 由调用方转成 BadRequest —— 不允许静默降级为空 body。
+fn read_body_file(path: &str) -> Result<Vec<u8>, String> {
+    std::fs::read(path).map_err(|e| format!("读取请求体文件失败：{path}（{e}）"))
+}
+
 #[tauri::command]
 pub async fn run_api_request(
     db: tauri::State<'_, Arc<Db>>,
@@ -288,14 +294,9 @@ pub async fn run_api_request(
     // 放在 text/multipart 分支之前即可——binary 时前端 body 为空串，
     // 下面的 `!payload.body.is_empty()` 与 `form_data_files` 分支都不会命中，两者天然互斥。
     if let Some(path) = payload.body_file.as_deref().filter(|p| !p.is_empty() && method != "GET") {
-        let bytes = match std::fs::read(path) {
+        let bytes = match read_body_file(path) {
             Ok(bytes) => bytes,
-            Err(e) => {
-                return Ok(crate::errors::AppError::BadRequest(format!(
-                    "读取请求体文件失败：{path}（{e}）"
-                ))
-                .into());
-            }
+            Err(msg) => return Ok(crate::errors::AppError::BadRequest(msg).into()),
         };
         effective_headers.push(("Content-Length".to_string(), bytes.len().to_string(), true));
         req = req.body(bytes);
@@ -763,6 +764,33 @@ pub async fn save_response_file(path: String, data_base64: String) -> Result<Api
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn read_body_file_returns_exact_bytes() {
+        let dir = std::env::temp_dir().join("apimocktle-body-file-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("payload.bin");
+        // 含非 UTF-8 字节，确保是「原样字节」而不是经过任何文本转换
+        let payload: Vec<u8> = vec![0x89, 0x50, 0x4E, 0x47, 0x00, 0xFF, 0x0A, 0x0D];
+        std::fs::write(&path, &payload).unwrap();
+
+        let read = read_body_file(path.to_str().unwrap()).unwrap();
+
+        assert_eq!(read, payload);
+        assert_eq!(read.len(), 8);
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn read_body_file_reports_missing_file_with_path() {
+        let missing = std::env::temp_dir().join("apimocktle-no-such-file.bin");
+
+        let err = read_body_file(missing.to_str().unwrap()).unwrap_err();
+
+        assert!(err.contains("读取请求体文件失败"));
+        assert!(err.contains("apimocktle-no-such-file.bin"));
+    }
 
     #[test]
     fn test_build_body_json_with_raw_text() {
