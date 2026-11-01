@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { api } from '@/api-client'
 import type { ApiRunResult } from '@/types'
 
 // useApiRequestRunner 依赖路由参数与若干 context,全部以最小替身注入
@@ -97,5 +98,37 @@ describe('useApiRequestRunner 竞态守卫', () => {
 
     expect(result.current.result?.url).toBe('https://api.example.com/fast')
     expect(result.current.running).toBe(false)
+  })
+})
+
+describe('useApiRequestRunner binary 请求体透传', () => {
+  it('把 bodyFile 与 octet-stream 放进 run_api_request 的 payload', async () => {
+    const { result } = renderHook(() => useApiRequestRunner())
+
+    await act(async () => {
+      await result.current.run(
+        'api-1',
+        'https://echo.apifox.com/post',
+        'POST',
+        [],
+        '',
+        'application/octet-stream',
+        undefined,
+        '/tmp/a.bin',
+      )
+    })
+
+    // 前一条用例也调用过 run_api_request，取最后一次
+    const call = vi.mocked(api).mock.calls.filter(([cmd]) => cmd === 'run_api_request').at(-1)
+
+    expect(call).toBeTruthy()
+
+    const payload = (call![1] as { payload: Record<string, unknown> }).payload
+
+    expect(payload.bodyFile).toBe('/tmp/a.bin')
+    expect(payload.contentType).toBe('application/octet-stream')
+    // binary 不发送文本 body，两者不会同时存在
+    expect(payload.body).toBe('')
+    expect(payload.formDataFiles).toBeUndefined()
   })
 })
