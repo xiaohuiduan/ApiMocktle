@@ -142,6 +142,13 @@ describe('mergeRunTabInfo', () => {
 
     expect(merged.requestBody?.rawText).toBe('{"from":"doc"}')
   })
+
+  it('保存点携带 binary 文件路径时透传到 requestBody.filePath', () => {
+    const doc = withBody(makeDoc(), '')
+    const merged = mergeRunTabInfo(doc, { bodyType: BodyType.Binary, bodyFilePath: '/tmp/a.bin' })
+
+    expect(merged.requestBody?.filePath).toBe('/tmp/a.bin')
+  })
 })
 
 describe('本地副本读写', () => {
@@ -179,5 +186,44 @@ describe('本地副本读写', () => {
 
     expect(readLocalRunCopy(key)).toBeUndefined()
     expect(readLocalRunCopy('')).toBeUndefined()
+  })
+
+  it('v3 载荷携带各类型正文缓存并可读回', () => {
+    const key = getRunTabStorageKey('api-1')
+    const bodyTexts = { [BodyType.Json]: '{"typed":"json"}', [BodyType.Raw]: 'raw text' }
+
+    writeLocalRunCopy(key, 'v1', withBody(makeDoc(), '{"typed":"json"}'), bodyTexts)
+
+    const restored = readLocalRunCopy(key)
+
+    expect(restored?.v).toBe(3)
+    expect(restored?.bodyTexts).toEqual(bodyTexts)
+  })
+
+  it('v2 载荷没有正文缓存时读取为空，不影响当前类型回显', () => {
+    const key = getRunTabStorageKey('api-1')
+
+    window.localStorage.setItem(key, JSON.stringify({
+      v: 2,
+      docUpdatedAt: 'v1',
+      workCopy: withBody(makeDoc(), '{"typed":"local"}'),
+    }))
+
+    const restored = readLocalRunCopy(key)
+
+    expect(restored?.bodyTexts).toBeUndefined()
+    expect(restored?.workCopy.requestBody?.rawText).toBe('{"typed":"local"}')
+  })
+
+  it('正文缓存中的非字符串值被丢弃', () => {
+    const key = getRunTabStorageKey('api-1')
+
+    window.localStorage.setItem(key, JSON.stringify({
+      v: 3,
+      workCopy: makeDoc(),
+      bodyTexts: { [BodyType.Json]: 'ok', [BodyType.Raw]: 123 },
+    }))
+
+    expect(readLocalRunCopy(key)?.bodyTexts).toEqual({ [BodyType.Json]: 'ok' })
   })
 })

@@ -132,6 +132,37 @@ describe('BodyPanel 类型选择器', () => {
     expect(screen.queryByText('一键填充')).toBeNull()
   })
 
+  it('binary 类型渲染文件选择器而不是文本编辑器', () => {
+    const { container } = render(
+      <BodyPanel requestBody={{ type: BodyType.Binary }} onBodyTypeChange={vi.fn()} />,
+    )
+
+    expect(container.querySelector('textarea')).toBeNull()
+    expect(screen.getByText('选择文件')).toBeTruthy()
+    expect(screen.getByText('未选择文件')).toBeTruthy()
+    expect(screen.getByText('未选择文件时本次不会发送请求体')).toBeTruthy()
+  })
+
+  it('binary 已选文件时显示文件名并可清除', () => {
+    const onBodyFilePathChange = vi.fn()
+
+    render(
+      <BodyPanel
+        bodyFilePath="/tmp/report.pdf"
+        requestBody={{ type: BodyType.Binary, filePath: '/tmp/report.pdf' }}
+        onBodyFilePathChange={onBodyFilePathChange}
+        onBodyTypeChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('report.pdf')).toBeTruthy()
+    expect(screen.queryByText('未选择文件时本次不会发送请求体')).toBeNull()
+
+    fireEvent.click(screen.getByText('清除'))
+
+    expect(onBodyFilePathChange).toHaveBeenCalledWith(undefined)
+  })
+
   it('只有 jsonSchema、正文为空时，正文组头不显示内容标记', () => {
     const { container } = render(
       <BodyPanel

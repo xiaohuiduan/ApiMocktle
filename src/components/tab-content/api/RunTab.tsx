@@ -240,14 +240,17 @@ export function RunTab() {
     if (initVersionRef.current === version) { return }
 
     const isFirstInit = initVersionRef.current === undefined
+    const localCopy = readLocalRunCopy(storageKey)
 
     initVersionRef.current = version
     docUpdatedAtRef.current = menuUpdatedAt
     originalDocRef.current = cloneApiDetails(docValue)
+    // 各类型正文缓存优先取本地副本（用户自己的编辑），其次是显式保存过的保存点
+    bodyTextsRef.current = { ...(localCopy?.bodyTexts ?? savedRunTabInfoRef.current?.bodyTexts ?? {}) }
     setWorkCopy(resolveInitialWorkCopy({
       docValue,
       savedRunTabInfo: savedRunTabInfoRef.current,
-      localCopy: readLocalRunCopy(storageKey),
+      localCopy,
       docUpdatedAt: menuUpdatedAt,
     }))
 
@@ -257,7 +260,7 @@ export function RunTab() {
   const persist = useCallback((copy: ApiDetails) => {
     if (!copy?.id) { return }
 
-    writeLocalRunCopy(getRunTabStorageKey(copy.id), docUpdatedAtRef.current, copy)
+    writeLocalRunCopy(getRunTabStorageKey(copy.id), docUpdatedAtRef.current, copy, bodyTextsRef.current)
   }, [])
 
   // 当前环境
@@ -528,7 +531,7 @@ export function RunTab() {
     // 请求级超时（毫秒）；未设置时 Rust 端回落到全局默认
     const timeoutMs = timeoutSeconds ? Math.round(timeoutSeconds * 1000) : undefined
 
-    const runResult = await run(tabData.key, url, workCopy.method ?? 'GET', headers, bodyText, built.contentType, built.formDataFiles, built.insecureSkipVerify, timeoutMs)
+    const runResult = await run(tabData.key, url, workCopy.method ?? 'GET', headers, bodyText, built.contentType, built.formDataFiles, built.bodyFile, built.insecureSkipVerify, timeoutMs)
 
     // ====== 后置脚本执行 ======
     if (workCopy.postScript?.trim() && runResult) {
@@ -599,6 +602,8 @@ export function RunTab() {
       bodyType: workCopy.requestBody?.type,
       bodyParameters: workCopy.requestBody?.parameters,
       bodyRawText: workCopy.requestBody?.rawText,
+      bodyFilePath: workCopy.requestBody?.filePath,
+      bodyTexts: bodyTextsRef.current,
       preScript: workCopy.preScript,
       postScript: workCopy.postScript,
       timeoutMs: timeoutSeconds ? Math.round(timeoutSeconds * 1000) : undefined,
@@ -951,10 +956,22 @@ export function RunTab() {
                 children: (
                   <BodyPanel
                     key={`body-tab-${resetCounter}`}
+                    bodyFilePath={workCopy.requestBody?.filePath}
                     bodyRawText={workCopy.requestBody?.rawText}
                     fillWithComments={fillWithComments}
                     requestBody={workCopy.requestBody}
                     varMap={varMap}
+                    onBodyFilePathChange={(filePath) => {
+                      const next = {
+                        ...workCopy,
+                        requestBody: {
+                          ...(workCopy.requestBody ?? { type: BodyType.None }),
+                          filePath,
+                        },
+                      }
+                      setWorkCopy(next)
+                      persist(next)
+                    }}
                     onBodyParametersChange={(parameters) => {
                       const next = {
                         ...workCopy,

@@ -76,6 +76,41 @@ describe('buildRequest GET/HEAD body 守卫', () => {
   })
 })
 
+describe('buildRequest binary 原始请求体', () => {
+  it('携带文件时产出 bodyFile 与 octet-stream，且不发文本', async () => {
+    const result = await buildRequest(baseCtx({
+      method: 'POST',
+      body: { type: BodyType.Binary, filePath: '/tmp/a.bin' },
+    }))
+
+    expect(result.bodyFile).toBe('/tmp/a.bin')
+    expect(result.contentType).toBe('application/octet-stream')
+    expect(result.bodyText).toBe('')
+    expect(result.bodyWarning).toBeUndefined()
+  })
+
+  it('未选文件时给出明确警告，不静默发送空 body', async () => {
+    const result = await buildRequest(baseCtx({
+      method: 'POST',
+      body: { type: BodyType.Binary },
+    }))
+
+    expect(result.bodyFile).toBeUndefined()
+    expect(result.bodyWarning).toContain('未选择文件')
+  })
+
+  it('GET 携带 binary 时被剔除并给出 GET/HEAD 警告', async () => {
+    const result = await buildRequest(baseCtx({
+      method: 'GET',
+      body: { type: BodyType.Binary, filePath: '/tmp/a.bin' },
+    }))
+
+    expect(result.bodyFile).toBeUndefined()
+    expect(result.contentType).toBeUndefined()
+    expect(result.bodyWarning).toContain('GET/HEAD')
+  })
+})
+
 describe('buildRequest Body 空值处理', () => {
   const schemaExample = () => '{"from":"schema"}'
 

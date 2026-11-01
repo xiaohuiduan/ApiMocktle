@@ -284,6 +284,23 @@ pub async fn run_api_request(
         }
     }
 
+    // binary 原始请求体：读本地文件字节直接发送，不做任何文本转换。
+    // 放在 text/multipart 分支之前即可——binary 时前端 body 为空串，
+    // 下面的 `!payload.body.is_empty()` 与 `form_data_files` 分支都不会命中，两者天然互斥。
+    if let Some(path) = payload.body_file.as_deref().filter(|p| !p.is_empty() && method != "GET") {
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                return Ok(crate::errors::AppError::BadRequest(format!(
+                    "读取请求体文件失败：{path}（{e}）"
+                ))
+                .into());
+            }
+        };
+        effective_headers.push(("Content-Length".to_string(), bytes.len().to_string(), true));
+        req = req.body(bytes);
+    }
+
     // Content-Length：text body 按字节计算（multipart 的 boundary 长度无法精确，跳过）
     if !payload.body.is_empty() && method != "GET" && !is_multipart && payload.form_data_files.is_empty() {
         effective_headers.push(("Content-Length".to_string(), payload.body.len().to_string(), true));
