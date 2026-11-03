@@ -68,6 +68,11 @@ export interface ApiRequestBody {
   required?: boolean
   /** 请求体示例 */
   examples?: { name?: string, value: unknown }[]
+  /**
+   * binary 类型的原始请求体文件（本地绝对路径，由 Tauri 后端读取字节后直接发送）。
+   * 刻意不复用 `rawText`：`rawText` 参与「文档回声」判定，塞路径会污染该逻辑。
+   */
+  filePath?: string
 }
 
 export interface ApiRunHeader {
@@ -241,6 +246,10 @@ export interface RunTabInfo {
   bodyParameters?: Parameter[]
   /** 运行时修改的请求体原始文本 */
   bodyRawText?: string
+  /** 运行时修改的 binary 请求体文件路径 */
+  bodyFilePath?: string
+  /** 各 Body 类型的正文缓存（仅 raw 槽位），用于跨会话「切走再切回」恢复 */
+  bodyTexts?: Partial<Record<BodyType, string>>
   /** 运行时修改的前置脚本 */
   preScript?: string
   /** 运行时修改的后置脚本 */

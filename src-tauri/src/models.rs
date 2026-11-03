@@ -276,6 +276,9 @@ pub struct RunRequestPayload {
     pub content_type: Option<String>,
     #[serde(rename = "formDataFiles", default)]
     pub form_data_files: Vec<FormDataFile>,
+    /// binary 类型的原始请求体文件路径：读其字节后作为 reqwest body 发送
+    #[serde(rename = "bodyFile", default)]
+    pub body_file: Option<String>,
     #[serde(rename = "proxyConfig", default)]
     pub proxy_config: Option<ProxyConfig>,
     #[serde(rename = "insecureSkipVerify", default)]

@@ -30,6 +30,7 @@ export function useApiRequestRunner() {
     body: string,
     contentType?: string,
     formDataFiles?: { name: string, path: string }[],
+    bodyFile?: string,
     insecureSkipVerify?: boolean,
     timeoutMs?: number,
   ): Promise<ApiRunResult | undefined> => {
@@ -60,7 +61,7 @@ export function useApiRequestRunner() {
       const payload: Record<string, unknown> = {
         sessionId,
         projectId,
-        payload: { url, method, headers, body, contentType, formDataFiles, insecureSkipVerify, timeoutMs },
+        payload: { url, method, headers, body, contentType, formDataFiles, bodyFile, insecureSkipVerify, timeoutMs },
       }
 
       // Attach proxy config if configured

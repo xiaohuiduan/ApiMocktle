@@ -45,6 +45,7 @@ yarn-error.log*
 # AI assistant configs
 .claude/
 .codebuddy/
+.workbuddy-ai/
 
 # local editor settings
 .vscode/

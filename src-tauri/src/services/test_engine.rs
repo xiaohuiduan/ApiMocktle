@@ -311,6 +311,8 @@ impl TestEngine {
             body,
             content_type,
             form_data_files,
+            // 测试流程的 override body 只支持 json/form/raw，binary 原始文件不在其覆盖范围内
+            body_file: None,
             proxy_config: None,
             insecure_skip_verify: false,
             timeout_ms: None,

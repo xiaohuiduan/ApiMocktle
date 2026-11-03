@@ -17,6 +17,8 @@ export interface BuildRequestBodyInput {
   type: BodyType
   rawText?: string
   parameters?: BuildRequestParam[]
+  /** binary 类型的原始请求体文件路径 */
+  filePath?: string
 }
 
 export interface BuildRequestContext {
@@ -51,6 +53,8 @@ export interface BuildRequestResult {
   bodyText: string
   contentType: string | undefined
   formDataFiles: { name: string, path: string }[] | undefined
+  /** binary 类型的原始请求体文件路径，由后端读取字节直接发送 */
+  bodyFile?: string
   insecureSkipVerify: boolean
   /** 非致命告警（如 GET/HEAD 携带 Body 被忽略），由调用方提示用户 */
   bodyWarning?: string
@@ -160,6 +164,7 @@ export async function buildRequest(ctx: BuildRequestContext): Promise<BuildReque
   let bodyText = ''
   let contentType: string | undefined
   let formDataFiles: { name: string, path: string }[] | undefined
+  let bodyFile: string | undefined
   let bodyField: ResolvedField | null = null
 
   if (body && body.type !== BodyType.None) {
@@ -173,6 +178,11 @@ export async function buildRequest(ctx: BuildRequestContext): Promise<BuildReque
         : body.type === BodyType.Raw
           ? 'text/plain'
           : 'application/json'
+    }
+    else if (body.type === BodyType.Binary) {
+      // binary 发送的是本地文件的原始字节，不做任何文本转换
+      bodyFile = body.filePath
+      contentType = 'application/octet-stream'
     }
     else if (body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) {
       const textParams: { name: string, example: string }[] = []
@@ -202,14 +212,22 @@ export async function buildRequest(ctx: BuildRequestContext): Promise<BuildReque
   // GET/HEAD 不支持携带请求体（后端亦会丢弃），显式剔除并提示，避免「以为发了 body」的调试误导
   const upperMethod = method.toUpperCase()
   const isBodylessMethod = upperMethod === 'GET' || upperMethod === 'HEAD'
-  const bodyWarning = isBodylessMethod && (bodyText !== '' || formDataFiles)
-    ? 'GET/HEAD 请求不支持携带请求体，已忽略 Body（如需携带请改用 POST，或把参数放进 Query）'
-    : undefined
+  const hasAnyBody = bodyText !== '' || !!formDataFiles || !!bodyFile
+
+  let bodyWarning: string | undefined
+
+  if (isBodylessMethod && hasAnyBody) {
+    bodyWarning = 'GET/HEAD 请求不支持携带请求体，已忽略 Body（如需携带请改用 POST，或把参数放进 Query）'
+  }
+  else if (body?.type === BodyType.Binary && !bodyFile) {
+    bodyWarning = 'binary 类型未选择文件，本次不发送请求体'
+  }
 
   if (isBodylessMethod) {
     bodyText = ''
     contentType = undefined
     formDataFiles = undefined
+    bodyFile = undefined
   }
 
   return {
@@ -219,6 +237,7 @@ export async function buildRequest(ctx: BuildRequestContext): Promise<BuildReque
     bodyText,
     contentType,
     formDataFiles,
+    bodyFile,
     insecureSkipVerify,
     bodyWarning,
     requestVars: {

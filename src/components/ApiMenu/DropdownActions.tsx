@@ -315,7 +315,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
       })
 
       try {
-        const r = await run(api.id, built.url, built.method, built.headers, built.bodyText, built.contentType, built.formDataFiles, false)
+        const r = await run(api.id, built.url, built.method, built.headers, built.bodyText, built.contentType, built.formDataFiles, built.bodyFile, false)
 
         if (r) {
           results.push({ name: api.name, status: r.status, durationMs: r.durationMs })

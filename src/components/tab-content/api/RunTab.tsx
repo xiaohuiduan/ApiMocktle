@@ -32,6 +32,7 @@ import { BodyType, ParamType } from '@/enums'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 import { type ApiDetails, type ApiRequestBody, type ApiRunResult, type RunTabInfo, type SavedRequestConfig, type ScriptConsoleEntry, type ScriptTestResult } from '@/types'
 
+import { getBodyTypeLabel } from './components/BodyTypeSelect'
 import { HistoryPanel, type RequestHistoryItem } from './components/HistoryPanel'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
@@ -239,14 +240,17 @@ export function RunTab() {
     if (initVersionRef.current === version) { return }
 
     const isFirstInit = initVersionRef.current === undefined
+    const localCopy = readLocalRunCopy(storageKey)
 
     initVersionRef.current = version
     docUpdatedAtRef.current = menuUpdatedAt
     originalDocRef.current = cloneApiDetails(docValue)
+    // 各类型正文缓存优先取本地副本（用户自己的编辑），其次是显式保存过的保存点
+    bodyTextsRef.current = { ...(localCopy?.bodyTexts ?? savedRunTabInfoRef.current?.bodyTexts ?? {}) }
     setWorkCopy(resolveInitialWorkCopy({
       docValue,
       savedRunTabInfo: savedRunTabInfoRef.current,
-      localCopy: readLocalRunCopy(storageKey),
+      localCopy,
       docUpdatedAt: menuUpdatedAt,
     }))
 
@@ -256,7 +260,7 @@ export function RunTab() {
   const persist = useCallback((copy: ApiDetails) => {
     if (!copy?.id) { return }
 
-    writeLocalRunCopy(getRunTabStorageKey(copy.id), docUpdatedAtRef.current, copy)
+    writeLocalRunCopy(getRunTabStorageKey(copy.id), docUpdatedAtRef.current, copy, bodyTextsRef.current)
   }, [])
 
   // 当前环境
@@ -527,7 +531,7 @@ export function RunTab() {
     // 请求级超时（毫秒）；未设置时 Rust 端回落到全局默认
     const timeoutMs = timeoutSeconds ? Math.round(timeoutSeconds * 1000) : undefined
 
-    const runResult = await run(tabData.key, url, workCopy.method ?? 'GET', headers, bodyText, built.contentType, built.formDataFiles, built.insecureSkipVerify, timeoutMs)
+    const runResult = await run(tabData.key, url, workCopy.method ?? 'GET', headers, bodyText, built.contentType, built.formDataFiles, built.bodyFile, built.insecureSkipVerify, timeoutMs)
 
     // ====== 后置脚本执行 ======
     if (workCopy.postScript?.trim() && runResult) {
@@ -570,16 +574,20 @@ export function RunTab() {
     }
   }
 
-  // 一键填充 Body
+  // 一键填充 Body：优先按 schema 生成示例；无 schema 时回退到文档里写的正文
+  // （文档 rawText 不再自动写入编辑器，只能通过这里显式取用）
   const handleFillBody = () => {
     if (!workCopy) { return }
 
     const text = fillWithComments
       ? buildJsoncBodyFillText(workCopy, menuRawList)
       : buildBodyFillText(workCopy, menuRawList)
+    const docRawText = originalDocRef.current?.requestBody?.rawText ?? ''
+    const finalText = text.trim() ? text : docRawText
+
     const next = {
       ...workCopy,
-      requestBody: { ...(workCopy.requestBody ?? { type: BodyType.None }), rawText: text },
+      requestBody: { ...(workCopy.requestBody ?? { type: BodyType.None }), rawText: finalText },
     }
     setWorkCopy(next)
     persist(next)
@@ -594,6 +602,8 @@ export function RunTab() {
       bodyType: workCopy.requestBody?.type,
       bodyParameters: workCopy.requestBody?.parameters,
       bodyRawText: workCopy.requestBody?.rawText,
+      bodyFilePath: workCopy.requestBody?.filePath,
+      bodyTexts: bodyTextsRef.current,
       preScript: workCopy.preScript,
       postScript: workCopy.postScript,
       timeoutMs: timeoutSeconds ? Math.round(timeoutSeconds * 1000) : undefined,
@@ -946,10 +956,22 @@ export function RunTab() {
                 children: (
                   <BodyPanel
                     key={`body-tab-${resetCounter}`}
+                    bodyFilePath={workCopy.requestBody?.filePath}
                     bodyRawText={workCopy.requestBody?.rawText}
                     fillWithComments={fillWithComments}
                     requestBody={workCopy.requestBody}
                     varMap={varMap}
+                    onBodyFilePathChange={(filePath) => {
+                      const next = {
+                        ...workCopy,
+                        requestBody: {
+                          ...(workCopy.requestBody ?? { type: BodyType.None }),
+                          filePath,
+                        },
+                      }
+                      setWorkCopy(next)
+                      persist(next)
+                    }}
                     onBodyParametersChange={(parameters) => {
                       const next = {
                         ...workCopy,
@@ -978,7 +1000,9 @@ export function RunTab() {
                       }
 
                       if (oldType && oldType !== type && oldText?.trim()) {
-                        messageApi.info('已保留原 Body 内容，可切换回原类型恢复')
+                        const oldLabel = getBodyTypeLabel(oldType)
+
+                        messageApi.info(`已保留 ${oldLabel} 的内容，切回 ${oldLabel} 可恢复`)
                       }
 
                       const nextText = type === oldType ? oldText : bodyTextsRef.current[type]

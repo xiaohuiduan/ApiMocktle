@@ -37,6 +37,7 @@ import { useTabSaveBridge } from '@/hooks/useTabSaveBridge'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 import { type ApiDetails, type ApiRunResult, type RunTabInfo, type ScriptConsoleEntry, type ScriptTestResult } from '@/types'
 
+import { getBodyTypeLabel } from './components/BodyTypeSelect'
 import { HistoryPanel, type RequestHistoryItem } from './components/HistoryPanel'
 import { ResponsePanel } from './components/ResponsePanel'
 import { ResultViewer } from './components/ResultViewer'
@@ -158,6 +159,10 @@ export function QuickRequestRun() {
   }, [menuRawList, tabData.key])
 
   const savedData = menuItem?.data as ApiDetails | undefined
+  // 保存点里的运行时信息（含各类型正文缓存）；menuItem 每次菜单合并都是新对象，用 ref 读取避免依赖抖动
+  const savedRunTabInfo = (menuItem as { runTabInfo?: RunTabInfo } | undefined)?.runTabInfo
+  const savedRunTabInfoRef = useRef(savedRunTabInfo)
+  savedRunTabInfoRef.current = savedRunTabInfo
 
   // 数据库原始数据（不含草稿覆盖层），用于判断已入库项是否被改动。
   const dbSavedData = useMemo(() => {
@@ -261,6 +266,8 @@ export function QuickRequestRun() {
   useEffect(() => {
     if (savedData && !isCreating) {
       setWorkCopy(JSON.parse(JSON.stringify(savedData)) as ApiDetails)
+      // 各类型正文缓存来自保存点，使「切走再切回」跨会话仍有效
+      bodyTextsRef.current = { ...(savedRunTabInfoRef.current?.bodyTexts ?? {}) }
     }
   }, [savedData?.id, isCreating])
 
@@ -306,6 +313,8 @@ export function QuickRequestRun() {
     bodyType: data.requestBody?.type,
     bodyParameters: data.requestBody?.parameters,
     bodyRawText: data.requestBody?.rawText,
+    bodyFilePath: data.requestBody?.filePath,
+    bodyTexts: bodyTextsRef.current,
     preScript: data.preScript,
     postScript: data.postScript,
   }), [])
@@ -501,7 +510,7 @@ export function QuickRequestRun() {
       }
     }
 
-    const runResult = await run(isCreating ? undefined : tabData.key, url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, built.contentType, built.formDataFiles, built.insecureSkipVerify)
+    const runResult = await run(isCreating ? undefined : tabData.key, url, workCopy.method ?? DEFAULT_METHOD, headers, bodyText, built.contentType, built.formDataFiles, built.bodyFile, built.insecureSkipVerify)
 
     // ====== 后置脚本执行 ======
     if (workCopy.postScript?.trim() && runResult) {
@@ -812,10 +821,17 @@ export function QuickRequestRun() {
                 label: <TabLabel hasContent={hasBodyContent}>Body</TabLabel>,
                 children: (
                   <BodyPanel
+                    bodyFilePath={workCopy.requestBody?.filePath}
                     bodyRawText={workCopy.requestBody?.rawText}
                     fillWithComments={fillWithComments}
                     requestBody={workCopy.requestBody}
                     varMap={varMap}
+                    onBodyFilePathChange={(filePath) => {
+                      setWorkCopy((prev) => ({
+                        ...prev,
+                        requestBody: { ...(prev.requestBody ?? { type: BodyType.None }), filePath },
+                      }))
+                    }}
                     onBodyParametersChange={(parameters) => {
                       setWorkCopy((prev) => ({
                         ...prev,
@@ -837,7 +853,9 @@ export function QuickRequestRun() {
                       }
 
                       if (oldType && oldType !== type && oldText?.trim()) {
-                        messageApi.info('已保留原 Body 内容，可切换回原类型恢复')
+                        const oldLabel = getBodyTypeLabel(oldType)
+
+                        messageApi.info(`已保留 ${oldLabel} 的内容，切回 ${oldLabel} 可恢复`)
                       }
 
                       const nextText = type === oldType ? oldText : bodyTextsRef.current[type]

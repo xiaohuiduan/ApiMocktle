@@ -1,47 +1,39 @@
 import { useMemo } from 'react'
 
-import { Button, Modal, Switch, Tag, theme, Typography } from 'antd'
+import { open } from '@tauri-apps/plugin-dialog'
+import { Button, Modal, Switch, theme, Typography } from 'antd'
 
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { BodyType } from '@/enums'
 import { useDynamicVariableDefs } from '@/hooks/useDynamicVariableDefs'
 import type { ApiRequestBody, Parameter } from '@/types'
 
+import { type BodySlot, BodyTypeSelect } from '../components/BodyTypeSelect'
 import { DynamicVariablesHelp } from '../components/DynamicVariablesHelp'
 import { ParamsEditableTable } from '../components/ParamsEditableTable'
 
-/** 判断某个 body 类型是否已有内容（用于类型标签的绿标） */
-function bodyTypeHasContent(requestBody: ApiRequestBody | undefined, t: BodyType): boolean {
-  if (!requestBody) {
-    return false
+/**
+ * 计算哪些内容槽位有「将被发送」的内容。
+ *
+ * 运行态只认真正会被 `buildRequest` 读取的载体：`parameters` 表格与 `rawText` 正文。
+ * 刻意不计入 `jsonSchema`——json 发送时只读 `rawText`，文档里的 schema 不参与发送，
+ * 把它算作「有内容」会造成「编辑器空白却标着有内容」。
+ */
+function getFilledSlots(requestBody: ApiRequestBody | undefined): BodySlot[] {
+  if (!requestBody) { return [] }
+
+  const slots: BodySlot[] = []
+
+  if ((requestBody.parameters ?? []).some((p) => p.name && p.enable !== false)) {
+    slots.push('parameters')
   }
 
-  if (t === BodyType.FormData || t === BodyType.UrlEncoded) {
-    return (requestBody.parameters ?? []).some((p) => p.name && p.enable !== false)
+  if (requestBody.rawText?.trim() || requestBody.filePath?.trim()) {
+    slots.push('raw')
   }
 
-  if (t === BodyType.Json) {
-    const schema = requestBody.jsonSchema as { properties?: unknown[] } | undefined
-
-    return !!(schema?.properties?.length) || !!(requestBody.rawText?.trim())
-  }
-
-  if (t === BodyType.Xml || t === BodyType.Raw || t === BodyType.Binary) {
-    return !!(requestBody.rawText?.trim())
-  }
-
-  return false
+  return slots
 }
-
-const bodyTypeOptions = [
-  { n: 'none', t: BodyType.None },
-  { n: 'form-data', t: BodyType.FormData },
-  { n: 'url-encoded', t: BodyType.UrlEncoded },
-  { n: 'json', t: BodyType.Json },
-  { n: 'xml', t: BodyType.Xml },
-  { n: 'raw', t: BodyType.Raw },
-  { n: 'binary', t: BodyType.Binary },
-]
 
 interface BodyPanelProps {
   requestBody?: ApiRequestBody
@@ -49,6 +41,9 @@ interface BodyPanelProps {
   onBodyTypeChange?: (type: BodyType) => void
   onBodyRawTextChange?: (text: string) => void
   onBodyParametersChange?: (params: Parameter[]) => void
+  /** binary 类型的原始请求体文件路径 */
+  bodyFilePath?: string
+  onBodyFilePathChange?: (path: string | undefined) => void
   onFillBody?: () => void
   fillWithComments?: boolean
   onFillWithCommentsChange?: (value: boolean) => void
@@ -63,6 +58,8 @@ export function BodyPanel(props: BodyPanelProps) {
     onBodyTypeChange,
     onBodyRawTextChange,
     onBodyParametersChange,
+    bodyFilePath,
+    onBodyFilePathChange,
     onFillBody,
     fillWithComments = true,
     onFillWithCommentsChange,
@@ -74,6 +71,8 @@ export function BodyPanel(props: BodyPanelProps) {
   // 快捷请求的数据可能没有 requestBody 字段（cURL 导入无请求体、历史数据、示例数据），
   // 此时仍要渲染类型选择器，否则用户永远无法切到 json / form-data。
   const body: ApiRequestBody = requestBody ?? { type: BodyType.None }
+
+  const filledSlots = useMemo(() => getFilledSlots(requestBody), [requestBody])
 
   // 变量补全项：内置动态变量 + 已定义用户变量
   const dynamicDefs = useDynamicVariableDefs()
@@ -88,10 +87,12 @@ export function BodyPanel(props: BodyPanelProps) {
     return [...dyn, ...users]
   }, [dynamicDefs, varMap])
 
+  // binary 不渲染文本编辑器：它发送的是本地文件的原始字节
   const showBodyEditor = body.type === BodyType.Json
     || body.type === BodyType.Xml
     || body.type === BodyType.Raw
-    || body.type === BodyType.Binary
+
+  const isBinary = body.type === BodyType.Binary
 
   // 「一键填充」按钮仅在 json/xml/raw 下显示（不含 binary），与 QuickRequestRun 对齐
   const showFillButton = body.type === BodyType.Json
@@ -125,25 +126,13 @@ export function BodyPanel(props: BodyPanelProps) {
       {/* Body Type 选择器 - 固定高度 */}
       <div className="shrink-0">
         <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1">
-            {bodyTypeOptions.map(({ n, t }) => {
-              const hasContent = bodyTypeHasContent(body, t)
-
-              return (
-                <Tag.CheckableTag
-                  key={t}
-                  checked={body.type === t}
-                  onChange={(checked) => {
-                    if (checked && onBodyTypeChange) {
-                      onBodyTypeChange(t)
-                    }
-                  }}
-                >
-                  {n}
-                  {hasContent && <span style={{ color: token.colorSuccess, marginLeft: 1 }}>*</span>}
-                </Tag.CheckableTag>
-              )
-            })}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs" style={{ color: token.colorTextSecondary }}>Body 类型</span>
+            <BodyTypeSelect
+              filledSlots={filledSlots}
+              value={body.type}
+              onChange={(type) => { onBodyTypeChange?.(type) }}
+            />
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {showFillButton && onFillBody && (
@@ -207,6 +196,54 @@ export function BodyPanel(props: BodyPanelProps) {
               varMap={varMap}
               onChange={(params) => onBodyParametersChange?.(params ?? [])}
             />
+          </div>
+        )}
+
+        {isBinary && (
+          <div
+            className="rounded border-solid p-3"
+            style={{ borderWidth: 1, borderColor: token.colorBorderSecondary }}
+          >
+            <Typography.Text className="mb-2 block text-xs" type="secondary">
+              选择一个本地文件，其原始字节将作为请求体发送（Content-Type: application/octet-stream）
+            </Typography.Text>
+            <div className="flex items-center gap-2">
+              <span
+                className="max-w-[260px] truncate text-xs"
+                style={{ color: bodyFilePath ? token.colorText : token.colorTextTertiary }}
+                title={bodyFilePath}
+              >
+                {bodyFilePath ? bodyFilePath.split(/[/\\]/).pop() : '未选择文件'}
+              </span>
+              <Button
+                size="small"
+                onClick={() => {
+                  void (async () => {
+                    const selected = await open({ multiple: false, directory: false })
+
+                    if (selected) {
+                      onBodyFilePathChange?.(selected)
+                    }
+                  })()
+                }}
+              >
+                选择文件
+              </Button>
+              {bodyFilePath && (
+                <Button
+                  size="small"
+                  type="link"
+                  onClick={() => { onBodyFilePathChange?.(undefined) }}
+                >
+                  清除
+                </Button>
+              )}
+            </div>
+            {!bodyFilePath && (
+              <Typography.Text className="mt-2 block text-xs" type="warning">
+                未选择文件时本次不会发送请求体
+              </Typography.Text>
+            )}
           </div>
         )}
 
