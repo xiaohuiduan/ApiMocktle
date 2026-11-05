@@ -623,7 +623,14 @@ impl<'a> NativeImport<'a> {
 
         match existing {
             Some((item_id, _)) => {
-                let mut updates = json!({ "name": name, "data": data_json });
+                // 字段级合并：只覆盖文档字段，preScript / postScript 等编辑器专属字段保留
+                let previous =
+                    menu_repo::get_menu_item_conn(self.conn, self.project_id, &item_id)?;
+                let merged = crate::services::import_service::merge_doc_fields(
+                    previous.and_then(|item| item.data_json),
+                    &data_json,
+                );
+                let mut updates = json!({ "name": name, "data": merged });
                 // 只有明确归属目录时才移动，避免把已有归位信息清空
                 if let Some(parent_id) = parent_id {
                     updates["parentId"] = json!(parent_id);

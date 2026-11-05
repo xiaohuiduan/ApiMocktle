@@ -491,6 +491,16 @@ pub fn get_menu_item(
     menu_id: &str,
 ) -> Result<Option<ApiMenuData>, crate::errors::AppError> {
     let conn = db.0.lock().unwrap();
+    get_menu_item_conn(&conn, project_id, menu_id)
+}
+
+/// 与 `get_menu_item` 同语义，但复用调用方已持有的连接。
+/// 导入事务里已经持有写连接，不能再取 `Db` 锁（会自锁死）。
+pub fn get_menu_item_conn(
+    conn: &Connection,
+    project_id: &str,
+    menu_id: &str,
+) -> Result<Option<ApiMenuData>, crate::errors::AppError> {
     conn.query_row(
         "SELECT id, parent_id, name, type, data_json, run_tab_json, sort_order, created_at, updated_at
          FROM menu_items WHERE project_id = ?1 AND id = ?2",

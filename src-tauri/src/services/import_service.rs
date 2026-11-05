@@ -448,6 +448,23 @@ struct ImportedApi<'a> {
     responses: Value,
 }
 
+/// 把文档字段合并进既有 `data_json`。
+///
+/// 只有文档里出现的字段被覆盖，其余字段（`preScript` / `postScript` /
+/// `responsibleId` / `editorId` 等编辑器专属内容）原样保留。
+pub(crate) fn merge_doc_fields(old: Option<Value>, doc: &Value) -> Value {
+    let mut base = match old {
+        Some(Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    };
+    if let Value::Object(doc_map) = doc {
+        for (key, value) in doc_map {
+            base.insert(key.clone(), value.clone());
+        }
+    }
+    Value::Object(base)
+}
+
 /// 按 method + path 幂等写入接口：命中则覆盖内容并保留原 id / createdAt，未命中才新建。
 fn upsert_api_detail(
     conn: &Connection,
@@ -488,7 +505,11 @@ fn upsert_api_detail(
 
     match existing {
         Some((item_id, _)) => {
-            let mut updates = serde_json::json!({ "name": api.name, "data": data_json });
+            // 字段级合并：只覆盖文档里出现的字段，preScript / postScript /
+            // responsibleId 等编辑器专属字段原样保留 —— 重复导入不该清空用户手写内容。
+            let previous = menu_repo::get_menu_item_conn(conn, project_id, &item_id)?;
+            let merged = merge_doc_fields(previous.and_then(|item| item.data_json), &data_json);
+            let mut updates = serde_json::json!({ "name": api.name, "data": merged });
             // 只有明确归属目录时才移动，避免把已有归位信息清空
             if api.parent_id.is_some() {
                 updates["parentId"] = serde_json::json!(api.parent_id);
@@ -785,10 +806,15 @@ fn detect_and_import(
         // Apifox 原生格式放最前面：它没有 openapi / swagger / paths 键，不会与其它格式混淆
         if native {
             import_native::import_native(conn, project_id, doc, &mut ctx)?;
-        } else if doc.get("openapi").is_some() || doc.get("paths").is_some() {
+        // 版本键必须排在 paths 前面：Swagger 2.0 文档同样带 paths，
+        // 先判 paths 会把它误送进 OpenAPI3 分支，请求体（in: body）与 definitions 全丢。
+        } else if doc.get("openapi").is_some() {
             import_openapi3(conn, project_id, doc, &mut ctx)?;
         } else if doc.get("swagger").is_some() {
             import_swagger2(conn, project_id, doc, &mut ctx)?;
+        } else if doc.get("paths").is_some() {
+            // 无版本键但有 paths：按泛 OpenAPI 3 处理
+            import_openapi3(conn, project_id, doc, &mut ctx)?;
         } else {
             return Err(AppError::BadRequest(
                 "不支持的文档格式，仅支持 Apifox 原生格式、OpenAPI 3.x、Swagger 2.0 格式".into(),
@@ -1159,6 +1185,104 @@ mod tests {
             .unwrap();
         assert_eq!(api.id, first_id, "同 method+path 应保留原 id");
         assert_eq!(api.name, "创建(更新)", "内容应被更新");
+    }
+
+    /// 导出→导入往返：Swagger 2.0 文档带 paths，必须仍走 import_swagger2 分支，
+    /// 请求体（导出时写成 parameters[in=body]）回导后要能还原，不能被 OpenAPI3 分支吞掉。
+    #[test]
+    fn swagger2_roundtrip_keeps_request_body() {
+        let db = test_db();
+        let doc = json!({
+            "openapi": "3.0.0",
+            "paths": {
+                "/orders": {
+                    "post": {
+                        "summary": "下单",
+                        "requestBody": {
+                            "required": true,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": { "id": { "type": "integer" } }
+                                    }
+                                }
+                            }
+                        },
+                        "responses": { "200": { "description": "成功" } }
+                    }
+                }
+            }
+        });
+        import_api_document(&db, "p1", "json", &doc.to_string(), Some("rt")).unwrap();
+
+        let state = project_repo::get_project_state(&db, "p1").unwrap();
+        let swagger = crate::commands::exports::build_export_spec(&state.menu_raw_list, false, None);
+        assert_eq!(swagger["swagger"], "2.0", "应导出 Swagger 2.0");
+        let params = swagger["paths"]["/orders"]["post"]["parameters"]
+            .as_array()
+            .expect("Swagger 2.0 导出应带 parameters");
+        assert!(
+            params.iter().any(|p| p["in"] == "body"),
+            "Swagger 2.0 请求体应写成 in: body 参数: {params:?}"
+        );
+
+        import_api_document(&db, "p1", "json", &swagger.to_string(), Some("rt")).unwrap();
+
+        let state = project_repo::get_project_state(&db, "p1").unwrap();
+        let apis: Vec<_> = state
+            .menu_raw_list
+            .iter()
+            .filter(|i| i.menu_type == "apiDetail")
+            .collect();
+        assert_eq!(apis.len(), 1, "同 source 同 method+path 应原地更新，不新增");
+        let data = apis[0].data_json.as_ref().unwrap();
+        assert!(
+            !data["requestBody"].is_null(),
+            "Swagger 2.0 回导丢了请求体: {data}"
+        );
+        assert_eq!(data["requestBody"]["jsonSchema"]["type"], "object");
+    }
+
+    /// 重复导入只覆盖文档字段，用户手写的脚本不能被清空。
+    #[test]
+    fn reimport_keeps_user_scripts() {
+        let db = test_db();
+        let content = sample_doc().to_string();
+        import_api_document(&db, "p1", "json", &content, Some("test-src")).unwrap();
+
+        // 模拟用户在脚本面板里写了前置/后置脚本
+        {
+            let conn = db.0.lock().unwrap();
+            let (id, raw): (String, String) = conn
+                .query_row(
+                    "SELECT id, data_json FROM menu_items WHERE project_id = 'p1' AND type = 'apiDetail'",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .unwrap();
+            let mut v: Value = serde_json::from_str(&raw).unwrap();
+            v["preScript"] = json!("pm.test('x', () => {})");
+            v["postScript"] = json!("console.log(1)");
+            conn.execute(
+                "UPDATE menu_items SET data_json = ?1 WHERE project_id = 'p1' AND id = ?2",
+                [v.to_string(), id],
+            )
+            .unwrap();
+        }
+
+        import_api_document(&db, "p1", "json", &content, Some("test-src")).unwrap();
+
+        let state = project_repo::get_project_state(&db, "p1").unwrap();
+        let api = state
+            .menu_raw_list
+            .iter()
+            .find(|i| i.menu_type == "apiDetail")
+            .unwrap();
+        let data = api.data_json.as_ref().unwrap();
+        assert_eq!(data["preScript"], "pm.test('x', () => {})", "前置脚本应保留");
+        assert_eq!(data["postScript"], "console.log(1)", "后置脚本应保留");
+        assert_eq!(data["status"], "released", "文档字段仍应被更新");
     }
 
     /// 原生格式导入时，环境与全局变量一并写入 environmentConfig。
