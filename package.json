@@ -13,6 +13,7 @@
     "lint:es": "eslint **/*.{ts,tsx}",
     "lint:ts": "tsc --noEmit --skipLibCheck",
     "test": "vitest run",
+    "test:rust": "node scripts/test-rust.mjs",
     "test:e2e": "playwright test --config=tests/e2e/playwright.config.ts",
     "build:icons": "node scripts/build-icons.mjs",
     "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
