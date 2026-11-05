@@ -63,12 +63,13 @@ pub fn run() {
                     .get("mcp_port")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(14203) as u16;
-                // 默认 0.0.0.0：WSL / 局域网里的 agent 走宿主 IP 连不了回环地址。
-                // 绑非回环时 MCP 全部工具都要求个人令牌（见 McpServerState::require_auth）。
+                // 默认只绑回环。MCP 能整库读写，敞到局域网必须由用户显式把
+                // mcp_host 改成 0.0.0.0 / 网卡地址，此时全部工具强制要求个人令牌
+                // （见 McpServerState::require_auth）。
                 let host = app_config
                     .get("mcp_host")
                     .and_then(|v| v.as_str().map(str::to_string))
-                    .unwrap_or_else(|| "0.0.0.0".to_string());
+                    .unwrap_or_else(|| "127.0.0.1".to_string());
                 let db_mcp = db_mcp.clone();
                 let handle_mcp = mcp_handle.clone();
                 tauri::async_runtime::spawn(async move {

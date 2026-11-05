@@ -1029,19 +1029,50 @@ fn requires_auth_for_host(host: &str) -> bool {
     !matches!(host, "127.0.0.1" | "localhost" | "::1")
 }
 
-fn authorize_doc_tool(db: &Db, headers: &HeaderMap) -> Result<(), JsonRpcError> {    let Some(token) = doc_header_token(headers) else {
+/// 校验个人令牌，返回其所属用户 id。
+fn authorize_doc_tool(db: &Db, headers: &HeaderMap) -> Result<String, JsonRpcError> {
+    let Some(token) = doc_header_token(headers) else {
         return Err(doc_err(
             -32001,
             "api-doc.* 工具需要个人令牌：请在请求头带 X-YAPI-TOKEN 或 Authorization: Bearer <令牌>",
         ));
     };
-    if personal_token_repo::find_user_by_personal_token(db, &token).is_none() {
-        return Err(doc_err(
+    personal_token_repo::find_user_by_personal_token(db, &token).ok_or_else(|| {
+        doc_err(
             -32001,
             "个人令牌无效或已删除，请在「设置 → 个人令牌」重新创建",
-        ));
+        )
+    })
+}
+
+/// 文档写工具的项目级授权：令牌只回答「调用者是谁」，还要回答「他能不能改这个项目」。
+///
+/// 缺 `projectId` 时不在这里拦：交给工具自身按参数错误返回，保持原有错误语义。
+fn ensure_project_editor(
+    db: &Db,
+    args: &serde_json::Value,
+    user_id: &str,
+) -> Result<(), JsonRpcError> {
+    let project_id = match args
+        .get("projectId")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(id) => id,
+        None => return Ok(()),
+    };
+    match project_repo::get_project_member_role(db, project_id, user_id) {
+        Some(role) if role == "owner" || role == "editor" => Ok(()),
+        Some(role) => Err(doc_err(
+            -32003,
+            format!("无权修改项目 {project_id}：当前角色 {role}，需要 owner 或 editor"),
+        )),
+        None => Err(doc_err(
+            -32003,
+            format!("无权修改项目 {project_id}：不是该项目成员"),
+        )),
     }
-    Ok(())
 }
 
 fn doc_normalize_param(raw: &serde_json::Value) -> serde_json::Value {
@@ -2870,19 +2901,39 @@ async fn handle_mcp_request(
             match serde_json::from_value::<ToolCallParams>(request.params.clone()) {
                 Ok(params) => {
                     // 文档写工具始终要求个人令牌；绑非回环地址时全部工具都要
-                    let auth = if state.require_auth || params.name.starts_with(DOC_TOOL_PREFIX) {
-                        authorize_doc_tool(&state.db, &headers)
+                    let needs_token =
+                        state.require_auth || params.name.starts_with(DOC_TOOL_PREFIX);
+                    let user_id = if needs_token {
+                        match authorize_doc_tool(&state.db, &headers) {
+                            Ok(uid) => Some(uid),
+                            Err(e) => {
+                                return Json(JsonRpcResponse {
+                                    jsonrpc: "2.0".to_string(),
+                                    id: request.id.clone(),
+                                    result: None,
+                                    error: Some(e),
+                                })
+                                .into_response();
+                            }
+                        }
                     } else {
-                        Ok(())
+                        None
                     };
-                    if let Err(e) = auth {
-                        return Json(JsonRpcResponse {
-                            jsonrpc: "2.0".to_string(),
-                            id: request.id.clone(),
-                            result: None,
-                            error: Some(e),
-                        })
-                        .into_response();
+                    // 令牌只证明「是谁」；文档写工具还要证明「能改这个项目」
+                    if params.name.starts_with(DOC_TOOL_PREFIX) {
+                        if let Some(uid) = user_id.as_deref() {
+                            if let Err(e) =
+                                ensure_project_editor(&state.db, &params.arguments, uid)
+                            {
+                                return Json(JsonRpcResponse {
+                                    jsonrpc: "2.0".to_string(),
+                                    id: request.id.clone(),
+                                    result: None,
+                                    error: Some(e),
+                                })
+                                .into_response();
+                            }
+                        }
                     }
                     match execute_tool(&params.name, &params.arguments, &state.db).await {
                         Ok(result) => JsonRpcResponse {
@@ -3232,6 +3283,7 @@ mod tests {
             CREATE TABLE test_folders (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
             CREATE TABLE test_flow_graphs (id TEXT PRIMARY KEY, task_id TEXT NOT NULL UNIQUE, graph_json TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
             CREATE TABLE personal_tokens (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL);
+            CREATE TABLE project_members (project_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (project_id, user_id));
             CREATE TABLE recycle_items (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, catalog_type TEXT NOT NULL, deleted_item_json TEXT NOT NULL, creator_json TEXT NOT NULL, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL);
             ",
         )
@@ -3239,6 +3291,11 @@ mod tests {
 
         conn.execute(
             "INSERT INTO projects (id, name, owner_id, created_at) VALUES ('proj-1', '测试项目', 'user-1', '2026-01-01')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO project_members (project_id, user_id, role, created_at) VALUES ('proj-1', 'user-1', 'owner', '2026-01-01')",
             [],
         )
         .unwrap();
@@ -3978,5 +4035,78 @@ mod tests {
             HeaderValue::from_str(&format!("Bearer {}", token.token)).unwrap(),
         );
         assert!(authorize_doc_tool(&db, &bearer).is_ok());
+    }
+
+    /// 令牌只证明调用者是谁；跨项目写必须被项目级授权拦下。
+    #[tokio::test]
+    async fn doc_tools_reject_cross_project_token() {
+        use axum::http::HeaderValue;
+
+        let db = setup_db();
+        {
+            let conn = db.0.lock().unwrap();
+            conn.execute(
+                "INSERT INTO projects (id, name, owner_id, created_at) VALUES ('proj-2', '别人的项目', 'user-2', '2026-01-01')",
+                [],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO project_members (project_id, user_id, role, created_at) VALUES ('proj-2', 'user-2', 'owner', '2026-01-01')",
+                [],
+            )
+            .unwrap();
+        }
+
+        let token = personal_token_repo::create_personal_token(&db, "user-1", "mcp").unwrap();
+        let state = Arc::new(McpServerState {
+            db: db.clone(),
+            tools: get_tool_definitions(),
+            require_auth: false,
+        });
+        let mut headers = HeaderMap::new();
+        headers.insert("X-YAPI-TOKEN", HeaderValue::from_str(&token.token).unwrap());
+
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(serde_json::json!(1)),
+            method: "tools/call".to_string(),
+            params: serde_json::json!({
+                "name": "api-doc.create_folder",
+                "arguments": {"projectId": "proj-2", "name": "越权目录"}
+            }),
+        };
+        let resp = handle_mcp_request(AxumState(state.clone()), headers.clone(), Json(req)).await;
+        let body = axum::body::to_bytes(resp.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["error"]["code"], -32003, "跨项目写应被拒: {v}");
+        {
+            let conn = db.0.lock().unwrap();
+            let cnt: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM menu_items WHERE project_id = 'proj-2'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(cnt, 0, "越权请求不应写入任何数据");
+        }
+
+        let req2 = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(serde_json::json!(2)),
+            method: "tools/call".to_string(),
+            params: serde_json::json!({
+                "name": "api-doc.create_folder",
+                "arguments": {"projectId": "proj-1", "name": "新目录"}
+            }),
+        };
+        let resp2 = handle_mcp_request(AxumState(state), headers, Json(req2)).await;
+        let body2 = axum::body::to_bytes(resp2.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let v2: serde_json::Value = serde_json::from_slice(&body2).unwrap();
+        assert!(v2.get("error").is_none(), "本项目写应通过: {v2}");
     }
 }

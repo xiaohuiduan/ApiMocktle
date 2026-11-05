@@ -45,10 +45,12 @@ pub async fn start_mcp_server(
     }
 
     let preferred_port = port.unwrap_or(14203);
+    // 默认只绑回环：MCP 的能力面是整库读写，敞到局域网必须由用户显式配置
+    // （把 app_config 里的 mcp_host 改成 0.0.0.0 或网卡地址），此时全部工具强制要求个人令牌。
     let host = app_config
         .get("mcp_host")
         .and_then(|v| v.as_str().map(str::to_string))
-        .unwrap_or_else(|| "0.0.0.0".to_string());
+        .unwrap_or_else(|| "127.0.0.1".to_string());
     let db_clone = db.inner().clone();
     let handle_clone = handle.inner().clone();
 
