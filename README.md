@@ -1,4 +1,4 @@
-﻿# ApiMocktle
+# ApiMocktle
 
 **Mock**（模拟，类似鹦鹉学舌，突出 API 模拟能力）+ **Turtle**（龟，象征数据结构稳定）→ **Mocktle**。一个基于 **Tauri v2 + React + Rust + SQLite** 的本地优先 API 管理桌面应用。
 
@@ -240,6 +240,18 @@ cargo install cargo-xwin
 ```
 
 `cargo-xwin` 首次运行会下载 MSVC SDK（约 1GB，需联网），之后可离线使用。
+
+### 运行测试
+
+```sh
+pnpm test          # 前端单元测试（vitest）
+pnpm test:rust     # Rust 单元测试
+```
+
+Windows 上**不要**直接跑 `cargo test --lib`：cargo 的 `rustc-link-arg-tests` 不作用于
+lib 单元测试目标，测试二进制没有内嵌 manifest，会在 `main` 之前以
+`STATUS_ENTRYPOINT_NOT_FOUND (0xC0000139)` 退出。`pnpm test:rust` 会在链接后用
+`mt.exe` 补嵌 `src-tauri/test.manifest` 再运行，因此需要装有 Windows SDK。
 
 ## 数据库
 
