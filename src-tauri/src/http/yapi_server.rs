@@ -541,8 +541,13 @@ async fn handle_add_cat(
         Some(id) => id,
         None => return yapi_error("缺少参数: project_id"),
     };
-    if !check_project_member(&state.db, &project_id, &user_id) {
-        return yapi_error("无权访问该项目");
+    // 建目录是写操作，跟 save / up / update_cat / del_cat / del 一致要求 owner|editor；
+    // 只看成员身份会让 viewer 也能改项目结构。
+    {
+        let role = project_repo::get_project_member_role(&state.db, &project_id, &user_id);
+        if role.as_deref() != Some("owner") && role.as_deref() != Some("editor") {
+            return yapi_error("无权修改该项目");
+        }
     }
     let name = match body.get("name").and_then(|v| v.as_str()) { Some(n) => n, None => return yapi_error("缺少必要参数: name") };
     let parent_id = read_parent_id(&body);

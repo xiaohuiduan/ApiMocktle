@@ -95,5 +95,4 @@ plans/**
 /.codegraph
 /.omp
 /docs/apifox-migration-findings.md
-/.gitattributes
 /src-tauri/gen/schemas/linux-schema.json
