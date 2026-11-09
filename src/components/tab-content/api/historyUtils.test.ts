@@ -1,6 +1,51 @@
 import { describe, expect, it } from 'vitest'
 
-import { collectEnvironmentBaseUrls, extractPathFromHistoryUrl } from './historyUtils'
+import { collectEnvironmentBaseUrls, extractPathFromHistoryUrl, parseQueryFromUrl, parseQueryPairsFromUrl } from './historyUtils'
+
+describe('parseQueryFromUrl', () => {
+  it('解析绝对地址的 query', () => {
+    expect(parseQueryFromUrl('https://dev.a.com/biz/sys?bizSys=1001&bizSysType=MAIN'))
+      .toEqual([
+        expect.objectContaining({ name: 'bizSys', example: '1001' }),
+        expect.objectContaining({ name: 'bizSysType', example: 'MAIN' }),
+      ])
+  })
+
+  it('解析相对路径的 query（未选环境时历史落库的就是这种形态）', () => {
+    expect(parseQueryFromUrl('/biz/sys?bizSys=1001')).toEqual([expect.objectContaining({ name: 'bizSys', example: '1001' })])
+    expect(parseQueryFromUrl('biz/sys?bizSys=1001')).toEqual([expect.objectContaining({ name: 'bizSys', example: '1001' })])
+  })
+
+  it('解码转义字符并保留重复参数', () => {
+    const params = parseQueryFromUrl('/q?name=%E5%BC%A0&tag=a&tag=b')
+
+    expect(params.map((p) => [p.name, p.example])).toEqual([
+      ['name', '张'],
+      ['tag', 'a'],
+      ['tag', 'b'],
+    ])
+  })
+
+  it('空值、空白与无 query 返回空数组', () => {
+    expect(parseQueryFromUrl('')).toEqual([])
+    expect(parseQueryFromUrl('   ')).toEqual([])
+    expect(parseQueryFromUrl('/biz/sys')).toEqual([])
+  })
+})
+
+describe('parseQueryPairsFromUrl', () => {
+  it('相对路径也产出 name/value 对（历史详情与错误历史的展示形态）', () => {
+    expect(parseQueryPairsFromUrl('/biz/sys?bizSys=1001&bizSysType=MAIN')).toEqual([
+      { name: 'bizSys', value: '1001' },
+      { name: 'bizSysType', value: 'MAIN' },
+    ])
+  })
+
+  it('无 query 或空值时返回空数组', () => {
+    expect(parseQueryPairsFromUrl('/biz/sys')).toEqual([])
+    expect(parseQueryPairsFromUrl('')).toEqual([])
+  })
+})
 
 describe('extractPathFromHistoryUrl', () => {
   it('剥离命中的环境 baseUrl，只保留相对路径', () => {

@@ -319,4 +319,99 @@ describe('快捷请求：Body 落库与回显', () => {
 
     expect(view.container.textContent).toContain('查看响应')
   })
+
+  it('历史回填：文档参数占位值被历史实际值覆盖，Params 面板直接可见', async () => {
+    h.state.item = {
+      id: 'qr-1',
+      name: '查询业务系统',
+      data: makeQuickRequest({
+        method: 'GET' as ApiDetails['method'],
+        path: '/biz/sys',
+        parameters: {
+          query: [
+            { id: 'q1', name: 'bizSys', example: '@id', enable: true, type: 'string' },
+            { id: 'q2', name: 'bizSysType', example: '@string', enable: true, type: 'string' },
+          ],
+          header: [],
+          path: [],
+          cookie: [],
+        } as ApiDetails['parameters'],
+      }),
+    }
+
+    h.state.history = [{
+      id: 'h1',
+      statusCode: 200,
+      durationMs: 12,
+      createdAt: new Date().toISOString(),
+      requestJson: {
+        url: 'https://dev.a.com/biz/sys?bizSys=1001&bizSysType=MAIN',
+        method: 'GET',
+        headers: [],
+        body: '',
+      },
+      responseJson: { status: 200, statusText: 'OK', durationMs: 12, body: '{}', headers: [] },
+    }]
+
+    render(<QuickRequestRun />)
+
+    // GET 默认停在 Params 页签，先确认占位值还在
+    expect(screen.getByDisplayValue('@id')).toBeTruthy()
+
+    fireEvent.click(screen.getByTitle('历史记录'))
+
+    fireEvent.click(await screen.findByText(/\/biz\/sys\?bizSys=1001/))
+
+    const applyLabel = await screen.findByText(/回\s*填/)
+    const applyBtn = applyLabel.closest('button')
+
+    if (!applyBtn) { throw new Error('未找到回填按钮') }
+
+    fireEvent.click(applyBtn)
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('1001')).toBeTruthy()
+    })
+    expect(screen.getByDisplayValue('MAIN')).toBeTruthy()
+    expect(screen.queryByDisplayValue('@id')).toBeNull()
+  })
+
+  it('历史回填：文档没有 requestBody 时也能写入历史 body', async () => {
+    h.state.item = {
+      id: 'qr-1',
+      name: '提交订单',
+      data: makeQuickRequest({ method: 'POST' as ApiDetails['method'], path: '/orders', requestBody: undefined }),
+    }
+
+    h.state.history = [{
+      id: 'h1',
+      statusCode: 200,
+      durationMs: 12,
+      createdAt: new Date().toISOString(),
+      requestJson: {
+        url: 'https://dev.a.com/orders',
+        method: 'POST',
+        headers: [],
+        body: '{"amount":5}',
+        contentType: 'application/json',
+      },
+      responseJson: { status: 200, statusText: 'OK', durationMs: 12, body: '{}', headers: [] },
+    }]
+
+    const view = render(<QuickRequestRun />)
+
+    fireEvent.click(screen.getByTitle('历史记录'))
+    fireEvent.click(await screen.findByText(/\/orders$/))
+
+    const applyLabel = await screen.findByText(/回\s*填/)
+    const applyBtn = applyLabel.closest('button')
+
+    if (!applyBtn) { throw new Error('未找到回填按钮') }
+
+    fireEvent.click(applyBtn)
+
+    await waitFor(() => {
+      expect(bodyEditor(view.container).value).toBe('{"amount":5}')
+    })
+  })
 })

@@ -381,10 +381,12 @@ describe('运行 Tab：Body 跨挂载回显', () => {
       requestBody: { ...doc.requestBody!, rawText: '{"query":{"match_all":{}}}' },
     })
 
-    h.state.history = [{
-      requestJson: { url: 'https://dev.a.com/orders?page=1', method: 'GET', headers: [], body: '' },
-      responseJson: { status: 200, statusText: 'OK', durationMs: 1, body: '{}', headers: [] },
-    }]
+    h.state.history = [
+      {
+        requestJson: { url: 'https://dev.a.com/orders?page=1', method: 'GET', headers: [], body: '' },
+        responseJson: { status: 200, statusText: 'OK', durationMs: 1, body: '{}', headers: [] },
+      },
+    ]
 
     const view = mountWith(doc)
 
@@ -403,6 +405,137 @@ describe('运行 Tab：Body 跨挂载回显', () => {
         : []
 
       expect(query.some((p) => p.name === 'page' && p.example === '1')).toBe(true)
+    })
+  })
+
+  it('文档定义了参数占位值时，历史记录会覆盖成实际值（参数面板直接可见）', async () => {
+    const doc = makeDoc({
+      method: 'GET' as ApiDetails['method'],
+      path: '/biz/sys',
+      parameters: {
+        query: [
+          { id: 'q1', name: 'bizSys', example: '@id', enable: true, type: 'string' },
+          { id: 'q2', name: 'bizSysType', example: '@string', enable: true, type: 'string' },
+        ],
+        header: [],
+        path: [],
+        cookie: [],
+      } as ApiDetails['parameters'],
+    })
+
+    h.state.history = [
+      {
+        requestJson: {
+          url: 'https://dev.a.com/biz/sys?bizSys=1001&bizSysType=MAIN',
+          method: 'GET',
+          headers: [],
+          body: '',
+        },
+        responseJson: { status: 200, statusText: 'OK', durationMs: 1, body: '{}', headers: [] },
+      },
+    ]
+
+    const view = mountWith(doc)
+
+    // 用户能看到的输入框：参数名保持文档结构，请求值换成历史实际值
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('1001')).toBeTruthy()
+    })
+    expect(screen.getByDisplayValue('MAIN')).toBeTruthy()
+    expect(screen.getByDisplayValue('bizSys')).toBeTruthy()
+    expect(screen.getByDisplayValue('bizSysType')).toBeTruthy()
+    expect(screen.queryByDisplayValue('@id')).toBeNull()
+
+    // 同一份结果也落到本地副本
+    const raw = window.localStorage.getItem(getRunTabStorageKey('api-1'))
+    const query = raw
+      ? (JSON.parse(raw) as { workCopy?: ApiDetails }).workCopy?.parameters?.query ?? []
+      : []
+
+    expect(query.map((p) => [p.name, p.example])).toEqual([
+      ['bizSys', '1001'],
+      ['bizSysType', 'MAIN'],
+    ])
+    expect(view.container.textContent).not.toContain('@id')
+  })
+
+  it('历史 URL 是相对路径（未选环境）时也能回填参数，不会把面板清空', async () => {
+    const doc = makeDoc({
+      method: 'GET' as ApiDetails['method'],
+      path: '/biz/sys',
+    })
+
+    h.state.history = [
+      {
+        requestJson: { url: '/biz/sys?bizSys=1001', method: 'GET', headers: [], body: '' },
+        responseJson: { status: 200, statusText: 'OK', durationMs: 1, body: '{}', headers: [] },
+      },
+    ]
+
+    mountWith(doc)
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('1001')).toBeTruthy()
+    })
+
+    // 相对路径还原时不能把 query 带进 path
+    expect(screen.getByDisplayValue('/biz/sys')).toBeTruthy()
+  })
+
+  it('用户自己写的 {{var}} 模板会被历史实际值覆盖（整体还原口径）', async () => {
+    const doc = makeDoc({
+      method: 'GET' as ApiDetails['method'],
+      path: '/biz/sys',
+      parameters: {
+        query: [{ id: 'q1', name: 'bizSys', example: '{{sysId}}', enable: true, type: 'string' }],
+        header: [],
+        path: [],
+        cookie: [],
+      } as ApiDetails['parameters'],
+    })
+
+    writeLocalRunCopy(getRunTabStorageKey('api-1'), 'v1', doc)
+    h.state.history = [
+      {
+        requestJson: { url: '/biz/sys?bizSys=1001', method: 'GET', headers: [], body: '' },
+        responseJson: { status: 200, statusText: 'OK', durationMs: 1, body: '{}', headers: [] },
+      },
+    ]
+
+    mountWith(doc)
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('1001')).toBeTruthy()
+    })
+    expect(screen.queryByDisplayValue('{{sysId}}')).toBeNull()
+  })
+
+  it('历史正文回填后同步写入按类型的正文缓存（切走再切回不会读到旧正文）', async () => {
+    const doc = makeDoc()
+
+    h.state.history = [
+      {
+        requestJson: {
+          url: '/orders',
+          method: 'POST',
+          headers: [],
+          body: '{"amount":5}',
+          contentType: 'application/json',
+        },
+        responseJson: { status: 200, statusText: 'OK', durationMs: 1, body: '{}', headers: [] },
+      },
+    ]
+
+    mountWith(doc)
+
+    await waitFor(() => {
+      const raw = window.localStorage.getItem(getRunTabStorageKey('api-1'))
+      const payload = raw
+        ? (JSON.parse(raw) as { workCopy?: ApiDetails, bodyTexts?: Record<string, string> })
+        : undefined
+
+      expect(payload?.workCopy?.requestBody?.rawText).toBe('{"amount":5}')
+      expect(payload?.bodyTexts?.['application/json']).toBe('{"amount":5}')
     })
   })
 
