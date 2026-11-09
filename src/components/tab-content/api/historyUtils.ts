@@ -3,9 +3,18 @@ import { nanoid } from 'nanoid'
 import { ParamType } from '@/enums'
 import type { ApiEnvironment, Parameter } from '@/types'
 
+const ABSOLUTE_URL = /^[a-z][\w+.-]*:\/\//i
+
 export function parseQueryFromUrl(url: string): Parameter[] {
+  const raw = (url ?? '').trim()
+
+  if (!raw) { return [] }
+
   try {
-    const parsed = new URL(url)
+    // 未选环境时 buildRequest 只产出相对路径（/path?x=1），必须给个虚拟基准，
+    // 否则 new URL 直接抛错、query 被静默丢弃（回填会把参数面板清空）。
+    // 只读 searchParams，虚拟基准的 origin 不会混进结果。
+    const parsed = ABSOLUTE_URL.test(raw) ? new URL(raw) : new URL(raw, 'http://relative.invalid')
     const params: Parameter[] = []
     parsed.searchParams.forEach((value, name) => {
       params.push({
@@ -22,6 +31,18 @@ export function parseQueryFromUrl(url: string): Parameter[] {
   catch {
     return []
   }
+}
+
+/**
+ * 从 URL 取 query 的「name/value 对」形态，供历史详情、错误历史等只读展示使用。
+ * 与 parseQueryFromUrl 共用一套解析，避免各处再写 `new URL(url).searchParams`
+ * 而在相对路径上静默失败。
+ */
+export function parseQueryPairsFromUrl(url: string): { name: string, value: string }[] {
+  return parseQueryFromUrl(url).map((param) => ({
+    name: param.name ?? '',
+    value: typeof param.example === 'string' ? param.example : '',
+  }))
 }
 
 export function parseHistoryParams(
@@ -110,7 +131,7 @@ export function extractPathFromHistoryUrl(
 
   if (!raw) { return '' }
 
-  if (!/^[a-z][\w+.-]*:\/\//i.test(raw)) {
+  if (!ABSOLUTE_URL.test(raw)) {
     return stripQueryAndHash(raw)
   }
 

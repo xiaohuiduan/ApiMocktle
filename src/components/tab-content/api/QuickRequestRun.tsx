@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useParams } from 'react-router'
 import { useEvent } from 'react-use-event-hook'
 
 import {
@@ -16,7 +17,6 @@ import {
 } from 'antd'
 import { ClockIcon, CopyIcon, PencilIcon, PlayIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
-import { useParams } from 'react-router'
 
 import { api } from '@/api-client'
 import type { ApiMenuData } from '@/components/ApiMenu/ApiMenu.type'
@@ -49,7 +49,8 @@ import { ScriptsPanel } from './params/ScriptsPanel'
 import { buildJsoncBodyFillText } from './bodyJsonc'
 import { buildRequest, type BuildRequestResult } from './buildRequest'
 import { generateCurl } from './curl'
-import { collectEnvironmentBaseUrls, extractPathFromHistoryUrl, parseHistoryParams } from './historyUtils'
+import { applyHistoryToWorkCopy } from './historyBackfill'
+import { collectEnvironmentBaseUrls } from './historyUtils'
 import { executeScript } from './scripts'
 import { useApiRequestRunner } from './useApiRequestRunner'
 import { useResolvedVarMap } from './useResolvedVarMap'
@@ -580,32 +581,15 @@ export function QuickRequestRun() {
   }
 
   const handleApplyHistory = (item: RequestHistoryItem) => {
-    const parsed = parseHistoryParams(item.requestJson.headers ?? [], item.requestJson.url ?? '')
-    // 历史 url 是已拼好环境 baseUrl 的完整地址，需还原为相对路径，否则切换环境不再生效
-    const historyPath = extractPathFromHistoryUrl(
-      item.requestJson.url,
-      collectEnvironmentBaseUrls(projectEnvironments, projectEnvironmentConfig?.environments),
-    )
+    const baseUrls = collectEnvironmentBaseUrls(projectEnvironments, projectEnvironmentConfig?.environments)
 
     setWorkCopy((prev) => {
-      const next = {
-        ...prev,
-        method: (item.requestJson.method ?? prev.method) as ApiDetails['method'],
-        path: historyPath || prev.path,
-        parameters: {
-          ...prev.parameters,
-          query: parsed.query,
-          header: parsed.header,
-          cookie: parsed.cookie,
-        },
-      }
+      const next = applyHistoryToWorkCopy({ current: prev, requestJson: item.requestJson, baseUrls })
+      const body = next.requestBody
 
-      if (item.requestJson.body && next.requestBody) {
-        next.requestBody = {
-          ...next.requestBody,
-          type: item.requestJson.contentType === 'application/json' ? BodyType.Json : BodyType.Raw,
-          rawText: item.requestJson.body,
-        }
+      // 正文缓存同步：否则回填后切走 Body 类型再切回会读到旧正文
+      if (body?.type && typeof body.rawText === 'string' && body.rawText.trim()) {
+        bodyTextsRef.current[body.type] = body.rawText
       }
 
       return next

@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/auth'
 import type { ApiRunResult } from '@/types'
 
 import { buildMarkdownReport, downloadText } from '../exportMarkdown'
+import { parseQueryPairsFromUrl } from '../historyUtils'
 import { calcBodySize, detectLanguage, getStatusColor, headerTableColumns } from '../utils'
 
 import { MarkdownDiffView } from './MarkdownDiffView'
@@ -106,15 +107,10 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
   const effectiveRequestQuery = (result?.requestQuery && result.requestQuery.length > 0)
     ? result.requestQuery
     : (() => {
-        try {
-          if (!result?.url) { return undefined }
+        // 后端 requestQuery 目前恒为空，详情实际靠这里兜底；相对路径 URL 也要能解析
+        const pairs = result?.url ? parseQueryPairsFromUrl(result.url) : []
 
-          const params: { name: string, value: string }[] = []
-          new URL(result.url).searchParams.forEach((value, name) => params.push({ name, value }))
-
-          return params.length > 0 ? params : undefined
-        }
-        catch { return undefined }
+        return pairs.length > 0 ? pairs : undefined
       })()
 
   return (
@@ -156,7 +152,7 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
               const r = item.responseJson
               const req = item.requestJson
               const md = buildMarkdownReport(
-                { url: req.url, method: req.method, headers: req.headers, body: req.body, contentType: req.contentType, query: (r.requestQuery ?? []) as never },
+                { url: req.url, method: req.method, headers: req.headers, body: req.body, contentType: req.contentType, query: (effectiveRequestQuery ?? []) as never },
                 { status: r.status, statusText: r.statusText, headers: r.headers, body: r.body, durationMs: r.durationMs, contentType: r.contentType },
               )
               downloadText(`接口报告-${r.status}-${Date.now()}.md`, md)

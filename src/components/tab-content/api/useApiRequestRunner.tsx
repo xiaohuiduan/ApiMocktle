@@ -7,6 +7,8 @@ import { useGlobalContext } from '@/contexts/global'
 import { useProxyConfig } from '@/contexts/proxy-config'
 import type { ApiRunResult } from '@/types'
 
+import { parseQueryPairsFromUrl } from './historyUtils'
+
 export function useApiRequestRunner() {
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<ApiRunResult>()
@@ -119,16 +121,8 @@ export function useApiRequestRunner() {
               return { name: decodeURIComponent(name), value: decodeURIComponent(rest.join('=')) }
             })
           : []
-        // 从 URL 中解析 query 参数
-        const queryFromUrl: { name: string, value: string }[] = []
-
-        try {
-          const urlObj = new URL(url)
-          urlObj.searchParams.forEach((value, name) => {
-            queryFromUrl.push({ name, value })
-          })
-        }
-        catch { /* url 可能不完整，忽略 */ }
+        // 从 URL 中解析 query 参数（相对路径也要能解析，否则错误历史里看不到 query）
+        const queryFromUrl = parseQueryPairsFromUrl(url)
 
         const errorResult: ApiRunResult = {
           url,

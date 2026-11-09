@@ -30,7 +30,7 @@ import { useProxyConfig } from '@/contexts/proxy-config'
 import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { BodyType, ParamType } from '@/enums'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
-import { type ApiDetails, type ApiRequestBody, type ApiRunResult, type RunTabInfo, type SavedRequestConfig, type ScriptConsoleEntry, type ScriptTestResult } from '@/types'
+import { type ApiDetails, type ApiRunResult, type RunTabInfo, type SavedRequestConfig, type ScriptConsoleEntry, type ScriptTestResult } from '@/types'
 
 import { getBodyTypeLabel } from './components/BodyTypeSelect'
 import { HistoryPanel, type RequestHistoryItem } from './components/HistoryPanel'
@@ -44,7 +44,8 @@ import { ScriptsPanel } from './params/ScriptsPanel'
 import { buildJsoncBodyFillText } from './bodyJsonc'
 import { buildRequest, type BuildRequestResult } from './buildRequest'
 import { generateCurl } from './curl'
-import { collectEnvironmentBaseUrls, extractPathFromHistoryUrl, parseHistoryParams } from './historyUtils'
+import { applyHistoryToWorkCopy } from './historyBackfill'
+import { collectEnvironmentBaseUrls } from './historyUtils'
 import { cloneApiDetails, getRunTabStorageKey, mergeRunTabInfo, readLocalRunCopy, resolveInitialWorkCopy, writeLocalRunCopy } from './runTabState'
 import { executeScript } from './scripts'
 import { useApiRequestRunner } from './useApiRequestRunner'
@@ -260,6 +261,13 @@ export function RunTab() {
   const persist = useCallback((copy: ApiDetails) => {
     if (!copy?.id) { return }
 
+    // 正文始终回写各类型缓存：否则历史回填改了正文，切走再切回会读到旧缓存
+    const body = copy.requestBody
+
+    if (body?.type && typeof body.rawText === 'string' && body.rawText.trim()) {
+      bodyTextsRef.current[body.type] = body.rawText
+    }
+
     writeLocalRunCopy(getRunTabStorageKey(copy.id), docUpdatedAtRef.current, copy, bodyTextsRef.current)
   }, [])
 
@@ -345,6 +353,9 @@ export function RunTab() {
 
   // 从数据库加载最近一次运行结果和请求参数
   const prevLoadedKeyRef = useRef<string | null>(null)
+  // 当前挂载的接口 key：异步返回时它可能已经切走，旧历史绝不能写进新接口的副本
+  const currentTabKeyRef = useRef(tabData.key)
+  currentTabKeyRef.current = tabData.key
   useEffect(() => {
     if (!tabData.key || !projectId || !sessionId) { return }
 
@@ -356,6 +367,8 @@ export function RunTab() {
     const loadLastResult = async () => {
       try {
         const list = await api<{ requestJson: SavedRequestConfig, responseJson: ApiRunResult }[]>('list_request_history', { sessionId, projectId, menuItemId: tabData.key })
+
+        if (currentTabKeyRef.current !== tabData.key) { return }
 
         if (list.length > 0) {
           const last = list[0]
@@ -375,48 +388,22 @@ export function RunTab() {
     void loadLastResult()
   }, [tabData.key, projectId, sessionId, setResult])
 
-  // 当 workCopy 可用时，用历史记录「只填补空白」：
-  // 本地副本已能恢复用户上次编辑的模板（含 {{var}}），历史里是变量已解析的文本，
-  // 直接覆盖属于数据降级，因此仅对当前为空的段落做兜底填充。
+  // workCopy 就绪后按最近一次运行历史整体还原：文档里的参数值往往只是占位
+  // （`@id` / `@string`），只补空白的话永远看不到上次真正发出去的值。
+  // 与历史面板「回填」共用 applyHistoryToWorkCopy，避免两条链路再次漂移。
   useEffect(() => {
     if (!workCopy || !pendingHistoryRef.current) { return }
 
-    const last = pendingHistoryRef.current
-    const parsed = parseHistoryParams(
-      last.requestJson.headers ?? [],
-      last.requestJson.url ?? '',
-    )
-
-    const isBlank = (list: { name?: string, enable?: boolean }[] | undefined) =>
-      !(list ?? []).some((p) => p.name && p.enable !== false)
-
-    const currentParams = workCopy.parameters ?? {}
-    const next: ApiDetails = {
-      ...workCopy,
-      parameters: {
-        ...currentParams,
-        query: isBlank(currentParams.query) && parsed.query.length > 0 ? parsed.query : currentParams.query,
-        header: isBlank(currentParams.header) && parsed.header.length > 0 ? parsed.header : currentParams.header,
-        cookie: isBlank(currentParams.cookie) && parsed.cookie.length > 0 ? parsed.cookie : currentParams.cookie,
-      },
-    }
-
-    // Body：仅当当前没有内容、且历史有 body 时填充；文档未定义 requestBody 时按 contentType 创建
-    const historyBody = last.requestJson.body
-    const currentRawText = workCopy.requestBody?.rawText
-
-    if (historyBody && !currentRawText?.trim()) {
-      const historyBodyType = last.requestJson.contentType === 'application/json' ? BodyType.Json : BodyType.Raw
-
-      next.requestBody = workCopy.requestBody
-        ? { ...workCopy.requestBody, type: historyBodyType, rawText: historyBody }
-        : ({ type: historyBodyType, rawText: historyBody } as ApiRequestBody)
-    }
+    const next = applyHistoryToWorkCopy({
+      current: workCopy,
+      requestJson: pendingHistoryRef.current.requestJson,
+      baseUrls: collectEnvironmentBaseUrls(projectEnvironments, projectEnvironmentConfig?.environments),
+    })
 
     setWorkCopy(next)
     persist(next)
     pendingHistoryRef.current = null
-  }, [workCopy, historyLoaded, persist])
+  }, [workCopy, historyLoaded, persist, projectEnvironments, projectEnvironmentConfig?.environments])
 
   // 运行
   const handleRun = async () => {
@@ -638,31 +625,11 @@ export function RunTab() {
   const handleApplyHistory = (item: RequestHistoryItem) => {
     if (!workCopy) { return }
 
-    const parsed = parseHistoryParams(item.requestJson.headers ?? [], item.requestJson.url ?? '')
-    // 历史 url 是已拼好环境 baseUrl 的完整地址，需还原为相对路径，否则切换环境不再生效
-    const historyPath = extractPathFromHistoryUrl(
-      item.requestJson.url,
-      collectEnvironmentBaseUrls(projectEnvironments, projectEnvironmentConfig?.environments),
-    )
-    const next: ApiDetails = {
-      ...workCopy,
-      method: (item.requestJson.method ?? workCopy.method) as ApiDetails['method'],
-      path: historyPath || workCopy.path,
-      parameters: {
-        ...workCopy.parameters,
-        query: parsed.query,
-        header: parsed.header,
-        cookie: parsed.cookie,
-      },
-    }
-
-    if (item.requestJson.body && next.requestBody) {
-      next.requestBody = {
-        ...next.requestBody,
-        type: item.requestJson.contentType === 'application/json' ? BodyType.Json : BodyType.Raw,
-        rawText: item.requestJson.body,
-      }
-    }
+    const next = applyHistoryToWorkCopy({
+      current: workCopy,
+      requestJson: item.requestJson,
+      baseUrls: collectEnvironmentBaseUrls(projectEnvironments, projectEnvironmentConfig?.environments),
+    })
 
     setWorkCopy(next)
     persist(next)

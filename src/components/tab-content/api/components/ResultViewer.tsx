@@ -26,6 +26,7 @@ import { useStyles } from '@/hooks/useStyle'
 import type { ApiRunHeader, ApiRunResult } from '@/types'
 
 import { buildMarkdownReport, downloadText } from '../exportMarkdown'
+import { parseQueryPairsFromUrl } from '../historyUtils'
 import type { ResolvedVar } from '../useResolvedVarMap'
 import { calcBodySize, detectLanguage, getStatusColor, headerTableColumns } from '../utils'
 
@@ -340,8 +341,11 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
                       key: 'export',
                       label: '导出 Markdown',
                       onClick: () => {
+                        const requestQuery = result.requestQuery && result.requestQuery.length > 0
+                          ? result.requestQuery
+                          : parseQueryPairsFromUrl(result.url)
                         const md = buildMarkdownReport(
-                          { url: result.url, method: result.method, headers: result.requestHeaders, body: result.requestBodyText, contentType: result.contentType, query: result.requestQuery },
+                          { url: result.url, method: result.method, headers: result.requestHeaders, body: result.requestBodyText, contentType: result.contentType, query: requestQuery },
                           { status: result.status, statusText: result.statusText, headers: result.headers, body: result.body, durationMs: result.durationMs, contentType: result.contentType },
                         )
                         downloadText(`接口报告-${result.status}-${Date.now()}.md`, md)
