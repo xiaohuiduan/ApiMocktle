@@ -29,6 +29,7 @@ import type {
 } from '@/types'
 import {
   buildYapiPushNotificationContent,
+  countYapiPushKind,
   getYapiPushNotificationKey,
   YAPI_PUSH_DEBOUNCE_MS,
   YAPI_PUSH_EVENT,
@@ -377,8 +378,8 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
 
   // ----- YAPI 推送通知：右上角常驻，合并防抖 -----
   const [notificationApi, notificationHolder] = notification.useNotification({ placement: 'topRight' })
-  const pendingRef = useRef<Map<string, { projectName: string, count: number, timer: number }>>(new Map())
-  const visibleRef = useRef<Map<string, number>>(new Map())
+  const pendingRef = useRef<Map<string, { projectName: string, created: number, merged: number, timer: number }>>(new Map())
+  const visibleRef = useRef<Map<string, { created: number, merged: number }>>(new Map())
   const activeProjectIdRef = useRef(activeProjectId)
   const reloadStateRef = useRef(reloadState)
   const openProjectRef = useRef(openProject)
@@ -401,9 +402,12 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
       if (!entry) { return }
 
       pendingRef.current.delete(projectId)
-      const { projectName, count } = entry
-      const prevVisible = visibleRef.current.get(projectId) ?? 0
-      const total = prevVisible > 0 ? prevVisible + count : count
+      const { projectName, created, merged } = entry
+      const prevVisible = visibleRef.current.get(projectId)
+      const total = {
+        created: (prevVisible?.created ?? 0) + created,
+        merged: (prevVisible?.merged ?? 0) + merged,
+      }
       visibleRef.current.set(projectId, total)
       const isActive = activeProjectIdRef.current === projectId
       const key = getYapiPushNotificationKey(projectId)
@@ -453,17 +457,27 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
 
           if (!payload?.projectId) { return }
 
+          const delta = countYapiPushKind(payload)
           const existing = pendingRef.current.get(payload.projectId)
 
           if (existing) {
             window.clearTimeout(existing.timer)
-            const newCount = existing.count + (payload.count || 1)
             const timer = window.setTimeout(() => { flush(payload.projectId) }, YAPI_PUSH_DEBOUNCE_MS)
-            pendingRef.current.set(payload.projectId, { projectName: payload.projectName || existing.projectName, count: newCount, timer: timer as unknown as number })
+            pendingRef.current.set(payload.projectId, {
+              projectName: payload.projectName || existing.projectName,
+              created: existing.created + delta.created,
+              merged: existing.merged + delta.merged,
+              timer: timer as unknown as number,
+            })
           }
           else {
             const timer = window.setTimeout(() => { flush(payload.projectId) }, YAPI_PUSH_DEBOUNCE_MS)
-            pendingRef.current.set(payload.projectId, { projectName: payload.projectName || payload.projectId, count: payload.count || 1, timer: timer as unknown as number })
+            pendingRef.current.set(payload.projectId, {
+              projectName: payload.projectName || payload.projectId,
+              created: delta.created,
+              merged: delta.merged,
+              timer: timer as unknown as number,
+            })
           }
         })
 

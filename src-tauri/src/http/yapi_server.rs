@@ -44,6 +44,10 @@ pub struct AppState {
     pub app_handle: Option<tauri::AppHandle>,
 }
 
+/// 推送事件的动作类型：新建记录 / 命中已有记录后合并更新。
+const PUSH_KIND_CREATED: &str = "created";
+const PUSH_KIND_MERGED: &str = "merged";
+
 // YApi push payload — emitted to frontend after successful push
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YapiPushPayload {
@@ -52,12 +56,19 @@ pub struct YapiPushPayload {
     #[serde(rename = "projectName")]
     pub project_name: String,
     pub count: u32,
+    /// "created" = 新建记录；"merged" = 命中已有记录（同 id 或同 METHOD+path）
+    pub kind: String,
 }
 
-fn emit_yapi_push(state: &AppState, project_id: &str) {
+/// 构造推送载荷。与 emit 分离，便于单测直接断言 kind 而不用伪造 AppHandle。
+fn build_yapi_push_payload(state: &AppState, project_id: &str, kind: &str) -> YapiPushPayload {
+    let project_name = project_repo::get_project_by_id(&state.db, project_id).ok().flatten().map(|(_, name)| name).unwrap_or_else(|| project_id.to_string());
+    YapiPushPayload { project_id: project_id.to_string(), project_name, count: 1, kind: kind.to_string() }
+}
+
+fn emit_yapi_push(state: &AppState, project_id: &str, kind: &str) {
     if let Some(handle) = &state.app_handle {
-        let project_name = project_repo::get_project_by_id(&state.db, project_id).ok().flatten().map(|(_, name)| name).unwrap_or_else(|| project_id.to_string());
-        let payload = YapiPushPayload { project_id: project_id.to_string(), project_name, count: 1 };
+        let payload = build_yapi_push_payload(state, project_id, kind);
         let _ = handle.emit("yapi:api-pushed", payload);
     }
 }
@@ -142,6 +153,17 @@ fn find_existing_interface(
         .flatten()
 }
 
+/// 归一化归属分类 id：空串等同「没有分类」。
+///
+/// `/api/interface/up` 没有分类入参，调用方只能把 `parent_id` 兜底成空串传进来；
+/// 空串一旦写进 `parent_id` 就成了指向不存在目录的悬挂引用，而且会让后续的
+/// 「首次落位」永远走不到——`existing.parent_id` 恒为 `Some("")`，`or_else` 不再触发。
+fn normalize_parent_id(raw: Option<&str>) -> Option<String> {
+    raw.map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+}
+
 fn upsert_menu_item_data(
     db: &Db, project_id: &str, existing: &ApiMenuData, folder_id: &str,
     name: &str, api_details: &Value,
@@ -162,12 +184,19 @@ fn upsert_menu_item_data(
         Value::Object(merged)
     } else { api_details.clone() };
 
-    let old_parent_id = existing.parent_id.clone();
-    let updates = serde_json::json!({ "name": name, "data": next_data, "parentId": folder_id });
+    let old_parent_id = normalize_parent_id(existing.parent_id.as_deref());
+    // 归属规则：已有归类优先，folder_id 只在首次落位（或孤儿记录）时生效。
+    // 同一个 METHOD+path 常被 Controller 与各调用方的 Feign 各推一次，后到的一份
+    // 只更新内容，不把接口从先到的分类里搬走（否则先到的分类会空掉甚至被删）。
+    let next_parent_id = old_parent_id
+        .clone()
+        .or_else(|| normalize_parent_id(Some(folder_id)));
+    let updates = serde_json::json!({ "name": name, "data": next_data, "parentId": next_parent_id });
     menu_repo::update_menu_item(db, project_id, &existing.id, &updates)?;
 
-    if let Some(ref old_pid) = old_parent_id {
-        if old_pid != folder_id {
+    // 归属未变化时不会产生空分类，这段只是防御性兜底
+    if old_parent_id != next_parent_id {
+        if let Some(ref old_pid) = old_parent_id {
             let all_items = menu_repo::list_menu_items(db, project_id)?;
             if !all_items.iter().any(|item| item.parent_id.as_deref() == Some(old_pid.as_str())) {
                 let _ = menu_repo::delete_menu_item(db, project_id, old_pid);
@@ -563,7 +592,8 @@ async fn handle_add_cat(
     let payload = CreateMenuItemPayload { id: folder_id.clone(), parent_id, name: name.to_string(), menu_type: "apiDetailFolder".to_string(), data_json: None, run_tab_json: None, sort_order: Some(sort_order) };
     match menu_repo::create_menu_item(&state.db, &project_id, &payload) {
         Ok(_) => {
-            emit_yapi_push(&state, &project_id);
+            // 目录操作没有「新增接口」语义，保守归入 merged，避免通知虚报新增
+            emit_yapi_push(&state, &project_id, PUSH_KIND_MERGED);
             yapi_ok(serde_json::json!({ "_id": folder_id, "name": name, "desc": "", "index": 0 }))
         },
         Err(e) => yapi_error(&format!("创建分类失败: {e}")),
@@ -635,7 +665,7 @@ async fn handle_interface_save(
         match menu_repo::get_menu_item(&state.db, &project_id, existing_id) {
             Ok(Some(existing)) => match upsert_menu_item_data(&state.db, &project_id, &existing, &catid, title, &api_details) {
                 Ok(result) => {
-                    emit_yapi_push(&state, &project_id);
+                    emit_yapi_push(&state, &project_id, PUSH_KIND_MERGED);
                     return yapi_ok(result);
                 },
                 Err(e) => return yapi_error(&format!("更新失败: {e}")),
@@ -647,7 +677,7 @@ async fn handle_interface_save(
     if let Some(existing) = find_existing_interface(&state.db, &project_id, path, method) {
         match upsert_menu_item_data(&state.db, &project_id, &existing, &catid, title, &api_details) {
             Ok(result) => {
-                emit_yapi_push(&state, &project_id);
+                emit_yapi_push(&state, &project_id, PUSH_KIND_MERGED);
                 return yapi_ok(result);
             },
             Err(e) => return yapi_error(&format!("更新失败: {e}")),
@@ -658,7 +688,7 @@ async fn handle_interface_save(
     let payload = CreateMenuItemPayload { id: menu_item_id.clone(), parent_id: Some(catid), name: title.to_string(), menu_type: "apiDetail".to_string(), data_json: Some(api_details), run_tab_json: None, sort_order: Some(sort_order) };
     match menu_repo::create_menu_item(&state.db, &project_id, &payload) {
         Ok(_) => {
-            emit_yapi_push(&state, &project_id);
+            emit_yapi_push(&state, &project_id, PUSH_KIND_CREATED);
             yapi_ok(serde_json::json!({ "_id": menu_item_id }))
         },
         Err(e) => yapi_error(&format!("创建接口失败: {e}")),
@@ -700,7 +730,7 @@ async fn handle_interface_up(
     let parent_id = existing.parent_id.clone().unwrap_or_default();
     match upsert_menu_item_data(&state.db, &project_id, &existing, &parent_id, title, &api_details) {
         Ok(result) => {
-            emit_yapi_push(&state, &project_id);
+            emit_yapi_push(&state, &project_id, PUSH_KIND_MERGED);
             yapi_ok(result)
         },
         Err(e) => yapi_error(&format!("更新失败: {e}")),
@@ -741,7 +771,8 @@ async fn handle_update_cat(
     let parent_id = read_parent_id(&body);
     match update_folder(&state.db, &project_id, &catid, name, parent_id.as_deref()) {
         Ok(item) => {
-            emit_yapi_push(&state, &project_id);
+            // 目录操作没有「新增接口」语义，保守归入 merged，避免通知虚报新增
+            emit_yapi_push(&state, &project_id, PUSH_KIND_MERGED);
             yapi_ok(
                 serde_json::json!({ "_id": item.id, "name": item.name, "catid": item.parent_id }),
             )
@@ -787,7 +818,7 @@ async fn handle_del_cat(
     }
     match menu_repo::delete_menu_item(&state.db, &project_id, &catid) {
         Ok(_) => {
-            emit_yapi_push(&state, &project_id);
+            emit_yapi_push(&state, &project_id, PUSH_KIND_MERGED);
             yapi_ok(serde_json::json!({ "_id": catid }))
         }
         Err(e) => yapi_error(&format!("删除目录失败: {e}")),
@@ -831,7 +862,7 @@ async fn handle_del(
     }
     match menu_repo::delete_menu_item(&state.db, &project_id, &id) {
         Ok(_) => {
-            emit_yapi_push(&state, &project_id);
+            emit_yapi_push(&state, &project_id, PUSH_KIND_MERGED);
             yapi_ok(serde_json::json!({ "_id": id }))
         }
         Err(e) => yapi_error(&format!("删除接口失败: {e}")),
@@ -921,11 +952,12 @@ mod tests {
 
     #[test]
     fn test_yapi_push_payload_serialize() {
-        let payload = YapiPushPayload { project_id: "p1".into(), project_name: "测试项目".into(), count: 3 };
+        let payload = YapiPushPayload { project_id: "p1".into(), project_name: "测试项目".into(), count: 3, kind: PUSH_KIND_CREATED.into() };
         let json = serde_json::to_value(&payload).unwrap();
         assert_eq!(json.get("projectId").and_then(|v| v.as_str()), Some("p1"));
         assert_eq!(json.get("projectName").and_then(|v| v.as_str()), Some("测试项目"));
         assert_eq!(json.get("count").and_then(|v| v.as_u64()), Some(3));
+        assert_eq!(json.get("kind").and_then(|v| v.as_str()), Some("created"));
     }
 
     #[test]
@@ -980,20 +1012,22 @@ mod tests {
 
     #[test]
     fn test_yapi_push_payload_deserialize() {
-        let json = serde_json::json!({"projectId":"p2","projectName":"项目B","count":5});
+        let json = serde_json::json!({"projectId":"p2","projectName":"项目B","count":5,"kind":"merged"});
         let payload: YapiPushPayload = serde_json::from_value(json).unwrap();
         assert_eq!(payload.project_id, "p2");
         assert_eq!(payload.project_name, "项目B");
         assert_eq!(payload.count, 5);
+        assert_eq!(payload.kind, "merged");
     }
 
     #[test]
     fn test_yapi_push_payload_count_default() {
         // ensure count field works with 1
-        let payload = YapiPushPayload { project_id: "p3".into(), project_name: "项目C".into(), count: 1 };
+        let payload = YapiPushPayload { project_id: "p3".into(), project_name: "项目C".into(), count: 1, kind: PUSH_KIND_MERGED.into() };
         let json = serde_json::to_string(&payload).unwrap();
         assert!(json.contains("projectId"));
         assert!(json.contains("projectName"));
+        assert!(json.contains("\"kind\":\"merged\""));
     }
 
     #[test]
@@ -1006,7 +1040,7 @@ mod tests {
         let db = Arc::new(Db(Mutex::new(conn)));
         let state = AppState { db, app_handle: None };
         // Should not panic even with None handle
-        emit_yapi_push(&state, "test-project");
+        emit_yapi_push(&state, "test-project", PUSH_KIND_MERGED);
     }
 
     #[test]
@@ -1018,7 +1052,7 @@ mod tests {
         let db = Arc::new(Db(Mutex::new(conn)));
         let state = AppState { db, app_handle: None };
         // project not in DB, fallback to project_id as name internally (count still 1, no panic)
-        emit_yapi_push(&state, "unknown-project-xyz");
+        emit_yapi_push(&state, "unknown-project-xyz", PUSH_KIND_CREATED);
     }
 
     #[test]
@@ -1087,6 +1121,25 @@ mod tests {
             .and_then(|v| v.as_str())
             .unwrap()
             .to_string()
+    }
+
+    /// 直接调用 save handler，模拟插件推送一次接口。
+    async fn save_interface(
+        state: &AppState,
+        headers: &HeaderMap,
+        title: &str,
+        path: &str,
+        method: &str,
+        catid: &str,
+    ) -> Json<Value> {
+        let body = serde_json::json!({ "title": title, "path": path, "method": method, "catid": catid });
+        handle_interface_save(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Bytes::from(serde_json::to_vec(&body).unwrap()),
+        )
+        .await
     }
 
     fn errcode(res: &Json<Value>) -> i64 {
@@ -1354,5 +1407,195 @@ mod tests {
         assert!(menu_repo::get_menu_item(&db, "p1", "api-1")
             .unwrap()
             .is_none());
+    }
+
+    // ---- 推送归属（D2：首次入库优先）与事件 kind ----
+
+    /// 现场复现：同一个 METHOD+path 先落在 Controller 分类，随后各调用方的 Feign
+    /// 客户端再推同一条 —— 记录不能变多，归属不能被搬走，源分类不能被删。
+    #[tokio::test]
+    async fn push_same_path_keeps_first_ownership() {
+        let (db, headers) = setup_yapi_db();
+        let state = AppState { db: db.clone(), app_handle: None };
+
+        let controller = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "TicketOrderController" })),
+        )
+        .await;
+        let controller_id = data_id(&controller);
+        let feign = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "TicketOrderRemoteService" })),
+        )
+        .await;
+        let feign_id = data_id(&feign);
+
+        let path = "/api/order-service/order/ticket/query";
+        let first = save_interface(&state, &headers, "查询工单", path, "GET", &controller_id).await;
+        assert_eq!(errcode(&first), 0, "Controller 侧首次推送应成功");
+        let api_id = data_id(&first);
+
+        let second = save_interface(&state, &headers, "查询工单(Feign)", path, "GET", &feign_id).await;
+        assert_eq!(errcode(&second), 0, "Feign 侧重复推送应成功");
+        assert_eq!(data_id(&second), api_id, "同 METHOD+path 命中同一条记录，不新建");
+
+        let items = menu_repo::list_menu_items(&db, "p1").unwrap();
+        let apis: Vec<_> = items.iter().filter(|i| i.menu_type == "apiDetail").collect();
+        assert_eq!(apis.len(), 1, "同 METHOD+path 在库里只应有一条记录");
+        assert_eq!(apis[0].parent_id.as_deref(), Some(controller_id.as_str()), "归属保持首次落位的 Controller 分类");
+        assert!(items.iter().any(|i| i.id == controller_id), "Controller 分类不应被删");
+        assert!(items.iter().any(|i| i.id == feign_id), "Feign 分类应保留");
+    }
+
+    /// 重复推送不能退化为「忽略」：内容与标题仍要更新，但归属不变。
+    #[tokio::test]
+    async fn push_same_path_updates_content() {
+        let (db, headers) = setup_yapi_db();
+        let state = AppState { db: db.clone(), app_handle: None };
+
+        let controller = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "TicketOrderController" })),
+        )
+        .await;
+        let controller_id = data_id(&controller);
+        let feign = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "TicketOrderRemoteService" })),
+        )
+        .await;
+        let feign_id = data_id(&feign);
+
+        let path = "/api/order-service/order/ticket/query";
+        let first = save_interface(&state, &headers, "查询工单", path, "GET", &controller_id).await;
+        let api_id = data_id(&first);
+        let before = menu_repo::get_menu_item(&db, "p1", &api_id).unwrap().unwrap();
+        let stable_data_id = before
+            .data_json
+            .as_ref()
+            .and_then(|d| d.get("id"))
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+
+        let second = save_interface(&state, &headers, "查询工单(Feign 版)", path, "GET", &feign_id).await;
+        assert_eq!(data_id(&second), api_id, "仍命中同一条记录");
+
+        let after = menu_repo::get_menu_item(&db, "p1", &api_id).unwrap().unwrap();
+        assert_eq!(after.name, "查询工单(Feign 版)", "标题随重复推送更新");
+        assert_eq!(after.parent_id.as_deref(), Some(controller_id.as_str()), "归属不随重复推送变化");
+        let after_data = after.data_json.unwrap();
+        assert_eq!(after_data.get("name").and_then(|v| v.as_str()), Some("查询工单(Feign 版)"), "data_json 内容同样更新");
+        assert_eq!(after_data.get("id").and_then(|v| v.as_str()), Some(stable_data_id.as_str()), "data.id 沿用首次入库的稳定标识");
+    }
+
+    /// 孤儿记录（`parent_id` 为空）第一次被推送命中时落到本次分类，之后再推不改归属。
+    #[tokio::test]
+    async fn push_orphan_lands_in_first_folder_then_stays() {
+        let (db, headers) = setup_yapi_db();
+        let state = AppState { db: db.clone(), app_handle: None };
+
+        let first_cat = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "分类A" })),
+        )
+        .await;
+        let first_cat_id = data_id(&first_cat);
+        let second_cat = handle_add_cat(
+            State(state.clone()),
+            headers.clone(),
+            project_query(),
+            Json(serde_json::json!({ "name": "分类B" })),
+        )
+        .await;
+        let second_cat_id = data_id(&second_cat);
+
+        let orphan = CreateMenuItemPayload {
+            id: "orphan-1".into(),
+            parent_id: None,
+            name: "孤儿接口".into(),
+            menu_type: "apiDetail".into(),
+            data_json: Some(serde_json::json!({ "id": "stable-orphan", "method": "POST", "path": "/api/orphan" })),
+            run_tab_json: None,
+            sort_order: Some(1),
+        };
+        menu_repo::create_menu_item(&db, "p1", &orphan).unwrap();
+
+        let first = save_interface(&state, &headers, "孤儿接口", "/api/orphan", "POST", &first_cat_id).await;
+        assert_eq!(errcode(&first), 0);
+        let landed = menu_repo::get_menu_item(&db, "p1", "orphan-1").unwrap().unwrap();
+        assert_eq!(landed.parent_id.as_deref(), Some(first_cat_id.as_str()), "孤儿记录首次命中时落位");
+
+        let second = save_interface(&state, &headers, "孤儿接口(改名)", "/api/orphan", "POST", &second_cat_id).await;
+        assert_eq!(errcode(&second), 0);
+        let after = menu_repo::get_menu_item(&db, "p1", "orphan-1").unwrap().unwrap();
+        assert_eq!(after.parent_id.as_deref(), Some(first_cat_id.as_str()), "落位后不再漂移");
+        assert_eq!(after.name, "孤儿接口(改名)", "内容仍更新");
+    }
+
+    /// `/api/interface/up` 没有分类入参，handler 兜底传空串：不能把空串写进 `parent_id`。
+    #[tokio::test]
+    async fn interface_up_does_not_write_blank_parent_id() {
+        let (db, headers) = setup_yapi_db();
+        let state = AppState { db: db.clone(), app_handle: None };
+
+        let orphan = CreateMenuItemPayload {
+            id: "orphan-2".into(),
+            parent_id: None,
+            name: "孤儿接口".into(),
+            menu_type: "apiDetail".into(),
+            data_json: Some(serde_json::json!({ "id": "stable-orphan-2", "method": "GET", "path": "/api/orphan-up" })),
+            run_tab_json: None,
+            sort_order: Some(1),
+        };
+        menu_repo::create_menu_item(&db, "p1", &orphan).unwrap();
+
+        let body = serde_json::json!({ "id": "orphan-2", "title": "改后标题", "path": "/api/orphan-up", "method": "GET" });
+        let res = handle_interface_up(
+            State(state),
+            headers,
+            project_query(),
+            Bytes::from(serde_json::to_vec(&body).unwrap()),
+        )
+        .await;
+        assert_eq!(errcode(&res), 0);
+
+        let after = menu_repo::get_menu_item(&db, "p1", "orphan-2").unwrap().unwrap();
+        assert_eq!(after.parent_id, None, "空串不得落库成悬挂归属");
+        assert_eq!(after.name, "改后标题", "up 仍更新内容");
+    }
+
+    /// kind 由 save 的三条分支与 up 硬编码：新建传 created，命中传 merged。
+    /// 单测里 AppHandle 为空（不发事件），因此直接断言构造出的载荷。
+    #[test]
+    fn push_payload_kind_distinguishes_created_and_merged() {
+        let (db, _headers) = setup_yapi_db();
+        let state = AppState { db: db.clone(), app_handle: None };
+
+        let created = build_yapi_push_payload(&state, "p1", PUSH_KIND_CREATED);
+        assert_eq!(created.kind, "created");
+        assert_eq!(created.project_name, "demo", "项目名从库里解析");
+        assert_eq!(created.count, 1);
+
+        let merged = build_yapi_push_payload(&state, "p1", PUSH_KIND_MERGED);
+        assert_eq!(merged.kind, "merged");
+
+        // 前端只认 'created' / 'merged' 两个字面量，常量值不得漂移
+        assert_eq!(PUSH_KIND_CREATED, "created");
+        assert_eq!(PUSH_KIND_MERGED, "merged");
+
+        let json = serde_json::to_value(&merged).unwrap();
+        assert_eq!(json.get("kind").and_then(|v| v.as_str()), Some("merged"), "kind 无需 rename，序列化为同名");
     }
 }
