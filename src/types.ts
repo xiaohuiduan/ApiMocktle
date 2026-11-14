@@ -325,6 +325,13 @@ export type RecycleCatalogType = CatalogType.Http | CatalogType.Schema | Catalog
 
 export type RecycleData = Record<RecycleCatalogType, { list?: RecycleDataItem[] }>
 
+/** 批量删除结果：deletedCount 为实际进回收站的记录数（含级联子项），childCount 为其含的子项数。 */
+export interface BatchDeleteOutcome {
+  deletedCount: number
+  rootCount: number
+  childCount: number
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyType = any
 

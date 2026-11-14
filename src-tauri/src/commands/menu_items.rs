@@ -90,7 +90,11 @@ pub fn batch_delete_menu_items(db: State<Arc<Db>>, session_id: String, project_i
     };
 
     match menu_repo::batch_delete_menu_items(&db, &project_id, &payload.menu_ids) {
-        Ok(()) => ApiResult::success(serde_json::json!({})),
+        Ok(outcome) => ApiResult::success(serde_json::json!({
+            "deletedCount": outcome.deleted_count,
+            "rootCount": outcome.root_count,
+            "childCount": outcome.deleted_count.saturating_sub(outcome.root_count),
+        })),
         Err(e) => e.into(),
     }
 }

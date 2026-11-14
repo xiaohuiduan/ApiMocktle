@@ -1,5 +1,5 @@
 use rusqlite::{params, Connection, Transaction};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 use crate::db::client::Db;
@@ -129,18 +129,204 @@ pub fn delete_menu_item(db: &Db, project_id: &str, menu_id: &str) -> Result<(), 
     Ok(())
 }
 
+/// 批量删除的结果计数：`deleted_count` 为实际进回收站的记录数（含级联子项），
+/// `root_count` 为剪枝后真正独立处理的根节点数。
+#[derive(Debug)]
+pub struct BatchDeleteOutcome {
+    pub deleted_count: usize,
+    pub root_count: usize,
+}
+
+/// 批量删除菜单项：一次操作一个事务，要么全删要么全不删。
+///
+/// 前端 Tree 默认父子联动，勾选目录时子孙会一并进入勾选集合。若逐个直接删除，
+/// 父目录的递归 CTE 已把子孙删净，轮到子项时递归集为空 → NotFound → 整批回滚。
+/// 这里改为集合运算：去重 → 存在性校验 → 剪掉被祖先覆盖的 id → 对根求闭包并集 →
+/// 批量写回收站 → 一次删行。
 pub fn batch_delete_menu_items(
     db: &Db,
     project_id: &str,
     menu_ids: &[String],
-) -> Result<(), crate::errors::AppError> {
-    let mut conn = db.0.lock().unwrap();
-    let tx = conn.transaction()?;
-    for id in menu_ids {
-        delete_menu_item_in_tx(&tx, project_id, id)?;
+) -> Result<BatchDeleteOutcome, crate::errors::AppError> {
+    // 去重（保序）：同一 id 重复提交只能产生一条回收站记录
+    let mut seen: HashSet<&str> = HashSet::new();
+    let requested: Vec<String> = menu_ids
+        .iter()
+        .filter(|id| seen.insert(id.as_str()))
+        .cloned()
+        .collect();
+
+    if requested.is_empty() {
+        return Ok(BatchDeleteOutcome {
+            deleted_count: 0,
+            root_count: 0,
+        });
     }
+
+    let mut conn = db.0.lock().map_err(|e| crate::errors::AppError::Internal(e.to_string()))?;
+    let tx = conn.transaction()?;
+
+    // 存在性校验：请求里有、库里没有的 id 视为整批失败，不做静默跳过
+    {
+        let placeholders = vec!["?"; requested.len()].join(", ");
+        let sql = format!(
+            "SELECT id FROM menu_items WHERE project_id = ? AND id IN ({placeholders})"
+        );
+        let mut stmt = tx.prepare(&sql)?;
+        let mut query_params: Vec<&dyn rusqlite::ToSql> = vec![&project_id];
+        for id in &requested {
+            query_params.push(id);
+        }
+        let existing: HashSet<String> = stmt
+            .query_map(query_params.as_slice(), |row| row.get::<_, String>(0))?
+            .collect::<Result<HashSet<_>, _>>()?;
+
+        for id in &requested {
+            if !existing.contains(id) {
+                return Err(crate::errors::AppError::NotFound(format!(
+                    "所选菜单项已不存在: {id}"
+                )));
+            }
+        }
+    }
+
+    // 剪枝求根：父子映射上溯，任一祖先也在请求集合内的 id 被剔除
+    let roots: Vec<String> = {
+        let parents: HashMap<String, Option<String>> = {
+            let mut stmt =
+                tx.prepare("SELECT id, parent_id FROM menu_items WHERE project_id = ?1")?;
+            let rows = stmt.query_map(params![project_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
+            })?;
+            rows.collect::<Result<HashMap<_, _>, _>>()?
+        };
+
+        let requested_set: HashSet<&str> = requested.iter().map(String::as_str).collect();
+        let max_depth = parents.len() + 1;
+        let mut roots: Vec<String> = Vec::new();
+
+        for id in &requested {
+            let mut covered = false;
+            let mut cursor = parents.get(id).cloned().flatten();
+            let mut depth = 0usize;
+
+            while let Some(parent_id) = cursor {
+                if requested_set.contains(parent_id.as_str()) {
+                    covered = true;
+                    break;
+                }
+                depth += 1;
+                // 脏数据成环时上溯会无限循环，用深度上限兜底
+                if depth > max_depth {
+                    break;
+                }
+                cursor = parents.get(&parent_id).cloned().flatten();
+            }
+
+            if !covered {
+                roots.push(id.clone());
+            }
+        }
+
+        roots
+    };
+
+    if roots.is_empty() {
+        return Err(crate::errors::AppError::Internal(
+            "菜单树存在环，无法确定批量删除的根节点".into(),
+        ));
+    }
+
+    // 求闭包：对每个根取子树（含自身），合并去重
+    let delete_ids: Vec<String> = {
+        let mut closure: Vec<String> = Vec::new();
+        let mut closure_seen: HashSet<String> = HashSet::new();
+
+        for root in &roots {
+            let subtree: Vec<String> = {
+                // 用 UNION（去重）而非 UNION ALL，成环数据下也能终止
+                let mut stmt = tx.prepare(
+                    "WITH RECURSIVE descendants(id) AS (
+                        SELECT id FROM menu_items WHERE project_id = ?1 AND id = ?2
+                        UNION
+                        SELECT m.id FROM menu_items m JOIN descendants d ON m.parent_id = d.id
+                        WHERE m.project_id = ?1
+                     )
+                     SELECT id FROM descendants",
+                )?;
+                let rows = stmt.query_map(params![project_id, root], |row| row.get::<_, String>(0))?;
+                rows.collect::<Result<Vec<_>, _>>()?
+            };
+
+            for id in subtree {
+                if closure_seen.insert(id.clone()) {
+                    closure.push(id);
+                }
+            }
+        }
+
+        closure
+    };
+
+    if delete_ids.is_empty() {
+        return Err(crate::errors::AppError::NotFound(
+            "所选菜单项已不存在".into(),
+        ));
+    }
+
+    // 写回收站：按 delete_ids 一次查出完整行，逐条落库，字段与原单删实现一致
+    let rows: Vec<ApiMenuData> = {
+        let placeholders = ids_placeholders(&delete_ids);
+        let sql = format!(
+            "SELECT id, parent_id, name, type, data_json, run_tab_json, sort_order, created_at, updated_at
+             FROM menu_items WHERE project_id = ? AND id IN ({placeholders})"
+        );
+        let mut stmt = tx.prepare(&sql)?;
+        let mut query_params: Vec<&dyn rusqlite::ToSql> = vec![&project_id];
+        for id in &delete_ids {
+            query_params.push(id);
+        }
+        let mapped = stmt.query_map(query_params.as_slice(), row_to_menu_data)?;
+        mapped.collect::<Result<Vec<_>, _>>()?
+    };
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let expires_at = chrono::Utc::now().timestamp_millis() + 30 * 24 * 60 * 60 * 1000;
+    let creator_json = serde_json::json!({"id": "", "username": "system"}).to_string();
+
+    for item in &rows {
+        let deleted_json = serde_json::to_string(item).unwrap_or_default();
+        tx.execute(
+            "INSERT INTO recycle_items (id, project_id, catalog_type, deleted_item_json, creator_json, expires_at, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![Uuid::new_v4().to_string(), project_id, item.menu_type, deleted_json, creator_json, expires_at, now],
+        )?;
+    }
+
+    // 删行：一次 IN 删除，与上面的批量 SELECT 同集合
+    {
+        let placeholders = ids_placeholders(&delete_ids);
+        let sql = format!("DELETE FROM menu_items WHERE project_id = ? AND id IN ({placeholders})");
+        let mut stmt = tx.prepare(&sql)?;
+        let mut query_params: Vec<&dyn rusqlite::ToSql> = vec![&project_id];
+        for id in &delete_ids {
+            query_params.push(id);
+        }
+        stmt.execute(query_params.as_slice())?;
+    }
+
     tx.commit()?;
-    Ok(())
+
+    // 计数以真正写进回收站的行数为准：口径是「实际删除」，不是「算出来的闭包」
+    Ok(BatchDeleteOutcome {
+        deleted_count: rows.len(),
+        root_count: roots.len(),
+    })
+}
+
+/// 只拼占位符、不拼值，值仍走绑定。
+fn ids_placeholders(ids: &[String]) -> String {
+    vec!["?"; ids.len()].join(", ")
 }
 
 /// 级联删除单个菜单项:目标及其全部后代逐条写入回收站后一并删除。
@@ -886,6 +1072,119 @@ mod tests {
         insert_item(&db, "a1", None, "接口A", "apiDetail", 0);
         move_menu_items(&db, "p1", "a1", "a1", 1).unwrap();
         assert_eq!(count_menu(&db), 1);
+    }
+
+    #[test]
+    fn batch_delete_parent_and_child_overlap_succeeds() {
+        let db = test_db();
+        insert_item(&db, "f1", None, "目录", "apiDetailFolder", 0);
+        insert_item(&db, "a1", Some("f1"), "接口A", "apiDetail", 0);
+        insert_item(&db, "f2", Some("f1"), "子目录", "apiDetailFolder", 1);
+        insert_item(&db, "a2", Some("f2"), "接口B", "apiDetail", 0);
+        insert_item(&db, "a3", None, "顶层接口", "apiDetail", 1);
+
+        // 勾选父目录 + 其子接口（前端父子联动的典型重叠提交）
+        let outcome = batch_delete_menu_items(&db, "p1", &["f1".to_string(), "a1".to_string()]).unwrap();
+
+        assert_eq!(count_menu(&db), 1, "仅剩顶层接口 a3");
+        assert_eq!(count_recycle(&db), 4, "目录+子目录+2 接口 均入回收站");
+        assert_eq!(outcome.deleted_count, 4);
+        assert_eq!(outcome.root_count, 1, "a1 被祖先 f1 覆盖，只剩一个根");
+    }
+
+    #[test]
+    fn batch_delete_all_items_succeeds() {
+        let db = test_db();
+        insert_item(&db, "f1", None, "目录", "apiDetailFolder", 0);
+        insert_item(&db, "a1", Some("f1"), "接口A", "apiDetail", 0);
+        insert_item(&db, "f2", Some("f1"), "子目录", "apiDetailFolder", 1);
+        insert_item(&db, "a2", Some("f2"), "接口B", "apiDetail", 0);
+        insert_item(&db, "a3", None, "顶层接口", "apiDetail", 1);
+
+        let outcome = batch_delete_menu_items(
+            &db,
+            "p1",
+            &[
+                "f1".to_string(),
+                "a1".to_string(),
+                "f2".to_string(),
+                "a2".to_string(),
+                "a3".to_string(),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(count_menu(&db), 0, "项目内菜单清空");
+        assert_eq!(count_recycle(&db), 5, "回收站条目数等于删除前记录数");
+        assert_eq!(outcome.deleted_count, 5);
+        assert_eq!(outcome.root_count, 2, "f1 与 a3 是两个根");
+    }
+
+    #[test]
+    fn batch_delete_missing_id_rolls_back_all() {
+        let db = test_db();
+        insert_item(&db, "a1", None, "接口A", "apiDetail", 0);
+
+        let err = batch_delete_menu_items(&db, "p1", &["a1".to_string(), "ghost".to_string()]).unwrap_err();
+
+        assert!(matches!(err, crate::errors::AppError::NotFound(_)));
+        assert_eq!(count_menu(&db), 1, "整批回滚，a1 仍在");
+        assert_eq!(count_recycle(&db), 0, "未写入回收站");
+    }
+
+    #[test]
+    fn batch_delete_duplicate_ids_recycles_once() {
+        let db = test_db();
+        insert_item(&db, "a1", None, "接口A", "apiDetail", 0);
+
+        let outcome = batch_delete_menu_items(&db, "p1", &["a1".to_string(), "a1".to_string()]).unwrap();
+
+        assert_eq!(outcome.deleted_count, 1, "重复 id 去重后只算一次");
+        assert_eq!(outcome.root_count, 1);
+        assert_eq!(count_recycle(&db), 1);
+    }
+
+    #[test]
+    fn batch_delete_independent_roots_recycles_without_duplicates() {
+        let db = test_db();
+        insert_item(&db, "f1", None, "目录一", "apiDetailFolder", 0);
+        insert_item(&db, "a1", Some("f1"), "接口A", "apiDetail", 0);
+        insert_item(&db, "f2", None, "目录二", "apiDetailFolder", 1);
+        insert_item(&db, "a2", Some("f2"), "接口B", "apiDetail", 0);
+
+        // 两个互不相关的目录连同各自子接口一起提交（父子联动的完整勾选）
+        let outcome = batch_delete_menu_items(
+            &db,
+            "p1",
+            &[
+                "f1".to_string(),
+                "a1".to_string(),
+                "f2".to_string(),
+                "a2".to_string(),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(count_menu(&db), 0);
+        assert_eq!(count_recycle(&db), 4, "每个菜单项恰好一条回收站记录，无重复");
+        assert_eq!(outcome.deleted_count, 4);
+        assert_eq!(outcome.root_count, 2, "两个目录各自成根");
+    }
+
+    #[test]
+    fn batch_delete_child_only_keeps_ancestors() {
+        let db = test_db();
+        insert_item(&db, "f1", None, "目录", "apiDetailFolder", 0);
+        insert_item(&db, "a1", Some("f1"), "接口A", "apiDetail", 0);
+        insert_item(&db, "a2", Some("f1"), "接口B", "apiDetail", 1);
+
+        // 只勾子接口时，父目录与兄弟接口都不该被牵连
+        let outcome = batch_delete_menu_items(&db, "p1", &["a1".to_string()]).unwrap();
+
+        assert_eq!(outcome.deleted_count, 1);
+        assert_eq!(outcome.root_count, 1);
+        assert_eq!(count_menu(&db), 2, "父目录 f1 与兄弟接口 a2 保留");
+        assert_eq!(count_recycle(&db), 1);
     }
 }
 

@@ -39,6 +39,82 @@ function toDeletableMenuIds(
   return rawKeys.filter((k): k is string => typeof k === 'string' && valid.has(k))
 }
 
+/**
+ * 剪掉被祖先覆盖的 id，得到提交给后端的根集合。
+ *
+ * Tree 父子联动时勾选目录会把子孙一并带进 `checkedKeys`，直接提交会让后端
+ * 对已被祖先删净的子项再删一次。后端也会自行剪枝，这里只是减少无效提交。
+ */
+function toRootIds(
+  ids: string[],
+  menuRawList: ApiMenuData[] | undefined,
+): string[] {
+  if (ids.length === 0 || !menuRawList?.length) {
+    return ids
+  }
+
+  const parents = new Map<string, string | undefined>()
+
+  menuRawList.forEach((menu) => parents.set(menu.id, menu.parentId))
+
+  const idSet = new Set(ids)
+
+  return ids.filter((id) => {
+    let cursor = parents.get(id)
+    let depth = 0
+
+    while (cursor) {
+      if (idSet.has(cursor)) {
+        return false
+      }
+
+      depth += 1
+
+      // 脏数据成环时上溯会无限循环，用深度上限兜底
+      if (depth > parents.size) {
+        break
+      }
+
+      cursor = parents.get(cursor)
+    }
+
+    return true
+  })
+}
+
+/**
+ * 展开根 + 全部子孙 id。
+ *
+ * 后端返回体只带计数，不含删除明细，所以本地清理（丢弃草稿、关闭标签页）
+ * 只能靠树自己推。它只影响 UI 清理，不作为计数口径。
+ */
+function collectSubtreeIds(
+  rootIds: string[],
+  menuRawList: ApiMenuData[] | undefined,
+): Set<string> {
+  const collected = new Set(rootIds)
+
+  if (!menuRawList?.length) {
+    return collected
+  }
+
+  // 每轮只要有新增就继续，直到集合不再变大
+  let grew = true
+
+  while (grew) {
+    grew = false
+
+    menuRawList.forEach((menu) => {
+      if (menu.parentId && collected.has(menu.parentId) && !collected.has(menu.id)) {
+        collected.add(menu.id)
+        grew = true
+      }
+    })
+  }
+
+  return collected
+}
+
 const TREE_MIN_VIEWPORT_HEIGHT = 240
 
 /**
@@ -116,6 +192,10 @@ export function ApiMenu() {
       return
     }
 
+    // 提交剪枝后的根集合；本地清理由根 + 全部子孙承担
+    const rootIds = toRootIds(ids, menuRawList)
+    const cleanupIds = collectSubtreeIds(rootIds, menuRawList)
+
     Modal.confirm({
       title: `确定删除所选的 ${ids.length} 项？`,
       content: '目录会连同子项一并删除，并进入回收站（30 天内可恢复）。',
@@ -124,32 +204,41 @@ export function ApiMenu() {
       maskClosable: true,
       onOk: async () => {
         try {
-          const ok = await removeMenuItems(ids)
+          const outcome = await removeMenuItems(rootIds)
 
-          if (!ok) {
+          if (!outcome) {
+            // 失败原因已由 helpers 的 message.error 透出，这里直接结束，避免叠加第二条提示
             return
           }
 
-          ids.forEach((key) => {
+          cleanupIds.forEach((key) => {
             discardDraft(key)
             removeTabItem({ key })
           })
           exitBatchMode()
           messageApi.open({
             type: 'success',
-            content: `已移入回收站 ${ids.length} 项，30 天内可恢复，可在左侧“回收站”查看`,
+            content: `已移入回收站 ${outcome.deletedCount} 个条目${outcome.childCount > 0 ? `（含 ${outcome.childCount} 个子项）` : ''}，30 天内可恢复，可在左侧「回收站」查看`,
             duration: 6,
           })
         }
         catch (error) {
           Modal.error({
             title: '批量删除失败',
-            content: error instanceof Error ? error.message : '请稍后重试',
+            content: error instanceof Error && error.message ? error.message : '请稍后重试',
           })
         }
       },
     })
-  }, [checkedKeys, exitBatchMode, menuRawList, removeMenuItems, removeTabItem, messageApi])
+  }, [
+    checkedKeys,
+    discardDraft,
+    exitBatchMode,
+    menuRawList,
+    removeMenuItems,
+    removeTabItem,
+    messageApi,
+  ])
 
   const handleMenuSelect = useEvent<TreeOnSelect>((_, { node }) => {
     if (batchMode) {

@@ -20,6 +20,7 @@ import {
 } from '@/project-environment-utils'
 import type {
   ApiEnvironment,
+  BatchDeleteOutcome,
   Creator,
   ProjectEnvironmentConfig,
   RecycleCatalogType,
@@ -37,7 +38,7 @@ import {
 interface MenuHelpers {
   addMenuItem: (menuData: ApiMenuData) => Promise<boolean>
   removeMenuItem: (menuData: Pick<ApiMenuData, 'id'>) => Promise<boolean>
-  removeMenuItems: (menuIds: ApiMenuData['id'][]) => Promise<boolean>
+  removeMenuItems: (menuIds: ApiMenuData['id'][]) => Promise<BatchDeleteOutcome | null>
   updateMenuItem: (menuData: Partial<ApiMenuData> & Pick<ApiMenuData, 'id'>) => Promise<void>
   restoreMenuItem: (menuData: { restoreId: RecycleDataItem['id'] }) => void
   restoreMenuItems: (recycleIds: RecycleDataItem['id'][]) => void
@@ -664,25 +665,33 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
       removeMenuItems: async (menuIds) => {
         const id = guardProject()
 
-        if (!id || menuIds.length === 0 || !sessionId) {
-          return false
+        // 空集合属于调用方的空操作，不该报「登录/项目失效」
+        if (menuIds.length === 0) {
+          return null
+        }
+
+        if (!id || !sessionId) {
+          message.error('当前项目或登录状态已失效，请刷新后重试')
+
+          return null
         }
 
         try {
-          await api<unknown>('batch_delete_menu_items', {
+          const outcome = await api<BatchDeleteOutcome>('batch_delete_menu_items', {
             sessionId,
             projectId: id,
             payload: { menuIds },
           })
           await reloadState()
 
-          return true
+          return outcome
         }
         catch (error: unknown) {
-          message.error('删除失败,请重试')
+          // 透出真实原因（无权限 / 所选菜单项已不存在 / 底层错误），兜底文案仅在消息为空时使用
+          message.error(error instanceof Error && error.message ? error.message : '删除失败,请重试')
           console.error(error)
 
-          return false
+          return null
         }
       },
       updateMenuItem: async ({ id: menuId, ...rest }) => {
