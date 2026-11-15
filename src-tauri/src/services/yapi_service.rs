@@ -144,6 +144,8 @@ fn map_param_type(yapi_type: Option<&str>) -> String {
         Some("integer") => "integer".to_string(),
         Some("number") => "number".to_string(),
         Some("boolean") => "boolean".to_string(),
+        // 文件上传字段透传，前端 ParamType.File 才能认出上传控件
+        Some("file") => "file".to_string(),
         _ => "string".to_string(),
     }
 }
@@ -718,5 +720,41 @@ mod tests {
         assert_eq!(yapi["req_body_required"].as_bool(), Some(true));
         assert_eq!(yapi["req_body_examples"].as_array().unwrap().len(), 1);
         assert_eq!(yapi["operationId"].as_str(), Some("op1"));
+    }
+
+    #[test]
+    fn 表单参数类型映射保留_file() {
+        assert_eq!(map_param_type(Some("file")), "file");
+        assert_eq!(map_param_type(Some("text")), "string");
+        assert_eq!(map_param_type(None), "string");
+        // 既有白名单不受影响
+        assert_eq!(map_param_type(Some("integer")), "integer");
+    }
+
+    #[test]
+    fn 表单接口的_file_字段在请求体参数里保留类型() {
+        let yapi = parse(serde_json::json!({
+            "title": "上传附件",
+            "path": "/upload",
+            "method": "post",
+            "req_body_type": "form",
+            "req_body_form": [
+                {"name": "files", "type": "file", "required": 1},
+                {"name": "note", "type": "text", "required": 0}
+            ]
+        }));
+
+        let details = yapi_to_api_details(&yapi);
+        let body = details.get("requestBody").unwrap();
+        let params = body.get("parameters").and_then(|v| v.as_array()).unwrap();
+
+        assert_eq!(body["type"].as_str(), Some("multipart/form-data"));
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0]["name"].as_str(), Some("files"));
+        assert_eq!(params[0]["type"].as_str(), Some("file"));
+        assert_eq!(params[0]["required"].as_bool(), Some(true));
+        // 非 file 类型仍按 string 处理
+        assert_eq!(params[1]["type"].as_str(), Some("string"));
+        assert_eq!(params[1]["required"].as_bool(), Some(false));
     }
 }

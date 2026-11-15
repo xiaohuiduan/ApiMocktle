@@ -103,8 +103,12 @@ pub fn generate_flow_prompt(
 
         // 请求体
         let req_body = format_request_body(d, &schema_map);
-        if let Some(body) = req_body {
-            api_docs.push_str(&format!("- 请求体参数:\n\n```json\n{}\n```\n", body));
+        if let Some((body, fence)) = req_body {
+            let lang = match fence {
+                BodyFence::Json => "json",
+                BodyFence::Text => "text",
+            };
+            api_docs.push_str(&format!("- 请求体参数:\n\n```{}\n{}\n```\n", lang, body));
         }
 
         // 响应体
@@ -351,43 +355,172 @@ fn type_to_example(prop: &JsonValue) -> JsonValue {
 
 // ==================== 格式化 API 文档 ====================
 
-fn format_request_body(data: &JsonValue, schema_map: &HashMap<String, JsonValue>) -> Option<String> {
-    // YApi 格式
-    let body = data.get("req_body_other").or_else(|| data.get("req_body_form"));
-    if let Some(b) = body {
-        let is_json_schema = data.get("req_body_is_json_schema").and_then(|v| v.as_bool()).unwrap_or(false);
-        let obj = if let Some(s) = b.as_str() {
-            serde_json::from_str::<JsonValue>(s).ok()?
-        } else {
-            b.clone()
-        };
-        let resolved = if schema_map.is_empty() { obj.clone() } else { resolve_schema(&obj, schema_map, &mut std::collections::HashSet::new()) };
-        if is_json_schema || resolved.get("type").and_then(|v| v.as_str()) == Some("object") {
-            if resolved.get("properties").is_some() {
-                let example = schema_to_example(&resolved, schema_map);
-                let json_str = serde_json::to_string_pretty(&example).ok()?;
-                return Some(truncate_json(&json_str, 500));
-            }
+/// 请求体代码块的包裹语言：结构化 JSON 用 json，表单清单等纯文本用 text
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BodyFence {
+    Json,
+    Text,
+}
+
+/// 字段是否启用：缺省视为启用，false / 0 / "0" / "false" 视为停用
+fn is_param_enabled(item: &JsonValue) -> bool {
+    match item.get("enable") {
+        Some(JsonValue::Bool(b)) => *b,
+        Some(JsonValue::Number(n)) => n.as_i64() != Some(0),
+        Some(JsonValue::String(s)) => s != "0" && s != "false",
+        _ => true,
+    }
+}
+
+/// 字段是否必填：兼容 bool、数字 0/1 与字符串 "1" / "true"
+fn is_param_required(item: &JsonValue) -> bool {
+    match item.get("required") {
+        Some(JsonValue::Bool(b)) => *b,
+        Some(JsonValue::Number(n)) => n.as_i64() == Some(1),
+        Some(JsonValue::String(s)) => s == "1" || s == "true",
+        _ => false,
+    }
+}
+
+/// 渲染 form 接口的表单字段清单：首行 Content-Type，空行后逐行「名称: 类型（必填/可选）」
+/// 跳过停用的字段与无名字段；没有任何可渲染字段时返回 None，不输出空段落
+fn render_form_params(params: Option<&JsonValue>, content_type: &str) -> Option<String> {
+    let items = params?.as_array()?;
+    let mut lines: Vec<String> = Vec::new();
+    for p in items {
+        if !is_param_enabled(p) {
+            continue;
         }
-        let json_str = serde_json::to_string_pretty(&obj).ok()?;
-        return Some(truncate_json(&json_str, 500));
+        let name = p.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        if name.is_empty() {
+            continue;
+        }
+        // 类型缺失时按 string 处理，与参数表一致
+        let param_type = p.get("type").and_then(|v| v.as_str()).unwrap_or("string");
+        let req_str = if is_param_required(p) { "必填" } else { "可选" };
+        lines.push(format!("{}: {}（{}）", name, param_type, req_str));
+    }
+    if lines.is_empty() {
+        return None;
+    }
+    Some(format!("Content-Type: {}\n\n{}", content_type, lines.join("\n")))
+}
+
+/// YApi 原生 json 请求体：解析 req_body_other 并展开 schema 示例（输出与改造前一致）
+fn format_yapi_json_body(data: &JsonValue, schema_map: &HashMap<String, JsonValue>) -> Option<String> {
+    let b = data.get("req_body_other")?;
+    let is_json_schema = data.get("req_body_is_json_schema").and_then(|v| v.as_bool()).unwrap_or(false);
+    let obj = if let Some(s) = b.as_str() {
+        serde_json::from_str::<JsonValue>(s).ok()?
+    } else {
+        b.clone()
+    };
+    let resolved = if schema_map.is_empty() { obj.clone() } else { resolve_schema(&obj, schema_map, &mut std::collections::HashSet::new()) };
+    if is_json_schema || resolved.get("type").and_then(|v| v.as_str()) == Some("object") {
+        if resolved.get("properties").is_some() {
+            let example = schema_to_example(&resolved, schema_map);
+            let json_str = serde_json::to_string_pretty(&example).ok()?;
+            return Some(truncate_json(&json_str, 500));
+        }
+    }
+    let json_str = serde_json::to_string_pretty(&obj).ok()?;
+    Some(truncate_json(&json_str, 500))
+}
+
+/// YApi 原生 raw 请求体：读 req_body_other 原文；能解析成 JSON 的沿用改造前的 pretty 输出
+fn format_yapi_raw_body(data: &JsonValue) -> Option<(String, BodyFence)> {
+    let raw = data.get("req_body_other")?;
+    // 可解析成 JSON 的仍套 json 代码块（与改造前一致）；纯文本原样输出并用 text 代码块
+    let (text, fence) = match raw.as_str() {
+        Some(s) => match serde_json::from_str::<JsonValue>(s) {
+            Ok(v) => (serde_json::to_string_pretty(&v).unwrap_or_else(|_| s.to_string()), BodyFence::Json),
+            Err(_) => (s.to_string(), BodyFence::Text),
+        },
+        None => (serde_json::to_string_pretty(raw).unwrap_or_else(|_| raw.to_string()), BodyFence::Json),
+    };
+    Some((truncate_json(&text, 500), fence))
+}
+
+/// 纯文本截断：按字符边界回退，避免切断多字节字符
+fn truncate_text(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        return s.to_string();
+    }
+    let mut cut = max_len;
+    while cut > 0 && !s.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    format!("{}...", &s[..cut])
+}
+
+/// YApi 原生 form 字段渲染：只读 req_body_form，req_body_other 一律忽略
+/// req_body_form 既可能是数组，也可能被整体序列化成 JSON 字符串
+fn render_yapi_form_body(data: &JsonValue, content_type: &str) -> Option<String> {
+    let raw = data.get("req_body_form")?;
+    let params = match raw {
+        JsonValue::String(s) => serde_json::from_str::<JsonValue>(s).ok()?,
+        other => other.clone(),
+    };
+    render_form_params(Some(&params), content_type)
+}
+
+/// 内部结构（yapi_to_api_details 产物）的 requestBody
+fn format_internal_request_body(
+    data: &JsonValue,
+    schema_map: &HashMap<String, JsonValue>,
+) -> Option<(String, BodyFence)> {
+    let rb = data.get("requestBody")?;
+    let content_type = rb.get("type").and_then(|v| v.as_str()).unwrap_or("application/json");
+
+    // form（multipart/form-data、x-www-form-urlencoded，可能带 boundary 参数）：渲染表单清单后结束
+    if content_type.to_lowercase().contains("form") {
+        return render_form_params(rb.get("parameters"), content_type).map(|s| (s, BodyFence::Text));
     }
 
-    // OpenAPI 格式
-    if let Some(rb) = data.get("requestBody") {
-        let content_type = rb.get("type").and_then(|v| v.as_str()).unwrap_or("application/json");
-        let schema = rb.get("jsonSchema");
-        if let Some(s) = schema {
-            let resolved = resolve_schema(s, schema_map, &mut std::collections::HashSet::new());
-            if resolved.get("properties").is_some() {
-                let example = schema_to_example(&resolved, schema_map);
-                let json_str = serde_json::to_string_pretty(&example).ok()?;
-                return Some(format!("Content-Type: {}\n{}", content_type, truncate_json(&json_str, 500)));
-            }
+    if let Some(schema) = rb.get("jsonSchema") {
+        let resolved = resolve_schema(schema, schema_map, &mut std::collections::HashSet::new());
+        if resolved.get("properties").is_some() {
+            let example = schema_to_example(&resolved, schema_map);
+            let json_str = serde_json::to_string_pretty(&example).ok()?;
+            return Some((format!("Content-Type: {}\n{}", content_type, truncate_json(&json_str, 500)), BodyFence::Json));
+        }
+    }
+
+    // 非 schema 的 json / raw 请求体只剩原文，按纯文本输出，别让它在 prompt 里消失
+    if let Some(raw) = rb.get("rawText").and_then(|v| v.as_str()) {
+        if !raw.is_empty() {
+            return Some((truncate_text(raw, 500), BodyFence::Text));
         }
     }
 
     None
+}
+
+fn format_request_body(data: &JsonValue, schema_map: &HashMap<String, JsonValue>) -> Option<(String, BodyFence)> {
+    let yapi_body_type = data.get("req_body_type").and_then(|v| v.as_str());
+
+    // 1. YApi 原生 form：只认表单字段，req_body_other（哪怕是 "{}"）一律忽略
+    if yapi_body_type == Some("form") {
+        if let Some(body) = render_yapi_form_body(data, "multipart/form-data") {
+            return Some((body, BodyFence::Text));
+        }
+        // 表里没有可用字段时不输出空段落，但仍要落到内部结构兜底，别整段丢掉
+    } else {
+        // 2. json / raw 读 req_body_other；缺这一键（含 req_body_type 缺省）时退到 req_body_form
+        let yapi_body = match yapi_body_type {
+            Some("raw") => format_yapi_raw_body(data),
+            _ => format_yapi_json_body(data, schema_map)
+                .map(|body| (body, BodyFence::Json))
+                // req_body_type 缺省但带 req_body_form 的历史数据：按 form 渲染，不能让请求体消失
+                .or_else(|| render_yapi_form_body(data, "multipart/form-data").map(|s| (s, BodyFence::Text))),
+        };
+        if let Some(body) = yapi_body {
+            return Some(body);
+        }
+    }
+
+    // 3. 内部结构 requestBody：form 清单 / jsonSchema / rawText
+    format_internal_request_body(data, schema_map)
 }
 
 fn format_response_body(data: &JsonValue, schema_map: &HashMap<String, JsonValue>) -> Option<String> {
@@ -461,12 +594,10 @@ fn format_openapi_params(params: &JsonValue, schema_map: &HashMap<String, JsonVa
     if sections.is_empty() { None } else { Some(sections.join("\n")) }
 }
 
+/// 截断 JSON 文本：超长时按字符边界回退并追加 ...
+/// 直接按字节切片会在切点落在多字节字符中间时 panic，而中文响应体是常态路径
 fn truncate_json(s: &str, max_len: usize) -> String {
-    if s.len() > max_len {
-        format!("{}...", &s[..max_len])
-    } else {
-        s.to_string()
-    }
+    truncate_text(s, max_len)
 }
 
 // ==================== Prompt 模板 ====================
@@ -807,4 +938,227 @@ const BRIEF_TEMPLATE: &str = r#"你是一个测试流程设计专家。你将通
 
 说明：以上仅为接口目录。要获取完整的节点类型定义、接口参数/请求体/响应体结构以及完整示例流程图，请调用 api-test.get_flow_prompt(mode=full) 后再构造 graphJson。
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn empty_schema_map() -> HashMap<String, JsonValue> {
+        HashMap::new()
+    }
+
+    #[test]
+    fn 内部结构_form_接口渲染表单清单() {
+        let data = serde_json::json!({
+            "requestBody": {
+                "type": "multipart/form-data",
+                "parameters": [
+                    {"id": "p1", "name": "files", "type": "file", "required": true, "enable": true},
+                    {"id": "p2", "name": "note", "type": "string", "required": false, "enable": true},
+                    {"id": "p3", "name": "legacy", "type": "string", "required": false, "enable": false}
+                ]
+            }
+        });
+
+        let (body, fence) = format_request_body(&data, &empty_schema_map()).unwrap();
+        assert_eq!(fence, BodyFence::Text);
+        assert_eq!(
+            body,
+            "Content-Type: multipart/form-data\n\nfiles: file（必填）\nnote: string（可选）"
+        );
+        // enable=false 的字段不出现
+        assert!(!body.contains("legacy"));
+    }
+
+    #[test]
+    fn 历史数据_form_优先表单字段并忽略_req_body_other() {
+        let data = serde_json::json!({
+            "req_body_type": "form",
+            "req_body_other": "{}",
+            "req_body_form": [
+                {"name": "files", "type": "file", "required": 1},
+                {"name": "note", "type": "text", "required": 0}
+            ]
+        });
+
+        let (body, fence) = format_request_body(&data, &empty_schema_map()).unwrap();
+        assert_eq!(fence, BodyFence::Text);
+        assert_eq!(
+            body,
+            "Content-Type: multipart/form-data\n\nfiles: file（必填）\nnote: text（可选）"
+        );
+        assert!(!body.contains("{}"));
+    }
+
+    #[test]
+    fn 内部结构_json_请求体输出保持不变() {
+        let data = serde_json::json!({
+            "requestBody": {
+                "type": "application/json",
+                "jsonSchema": {
+                    "type": "object",
+                    "properties": {"username": {"type": "string"}}
+                }
+            }
+        });
+
+        let (body, fence) = format_request_body(&data, &empty_schema_map()).unwrap();
+        assert_eq!(fence, BodyFence::Json);
+        assert_eq!(body, "Content-Type: application/json\n{\n  \"username\": \"string\"\n}");
+    }
+
+    #[test]
+    fn yapi_json_请求体输出保持不变() {
+        let data = serde_json::json!({
+            "req_body_type": "json",
+            "req_body_is_json_schema": true,
+            "req_body_other": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"}}}"
+        });
+
+        let (body, fence) = format_request_body(&data, &empty_schema_map()).unwrap();
+        assert_eq!(fence, BodyFence::Json);
+        assert_eq!(body, "{\n  \"id\": 0\n}");
+    }
+
+    #[test]
+    fn 无请求体时输出_none() {
+        assert!(format_request_body(&serde_json::json!({"requestBody": {"type": "none"}}), &empty_schema_map()).is_none());
+        // form 类型但没有字段，不输出空段落
+        assert!(format_request_body(
+            &serde_json::json!({"requestBody": {"type": "multipart/form-data", "parameters": []}}),
+            &empty_schema_map()
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn raw_请求体超长中文按字符边界截断() {
+        // 300 个汉字 = 900 字节，超过 500 的截断阈值
+        let long_text = "中".repeat(300);
+        let data = serde_json::json!({
+            "req_body_type": "raw",
+            "req_body_other": long_text
+        });
+
+        let (body, fence) = format_request_body(&data, &empty_schema_map()).unwrap();
+        // 纯文本不套 json 代码块，避免 AI 按 JSON 解析
+        assert_eq!(fence, BodyFence::Text);
+        assert!(body.ends_with("..."));
+        assert!(body.len() <= 503);
+    }
+
+    #[test]
+    fn raw_请求体可解析为_json_时仍套_json_代码块() {
+        let data = serde_json::json!({
+            "req_body_type": "raw",
+            "req_body_other": "{\"a\":1}"
+        });
+
+        let (body, fence) = format_request_body(&data, &empty_schema_map()).unwrap();
+        assert_eq!(fence, BodyFence::Json);
+        assert_eq!(body, "{\n  \"a\": 1\n}");
+    }
+
+    #[test]
+    fn truncate_json_按字符边界截断中文不_panic() {
+        // 500 字节的切点落在汉字中间：按字节切片会 panic
+        let long = format!("{{\"msg\":\"{}\"}}", "中文".repeat(200));
+        assert!(long.len() > 500);
+
+        let out = truncate_json(&long, 500);
+        assert!(out.ends_with("..."));
+        assert!(out.len() <= 503);
+
+        // 未超长时逐字返回，既有输出不受影响
+        let short = "{\n  \"a\": 1\n}";
+        assert_eq!(truncate_json(short, 500), short);
+    }
+
+    #[test]
+    fn json_请求体超长中文不触发字符边界_panic() {
+        let data = serde_json::json!({
+            "req_body_type": "json",
+            "req_body_other": serde_json::json!({"msg": "中".repeat(300)}).to_string()
+        });
+
+        let (body, fence) = format_request_body(&data, &empty_schema_map()).unwrap();
+        assert_eq!(fence, BodyFence::Json);
+        assert!(body.ends_with("..."));
+        assert!(body.len() <= 503);
+    }
+
+    #[test]
+    fn req_body_type_缺省时按_form_渲染历史数据() {
+        // 老数据没有 req_body_type，只有 req_body_form：改造前请求体会整段丢失
+        let data = serde_json::json!({
+            "req_body_form": [
+                {"name": "files", "type": "file", "required": 1},
+                {"name": "note", "type": "text", "required": 0}
+            ]
+        });
+
+        let (body, fence) = format_request_body(&data, &empty_schema_map()).unwrap();
+        assert_eq!(fence, BodyFence::Text);
+        assert_eq!(
+            body,
+            "Content-Type: multipart/form-data\n\nfiles: file（必填）\nnote: text（可选）"
+        );
+    }
+
+    #[test]
+    fn req_body_form_被序列化成字符串时仍能解析() {
+        let form = serde_json::json!([
+            {"name": "avatar", "type": "file", "required": true},
+            {"name": "nickname", "type": "string", "required": "1"}
+        ])
+        .to_string();
+
+        let data = serde_json::json!({"req_body_type": "form", "req_body_form": form});
+        let (body, fence) = format_request_body(&data, &empty_schema_map()).unwrap();
+        assert_eq!(fence, BodyFence::Text);
+        assert_eq!(
+            body,
+            "Content-Type: multipart/form-data\n\navatar: file（必填）\nnickname: string（必填）"
+        );
+    }
+
+    #[test]
+    fn form_字段过滤停用项与无名字段() {
+        let data = serde_json::json!({
+            "requestBody": {
+                "type": "x-www-form-urlencoded",
+                "parameters": [
+                    {"name": "keep", "type": "string", "required": false},
+                    {"name": "off", "type": "string", "required": true, "enable": false},
+                    {"name": "off_num", "type": "string", "enable": 0},
+                    {"name": "", "type": "string", "enable": true},
+                    {"name": "num_req", "type": "integer", "required": 1}
+                ]
+            }
+        });
+
+        let (body, fence) = format_request_body(&data, &empty_schema_map()).unwrap();
+        assert_eq!(fence, BodyFence::Text);
+        assert_eq!(
+            body,
+            "Content-Type: x-www-form-urlencoded\n\nkeep: string（可选）\nnum_req: integer（必填）"
+        );
+    }
+
+    #[test]
+    fn 内部结构非_schema_json_请求体回退到原文() {
+        // convert_request_body 对非 schema 的 json 只写 rawText，jsonSchema 为 null
+        let data = serde_json::json!({
+            "requestBody": {
+                "type": "application/json",
+                "jsonSchema": null,
+                "rawText": "{\"a\":1}"
+            }
+        });
+
+        let (body, fence) = format_request_body(&data, &empty_schema_map()).unwrap();
+        assert_eq!(fence, BodyFence::Text);
+        assert_eq!(body, "{\"a\":1}");
+    }
+}
 
