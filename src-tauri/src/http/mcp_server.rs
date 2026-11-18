@@ -240,6 +240,10 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
                     "query": {
                         "type": "string",
                         "description": "可选关键词，按接口名称/路径/方法过滤（不区分大小写）；为空时返回全部接口目录"
+                    },
+                    "folderId": {
+                        "type": "string",
+                        "description": "可选目录 ID，只返回该目录（含全部子目录）下的接口"
                     }
                 },
                 "required": ["projectId"]
@@ -567,7 +571,7 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "api-doc.upsert_endpoint".to_string(),
-            description: "创建或更新接口文档。给了 id 按 id 更新；没给 id 时按 (projectId, method, path) 查重后更新，否则新建。幂等：同 (method, path) 再次调用更新同一条并保留原 id 与 createdAt。参数类型非法值降级 string；状态非法值时沿用原状态（无有效原状态才用 designing）。parameters / requestBody / responses / tags 传入即整体替换该字段（类型不符等同未传），不传才沿用原值；只改描述或状态时不要传这几个字段，要传就必须带全量。删除接口请用 api-doc.delete_endpoint。".to_string(),
+            description: "创建或更新接口文档。给了 id 按 id 更新；没给 id 时按 (projectId, method, path) 查重后更新，否则新建。幂等：同 (method, path) 再次调用更新同一条并保留原 id 与 createdAt。参数类型非法值降级 string；状态非法值时沿用原状态（无有效原状态才用 designing）。parameters / requestBody / responses / tags 传入即整体替换该字段（类型不符或显式 null 等同未传），不传才沿用原值；描述、状态显式 null 同样沿用原值。只改描述、状态或搬目录时不要传这几个字段；要传就必须带全量。移动接口目录请用 api-doc.move_endpoint（只改位置不改内容），删除接口请用 api-doc.delete_endpoint。".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -663,12 +667,38 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "api-doc.list_folders".to_string(),
-            description: "列出项目下全部接口目录（apiDetailFolder）。返回扁平数组，每项含 id/name/parentId/sortOrder/path，path 形如 微信支付/服务商；按 parentId 可自行组树。".to_string(),
+            name: "api-doc.delete_folder".to_string(),
+            description: "删除接口目录。仅允许删除空目录：目录下仍有子项（接口或子目录）时拒绝并报出子项数量，需先移走或删除子项。删除进回收站。".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "projectId": { "type": "string", "description": "项目 ID" }
+                    "projectId": { "type": "string", "description": "项目 ID" },
+                    "id": { "type": "string", "description": "目录 ID" }
+                },
+                "required": ["projectId", "id"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-doc.move_endpoint".to_string(),
+            description: "移动接口到指定目录，只改位置不改内容。对比 upsert_endpoint 的整体替换语义，搬目录用本工具避免误覆盖参数。".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "projectId": { "type": "string", "description": "项目 ID" },
+                    "id": { "type": "string", "description": "接口菜单项 ID" },
+                    "parentId": { "type": ["string", "null"], "description": "目标目录 ID；显式 null 表示移到根级" }
+                },
+                "required": ["projectId", "id", "parentId"]
+            }),
+        },
+        ToolDefinition {
+            name: "api-doc.list_folders".to_string(),
+            description: "列出项目下全部接口目录（apiDetailFolder）。返回扁平数组，每项含 id/name/parentId/sortOrder/path/endpointCount，path 形如 微信支付/服务商；重名目录的 path 会追加 `#<id 前 8 位>` 后缀以便区分，按 parentId 可自行组树。".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "projectId": { "type": "string", "description": "项目 ID" },
+                    "withEndpointCount": { "type": "boolean", "description": "可选，缺省 true；是否统计每个目录（含子目录）下的接口数量 endpointCount" }
                 },
                 "required": ["projectId"]
             }),
@@ -1557,35 +1587,171 @@ fn doc_move_folder(
     }))
 }
 
+/// 删除接口目录：仅允许空目录，非空拒绝并报子项数量。
+fn doc_delete_folder(
+    db: &Db,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, JsonRpcError> {
+    let project_id = doc_str_arg(args, "projectId")?;
+    let id = doc_str_arg(args, "id")?;
+    ensure_project_exists(db, project_id)?;
+
+    match menu_repo::get_menu_item(db, project_id, id).map_err(doc_db_err)? {
+        None => return Err(doc_err(-32602, format!("目录不存在: {id}"))),
+        Some(item) if item.menu_type != "apiDetailFolder" => {
+            return Err(doc_err(-32602, format!("菜单项 {id} 不是接口目录")));
+        }
+        Some(_) => {}
+    }
+
+    let items = menu_repo::list_menu_items(db, project_id).map_err(doc_db_err)?;
+    let child_count = items
+        .iter()
+        .filter(|i| i.parent_id.as_deref() == Some(id))
+        .count();
+    if child_count > 0 {
+        return Err(doc_err(
+            -32602,
+            format!("目录非空，包含 {child_count} 个子项，请先移走或删除其中的接口与子目录"),
+        ));
+    }
+
+    menu_repo::delete_menu_item(db, project_id, id).map_err(doc_db_err)?;
+    Ok(serde_json::json!({ "id": id, "deleted": true }))
+}
+
+/// 移动接口到指定目录，只改位置不改内容。
+fn doc_move_endpoint(
+    db: &Db,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, JsonRpcError> {
+    let project_id = doc_str_arg(args, "projectId")?;
+    let id = doc_str_arg(args, "id")?;
+    ensure_project_exists(db, project_id)?;
+
+    match menu_repo::get_menu_item(db, project_id, id).map_err(doc_db_err)? {
+        None => return Err(doc_err(-32602, format!("接口不存在: {id}"))),
+        Some(item) if item.menu_type != "apiDetail" => {
+            return Err(doc_err(-32602, format!("菜单项 {id} 不是接口")));
+        }
+        Some(_) => {}
+    }
+
+    // parentId 必填：字符串 = 挂到该目录；显式 null = 根级。doc_optional_parent 把缺省也当根级，
+    // 但本工具 required 了 parentId，缺省不会走到这里。
+    let target = doc_optional_parent(db, project_id, args, &["apiDetailFolder"])?;
+    if args.get("parentId").is_none() {
+        return Err(doc_err(-32602, "缺少 parentId：目标目录 ID 或 null（移到根级）"));
+    }
+
+    {
+        let mut guard = db
+            .0
+            .lock()
+            .map_err(|_| doc_err(-32603, "数据库锁不可用"))?;
+        let tx = guard.transaction().map_err(doc_db_err)?;
+        menu_repo::set_menu_item_parent(&tx, project_id, id, target.as_deref()).map_err(doc_db_err)?;
+        tx.commit().map_err(doc_db_err)?;
+    }
+
+    Ok(serde_json::json!({
+        "id": id,
+        "parentId": target,
+    }))
+}
+
 /// 列出项目下全部接口目录，扁平返回，`path` 为 `A/B` 形态的完整路径。
+/// 重名目录的 path 追加 `#<id 前 8 位>` 后缀；endpointCount 统计目录子树（含子目录）下的接口数。
 fn doc_list_folders(
     db: &Db,
     args: &serde_json::Value,
 ) -> Result<serde_json::Value, JsonRpcError> {
     let project_id = doc_str_arg(args, "projectId")?;
     ensure_project_exists(db, project_id)?;
+    let with_count = args
+        .get("withEndpointCount")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
 
     let items = menu_repo::list_menu_items(db, project_id).map_err(doc_db_err)?;
     let paths = menu_path::folder_paths(&items);
 
-    let mut folders: Vec<&ApiMenuData> = items
-        .iter()
-        .filter(|i| i.menu_type == "apiDetailFolder")
-        .collect();
-    folders.sort_by(|a, b| {
-        (a.sort_order, a.name.as_str()).cmp(&(b.sort_order, b.name.as_str()))
-    });
+    // 撞名检测：同名且同 path 的目录，给 path 追加 id 后缀
+    let folders: Vec<&ApiMenuData> = {
+        let mut fs: Vec<&ApiMenuData> = items
+            .iter()
+            .filter(|i| i.menu_type == "apiDetailFolder")
+            .collect();
+        fs.sort_by(|a, b| {
+            (a.sort_order, a.name.as_str()).cmp(&(b.sort_order, b.name.as_str()))
+        });
+        fs
+    };
+    let mut dup_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for f in &folders {
+        let path = paths.get(&f.id).cloned().flatten().unwrap_or_default();
+        let key = format!("{}\u{0}{}", path, f.name);
+        *seen.entry(key.clone()).or_insert(0) += 1;
+        if seen[&key] > 1 {
+            dup_keys.insert(key);
+        }
+    }
+
+    // endpointCount：目录子树（含子目录）下的接口数
+    let counts: std::collections::HashMap<&str, usize> = if with_count {
+        let mut direct: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for i in items.iter().filter(|i| i.menu_type == "apiDetail") {
+            if let Some(pid) = i.parent_id.as_deref() {
+                *direct.entry(pid).or_insert(0) += 1;
+            }
+        }
+        let mut counts = std::collections::HashMap::new();
+        for f in &folders {
+            let mut total = direct.get(f.id.as_str()).copied().unwrap_or(0);
+            // 沿子孙目录累加：逐层找 parent_id 指向已知集合的目录
+            let mut owned: std::collections::HashSet<&str> =
+                std::collections::HashSet::from([f.id.as_str()]);
+            let mut changed = true;
+            while changed {
+                changed = false;
+                for i in items.iter().filter(|i| i.menu_type == "apiDetailFolder") {
+                    if let Some(pid) = i.parent_id.as_deref() {
+                        if owned.contains(pid) && owned.insert(i.id.as_str()) {
+                            total += direct.get(i.id.as_str()).copied().unwrap_or(0);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            counts.insert(f.id.as_str(), total);
+        }
+        counts
+    } else {
+        std::collections::HashMap::new()
+    };
 
     let list: Vec<serde_json::Value> = folders
         .iter()
         .map(|i| {
-            serde_json::json!({
+            let raw_path = paths.get(&i.id).cloned().flatten().unwrap_or_default();
+            let key = format!("{}\u{0}{}", raw_path, i.name);
+            let path = if dup_keys.contains(&key) {
+                format!("{}#{}", raw_path, &i.id[..8.min(i.id.len())])
+            } else {
+                raw_path
+            };
+            let mut entry = serde_json::json!({
                 "id": i.id,
                 "name": i.name,
                 "parentId": i.parent_id,
                 "sortOrder": i.sort_order,
-                "path": paths.get(&i.id).cloned().flatten(),
-            })
+                "path": path,
+            });
+            if with_count {
+                entry["endpointCount"] = serde_json::json!(counts.get(i.id.as_str()).copied().unwrap_or(0));
+            }
+            entry
         })
         .collect();
     Ok(serde_json::Value::Array(list))
@@ -1918,6 +2084,7 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                 })?;
             let query = arguments.get("query").and_then(|v| v.as_str());
             let query_lower = query.map(|q| q.to_lowercase());
+            let folder_id = arguments.get("folderId").and_then(|v| v.as_str()).map(str::trim).filter(|s| !s.is_empty());
 
             let items = menu_repo::list_menu_items(db, project_id)
                 .map_err(|e| JsonRpcError {
@@ -1926,9 +2093,41 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                     data: None,
                 })?;
 
+            // folderId 过滤：收集该目录子树（含子目录）下的全部接口 id
+            let mut in_folder: Option<std::collections::HashSet<&str>> = None;
+            if let Some(fid) = folder_id {
+                if !items.iter().any(|i| i.id == fid) {
+                    return Ok(ToolResult {
+                        content: vec![ToolResultContent {
+                            content_type: "text".to_string(),
+                            text: format!("Error: 目录不存在: {fid}"),
+                        }],
+                        is_error: Some(true),
+                    });
+                }
+                let mut owned: std::collections::HashSet<&str> = std::collections::HashSet::new();
+                owned.insert(fid);
+                let mut changed = true;
+                while changed {
+                    changed = false;
+                    for i in items.iter().filter(|i| i.menu_type == "apiDetailFolder") {
+                        if let Some(pid) = i.parent_id.as_deref() {
+                            if owned.contains(pid) && owned.insert(i.id.as_str()) {
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+                in_folder = Some(owned);
+            }
+
             let paths = menu_path::folder_paths(&items);
             let mut results: Vec<serde_json::Value> = Vec::new();
             for item in items.iter().filter(|i| i.menu_type == "apiDetail" && i.data_json.is_some()) {
+                if let Some(set) = &in_folder {
+                    let pid = item.parent_id.as_deref().unwrap_or("");
+                    if !set.contains(pid) { continue; }
+                }
                 let d = item.data_json.as_ref();
                 let method = d.and_then(|v| v.get("method")).and_then(|v| v.as_str()).unwrap_or("GET").to_uppercase();
                 let path = d.and_then(|v| v.get("path")).and_then(|v| v.as_str()).unwrap_or("");
@@ -2933,6 +3132,8 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
         "api-doc.delete_endpoint" => doc_call_result(doc_delete_endpoint(db, arguments)),
         "api-doc.create_folder" => doc_call_result(doc_create_folder(db, arguments)),
         "api-doc.move_folder" => doc_call_result(doc_move_folder(db, arguments)),
+        "api-doc.delete_folder" => doc_call_result(doc_delete_folder(db, arguments)),
+        "api-doc.move_endpoint" => doc_call_result(doc_move_endpoint(db, arguments)),
         "api-doc.list_folders" => doc_call_result(doc_list_folders(db, arguments)),
         "api-doc.save_schema" => doc_call_result(doc_save_schema(db, arguments)),
         "api-doc.save_environment" => doc_call_result(doc_save_environment(db, arguments)),
@@ -3133,7 +3334,7 @@ mod tests {
     #[test]
     fn test_tool_definitions_count() {
         let tools = get_tool_definitions();
-        assert_eq!(tools.len(), 26, "Expected 26 MCP tools, got {}", tools.len());
+        assert_eq!(tools.len(), 28, "Expected 28 MCP tools, got {}", tools.len());
     }
 
     #[test]
@@ -3173,6 +3374,8 @@ mod tests {
             "api-doc.delete_endpoint",
             "api-doc.create_folder",
             "api-doc.move_folder",
+            "api-doc.delete_folder",
+            "api-doc.move_endpoint",
             "api-doc.list_folders",
             "api-doc.save_schema",
             "api-doc.save_environment",
@@ -4187,6 +4390,181 @@ mod tests {
         );
         assert_eq!(err.code, -32602);
         assert!(err.message.contains("不是目录"), "{}", err.message);
+    }
+
+    /// 建一棵 目录A > 目录B > 接口 的测试树，返回 (目录A id, 目录B id)。
+    fn setup_folder_tree(db: &Db) -> (String, String) {
+        let fa = call_json(
+            db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "订单"}),
+        );
+        let fb = call_json(
+            db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "支付", "parentId": fa["id"]}),
+        );
+        (fa["id"].as_str().unwrap().to_string(), fb["id"].as_str().unwrap().to_string())
+    }
+
+    #[test]
+    fn doc_delete_folder_rejects_non_empty() {
+        let db = setup_db();
+        let (fa, _fb) = setup_folder_tree(&db);
+        let err = call_err(
+            &db,
+            "api-doc.delete_folder",
+            serde_json::json!({"projectId": "proj-1", "id": fa}),
+        );
+        assert_eq!(err.code, -32602);
+        assert!(err.message.contains("1 个子项"), "{}", err.message);
+        // 目录仍在
+        let folders = call_json(&db, "api-doc.list_folders", serde_json::json!({"projectId": "proj-1"}));
+        assert!(folders.as_array().unwrap().iter().any(|f| f["id"] == fa));
+    }
+
+    #[test]
+    fn doc_delete_folder_removes_empty_and_recycles() {
+        let db = setup_db();
+        let (fa, fb) = setup_folder_tree(&db);
+        // 先删空的子目录 B，再删空的父目录 A
+        let res = call_json(
+            &db,
+            "api-doc.delete_folder",
+            serde_json::json!({"projectId": "proj-1", "id": fb}),
+        );
+        assert_eq!(res["deleted"], serde_json::json!(true));
+        let res = call_json(
+            &db,
+            "api-doc.delete_folder",
+            serde_json::json!({"projectId": "proj-1", "id": fa}),
+        );
+        assert_eq!(res["deleted"], serde_json::json!(true));
+        let folders = call_json(&db, "api-doc.list_folders", serde_json::json!({"projectId": "proj-1"}));
+        assert!(folders.as_array().unwrap().iter().all(|f| f["id"] != fa && f["id"] != fb));
+        let recycled: i64 = db.0.lock().unwrap()
+            .query_row("SELECT COUNT(*) FROM recycle_items WHERE catalog_type = 'apiDetailFolder'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(recycled, 2);
+    }
+
+    #[test]
+    fn doc_delete_folder_rejects_non_folder() {
+        let db = setup_db();
+        let err = call_err(
+            &db,
+            "api-doc.delete_folder",
+            serde_json::json!({"projectId": "proj-1", "id": "api-login"}),
+        );
+        assert_eq!(err.code, -32602);
+        assert!(err.message.contains("不是接口目录"), "{}", err.message);
+    }
+
+    #[test]
+    fn doc_move_endpoint_moves_without_touching_data() {
+        let db = setup_db();
+        let (fa, _fb) = setup_folder_tree(&db);
+        let before = api_data(&db, "api-login");
+        let res = call_json(
+            &db,
+            "api-doc.move_endpoint",
+            serde_json::json!({"projectId": "proj-1", "id": "api-login", "parentId": fa}),
+        );
+        assert_eq!(res["parentId"].as_str().unwrap(), fa);
+        assert_eq!(api_data(&db, "api-login"), before, "移动不能改内容");
+        // 移回根级
+        let res = call_json(
+            &db,
+            "api-doc.move_endpoint",
+            serde_json::json!({"projectId": "proj-1", "id": "api-login", "parentId": serde_json::Value::Null}),
+        );
+        assert_eq!(res["parentId"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn doc_move_endpoint_rejects_non_api_and_bad_parent() {
+        let db = setup_db();
+        let (fa, _fb) = setup_folder_tree(&db);
+        // 目录不能当接口移动
+        let err = call_err(
+            &db,
+            "api-doc.move_endpoint",
+            serde_json::json!({"projectId": "proj-1", "id": fa, "parentId": serde_json::Value::Null}),
+        );
+        assert_eq!(err.code, -32602);
+        assert!(err.message.contains("不是接口"), "{}", err.message);
+        // 父级必须是目录
+        let err = call_err(
+            &db,
+            "api-doc.move_endpoint",
+            serde_json::json!({"projectId": "proj-1", "id": "api-login", "parentId": "api-user"}),
+        );
+        assert_eq!(err.code, -32602);
+        assert!(err.message.contains("不是目录"), "{}", err.message);
+    }
+
+    #[test]
+    fn doc_list_folders_marks_duplicate_paths_and_counts() {
+        let db = setup_db();
+        // 两个根级同名目录
+        call_json(&db, "api-doc.create_folder", serde_json::json!({"projectId": "proj-1", "name": "wxpay"}));
+        call_json(&db, "api-doc.create_folder", serde_json::json!({"projectId": "proj-1", "name": "wxpay"}));
+        // 其中一个挂接口
+        let folders0 = call_json(&db, "api-doc.list_folders", serde_json::json!({"projectId": "proj-1"}));
+        let first_id = folders0.as_array().unwrap()[0]["id"].as_str().unwrap().to_string();
+        call_json(
+            &db,
+            "api-doc.upsert_endpoint",
+            serde_json::json!({"projectId": "proj-1", "method": "GET", "path": "/wx/a", "name": "A", "parentId": first_id}),
+        );
+        let folders = call_json(&db, "api-doc.list_folders", serde_json::json!({"projectId": "proj-1"}));
+        let arr = folders.as_array().unwrap();
+        let dup: Vec<&serde_json::Value> = arr.iter().filter(|f| f["name"] == "wxpay").collect();
+        assert_eq!(dup.len(), 2);
+        for f in &dup {
+            let path = f["path"].as_str().unwrap();
+            assert!(path.contains("#"), "重名目录 path 应带 # 后缀: {path}");
+            assert_eq!(path.len(), 5 + 1 + 8, "wxpay + # + 8 位 id: {path}");
+        }
+        let with_api = dup.iter().find(|f| f["endpointCount"] == serde_json::json!(1)).unwrap();
+        assert!(with_api.is_object(), "应有且只有一个 wxpay 含 1 个接口");
+        // 关闭计数
+        let folders = call_json(
+            &db,
+            "api-doc.list_folders",
+            serde_json::json!({"projectId": "proj-1", "withEndpointCount": false}),
+        );
+        assert!(folders.as_array().unwrap()[0].get("endpointCount").is_none());
+    }
+
+    #[test]
+    fn search_apis_filters_by_folder_subtree() {
+        let db = setup_db();
+        let (fa, fb) = setup_folder_tree(&db);
+        // 三个接口：根级 / A 直下 / B（A 的子目录）下
+        call_json(&db, "api-doc.upsert_endpoint", serde_json::json!({"projectId": "proj-1", "method": "GET", "path": "/r", "name": "root-api"}));
+        let in_a = call_json(&db, "api-doc.upsert_endpoint", serde_json::json!({"projectId": "proj-1", "method": "GET", "path": "/a", "name": "a-api", "parentId": fa}));
+        call_json(&db, "api-doc.upsert_endpoint", serde_json::json!({"projectId": "proj-1", "method": "GET", "path": "/b", "name": "b-api", "parentId": fb}));
+        assert_eq!(in_a["parentId"].as_str().unwrap(), fa);
+
+        let res = call_json(
+            &db,
+            "api-test.search_apis",
+            serde_json::json!({"projectId": "proj-1", "folderId": fa}),
+        );
+        let paths: Vec<&str> = res.as_array().unwrap().iter().map(|x| x["path"].as_str().unwrap()).collect();
+        assert!(paths.contains(&"/a"), "A 直下接口应在: {paths:?}");
+        assert!(paths.contains(&"/b"), "子目录下接口应在: {paths:?}");
+        assert!(!paths.contains(&"/r"), "根级接口不应在: {paths:?}");
+
+        // 目录不存在时报错
+        let res = call(
+            &db,
+            "api-test.search_apis",
+            serde_json::json!({"projectId": "proj-1", "folderId": "no-such"}),
+        );
+        assert_eq!(res.is_error, Some(true));
+        assert!(res.content[0].text.contains("目录不存在"), "{}", res.content[0].text);
     }
 
     #[test]
