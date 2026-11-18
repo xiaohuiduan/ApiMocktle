@@ -19,6 +19,7 @@ use crate::db::personal_token_repo;
 use crate::db::project_repo;
 use crate::models::*;
 use crate::services::import_service::API_STATUSES;
+use crate::services::menu_path;
 use crate::services::test_engine::execute_task_full;
 
 // ==================== MCP Protocol Types ====================
@@ -662,6 +663,17 @@ fn get_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "api-doc.list_folders".to_string(),
+            description: "列出项目下全部接口目录（apiDetailFolder）。返回扁平数组，每项含 id/name/parentId/sortOrder/path，path 形如 微信支付/服务商；按 parentId 可自行组树。".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "projectId": { "type": "string", "description": "项目 ID" }
+                },
+                "required": ["projectId"]
+            }),
+        },
+        ToolDefinition {
             name: "api-doc.save_schema".to_string(),
             description: "保存数据模型（apiSchema）。按名称幂等：同名模型覆盖内容并保留原 id，不产生重复项。".to_string(),
             input_schema: serde_json::json!({
@@ -989,6 +1001,32 @@ fn ensure_project_exists(db: &Db, project_id: &str) -> Result<(), JsonRpcError> 
     }
 }
 
+/// 供报错提示用：同项目可用接口目录，最多列 20 个，超出追加「等 N 个」。
+/// 查询失败或无目录时返回空串——不能把原始错误盖掉。
+fn doc_available_folders_hint(db: &Db, project_id: &str) -> String {
+    let Ok(items) = menu_repo::list_menu_items(db, project_id) else {
+        return String::new();
+    };
+    let folders: Vec<&ApiMenuData> = items
+        .iter()
+        .filter(|i| i.menu_type == "apiDetailFolder")
+        .collect();
+    if folders.is_empty() {
+        return String::new();
+    }
+    let shown: Vec<String> = folders
+        .iter()
+        .take(20)
+        .map(|i| format!("{}({})", i.name, i.id))
+        .collect();
+    let tail = if folders.len() > 20 {
+        format!(" 等 {} 个", folders.len())
+    } else {
+        String::new()
+    };
+    format!("；可用目录: {}{}", shown.join(", "), tail)
+}
+
 fn ensure_folder(
     db: &Db,
     project_id: &str,
@@ -997,8 +1035,20 @@ fn ensure_folder(
 ) -> Result<(), JsonRpcError> {
     match menu_repo::get_menu_item(db, project_id, folder_id) {
         Ok(Some(item)) if allowed.contains(&item.menu_type.as_str()) => Ok(()),
-        Ok(Some(_)) => Err(doc_err(-32602, format!("父级 {folder_id} 不是目录"))),
-        Ok(None) => Err(doc_err(-32602, format!("父级不存在: {folder_id}"))),
+        Ok(Some(_)) => Err(doc_err(
+            -32602,
+            format!(
+                "父级 {folder_id} 不是目录{}",
+                doc_available_folders_hint(db, project_id)
+            ),
+        )),
+        Ok(None) => Err(doc_err(
+            -32602,
+            format!(
+                "父级不存在: {folder_id}{}",
+                doc_available_folders_hint(db, project_id)
+            ),
+        )),
         Err(e) => Err(doc_db_err(e)),
     }
 }
@@ -1371,7 +1421,13 @@ fn doc_upsert_endpoint(
         tx.commit().map_err(doc_db_err)?;
     }
 
-    Ok(serde_json::json!({ "id": api_id, "created": created }))
+    // 提交后重读，回传接口真实所在目录（未传 parentId 时沿用原位置）
+    let parent_after = menu_repo::get_menu_item(db, project_id, &api_id).map_err(doc_db_err)?;
+    Ok(serde_json::json!({
+        "id": api_id,
+        "created": created,
+        "parentId": parent_after.and_then(|i| i.parent_id),
+    }))
 }
 
 fn doc_delete_endpoint(
@@ -1499,6 +1555,40 @@ fn doc_move_folder(
         "parentId": item.as_ref().and_then(|i| i.parent_id.clone()),
         "name": item.map(|i| i.name).unwrap_or_default(),
     }))
+}
+
+/// 列出项目下全部接口目录，扁平返回，`path` 为 `A/B` 形态的完整路径。
+fn doc_list_folders(
+    db: &Db,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, JsonRpcError> {
+    let project_id = doc_str_arg(args, "projectId")?;
+    ensure_project_exists(db, project_id)?;
+
+    let items = menu_repo::list_menu_items(db, project_id).map_err(doc_db_err)?;
+    let paths = menu_path::folder_paths(&items);
+
+    let mut folders: Vec<&ApiMenuData> = items
+        .iter()
+        .filter(|i| i.menu_type == "apiDetailFolder")
+        .collect();
+    folders.sort_by(|a, b| {
+        (a.sort_order, a.name.as_str()).cmp(&(b.sort_order, b.name.as_str()))
+    });
+
+    let list: Vec<serde_json::Value> = folders
+        .iter()
+        .map(|i| {
+            serde_json::json!({
+                "id": i.id,
+                "name": i.name,
+                "parentId": i.parent_id,
+                "sortOrder": i.sort_order,
+                "path": paths.get(&i.id).cloned().flatten(),
+            })
+        })
+        .collect();
+    Ok(serde_json::Value::Array(list))
 }
 
 fn doc_save_schema(
@@ -1836,6 +1926,7 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                     data: None,
                 })?;
 
+            let paths = menu_path::folder_paths(&items);
             let mut results: Vec<serde_json::Value> = Vec::new();
             for item in items.iter().filter(|i| i.menu_type == "apiDetail" && i.data_json.is_some()) {
                 let d = item.data_json.as_ref();
@@ -1857,6 +1948,7 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                     "method": method,
                     "path": path,
                     "description": desc,
+                    "folderPath": paths.get(&item.id).cloned().flatten(),
                 }));
             }
 
@@ -2841,6 +2933,7 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
         "api-doc.delete_endpoint" => doc_call_result(doc_delete_endpoint(db, arguments)),
         "api-doc.create_folder" => doc_call_result(doc_create_folder(db, arguments)),
         "api-doc.move_folder" => doc_call_result(doc_move_folder(db, arguments)),
+        "api-doc.list_folders" => doc_call_result(doc_list_folders(db, arguments)),
         "api-doc.save_schema" => doc_call_result(doc_save_schema(db, arguments)),
         "api-doc.save_environment" => doc_call_result(doc_save_environment(db, arguments)),
         _ => Err(JsonRpcError {
@@ -3040,7 +3133,7 @@ mod tests {
     #[test]
     fn test_tool_definitions_count() {
         let tools = get_tool_definitions();
-        assert_eq!(tools.len(), 25, "Expected 25 MCP tools, got {}", tools.len());
+        assert_eq!(tools.len(), 26, "Expected 26 MCP tools, got {}", tools.len());
     }
 
     #[test]
@@ -3080,6 +3173,7 @@ mod tests {
             "api-doc.delete_endpoint",
             "api-doc.create_folder",
             "api-doc.move_folder",
+            "api-doc.list_folders",
             "api-doc.save_schema",
             "api-doc.save_environment",
         ] {
@@ -3446,6 +3540,49 @@ mod tests {
     }
 
 #[test]
+    fn flow_prompt_includes_folder_path() {
+        let db = setup_db();
+        let folder = call_json(
+            &db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "支付"}),
+        );
+        call_json(
+            &db,
+            "api-doc.upsert_endpoint",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "method": "POST",
+                "path": "/pay/notify",
+                "name": "支付回调",
+                "parentId": folder["id"]
+            }),
+        );
+
+        let full = call(
+            &db,
+            "api-test.get_flow_prompt",
+            serde_json::json!({"projectId": "proj-1", "query": "回调"}),
+        );
+        assert!(
+            full.content[0].text.contains("- 目录: 支付"),
+            "full 模式应含目录: {}",
+            full.content[0].text
+        );
+
+        let brief = call(
+            &db,
+            "api-test.get_flow_prompt",
+            serde_json::json!({"projectId": "proj-1", "mode": "brief", "query": "回调"}),
+        );
+        assert!(
+            brief.content[0].text.contains("目录：支付"),
+            "brief 模式应含目录: {}",
+            brief.content[0].text
+        );
+    }
+
+#[test]
     fn create_task_with_flow_rejects_invalid_graph() {
         let db = setup_db();
         let bad_graph = serde_json::json!({
@@ -3499,6 +3636,157 @@ mod tests {
         let db = setup_db();
         let res = call(&db, "api-test.search_apis", serde_json::json!({"projectId": "proj-1"}));
         assert!(res.content[0].text.contains("\"menuItemId\": \"api-login\""), "{}", res.content[0].text);
+    }
+
+    #[test]
+    fn search_apis_returns_folder_path() {
+        let db = setup_db();
+        let folder = call_json(
+            &db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "支付"}),
+        );
+        call_json(
+            &db,
+            "api-doc.upsert_endpoint",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "method": "POST",
+                "path": "/pay/notify",
+                "name": "支付回调",
+                "parentId": folder["id"]
+            }),
+        );
+
+        let nested = call_json(
+            &db,
+            "api-test.search_apis",
+            serde_json::json!({"projectId": "proj-1", "query": "回调"}),
+        );
+        let arr = nested.as_array().unwrap();
+        assert_eq!(arr.len(), 1, "{}", nested);
+        assert_eq!(arr[0]["folderPath"], "支付");
+
+        let root_level = call_json(
+            &db,
+            "api-test.search_apis",
+            serde_json::json!({"projectId": "proj-1", "query": "登录"}),
+        );
+        assert!(root_level[0]["folderPath"].is_null(), "{}", root_level);
+    }
+
+    #[test]
+    fn doc_list_folders_returns_flat_paths() {
+        let db = setup_db();
+        let root = call_json(
+            &db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "微信支付"}),
+        );
+        let child = call_json(
+            &db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "服务商", "parentId": root["id"]}),
+        );
+        let api = call_json(
+            &db,
+            "api-doc.upsert_endpoint",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "method": "POST",
+                "path": "/pay/sub",
+                "name": "服务商下单",
+                "parentId": child["id"]
+            }),
+        );
+
+        let list = call_json(&db, "api-doc.list_folders", serde_json::json!({"projectId": "proj-1"}));
+        let arr = list.as_array().unwrap();
+        assert_eq!(arr.len(), 2, "{}", list);
+
+        let child_row = arr.iter().find(|f| f["id"] == child["id"]).unwrap();
+        assert_eq!(child_row["path"], "微信支付/服务商");
+        assert_eq!(child_row["parentId"], root["id"]);
+        assert!(child_row["sortOrder"].is_number());
+
+        let root_row = arr.iter().find(|f| f["id"] == root["id"]).unwrap();
+        assert!(root_row["parentId"].is_null(), "{}", root_row);
+        assert_eq!(root_row["path"], "微信支付");
+
+        assert!(
+            arr.iter().all(|f| f["id"] != api["id"]),
+            "接口不应出现在目录列表: {}",
+            list
+        );
+    }
+
+    #[test]
+    fn doc_upsert_endpoint_returns_parent_id() {
+        let db = setup_db();
+        let folder = call_json(
+            &db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "支付"}),
+        );
+
+        let created = call_json(
+            &db,
+            "api-doc.upsert_endpoint",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "method": "POST",
+                "path": "/pay",
+                "name": "发起支付",
+                "parentId": folder["id"]
+            }),
+        );
+        assert_eq!(created["parentId"], folder["id"]);
+
+        // 不传 parentId：沿用原目录
+        let updated = call_json(
+            &db,
+            "api-doc.upsert_endpoint",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "method": "POST",
+                "path": "/pay",
+                "name": "发起支付"
+            }),
+        );
+        assert_eq!(updated["id"], created["id"]);
+        assert_eq!(updated["parentId"], folder["id"]);
+
+        // 显式 null：移到根级
+        let moved = call_json(
+            &db,
+            "api-doc.upsert_endpoint",
+            serde_json::json!({
+                "projectId": "proj-1",
+                "method": "POST",
+                "path": "/pay",
+                "name": "发起支付",
+                "parentId": null
+            }),
+        );
+        assert!(moved["parentId"].is_null(), "{}", moved);
+    }
+
+    #[test]
+    fn doc_create_folder_error_lists_available_folders() {
+        let db = setup_db();
+        call_json(
+            &db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "微信支付"}),
+        );
+        let err = call_err(
+            &db,
+            "api-doc.create_folder",
+            serde_json::json!({"projectId": "proj-1", "name": "X", "parentId": "nope"}),
+        );
+        assert_eq!(err.code, -32602);
+        assert!(err.message.contains("可用目录"), "{}", err.message);
+        assert!(err.message.contains("微信支付"), "{}", err.message);
     }
 
     #[test]

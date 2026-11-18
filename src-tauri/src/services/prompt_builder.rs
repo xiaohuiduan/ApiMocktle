@@ -36,6 +36,7 @@ pub fn generate_flow_prompt(
     // 3. 为每个 apiDetail 生成接口文档
     let brief = mode == "brief";
     let query_lower = query.map(|q| q.to_lowercase());
+    let folder_paths = crate::services::menu_path::folder_paths(&items);
     let mut api_docs = String::new();
     let mut idx = 0;
     for item in &items {
@@ -59,10 +60,15 @@ pub fn generate_flow_prompt(
         let desc = d.get("description").or_else(|| d.get("desc"))
             .and_then(|v| v.as_str()).unwrap_or("");
 
+        let folder_path = folder_paths.get(&item.id).cloned().flatten();
+
         if brief {
             api_docs.push_str(&format!("- menuItemId: `{}` | {} | {} {}\n", item.id, item.name, method.to_uppercase(), path));
             if !desc.is_empty() {
                 api_docs.push_str(&format!("  说明：{}\n", desc));
+            }
+            if let Some(fp) = &folder_path {
+                api_docs.push_str(&format!("  目录：{}\n", fp));
             }
             continue;
         }
@@ -71,6 +77,9 @@ pub fn generate_flow_prompt(
         api_docs.push_str(&format!("- menuItemId: `{}`\n", item.id));
         api_docs.push_str(&format!("- 方法: {}\n", method.to_uppercase()));
         api_docs.push_str(&format!("- 路径: {}\n", path));
+        if let Some(fp) = &folder_path {
+            api_docs.push_str(&format!("- 目录: {}\n", fp));
+        }
         if !desc.is_empty() {
             api_docs.push_str(&format!("- 说明: {}\n", desc));
         }
