@@ -8,6 +8,9 @@ import { AuthProvider } from '@/contexts/auth'
 import { ProjectTabsProvider } from '@/contexts/project-tabs'
 import { ProxyConfigProvider } from '@/contexts/proxy-config'
 import { SessionVariablesProvider } from '@/contexts/session-variables'
+import { ensureAnchorExternalLinkHandler } from '@/utils/anchor-external-link'
+
+import { appRoutes } from './routes'
 
 // Monaco Editor 本地加载（离线可用）
 loader.config({ paths: { vs: '/monaco-editor/vs' } })
@@ -22,9 +25,11 @@ void loader.init().then((monaco) => {
   })
 })
 
-import { appRoutes } from './routes'
-
 import '@/styles/globals.css'
+
+// Markdown 预览里的外链交给系统浏览器：bytemd Viewer 只拦 `#` 锚点，
+// 其余链接会让 WebView 整体导航到外站，而主窗口没有后退按钮
+ensureAnchorExternalLinkHandler()
 
 // 桌面应用：阻止浏览器默认右键菜单（刷新/另存为等），
 // 但放行文本输入区（接口路径、Body 编辑器等高频粘贴/撤销场景）
