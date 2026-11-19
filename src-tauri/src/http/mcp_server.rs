@@ -1708,22 +1708,11 @@ fn doc_list_folders(
         }
         let mut counts = std::collections::HashMap::new();
         for f in &folders {
-            let mut total = direct.get(f.id.as_str()).copied().unwrap_or(0);
-            // 沿子孙目录累加：逐层找 parent_id 指向已知集合的目录
-            let mut owned: std::collections::HashSet<&str> =
-                std::collections::HashSet::from([f.id.as_str()]);
-            let mut changed = true;
-            while changed {
-                changed = false;
-                for i in items.iter().filter(|i| i.menu_type == "apiDetailFolder") {
-                    if let Some(pid) = i.parent_id.as_deref() {
-                        if owned.contains(pid) && owned.insert(i.id.as_str()) {
-                            total += direct.get(i.id.as_str()).copied().unwrap_or(0);
-                            changed = true;
-                        }
-                    }
-                }
-            }
+            // 子树（含子目录）下的接口总数
+            let total = menu_path::collect_subtree_ids(&items, &[f.id.as_str()])
+                .iter()
+                .map(|id| direct.get(id).copied().unwrap_or(0))
+                .sum();
             counts.insert(f.id.as_str(), total);
         }
         counts
@@ -2096,29 +2085,29 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
             // folderId 过滤：收集该目录子树（含子目录）下的全部接口 id
             let mut in_folder: Option<std::collections::HashSet<&str>> = None;
             if let Some(fid) = folder_id {
-                if !items.iter().any(|i| i.id == fid) {
-                    return Ok(ToolResult {
-                        content: vec![ToolResultContent {
-                            content_type: "text".to_string(),
-                            text: format!("Error: 目录不存在: {fid}"),
-                        }],
-                        is_error: Some(true),
-                    });
-                }
-                let mut owned: std::collections::HashSet<&str> = std::collections::HashSet::new();
-                owned.insert(fid);
-                let mut changed = true;
-                while changed {
-                    changed = false;
-                    for i in items.iter().filter(|i| i.menu_type == "apiDetailFolder") {
-                        if let Some(pid) = i.parent_id.as_deref() {
-                            if owned.contains(pid) && owned.insert(i.id.as_str()) {
-                                changed = true;
-                            }
-                        }
+                // 不校验类型的话，传一个接口 id 会通过并返回空列表，读起来像「该目录没接口」
+                match items.iter().find(|i| i.id == fid) {
+                    None => {
+                        return Ok(ToolResult {
+                            content: vec![ToolResultContent {
+                                content_type: "text".to_string(),
+                                text: format!("Error: 目录不存在: {fid}"),
+                            }],
+                            is_error: Some(true),
+                        });
                     }
+                    Some(i) if i.menu_type != "apiDetailFolder" => {
+                        return Ok(ToolResult {
+                            content: vec![ToolResultContent {
+                                content_type: "text".to_string(),
+                                text: format!("Error: menuItemId {fid} 不是接口目录"),
+                            }],
+                            is_error: Some(true),
+                        });
+                    }
+                    Some(_) => {}
                 }
-                in_folder = Some(owned);
+                in_folder = Some(menu_path::collect_subtree_ids(&items, &[fid]));
             }
 
             let paths = menu_path::folder_paths(&items);
@@ -2148,6 +2137,8 @@ async fn execute_tool(name: &str, arguments: &serde_json::Value, db: &Db) -> Res
                     "path": path,
                     "description": desc,
                     "folderPath": paths.get(&item.id).cloned().flatten(),
+                    // 重名目录的 folderPath 相同，用它去对齐 list_folders 的 id
+                    "folderId": item.parent_id,
                 }));
             }
 
@@ -3742,7 +3733,7 @@ mod tests {
         assert!(!text.contains("api-user"), "should exclude user api");
     }
 
-#[test]
+    #[test]
     fn flow_prompt_includes_folder_path() {
         let db = setup_db();
         let folder = call_json(
@@ -3992,7 +3983,6 @@ mod tests {
         assert!(err.message.contains("微信支付"), "{}", err.message);
     }
 
-    #[test]
     #[test]
     fn create_task_with_flow_returns_warnings_on_success() {
         let db = setup_db();
@@ -4557,6 +4547,18 @@ mod tests {
         assert!(paths.contains(&"/b"), "子目录下接口应在: {paths:?}");
         assert!(!paths.contains(&"/r"), "根级接口不应在: {paths:?}");
 
+        // 返回 folderId，重名目录下靠它对齐 list_folders
+        let folder_ids: Vec<Option<&str>> = res
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x["folderId"].as_str())
+            .collect();
+        assert!(
+            folder_ids.iter().all(|id| *id == Some(fa.as_str()) || *id == Some(fb.as_str())),
+            "folderId 应指向所属目录: {folder_ids:?}"
+        );
+
         // 目录不存在时报错
         let res = call(
             &db,
@@ -4565,6 +4567,42 @@ mod tests {
         );
         assert_eq!(res.is_error, Some(true));
         assert!(res.content[0].text.contains("目录不存在"), "{}", res.content[0].text);
+
+        // 传接口 id 直接拒绝，而不是返回空列表
+        let res = call(
+            &db,
+            "api-test.search_apis",
+            serde_json::json!({"projectId": "proj-1", "folderId": "api-login"}),
+        );
+        assert_eq!(res.is_error, Some(true));
+        assert!(res.content[0].text.contains("不是接口目录"), "{}", res.content[0].text);
+    }
+
+    #[test]
+    fn move_accepts_empty_parent_id_as_root() {
+        let db = setup_db();
+        let (fa, _fb) = setup_folder_tree(&db);
+
+        // 空串等同根级：两个移动工具都锁住这个语义，免得被改成报错或「不动位置」
+        let moved = call_json(
+            &db,
+            "api-doc.move_endpoint",
+            serde_json::json!({"projectId": "proj-1", "id": "api-login", "parentId": fa}),
+        );
+        assert_eq!(moved["parentId"].as_str(), Some(fa.as_str()));
+        let moved = call_json(
+            &db,
+            "api-doc.move_endpoint",
+            serde_json::json!({"projectId": "proj-1", "id": "api-login", "parentId": ""}),
+        );
+        assert_eq!(moved["parentId"], serde_json::Value::Null, "{}", moved);
+
+        let moved = call_json(
+            &db,
+            "api-doc.move_folder",
+            serde_json::json!({"projectId": "proj-1", "id": fa, "parentId": ""}),
+        );
+        assert_eq!(moved["parentId"], serde_json::Value::Null, "{}", moved);
     }
 
     #[test]

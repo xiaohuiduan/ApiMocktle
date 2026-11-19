@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::models::ApiMenuData;
 
@@ -28,6 +28,26 @@ pub fn folder_paths(items: &[ApiMenuData]) -> HashMap<String, Option<String>> {
             (item.id.clone(), path)
         })
         .collect()
+}
+
+/// 收集 `roots` 及其全部子孙目录的 id（含自身）。
+///
+/// 只沿 `apiDetailFolder` 下钻；`insert` 的幂等性同时防御父子成环。
+/// 调用方拿这个集合去筛接口、或累加子树计数。
+pub fn collect_subtree_ids<'a>(items: &'a [ApiMenuData], roots: &[&'a str]) -> HashSet<&'a str> {
+    let mut owned: HashSet<&str> = roots.iter().copied().collect();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for i in items.iter().filter(|i| i.menu_type == FOLDER_TYPE) {
+            if let Some(pid) = i.parent_id.as_deref() {
+                if owned.contains(pid) && owned.insert(i.id.as_str()) {
+                    changed = true;
+                }
+            }
+        }
+    }
+    owned
 }
 
 /// 沿 `parent_id` 链收集目录名，拼成 `A/B`；无目录祖先返回 `None`。

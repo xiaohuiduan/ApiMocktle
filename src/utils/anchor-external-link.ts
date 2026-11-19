@@ -108,7 +108,7 @@ function handleAnchorClick(event: MouseEvent): void {
 }
 
 /**
- * 注册全局 `<a>` 点击拦截，覆盖所有 Markdown 预览场景。
+ * 注册 document 级 `<a>` 点击拦截，作用于全应用的外链，Markdown 预览是主要场景。
  *
  * 全局只需注册一次，重复调用直接返回。
  */
