@@ -7,3 +7,4 @@ pub mod yapi_service;
 pub mod test_engine;
 pub mod prompt_builder;
 pub mod dynamic_variables;
+pub mod menu_path;
