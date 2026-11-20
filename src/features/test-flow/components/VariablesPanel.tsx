@@ -1,17 +1,22 @@
+import { useTranslation } from 'react-i18next'
+
 import { Tag } from 'antd'
 
 import type { VariableSource } from '../hooks/useFlowExecution'
 
+import { translateKey } from '@/i18n/translate'
+
 // ==================== 样式常量 ====================
 
-const SOURCE_TYPE_LABELS: Record<VariableSource['sourceType'], string> = {
-  init: '环境',
-  setVariable: '赋值节点',
-  preScript: '前置脚本',
-  postScript: '后置脚本',
-  extractor: '提取器',
-  loop: '循环',
-  system: '系统',
+/** 变量来源对应的 i18n key（渲染期取词，勿在模块顶层求值） */
+const SOURCE_TYPE_LABEL_KEYS: Record<VariableSource['sourceType'], string> = {
+  init: 'flow.enum.variableSource.init',
+  setVariable: 'flow.enum.variableSource.setVariable',
+  preScript: 'flow.enum.variableSource.preScript',
+  postScript: 'flow.enum.variableSource.postScript',
+  extractor: 'flow.enum.variableSource.extractor',
+  loop: 'flow.enum.variableSource.loop',
+  system: 'flow.enum.variableSource.system',
 }
 
 const SOURCE_TYPE_COLORS: Record<VariableSource['sourceType'], string> = {
@@ -31,12 +36,13 @@ interface VariablesPanelProps {
 }
 
 export default function VariablesPanel({ sources }: VariablesPanelProps) {
+  const { t } = useTranslation()
   const entries = Object.entries(sources).sort((a, b) => a[1].timestamp - b[1].timestamp)
 
   if (entries.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--ds-node-text-muted)', fontSize: 12 }}>
-        运行流程后此处显示变量
+        {t('flow.variables.empty')}
       </div>
     )
   }
@@ -61,14 +67,14 @@ export default function VariablesPanel({ sources }: VariablesPanelProps) {
               color={SOURCE_TYPE_COLORS[src.sourceType]}
               style={{ fontSize: 10, lineHeight: '14px', padding: '0 4px', margin: 0 }}
             >
-              {SOURCE_TYPE_LABELS[src.sourceType]}
+              {translateKey(SOURCE_TYPE_LABEL_KEYS[src.sourceType])}
             </Tag>
           </div>
           <div style={{ fontFamily: 'monospace', color: 'var(--ds-node-text-secondary)', fontSize: 11, wordBreak: 'break-all' }}>
             {src.value.length > 100 ? src.value.substring(0, 100) + '...' : src.value}
           </div>
           <div style={{ display: 'flex', gap: 4, color: 'var(--ds-node-text-muted)', fontSize: 10 }}>
-            {src.nodeName && <span>节点: {src.nodeName}</span>}
+            {src.nodeName && <span>{t('flow.variables.nodeName', { name: src.nodeName })}</span>}
             {src.source && <span>· {src.source}</span>}
           </div>
         </div>

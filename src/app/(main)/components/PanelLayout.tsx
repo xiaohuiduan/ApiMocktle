@@ -1,6 +1,7 @@
 'use client'
 
 import { useLayoutEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   getPanelGroupElement,
   Panel,
@@ -33,6 +34,7 @@ interface PanelLayoutProps {
 }
 
 export function PanelLayout(props: PanelLayoutProps) {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
   const { isGlassStyle, isNeumorphism } = useDesignStyle()
 
@@ -167,9 +169,9 @@ export function PanelLayout(props: PanelLayoutProps) {
 
       {isSideMenuCollapsed && (
         <button
-          type="button"
-          aria-label="展开目录面板"
+          aria-label={t('app.shell.expandSidePanel')}
           className={`absolute left-0 top-1/2 z-50 flex h-16 w-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-r-lg border-none bg-transparent p-0 ${styles.expandTrigger}`}
+          type="button"
           onClick={() => {
             panelRef.current?.expand()
           }}

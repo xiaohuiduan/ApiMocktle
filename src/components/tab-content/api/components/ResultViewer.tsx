@@ -1,6 +1,7 @@
 'use client'
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router'
 
 import {
@@ -64,6 +65,7 @@ interface HistoryPickItem {
 
 export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, requestVars }: ResultViewerProps) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const { proxyConfig } = useProxyConfig()
   const { projectId } = useParams()
   const { sessionId } = useAuth()
@@ -84,7 +86,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
       setHistoryOpen(true)
     }
     catch {
-      message.error('获取历史记录失败')
+      message.error(t('api.history.loadFailed'))
     }
   }
 
@@ -160,7 +162,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
           errorType: 'unknown',
           errorMessage: error,
           errorDetail: '',
-          suggestion: '请检查操作是否正确，如果问题持续请尝试重新登录',
+          suggestion: t('api.run.genericSuggestion'),
         }}
       />
     )
@@ -168,10 +170,16 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
 
   if (!result) { return null }
 
+  const headersCountLabel = (label: string, count?: number) => (
+    count
+      ? t('api.run.headersCount', { label, count })
+      : label
+  )
+
   const tabsItems = [
     {
       key: 'resContent',
-      label: '响应内容',
+      label: t('api.run.tabResponseBody'),
       children: result.body != null
         ? (
             <ResponseBodyViewer
@@ -185,11 +193,11 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
               onToggleFormat={() => { setShowFormatted((v) => !v) }}
             />
           )
-        : <Typography.Text className="text-xs" type="secondary">无响应体</Typography.Text>,
+        : <Typography.Text className="text-xs" type="secondary">{t('api.run.noResponseBody')}</Typography.Text>,
     },
     {
       key: 'resHeaders',
-      label: `响应头${result.headers?.length ? ` (${result.headers.length})` : ''}`,
+      label: headersCountLabel(t('api.run.tabResponseHeaders'), result.headers?.length),
       children: result.headers && result.headers.length > 0
         ? (
             <Table
@@ -200,11 +208,11 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
               size="small"
             />
           )
-        : <Typography.Text className="text-xs" type="secondary">无响应头</Typography.Text>,
+        : <Typography.Text className="text-xs" type="secondary">{t('api.run.noResponseHeaders')}</Typography.Text>,
     },
     {
       key: 'reqContent',
-      label: '请求内容',
+      label: t('api.run.tabRequestBody'),
       children: (
         <div className="flex h-full min-h-0 flex-col">
           <div className="shrink-0 rounded p-1 text-xs" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace' }}>
@@ -247,7 +255,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
             </div>
           )}
           {!requestVars?.body && !result.requestBodyText && (!result.requestBodyParameters || result.requestBodyParameters.length === 0) && (
-            <Typography.Text className="text-xs" type="secondary">无请求体</Typography.Text>
+            <Typography.Text className="text-xs" type="secondary">{t('api.run.noRequestBody')}</Typography.Text>
           )}
         </div>
       ),
@@ -256,22 +264,23 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
       key: 'reqHeaders',
       // 优先展示实际发出的请求头（后端回显，含自动附加的 Content-Type / cookie jar Cookie）；
       // 无回显时回退到构建快照 requestVars（保留变量高亮）。
-      label: `请求头${result.requestHeaders?.length
-        ? ` (${result.requestHeaders.length})`
-        : (requestVars?.headers.length ? ` (${requestVars.headers.length})` : '')}`,
+      label: headersCountLabel(
+        t('api.run.tabRequestHeaders'),
+        result.requestHeaders?.length || requestVars?.headers.length,
+      ),
       children: result.requestHeaders && result.requestHeaders.length > 0
         ? (
             <Table
               columns={[
                 headerTableColumns[0],
                 {
-                  title: '值',
+                  title: t('common.value'),
                   dataIndex: 'value',
                   key: 'value',
                   render: (value: string, record: ApiRunHeader) => (
                     record.sent === false
                       ? (
-                          <Tooltip title="常见客户端默认，reqwest 实际未发送">
+                          <Tooltip title={t('api.run.headerNotSent')}>
                             <span className="italic" style={{ color: token.colorTextTertiary }}>{value}</span>
                           </Tooltip>
                         )
@@ -291,7 +300,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
                 columns={[
                   ...headerTableColumns.slice(0, 1),
                   {
-                    title: '值',
+                    title: t('common.value'),
                     dataIndex: 'value',
                     key: 'value',
                     render: (_: unknown, __: unknown, index: number) => {
@@ -310,7 +319,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
                 size="small"
               />
             )
-          : <Typography.Text className="text-xs" type="secondary">无请求头</Typography.Text>,
+          : <Typography.Text className="text-xs" type="secondary">{t('api.run.noRequestHeaders')}</Typography.Text>,
     },
     {
       key: 'curl',
@@ -320,7 +329,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
           cURL
         </span>
       ),
-      children: curlContent ?? <Typography.Text className="text-xs" type="secondary">无 cURL 命令</Typography.Text>,
+      children: curlContent ?? <Typography.Text className="text-xs" type="secondary">{t('api.run.noCurl')}</Typography.Text>,
     },
   ]
 
@@ -339,7 +348,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
                   items: [
                     {
                       key: 'export',
-                      label: '导出 Markdown',
+                      label: t('api.run.exportMarkdown'),
                       onClick: () => {
                         const requestQuery = result.requestQuery && result.requestQuery.length > 0
                           ? result.requestQuery
@@ -348,12 +357,12 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
                           { url: result.url, method: result.method, headers: result.requestHeaders, body: result.requestBodyText, contentType: result.contentType, query: requestQuery },
                           { status: result.status, statusText: result.statusText, headers: result.headers, body: result.body, durationMs: result.durationMs, contentType: result.contentType },
                         )
-                        downloadText(`接口报告-${result.status}-${Date.now()}.md`, md)
+                        downloadText(t('api.run.reportFileName', { status: result.status, ts: Date.now() }), md)
                       },
                     },
                     {
                       key: 'compare',
-                      label: '对比历史',
+                      label: t('api.run.compareHistory'),
                       disabled: !menuItemId,
                       onClick: () => void openHistoryPicker(),
                     },
@@ -361,7 +370,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
                       ? [
                           {
                             key: 'format',
-                            label: showFormatted ? '查看原始' : '格式化 JSON',
+                            label: showFormatted ? t('api.run.showRaw') : t('api.run.formatJson'),
                             onClick: () => { setShowFormatted((v) => !v) },
                           },
                         ]
@@ -370,7 +379,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
                 }}
               >
                 <Button
-                  aria-label="更多操作"
+                  aria-label={t('api.run.moreActions')}
                   icon={<MoreHorizontalIcon size={14} />}
                   size="small"
                   type="text"
@@ -382,8 +391,11 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
               <span className="truncate text-xs opacity-50">
                 {result.method?.toUpperCase()}
                 {result.proxyType && result.proxyType !== 'none' && (
-                  <Tooltip title={proxyTooltip ? `代理: ${proxyTooltip}` : undefined}>
-                    <span> | {result.proxyType === 'socks5' ? 'SOCKS5' : 'HTTP'} 代理</span>
+                  <Tooltip title={proxyTooltip ? t('api.run.proxyTooltip', { value: proxyTooltip }) : undefined}>
+                    <span>
+                      {' | '}
+                      {t('api.run.proxyLabel', { type: result.proxyType === 'socks5' ? 'SOCKS5' : 'HTTP' })}
+                    </span>
                   </Tooltip>
                 )}
                 {' | '}{result.durationMs}ms
@@ -395,7 +407,7 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
         onChange={setActiveTab}
       />
 
-      <Modal footer={null} open={historyOpen} title="选择历史记录对比" width={640} onCancel={() => { setHistoryOpen(false) }}>
+      <Modal footer={null} open={historyOpen} title={t('api.history.pickTitle')} width={640} onCancel={() => { setHistoryOpen(false) }}>
         <List
           dataSource={historyList}
           renderItem={(item) => (
@@ -407,13 +419,13 @@ export function ResultViewer({ result, error, curlContent, onRetry, menuItemId, 
         />
       </Modal>
 
-      <Modal footer={null} open={diffOpen} title="响应对比（当前 vs 历史）" width={900} onCancel={() => { setDiffOpen(false) }}>
+      <Modal footer={null} open={diffOpen} title={t('api.run.diffTitle')} width={900} onCancel={() => { setDiffOpen(false) }}>
         {compareWith && (
           <MarkdownDiffView
             leftText={compareWith.body ?? ''}
-            leftTitle="历史响应"
+            leftTitle={t('api.run.diffLeftTitle')}
             rightText={result.body ?? ''}
-            rightTitle="当前响应"
+            rightTitle={t('api.run.diffRightTitle')}
           />
         )}
       </Modal>

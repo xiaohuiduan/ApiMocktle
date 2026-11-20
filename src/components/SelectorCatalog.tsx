@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { show } from '@ebay/nice-modal-react'
 import { Cascader, type CascaderProps, Divider, theme } from 'antd'
@@ -17,6 +18,7 @@ interface SelectorCatalogProps extends UseCatalogParmas, Pick<CascaderProps, 'pl
 }
 
 export function SelectorCatalog(props: SelectorCatalogProps) {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
 
   const { value, onChange, type, exclued, hideCreateNew, ...rest } = props
@@ -64,7 +66,7 @@ export function SelectorCatalog(props: SelectorCatalogProps) {
                       }
                     }}
                   >
-                    新建目录
+                    {t('app.catalog.createNew')}
                   </div>
                 </>
               )

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { invoke } from '@tauri-apps/api/core'
 import {
@@ -33,6 +34,7 @@ interface ShareServerConfig {
 }
 
 export function ShareServerPanel() {
+  const { t } = useTranslation()
   const { sessionId } = useAuth()
   const [status, setStatus] = useState<ShareServerStatus>({ running: false, port: 0 })
   const [config, setConfig] = useState<ShareServerConfig>({ port: 14204 })
@@ -134,15 +136,15 @@ export function ShareServerPanel() {
         setStatus(result.data)
 
         if (result.data.running) {
-          msgApi.success('分享服务已启动')
+          msgApi.success(t('settings.shareServer.started'))
         }
         else {
-          msgApi.error('启动失败：端口被占用且无可用端口')
+          msgApi.error(t('settings.shareServer.startFailedBusy'))
         }
       }
     }
     catch (err) {
-      msgApi.error('启动失败: ' + String(err))
+      msgApi.error(t('settings.service.startFailed', { error: String(err) }))
     }
     finally {
       setLoading(false)
@@ -157,11 +159,11 @@ export function ShareServerPanel() {
 
       if (result.ok && result.data) {
         setStatus(result.data)
-        msgApi.success('分享服务已停止')
+        msgApi.success(t('settings.shareServer.stopped'))
       }
     }
     catch (err) {
-      msgApi.error('停止失败: ' + String(err))
+      msgApi.error(t('settings.service.stopFailed', { error: String(err) }))
     }
     finally {
       setLoading(false)
@@ -171,10 +173,10 @@ export function ShareServerPanel() {
   const handleSaveConfig = async () => {
     try {
       await invoke('save_share_server_config', { config })
-      msgApi.success('配置已保存')
+      msgApi.success(t('settings.service.configSaved'))
     }
     catch (err) {
-      msgApi.error('保存失败: ' + String(err))
+      msgApi.error(t('settings.service.saveFailed', { error: String(err) }))
     }
   }
 
@@ -183,22 +185,22 @@ export function ShareServerPanel() {
       const result = await invoke<{ ok: boolean, error?: string }>('delete_share_link', { sessionId, id })
 
       if (!result.ok) {
-        msgApi.error(result.error ?? '删除失败')
+        msgApi.error(result.error ?? t('settings.shareServer.deleteFailed'))
 
         return
       }
 
-      msgApi.success('已删除，链接即时失效')
+      msgApi.success(t('settings.shareServer.deleted'))
       void fetchLinks()
     }
     catch (err) {
-      msgApi.error('删除失败: ' + String(err))
+      msgApi.error(t('settings.shareServer.deleteFailedDetail', { error: String(err) }))
     }
   }
 
   const handleCopy = async (text: string) => {
     await navigator.clipboard.writeText(text)
-    msgApi.success('链接已复制')
+    msgApi.success(t('settings.shareServer.linkCopied'))
   }
 
   /** 带密码链接：后端返回明文密码时直接复制，否则弹窗手动输入 */
@@ -216,13 +218,13 @@ export function ShareServerPanel() {
     <div>
       {contextHolder}
 
-      <Card className="mb-3" size="small" title="服务状态">
+      <Card className="mb-3" size="small" title={t('settings.service.statusTitle')}>
         <div className="mb-3 flex items-center justify-between">
           <Space>
             <Tag color={status.running ? 'success' : 'default'}>
-              {status.running ? '运行中' : '已停止'}
+              {status.running ? t('settings.service.running') : t('settings.service.stopped')}
             </Tag>
-            {status.running && <Tag>端口: {status.port}</Tag>}
+            {status.running && <Tag>{t('settings.service.port', { port: status.port })}</Tag>}
           </Space>
           <Space>
             {status.running
@@ -236,7 +238,7 @@ export function ShareServerPanel() {
                       void handleStop()
                     }}
                   >
-                    停止
+                    {t('settings.service.stop')}
                   </Button>
                 )
               : (
@@ -249,7 +251,7 @@ export function ShareServerPanel() {
                       void handleStart()
                     }}
                   >
-                    启动
+                    {t('settings.service.start')}
                   </Button>
                 )}
           </Space>
@@ -275,15 +277,15 @@ export function ShareServerPanel() {
                 ))}
               </div>
             )}
-            message="同局域网设备访问以下地址（需先创建分享链接）"
+            message={t('settings.shareServer.lanAccessHint')}
             type="success"
           />
         )}
       </Card>
 
-      <Card size="small" title="服务配置">
+      <Card size="small" title={t('settings.service.configTitle')}>
         <Form layout="vertical" size="small">
-          <Form.Item label="端口号">
+          <Form.Item label={t('settings.service.portLabel')}>
             <InputNumber
               max={65535}
               min={1024}
@@ -302,7 +304,7 @@ export function ShareServerPanel() {
                 void handleSaveConfig()
               }}
             >
-              保存配置
+              {t('settings.service.saveConfig')}
             </Button>
           </Form.Item>
         </Form>
@@ -319,55 +321,59 @@ export function ShareServerPanel() {
               setCreateOpen(true)
             }}
           >
-            新建分享
+            {t('settings.projectShare.newShare')}
           </Button>
         )}
         size="small"
-        title="全部分享链接"
+        title={t('settings.shareServer.allLinksTitle')}
       >
         <Table<ShareLink>
           columns={[
             {
-              title: '标题',
+              title: t('settings.projectShare.colTitle'),
               dataIndex: 'title',
               render: (value: string | undefined, record) => value ?? record.projectName ?? '-',
             },
             {
-              title: '项目',
+              title: t('settings.shareServer.project'),
               dataIndex: 'projectName',
               render: (value?: string) => value ?? '-',
             },
             {
-              title: '范围',
+              title: t('settings.projectShare.colRange'),
               dataIndex: 'apiMenuIds',
-              render: (ids: string[]) => (ids.length === 0 ? <Tag color="blue">全部</Tag> : `${ids.length} 项`),
+              render: (ids: string[]) => (ids.length === 0
+                ? <Tag color="blue">{t('common.all')}</Tag>
+                : t('settings.projectShare.rangeItems', { count: ids.length })),
             },
             {
-              title: '过期时间',
+              title: t('settings.projectShare.colExpiresAt'),
               dataIndex: 'expiresAt',
               render: (value?: string) => {
                 if (!value) {
-                  return <Tag>永久</Tag>
+                  return <Tag>{t('settings.projectShare.permanent')}</Tag>
                 }
 
                 const expired = dayjs(value).isBefore(dayjs())
 
-                return expired ? <Tag color="red">已过期</Tag> : dayjs(value).format('YYYY-MM-DD')
+                return expired ? <Tag color="red">{t('settings.projectShare.expired')}</Tag> : dayjs(value).format('YYYY-MM-DD')
               },
             },
             {
-              title: '创建时间',
+              title: t('common.createdAt'),
               dataIndex: 'createdAt',
               render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm'),
             },
             {
-              title: '密码',
+              title: t('settings.projectShare.colPassword'),
               dataIndex: 'hasPassword',
               width: 70,
-              render: (has: boolean) => (has ? <Tag color="orange">有密码</Tag> : <Tag>无</Tag>),
+              render: (has: boolean) => (has
+                ? <Tag color="orange">{t('settings.projectShare.hasPassword')}</Tag>
+                : <Tag>{t('common.none')}</Tag>),
             },
             {
-              title: '操作',
+              title: t('common.action'),
               width: 320,
               render: (_, record) => (
                 <Space>
@@ -379,7 +385,7 @@ export function ShareServerPanel() {
                       void handleCopy(buildShareLinkUrl(baseUrl, record, false))
                     }}
                   >
-                    复制链接
+                    {t('settings.projectShare.copyLink')}
                   </Button>
                   {record.hasPassword && (
                     <Button
@@ -390,7 +396,7 @@ export function ShareServerPanel() {
                         handlePwdLink(record)
                       }}
                     >
-                      带密码链接
+                      {t('settings.projectShare.pwdLink')}
                     </Button>
                   )}
                   <Button
@@ -400,7 +406,7 @@ export function ShareServerPanel() {
                       setEditingLink(record)
                     }}
                   >
-                    编辑
+                    {t('common.edit')}
                   </Button>
                   <Button
                     danger
@@ -409,43 +415,43 @@ export function ShareServerPanel() {
                       void handleDelete(record.id)
                     }}
                   >
-                    删除
+                    {t('common.delete')}
                   </Button>
                 </Space>
               ),
             },
           ]}
           dataSource={links}
-          locale={{ emptyText: '暂无分享链接' }}
+          locale={{ emptyText: t('settings.projectShare.emptyLinks') }}
           pagination={false}
           rowKey="id"
           size="small"
         />
       </Card>
 
-      <Card className="mt-3" size="small" title="使用说明">
+      <Card className="mt-3" size="small" title={t('settings.service.usageTitle')}>
         <Typography.Paragraph className="text-sm">
-          1. 启动服务后，在「项目设置 → 文档分享」中选择项目新建分享，或在此处选择项目创建
+          {t('settings.shareServer.usageStep1')}
           <br />
-          2. 将生成的访问链接 + 密码发给同局域网的用户
+          {t('settings.shareServer.usageStep2')}
           <br />
-          3. 用户在浏览器打开链接，输入密码即可只读查看接口文档
+          {t('settings.shareServer.usageStep3')}
           <br />
-          4. 删除分享链接后，已打开的页面将立即失效
+          {t('settings.shareServer.usageStep4')}
         </Typography.Paragraph>
         <Alert
           showIcon
-          description={'首次启动服务时，Windows 可能弹出防火墙授权提示，请选择"允许访问"，否则其他设备无法访问。所有设备需处于同一局域网。'}
-          message="Windows 防火墙"
+          description={t('settings.shareServer.firewallDescription')}
+          message={t('settings.shareServer.firewallTitle')}
           type="warning"
         />
       </Card>
 
       <Modal
-        cancelText="取消"
-        okText="复制链接"
+        cancelText={t('common.cancel')}
+        okText={t('settings.projectShare.copyLink')}
         open={Boolean(pwdLinkTarget)}
-        title="生成带密码链接"
+        title={t('settings.projectShare.pwdLinkTitle')}
         width={480}
         onCancel={() => {
           setPwdLinkTarget(undefined)
@@ -456,15 +462,15 @@ export function ShareServerPanel() {
             setPwdLinkTarget(undefined)
           }
           else {
-            msgApi.error('请输入该分享的访问密码')
+            msgApi.error(t('settings.projectShare.pwdRequired'))
           }
         }}
       >
         <Typography.Paragraph className="text-sm">
-          输入该分享链接的访问密码，生成「打开即自动填充密码」的链接，访客无需手动输入。
+          {t('settings.projectShare.pwdLinkDescription')}
         </Typography.Paragraph>
         <Input.Password
-          placeholder="输入该分享的访问密码"
+          placeholder={t('settings.projectShare.pwdPlaceholder')}
           value={pwdLinkInput}
           onChange={(e) => {
             setPwdLinkInput(e.target.value)

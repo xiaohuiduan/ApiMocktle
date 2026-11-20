@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Modal, Space, Tabs, theme } from 'antd'
 import { CopyIcon, EyeIcon, SparklesIcon } from 'lucide-react'
@@ -27,6 +28,8 @@ interface JsonSchemaCardProps
 
 export function JsonSchemaCard(props: JsonSchemaCardProps) {
   const { token } = theme.useToken()
+
+  const { t } = useTranslation()
 
   const { defaultValue, value = defaultValue, onChange, editorProps } = props
 
@@ -83,7 +86,7 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
             }}
           >
             <SparklesIcon size={14} />
-            <span className="ml-1">生成</span>
+            <span className="ml-1">{t('ui.schema.card.generate')}</span>
           </UIButton>
 
           <div className="ml-auto">
@@ -95,7 +98,7 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                 }}
               >
                 <EyeIcon size={14} />
-                <span className="ml-1">查看</span>
+                <span className="ml-1">{t('ui.schema.card.view')}</span>
               </UIButton>
             </Space>
           </div>
@@ -112,7 +115,7 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
         footer={null}
         maskClosable={false}
         open={generateModalOpen}
-        title="生成"
+        title={t('ui.schema.card.generate')}
         width={800}
         onCancel={() => {
           setGenerateModalOpen(false)
@@ -138,7 +141,7 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                         borderBottom: `1px solid ${token.colorBorderSecondary}`,
                       }}
                     >
-                      输入 JSON
+                      {t('ui.schema.card.inputJson')}
                     </div>
 
                     <MonacoEditor
@@ -170,11 +173,11 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                           setGenSchemaPreview(schema)
                         }
                         catch {
-                          messageApi.error('JSON 格式不正确，请检查！')
+                          messageApi.error(t('ui.schema.card.invalidJson'))
                         }
                       }}
                     >
-                      生成 Schema
+                      {t('ui.schema.card.generateSchema')}
                     </UIButton>
                   </div>
 
@@ -192,7 +195,7 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                           borderBottom: `1px solid ${token.colorBorderSecondary}`,
                         }}
                       >
-                        生成的 Schema 预览
+                        {t('ui.schema.card.generatedSchemaPreview')}
                       </div>
 
                       <MonacoEditor
@@ -214,11 +217,11 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                           primary
                           onClick={() => {
                             onChange?.(genSchemaPreview)
-                            messageApi.success('Schema 已应用')
+                            messageApi.success(t('ui.schema.card.schemaApplied'))
                             setGenerateModalOpen(false)
                           }}
                         >
-                          应用
+                          {t('ui.schema.card.apply')}
                         </UIButton>
                       </div>
                     </div>
@@ -243,7 +246,7 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                         borderBottom: `1px solid ${token.colorBorderSecondary}`,
                       }}
                     >
-                      输入 JSON Schema
+                      {t('ui.schema.card.inputJsonSchema')}
                     </div>
 
                     <MonacoEditor
@@ -275,11 +278,11 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                           setGenExamplePreview(JSON.stringify(example, null, 2))
                         }
                         catch {
-                          messageApi.error('JSON Schema 格式不正确，请检查！')
+                          messageApi.error(t('ui.schema.card.invalidJsonSchema'))
                         }
                       }}
                     >
-                      生成示例
+                      {t('ui.schema.card.generateExample')}
                     </UIButton>
                   </div>
 
@@ -297,7 +300,7 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                           borderBottom: `1px solid ${token.colorBorderSecondary}`,
                         }}
                       >
-                        生成的 JSON 示例
+                        {t('ui.schema.card.generatedJsonExample')}
                       </div>
 
                       <MonacoEditor
@@ -318,13 +321,13 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                         <UIButton
                           onClick={() => {
                             void navigator.clipboard.writeText(genExamplePreview).then(() => {
-                              messageApi.success('已复制')
+                              messageApi.success(t('common.copied'))
                             })
                           }}
                         >
                           <span className="inline-flex items-center gap-1">
                             <CopyIcon size={12} />
-                            复制
+                            {t('common.copy')}
                           </span>
                         </UIButton>
 
@@ -335,15 +338,15 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                               const parsed = JSON.parse(genSchemaInput || '{}')
                               const normalized = normalizeJsonSchema(parsed)
                               onChange?.(normalized as JsonSchema)
-                              messageApi.success('Schema 已应用')
+                              messageApi.success(t('ui.schema.card.schemaApplied'))
                               setGenerateModalOpen(false)
                             }
                             catch {
-                              messageApi.error('JSON Schema 格式不正确，请检查！')
+                              messageApi.error(t('ui.schema.card.invalidJsonSchema'))
                             }
                           }}
                         >
-                          应用
+                          {t('ui.schema.card.apply')}
                         </UIButton>
                       </div>
                     </div>
@@ -377,7 +380,7 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
         footer={null}
         maskClosable={false}
         open={viewModalOpen}
-        title="查看"
+        title={t('ui.schema.card.view')}
         width={800}
         onCancel={() => {
           setViewModalOpen(false)
@@ -400,13 +403,13 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                     <UIButton
                       onClick={() => {
                         void navigator.clipboard.writeText(viewSchemaStr).then(() => {
-                          messageApi.success('已复制')
+                          messageApi.success(t('common.copied'))
                         })
                       }}
                     >
                       <span className="inline-flex items-center gap-1">
                         <CopyIcon size={12} />
-                        复制代码
+                        {t('ui.schema.card.copyCode')}
                       </span>
                     </UIButton>
                   </div>
@@ -423,7 +426,7 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
             },
             {
               key: 'view-example',
-              label: 'JSON 示例',
+              label: t('ui.schema.card.jsonExampleTab'),
               children: (
                 <>
                   <div
@@ -436,13 +439,13 @@ export function JsonSchemaCard(props: JsonSchemaCardProps) {
                     <UIButton
                       onClick={() => {
                         void navigator.clipboard.writeText(viewExampleStr).then(() => {
-                          messageApi.success('已复制')
+                          messageApi.success(t('common.copied'))
                         })
                       }}
                     >
                       <span className="inline-flex items-center gap-1">
                         <CopyIcon size={12} />
-                        复制代码
+                        {t('ui.schema.card.copyCode')}
                       </span>
                     </UIButton>
                   </div>

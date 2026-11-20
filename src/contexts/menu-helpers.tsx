@@ -14,6 +14,7 @@ import {
 } from '@/contexts/menu-drafts'
 import { useProjectTabsContext } from '@/contexts/project-tabs'
 import { CatalogType, MenuItemType } from '@/enums'
+import { t } from '@/i18n'
 import {
   createGlobalParameters,
   EMPTY_PROJECT_ENVIRONMENT_CONFIG,
@@ -163,7 +164,7 @@ function normalizeRecycleData(raw: unknown): RecycleData {
     if (!ct) { continue }
 
     const days = Math.ceil((item.expiresAt - Date.now()) / (1000 * 60 * 60 * 24))
-    const expiredAt = `${Math.max(0, days)}天`
+    const expiredAt = t('app.recycle.remainingDays', { days: Math.max(0, days) })
 
     const creator: Creator = {
       id: item.creatorJson.id,
@@ -441,7 +442,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
               }
             }}
           >
-            {isActive ? '立即刷新' : '去查看'}
+            {isActive ? t('app.yapiPush.refreshNow') : t('app.yapiPush.goView')}
           </Button>
         ),
         onClose: () => {
@@ -574,7 +575,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
   const menuHelpers = useMemo<MenuHelpers>(() => {
     const guardProject = () => {
       if (!activeProjectId) {
-        console.error(new Error('当前不在项目页面'))
+        console.error(new Error(t('app.errors.notInProject')))
 
         return undefined
       }
@@ -605,7 +606,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         )
           .then(() => reloadState())
           .catch((error: unknown) => {
-            message.error('还原失败,请重试')
+            message.error(t('app.errors.restoreFailed'))
             console.error(error)
           })
       }
@@ -617,7 +618,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         })
           .then(() => reloadState())
           .catch((error: unknown) => {
-            message.error('删除失败,请重试')
+            message.error(t('app.errors.deleteFailed'))
             console.error(error)
           })
       }
@@ -646,7 +647,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
           return true
         }
         catch (error: unknown) {
-          message.error('新增失败,请重试')
+          message.error(t('app.errors.createFailed'))
           console.error(error)
 
           return false
@@ -670,7 +671,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
           return true
         }
         catch (error: unknown) {
-          message.error('删除失败,请重试')
+          message.error(t('app.errors.deleteFailed'))
           console.error(error)
 
           return false
@@ -685,7 +686,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         }
 
         if (!id || !sessionId) {
-          message.error('当前项目或登录状态已失效，请刷新后重试')
+          message.error(t('app.errors.projectExpired'))
 
           return null
         }
@@ -702,7 +703,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         }
         catch (error: unknown) {
           // 透出真实原因（无权限 / 所选菜单项已不存在 / 底层错误），兜底文案仅在消息为空时使用
-          message.error(error instanceof Error && error.message ? error.message : '删除失败,请重试')
+          message.error(error instanceof Error && error.message ? error.message : t('app.errors.deleteFailed'))
           console.error(error)
 
           return null
@@ -746,7 +747,7 @@ export function MenuHelpersContextProvider(props: React.PropsWithChildren) {
         })
           .then(() => reloadState())
           .catch((error: unknown) => {
-            message.error(typeof error === 'object' && error !== null && 'message' in error && String((error as Error).message).includes('不能将') ? (error as Error).message : '移动失败,请重试')
+            message.error(typeof error === 'object' && error !== null && 'message' in error && String((error as Error).message).includes('不能将') ? (error as Error).message : t('app.errors.moveFailed'))
             console.error(error)
           })
       },

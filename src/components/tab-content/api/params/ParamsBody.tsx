@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Flex, theme } from 'antd'
 
 import { SchemaType } from '@/components/JsonSchema'
@@ -43,6 +45,7 @@ interface BodyCompProps {
 
 function BodyComp(props: BodyCompProps) {
   const { value, onChange } = props
+  const { t } = useTranslation()
 
   const { styles } = useStyles(({ token }, css) => {
     return {
@@ -60,7 +63,7 @@ function BodyComp(props: BodyCompProps) {
   if (value.type === BodyType.None) {
     return (
       <div className={`flex h-24 items-center justify-center rounded ${styles.bodyNone}`}>
-        该请求没有 Body 体
+        {t('api.body.noBodyBody')}
       </div>
     )
   }
@@ -68,7 +71,7 @@ function BodyComp(props: BodyCompProps) {
   if (value.type === BodyType.FormData || value.type === BodyType.UrlEncoded) {
     return (
       <ParamsEditableTable
-        exampleColumnTitle="示例值"
+        exampleColumnTitle={t('api.doc.exampleValue')}
         value={value.parameters}
         onChange={(values) => {
           onChange?.({ ...value, parameters: values })
@@ -102,6 +105,7 @@ interface ParamsBodyProps {
 export function ParamsBody(props: ParamsBodyProps) {
   const { globalRows, value, onChange } = props
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const selectedType = value?.type ?? BodyType.None
   const bodyParamNames = new Set(
@@ -115,7 +119,7 @@ export function ParamsBody(props: ParamsBodyProps) {
   return (
     <div>
       <Flex align="center" className="p-2" gap={8}>
-        <span className="text-xs" style={{ color: token.colorTextSecondary }}>Body 类型</span>
+        <span className="text-xs" style={{ color: token.colorTextSecondary }}>{t('api.body.typeLabel')}</span>
         <BodyTypeSelect
           filledSlots={filledSlots}
           value={selectedType}
@@ -126,11 +130,11 @@ export function ParamsBody(props: ParamsBodyProps) {
       <div>
         <GlobalParametersNotice
           description={supportsGlobalBodyParams
-            ? '运行时会自动带入这些全局 Body 参数；同名接口参数优先。'
-            : `当前 Body 类型为 ${selectedType}，这些全局 Body 参数当前不会生效。`}
+            ? t('api.body.globalBodyActive')
+            : t('api.body.globalBodyInactive', { type: selectedType })}
           overriddenNames={bodyParamNames}
           rows={globalRows}
-          title="当前全局 Body 参数"
+          title={t('api.body.globalBodyTitle')}
         />
         <BodyComp value={value ?? { type: BodyType.None }} onChange={onChange} />
       </div>

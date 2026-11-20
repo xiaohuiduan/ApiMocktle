@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { invoke } from '@tauri-apps/api/core'
 import { Button, Form, Input, List, message, Popconfirm, Space, Typography } from 'antd'
@@ -15,6 +16,7 @@ interface PersonalToken {
 }
 
 export function PersonalTokenPanel() {
+  const { t } = useTranslation()
   const { sessionId } = useAuth()
   const [tokens, setTokens] = useState<PersonalToken[]>([])
   const [loadingTokens, setLoadingTokens] = useState(false)
@@ -46,7 +48,7 @@ export function PersonalTokenPanel() {
 
     try {
       await api('create_personal_token', { sessionId, name: values.name })
-      message.success('Token 已创建')
+      message.success(t('settings.token.created'))
       await loadTokens()
     }
     catch (err) {
@@ -59,7 +61,7 @@ export function PersonalTokenPanel() {
 
     try {
       await api('delete_personal_token', { sessionId, tokenId })
-      message.success('已删除')
+      message.success(t('settings.action.deleted'))
       await loadTokens()
     }
     catch (err) {
@@ -75,7 +77,7 @@ export function PersonalTokenPanel() {
           copyable={{ text: `http://127.0.0.1:${yapiPort}` }}
           type="secondary"
         >
-          服务地址：http://127.0.0.1:{yapiPort}
+          {t('settings.token.serviceAddress', { port: yapiPort })}
         </Typography.Paragraph>
       )}
 
@@ -84,27 +86,27 @@ export function PersonalTokenPanel() {
         layout="inline"
         onFinish={(values) => void handleCreateToken(values)}
       >
-        <Form.Item name="name" rules={[{ required: true, message: '请输入名称' }]}>
-          <Input placeholder="Token 名称" style={{ width: 200 }} />
+        <Form.Item name="name" rules={[{ required: true, message: t('settings.token.nameRequired') }]}>
+          <Input placeholder={t('settings.token.namePlaceholder')} style={{ width: 200 }} />
         </Form.Item>
         <Form.Item>
-          <Button htmlType="submit" type="primary">创建</Button>
+          <Button htmlType="submit" type="primary">{t('settings.action.create')}</Button>
         </Form.Item>
         <Form.Item>
-          <Button onClick={() => void loadTokens()}>刷新</Button>
+          <Button onClick={() => void loadTokens()}>{t('common.refresh')}</Button>
         </Form.Item>
       </Form>
 
       <List
         dataSource={tokens}
         loading={loadingTokens}
-        locale={{ emptyText: '暂无 Token' }}
+        locale={{ emptyText: t('settings.token.empty') }}
         renderItem={(item) => (
           <List.Item
             actions={[
               <Popconfirm
                 key="del"
-                title="确定删除？"
+                title={t('settings.token.confirmDelete')}
                 onConfirm={() => void handleDeleteToken(item.id)}
               >
                 <Button danger icon={<TrashIcon size={14} />} size="small" type="text" />
@@ -120,7 +122,7 @@ export function PersonalTokenPanel() {
                     size="small"
                     type="text"
                     onClick={() => {
-                      void navigator.clipboard.writeText(item.token).then(() => message.success('已复制'))
+                      void navigator.clipboard.writeText(item.token).then(() => message.success(t('common.copied')))
                     }}
                   />
                 </Space>

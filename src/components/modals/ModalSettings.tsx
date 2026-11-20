@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Viewer } from '@bytemd/react'
 import { create, useModal } from '@ebay/nice-modal-react'
 import { invoke } from '@tauri-apps/api/core'
-import { ConfigProvider, Menu, type MenuProps, Modal, type ModalProps, theme } from 'antd'
-import { Code2Icon, Globe, InfoIcon, KeyRoundIcon, SendIcon, Share2, ShirtIcon, Zap } from 'lucide-react'
+import { ConfigProvider, Menu, Modal, type ModalProps, theme } from 'antd'
+import type { TFunction } from 'i18next'
+import { Code2Icon, Globe, InfoIcon, KeyRoundIcon, LanguagesIcon, SendIcon, Share2, ShirtIcon, Zap } from 'lucide-react'
 
 import { McpServerPanel } from '@/components/project-settings/McpServerPanel'
 import { ShareServerPanel } from '@/components/project-settings/ShareServerPanel'
 import { ProxySettingsForm } from '@/components/proxy-settings/ProxySettingsForm'
 import { DynamicVariablePanel } from '@/components/settings/DynamicVariablePanel'
+import { LanguageSettingPanel } from '@/components/settings/LanguageSettingPanel'
 import { PersonalTokenPanel } from '@/components/settings/PersonalTokenPanel'
 import { RequestSettingsPanel } from '@/components/settings/RequestSettingsPanel'
 import { ThemeEditor, useThemeContext } from '@/components/ThemeEditor'
@@ -24,50 +27,71 @@ export const enum SettingsMenuKey {
   Request = '5',
   Share = '6',
   DynamicVariables = '7',
+  Language = '8',
 }
 
-const settingMenuItems = [
-  {
-    key: SettingsMenuKey.Appearance,
-    icon: <ShirtIcon size={16} />,
-    label: '外观',
-  },
-  {
-    key: SettingsMenuKey.Proxy,
-    icon: <Globe size={16} />,
-    label: '网络代理',
-  },
-  {
-    key: SettingsMenuKey.Request,
-    icon: <SendIcon size={16} />,
-    label: '请求',
-  },
-  {
-    key: SettingsMenuKey.Tokens,
-    icon: <KeyRoundIcon size={16} />,
-    label: 'Token 管理',
-  },
-  {
-    key: SettingsMenuKey.McpServer,
-    icon: <Zap size={16} />,
-    label: 'MCP 服务',
-  },
-  {
-    key: SettingsMenuKey.Share,
-    icon: <Share2 size={16} />,
-    label: '文档分享',
-  },
-  {
-    key: SettingsMenuKey.DynamicVariables,
-    icon: <Code2Icon size={16} />,
-    label: '动态变量',
-  },
-  {
-    key: SettingsMenuKey.About,
-    icon: <InfoIcon size={16} />,
-    label: '关于此项目',
-  },
-] satisfies MenuProps['items']
+/**
+ * 设置弹窗左侧菜单项。
+ *
+ * 必须是函数：菜单文案随语言变化，模块顶层只会在加载时求值一次，
+ * 切换语言后永不刷新。消费方在渲染期用 `useMemo(() => createSettingMenuItems(t), [t])`。
+ */
+export interface SettingMenuItem {
+  key: SettingsMenuKey
+  icon: React.ReactNode
+  label: string
+}
+
+export function createSettingMenuItems(t: TFunction): SettingMenuItem[] {
+  return [
+    {
+      key: SettingsMenuKey.Appearance,
+      icon: <ShirtIcon size={16} />,
+      label: t('settings.menu.appearance'),
+    },
+    {
+      // 语言紧跟外观：两者同属「界面呈现」偏好，放在一起符合心智
+      key: SettingsMenuKey.Language,
+      icon: <LanguagesIcon size={16} />,
+      label: t('settings.menu.language'),
+    },
+    {
+      key: SettingsMenuKey.Proxy,
+      icon: <Globe size={16} />,
+      label: t('settings.menu.proxy'),
+    },
+    {
+      key: SettingsMenuKey.Request,
+      icon: <SendIcon size={16} />,
+      label: t('settings.menu.request'),
+    },
+    {
+      key: SettingsMenuKey.Tokens,
+      icon: <KeyRoundIcon size={16} />,
+      label: t('settings.menu.tokens'),
+    },
+    {
+      key: SettingsMenuKey.McpServer,
+      icon: <Zap size={16} />,
+      label: t('settings.menu.mcpServer'),
+    },
+    {
+      key: SettingsMenuKey.Share,
+      icon: <Share2 size={16} />,
+      label: t('settings.menu.share'),
+    },
+    {
+      key: SettingsMenuKey.DynamicVariables,
+      icon: <Code2Icon size={16} />,
+      label: t('settings.menu.dynamicVariables'),
+    },
+    {
+      key: SettingsMenuKey.About,
+      icon: <InfoIcon size={16} />,
+      label: t('settings.menu.about'),
+    },
+  ]
+}
 
 function ThemeEditorWrapper() {
   const { themeSetting, setThemeSetting, autoSaveId } = useThemeContext()
@@ -89,6 +113,9 @@ const renderMenuContent = (props: { menuKey: SettingsMenuKey }) => {
   switch (props.menuKey) {
     case SettingsMenuKey.Appearance:
       return <ThemeEditorWrapper />
+
+    case SettingsMenuKey.Language:
+      return <LanguageSettingPanel />
 
     case SettingsMenuKey.Proxy:
       return <ProxySettingsForm />
@@ -114,6 +141,7 @@ const renderMenuContent = (props: { menuKey: SettingsMenuKey }) => {
 }
 
 function AboutContent() {
+  const { t } = useTranslation()
   const [version, setVersion] = useState<string>('')
 
   useEffect(() => {
@@ -126,7 +154,7 @@ function AboutContent() {
     <div>
       <Viewer value={PROJECT_ABOUT_MARKDOWN} />
       {version && (
-        <div className="mt-4 text-sm" style={{ color: 'var(--ds-node-text-secondary)' }}>版本 {version}</div>
+        <div className="mt-4 text-sm" style={{ color: 'var(--ds-node-text-secondary)' }}>{t('settings.menu.version', { version })}</div>
       )}
     </div>
   )
@@ -139,6 +167,7 @@ interface ModalSettingsProps extends Omit<ModalProps, 'open' | 'footer'> {
 
 export const ModalSettings = create((props: ModalSettingsProps) => {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const { selectedKey, defaultSelectedKey, ...restModalProps } = props
 
@@ -155,9 +184,12 @@ export const ModalSettings = create((props: ModalSettingsProps) => {
     }
   }, [selectedKey, defaultSelectedKey])
 
+  // t 作为依赖：语言切换时 t 引用变化，触发菜单文案重算
+  const settingMenuItems = useMemo(() => createSettingMenuItems(t), [t])
+
   const selectedMenuItem = useMemo(() => {
     return settingMenuItems.find((item) => item.key === selectedKeys?.at(0))
-  }, [selectedKeys])
+  }, [settingMenuItems, selectedKeys])
 
   const renderMenuKey = selectedKeys?.at(0)
 
@@ -196,7 +228,7 @@ export const ModalSettings = create((props: ModalSettingsProps) => {
                 padding: `0 ${token.paddingMD}px ${token.paddingMD}px ${token.paddingMD}px`,
               }}
             >
-              设置
+              {t('settings.menu.title')}
             </div>
 
             <div style={{ padding: `0 ${token.paddingMD}px` }}>

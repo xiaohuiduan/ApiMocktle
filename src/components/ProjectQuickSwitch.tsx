@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 
 import { Button, Dropdown, Input, type MenuProps, theme, Typography } from 'antd'
@@ -13,17 +14,13 @@ import { useAuth } from '@/contexts/auth'
 import { useProjectTabsContext } from '@/contexts/project-tabs'
 
 type DropdownItem = Required<MenuProps>['items'][number]
-const roleText: Record<ProjectItem['role'], string> = {
-  owner: '拥有者',
-  editor: '编辑者',
-  viewer: '查看者',
-}
 
 function getProjectMark(name: string) {
-  return name.trim().charAt(0).toUpperCase() || '项'
+  return name.trim().charAt(0).toUpperCase()
 }
 
 export function ProjectQuickSwitch() {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
   const navigate = useNavigate()
   const { sessionId } = useAuth()
@@ -31,6 +28,15 @@ export function ProjectQuickSwitch() {
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [error, setError] = useState<string>()
   const [searchText, setSearchText] = useState('')
+
+  const roleText = useMemo<Record<ProjectItem['role'], string>>(
+    () => ({
+      owner: t('app.projects.role.owner'),
+      editor: t('app.projects.role.editor'),
+      viewer: t('app.projects.role.viewer'),
+    }),
+    [t],
+  )
 
   useEffect(() => {
     if (!sessionId) {
@@ -100,7 +106,7 @@ export function ProjectQuickSwitch() {
           </span>
           <div className="min-w-0 flex-1">
             <div className="truncate font-medium">{project.name}</div>
-            <div className="truncate text-xs opacity-60">角色：{roleText[project.role]}</div>
+            <div className="truncate text-xs opacity-60">{t('app.projects.quickSwitch.roleLine', { role: roleText[project.role] })}</div>
           </div>
           {activeProjectId === project.id && <CheckIcon size={14} />}
         </div>
@@ -130,14 +136,14 @@ export function ProjectQuickSwitch() {
     result.push({
       key: 'projects',
       icon: <FolderIcon size={14} />,
-      label: '查看项目列表',
+      label: t('app.projects.quickSwitch.viewList'),
       onClick: () => {
         navigate('/projects')
       },
     })
 
     return result
-  }, [filteredProjects, error, activeProjectId, openProject, navigate])
+  }, [t, filteredProjects, error, activeProjectId, openProject, navigate, roleText])
 
   return (
     <Dropdown
@@ -146,7 +152,7 @@ export function ProjectQuickSwitch() {
           <div className="px-2 py-1.5">
             <Input
               allowClear
-              placeholder="搜索项目"
+              placeholder={t('app.projects.quickSwitch.searchPlaceholder')}
               size="small"
               value={searchText}
               onChange={(e) => { setSearchText(e.target.value) }}
@@ -173,10 +179,10 @@ export function ProjectQuickSwitch() {
               backgroundColor: token.colorPrimaryBg,
             }}
           >
-            {getProjectMark(currentProject?.name ?? '项')}
+            {getProjectMark(currentProject?.name ?? '') || t('app.projects.quickSwitch.fallbackMark')}
           </span>
           <Typography.Text ellipsis className="!mb-0 max-w-[120px]">
-            {currentProject?.name ?? '快速切换项目'}
+            {currentProject?.name ?? t('app.projects.quickSwitch.placeholder')}
           </Typography.Text>
         </span>
         <ChevronDownIcon size={14} />

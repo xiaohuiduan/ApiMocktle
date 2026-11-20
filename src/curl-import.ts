@@ -14,6 +14,7 @@ import {
   parseFormPairs,
 } from '@/curl-import-parser'
 import { ApiStatus, BodyType, HttpMethod, MenuItemType, ParamType } from '@/enums'
+import { t } from '@/i18n'
 import type { ApiDetails, Parameter } from '@/types'
 
 type NonRefJsonSchema = Exclude<JsonSchema, { type: SchemaType.Refer }>
@@ -150,7 +151,7 @@ function buildRequestBody(state: CurlParseState, contentType?: string): ApiDetai
   }
 
   if (rawBody && lowerContentType?.includes('application/json') && parsedJson === undefined) {
-    throw new Error('JSON Body 解析失败，请检查 cURL 中的请求体格式')
+    throw new Error(t('api.curl.jsonBodyParseFailed'))
   }
 
   if (rawBody && (parsedJson !== undefined || lowerContentType?.includes('application/json'))) {
@@ -190,7 +191,7 @@ export function convertCurlToApiMenuItem(curlText: string, options: ConvertCurlO
   const requestUrl = state.url
 
   if (!requestUrl) {
-    throw new Error('未识别到有效的请求 URL')
+    throw new Error(t('api.curl.invalidUrl'))
   }
 
   const url = new URL(requestUrl)

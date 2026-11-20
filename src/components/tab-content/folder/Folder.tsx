@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Tabs } from 'antd'
 
 import { ApiTabContentWrapper } from '@/components/ApiTab/ApiTabContentWrapper'
@@ -6,6 +8,8 @@ import { FolderApiList } from './FolderApiList'
 import { FolderSetting } from './FolderSetting'
 
 export function Folder() {
+  const { t } = useTranslation()
+
   return (
     <div>
       <Tabs
@@ -14,7 +18,7 @@ export function Folder() {
         items={[
           {
             key: 'settings',
-            label: '目录设置',
+            label: t('api.folder.settings'),
             children: (
               <ApiTabContentWrapper className="p-tabContent">
                 <FolderSetting />
@@ -23,7 +27,7 @@ export function Folder() {
           },
           {
             key: 'apis',
-            label: '全部接口',
+            label: t('api.folder.allApis'),
             children: (
               <ApiTabContentWrapper className="p-tabContent">
                 <FolderApiList />

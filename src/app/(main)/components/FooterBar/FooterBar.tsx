@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Button, type ButtonProps, theme, Tooltip } from 'antd'
 import { ArrowLeftToLine, ArrowRightToLine, CircleDot, FileWarning } from 'lucide-react'
 
@@ -19,6 +21,7 @@ function SmallButton({ children, ...props }: React.PropsWithChildren<ButtonProps
  * 环境与页签数据来自全局 Context，无数据时自动降级为仅折叠按钮。
  */
 export function FooterBar() {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
   const { panelRef, isSideMenuCollapsed } = useLayoutContext()
   const { projectEnvironments, currentProjectEnvironmentId } = useMenuHelpersContext()
@@ -61,10 +64,10 @@ export function FooterBar() {
         )}
 
         {unsavedCount > 0 && (
-          <Tooltip title={`${unsavedCount} 个页签有未保存的修改`}>
+          <Tooltip title={t('app.footer.unsavedTabsTip', { count: unsavedCount })}>
             <span className="flex cursor-default items-center gap-1">
               <FileWarning size={12} style={{ color: token.colorWarning }} />
-              <span>{unsavedCount} 未保存</span>
+              <span>{t('app.footer.unsavedCount', { count: unsavedCount })}</span>
             </span>
           </Tooltip>
         )}

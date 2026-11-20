@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { Copy, FileText, Upload } from 'lucide-react'
 import gfm from '@bytemd/plugin-gfm'
 import { Viewer } from '@bytemd/react'
 import { invoke } from '@tauri-apps/api/core'
 import { Button, Input, message, Modal, Popconfirm, Spin, Tabs, Typography } from 'antd'
+import { Copy, FileText, Upload } from 'lucide-react'
 
 import { useAuth } from '@/contexts/auth'
 
@@ -54,6 +55,7 @@ interface ImportFlowModalProps {
 }
 
 export default function ImportFlowModal({ open, projectId, onClose, onImport }: ImportFlowModalProps) {
+  const { t } = useTranslation()
   const [jsonText, setJsonText] = useState('')
   const [importing, setImporting] = useState(false)
   const [promptText, setPromptText] = useState('')
@@ -69,20 +71,20 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
       .then((res) => { setPromptText(res.data.prompt) })
       .catch((err: unknown) => {
         console.error('获取 Prompt 失败:', err)
-        setPromptText('获取 Prompt 失败，请重试')
+        setPromptText(t('flow.importModal.promptLoadFailed'))
       })
       .finally(() => { setPromptLoading(false) })
-  }, [open, projectId, sessionId])
+  }, [open, projectId, sessionId, t])
 
   const handleCopyPrompt = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(promptText)
-      message.success('Prompt 已复制到剪贴板，粘贴给 AI 即可')
+      message.success(t('flow.importModal.promptCopied'))
     }
     catch {
-      message.error('复制失败，请手动复制')
+      message.error(t('flow.importModal.copyFailed'))
     }
-  }, [promptText])
+  }, [promptText, t])
 
   const handleImportFile = useCallback(() => {
     const input = document.createElement('input')
@@ -101,10 +103,10 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
           const graph = JSON.parse(event.target?.result as string)
           onImport(graph)
           onClose()
-          message.success('导入成功')
+          message.success(t('flow.importModal.success'))
         }
         catch {
-          message.error('JSON 解析失败，请检查文件格式')
+          message.error(t('flow.importModal.jsonParseFailed'))
         }
       }
 
@@ -112,11 +114,11 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
     }
 
     input.click()
-  }, [onImport, onClose])
+  }, [onImport, onClose, t])
 
   const handleImportJson = useCallback(() => {
     if (!jsonText.trim()) {
-      message.warning('请先粘贴 JSON 内容')
+      message.warning(t('flow.importModal.pasteJsonFirst'))
 
       return
     }
@@ -125,13 +127,13 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
       const graph = JSON.parse(jsonText)
 
       if (!graph.nodes || !Array.isArray(graph.nodes)) {
-        message.error('JSON 缺少 nodes 数组')
+        message.error(t('flow.importModal.missingNodes'))
 
         return
       }
 
       if (!graph.edges || !Array.isArray(graph.edges)) {
-        message.error('JSON 缺少 edges 数组')
+        message.error(t('flow.importModal.missingEdges'))
 
         return
       }
@@ -139,15 +141,15 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
       setImporting(true)
       onImport(graph)
       onClose()
-      message.success('导入成功')
+      message.success(t('flow.importModal.success'))
     }
     catch (err) {
-      message.error('JSON 格式错误：' + (err as Error).message)
+      message.error(t('flow.importModal.jsonFormatError', { message: (err as Error).message }))
     }
     finally {
       setImporting(false)
     }
-  }, [jsonText, onImport, onClose])
+  }, [jsonText, onImport, onClose, t])
 
   const tabItems = [
     {
@@ -156,13 +158,13 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
         <span>
           <FileText size={14} />
           {' '}
-          粘贴 JSON
+          {t('flow.importModal.tabPaste')}
         </span>
       ),
       children: (
         <div style={{ padding: 'var(--ds-pad-lg) 0' }}>
           <Text style={{ display: 'block', marginBottom: 8 }} type="secondary">
-            将 AI 生成的 JSON 粘贴到下方，导入后会自动布局
+            {t('flow.importModal.pasteHint')}
           </Text>
           <TextArea
             placeholder='{ "nodes": [...], "edges": [...] }'
@@ -173,15 +175,15 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
           />
           <div style={{ marginTop: 12, textAlign: 'right' }}>
             <Popconfirm
-              cancelText="取消"
-              description="导入将覆盖当前画布上的所有节点和连线，确定继续？"
+              cancelText={t('common.cancel')}
+              description={t('flow.importModal.confirmDescription')}
               disabled={!jsonText.trim()}
-              okText="确定导入"
-              title="确认导入"
+              okText={t('flow.importModal.confirmOk')}
+              title={t('flow.importModal.confirmTitle')}
               onConfirm={handleImportJson}
             >
               <Button disabled={!jsonText.trim()} loading={importing} type="primary">
-                导入并覆盖
+                {t('flow.importModal.importOverwrite')}
               </Button>
             </Popconfirm>
           </div>
@@ -194,16 +196,16 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
         <span>
           <Upload size={14} />
           {' '}
-          导入文件
+          {t('flow.importModal.tabFile')}
         </span>
       ),
       children: (
         <div style={{ padding: 'var(--ds-pad-lg) 0', textAlign: 'center' }}>
           <Text style={{ display: 'block', marginBottom: 16 }} type="secondary">
-            选择之前导出的 .json 文件导入
+            {t('flow.importModal.fileHint')}
           </Text>
           <Button icon={<Upload size={16} />} size="large" type="primary" onClick={handleImportFile}>
-            选择 JSON 文件
+            {t('flow.importModal.selectFile')}
           </Button>
         </div>
       ),
@@ -220,25 +222,25 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
       children: (
         <div style={{ padding: 'var(--ds-pad-lg) 0' }}>
           <Text style={{ display: 'block', marginBottom: 8 }} type="secondary">
-            复制下方 Prompt 给 AI，附上你的测试需求，AI 会生成可直接导入的 JSON
+            {t('flow.importModal.promptHint')}
           </Text>
           {promptLoading
             ? (
                 <div style={{ textAlign: 'center', padding: 40 }}>
-                  <Spin tip="加载 API 列表..." />
+                  <Spin tip={t('flow.importModal.loadingApiList')} />
                 </div>
               )
             : (
                 <div className={mdPreviewClass}>
                   <Viewer plugins={[gfm()]} value={promptText} />
                   <p style={{ color: 'var(--ds-highlight-selected)', marginTop: 8 }}>
-                    <strong>[你的测试需求写在这里]</strong>
+                    <strong>{t('flow.importModal.yourRequirement')}</strong>
                   </p>
                 </div>
               )}
           <div style={{ marginTop: 12, textAlign: 'right' }}>
             <Button disabled={promptLoading || !promptText} icon={<Copy size={16} />} type="primary" onClick={() => { void handleCopyPrompt() }}>
-              复制 Prompt
+              {t('flow.importModal.copyPrompt')}
             </Button>
           </div>
         </div>
@@ -251,7 +253,7 @@ export default function ImportFlowModal({ open, projectId, onClose, onImport }: 
       destroyOnClose
       footer={null}
       open={open}
-      title="导入测试流程"
+      title={t('flow.importModal.title')}
       width={680}
       onCancel={onClose}
     >

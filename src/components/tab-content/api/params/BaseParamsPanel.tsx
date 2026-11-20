@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Switch, Tag, theme, Typography } from 'antd'
 
 import type { ApiDetails, ApiEnvironmentValue, Parameter, ProjectEnvironmentConfig } from '@/types'
@@ -17,6 +19,7 @@ function InheritedParamsBar(props: {
   onToggle: (name: string, enabled: boolean) => void
 }) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const { globalRows, envRows, localParams, sourceLabel, disabledNames, onToggle } = props
 
   const localNames = new Set((localParams ?? []).map((p) => p.name).filter(Boolean))
@@ -48,7 +51,7 @@ function InheritedParamsBar(props: {
     >
       <Typography.Text strong>{sourceLabel}</Typography.Text>
       <Typography.Paragraph className="!mb-1 mt-0.5" type="secondary">
-        这些参数来自全局/环境配置，同名接口参数优先。
+        {t('api.params.inheritedHint')}
       </Typography.Paragraph>
       <div className="grid gap-1.5">
         {allRows.map((r) => {
@@ -66,8 +69,8 @@ function InheritedParamsBar(props: {
               }}
             >
               <Tag color={overridden ? 'default' : r.source === 'env' ? 'purple' : 'blue'}>
-                {r.source === 'env' ? '环境' : '全局'}
-                {overridden ? ' (已覆盖)' : ''}
+                {r.source === 'env' ? t('api.params.sourceEnv') : t('api.params.sourceGlobal')}
+                {overridden ? t('api.params.overriddenSuffix') : ''}
               </Tag>
               <Typography.Text code className="truncate">{r.name}</Typography.Text>
               <Typography.Text className="truncate" type="secondary">
@@ -108,6 +111,7 @@ interface BaseParamsPanelProps {
  * 基础参数面板组件，用于 Query/Headers/Cookie 三个独立 tab
  */
 export function BaseParamsPanel(props: BaseParamsPanelProps) {
+  const { t } = useTranslation()
   const {
     type,
     value: parameters,
@@ -163,13 +167,13 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
   const getSourceLabel = () => {
     switch (type) {
       case 'query':
-        return '当前全局/环境 Query 参数'
+        return t('api.params.envQueryTitle')
 
       case 'header':
-        return '当前全局/环境 Header 参数'
+        return t('api.params.envHeaderTitle')
 
       case 'cookie':
-        return '当前全局/环境 Cookie 参数'
+        return t('api.params.envCookieTitle')
     }
   }
 
@@ -216,7 +220,7 @@ export function BaseParamsPanel(props: BaseParamsPanelProps) {
       {type === 'query' && showPathParams && parameters?.path && parameters.path.length > 0 && (
         <>
           <div className="py-1">
-            <Typography.Text type="secondary">Path 参数</Typography.Text>
+            <Typography.Text type="secondary">{t('api.params.pathTitle')}</Typography.Text>
           </div>
           <ParamsEditableTable
             isPathParamsTable

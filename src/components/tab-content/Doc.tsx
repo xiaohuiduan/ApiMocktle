@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Viewer } from '@bytemd/react'
 import { Button, Space, theme } from 'antd'
@@ -16,10 +17,9 @@ import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { useTabSaveBridge } from '@/hooks/useTabSaveBridge'
 import type { ApiDoc } from '@/types'
 
-const DEFAULT_DOC_NAME = '未命名文档'
-
 export function Doc() {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const { messageApi } = useGlobalContext()
   const { menuRawList, addMenuItem, updateMenuItem } = useMenuHelpersContext()
@@ -45,14 +45,14 @@ export function Doc() {
   }, [docValue])
 
   const handleDocSave = () => {
-    const values: ApiDoc = { id: nanoid(6), name: name ?? DEFAULT_DOC_NAME, content }
+    const values: ApiDoc = { id: nanoid(6), name: name ?? t('api.markdown.defaultName'), content }
 
     if (isCreating) {
       const menuItemId = nanoid(6)
 
       addMenuItem({
         id: menuItemId,
-        name: name ?? DEFAULT_DOC_NAME,
+        name: name ?? t('api.markdown.defaultName'),
         type: MenuItemType.Doc,
         parentId: tabData.data?.parentId as string | undefined,
         data: values,
@@ -66,7 +66,7 @@ export function Doc() {
         },
         { replaceTab: tabData.key },
       )
-      messageApi.success('已保存')
+      messageApi.success(t('api.markdown.saved'))
     }
     else {
       updateMenuItem({
@@ -75,7 +75,7 @@ export function Doc() {
         data: values,
       })
 
-      messageApi.success('已保存')
+      messageApi.success(t('api.markdown.saved'))
     }
   }
 
@@ -90,7 +90,7 @@ export function Doc() {
       <div className="flex h-full flex-col">
         <div className="flex items-center px-tabContent py-2" style={{ gap: `${token.padding}px` }}>
           <InputUnderline
-            placeholder={DEFAULT_DOC_NAME}
+            placeholder={t('api.markdown.defaultName')}
             style={{ fontWeight: 'bold', fontSize: '18px' }}
             value={name ?? ''}
             onChange={(ev) => {
@@ -105,11 +105,11 @@ export function Doc() {
                   setEditing(false)
                 }}
               >
-                退出编辑
+                {t('api.markdown.exitEditing')}
               </Button>
             )}
 
-            <Button type="primary" onClick={handleDocSave}>保存</Button>
+            <Button type="primary" onClick={handleDocSave}>{t('common.save')}</Button>
           </Space>
         </div>
 
@@ -135,7 +135,7 @@ export function Doc() {
             setEditing(true)
           }}
         >
-          编辑
+          {t('common.edit')}
         </Button>
       </div>
 

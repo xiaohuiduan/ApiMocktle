@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Card, Descriptions, Table, Tag, Typography } from 'antd'
 import { FileJson2 } from 'lucide-react'
 
@@ -29,6 +31,8 @@ interface SchemaSectionProps {
 }
 
 function SchemaSection({ title, schema }: SchemaSectionProps) {
+  const { t } = useTranslation()
+
   if (!schema || typeof schema !== 'object') {
     return null
   }
@@ -44,24 +48,26 @@ function SchemaSection({ title, schema }: SchemaSectionProps) {
           className="mb-2"
           columns={[
             {
-              title: '字段',
+              title: t('share.table.field'),
               dataIndex: 'name',
               render: (value: string) => <span className="font-mono">{value}</span>,
             },
             {
-              title: '类型',
+              title: t('share.table.type'),
               dataIndex: 'type',
               width: 140,
               render: (value: string) => <span className="font-mono">{value}</span>,
             },
             {
-              title: '必填',
+              title: t('share.table.required'),
               dataIndex: 'required',
               width: 80,
-              render: (value: boolean) => (value ? <Tag color="red">必填</Tag> : <Tag>可选</Tag>),
+              render: (value: boolean) => (value
+                ? <Tag color="red">{t('share.table.required')}</Tag>
+                : <Tag>{t('share.table.optional')}</Tag>),
             },
             {
-              title: '说明',
+              title: t('share.table.description'),
               dataIndex: 'description',
               render: (value?: string) => value ?? '-',
             },
@@ -76,7 +82,7 @@ function SchemaSection({ title, schema }: SchemaSectionProps) {
       <div className="flex items-center gap-1 text-xs text-gray-500">
         <FileJson2 size={14} />
         {' '}
-        示例
+        {t('share.schema.example')}
       </div>
       <JsonBlock value={example} />
     </div>
@@ -92,7 +98,17 @@ interface ParameterRow {
   example?: string | string[]
 }
 
+/** 参数分组名 → key。模块顶层只存 key，渲染期才求值，避免切语言后残留旧文案。 */
+const PARAM_SECTION_KEYS = {
+  path: 'share.apiDetail.pathParams',
+  query: 'share.apiDetail.queryParams',
+  header: 'share.apiDetail.headerParams',
+  cookie: 'share.apiDetail.cookieParams',
+} as const
+
 function ParameterTable({ parameters }: { parameters: ParameterRow[] }) {
+  const { t } = useTranslation()
+
   if (parameters.length === 0) {
     return null
   }
@@ -101,11 +117,11 @@ function ParameterTable({ parameters }: { parameters: ParameterRow[] }) {
     <table className="w-full border-collapse text-xs">
       <thead>
         <tr>
-          <th className="border border-gray-200 bg-gray-50 p-2 text-left">参数名</th>
-          <th className="border border-gray-200 bg-gray-50 p-2 text-left">类型</th>
-          <th className="border border-gray-200 bg-gray-50 p-2 text-left">必填</th>
-          <th className="border border-gray-200 bg-gray-50 p-2 text-left">示例</th>
-          <th className="border border-gray-200 bg-gray-50 p-2 text-left">说明</th>
+          <th className="border border-gray-200 bg-gray-50 p-2 text-left">{t('share.apiDetail.paramName')}</th>
+          <th className="border border-gray-200 bg-gray-50 p-2 text-left">{t('share.table.type')}</th>
+          <th className="border border-gray-200 bg-gray-50 p-2 text-left">{t('share.table.required')}</th>
+          <th className="border border-gray-200 bg-gray-50 p-2 text-left">{t('share.schema.example')}</th>
+          <th className="border border-gray-200 bg-gray-50 p-2 text-left">{t('share.table.description')}</th>
         </tr>
       </thead>
       <tbody>
@@ -114,7 +130,9 @@ function ParameterTable({ parameters }: { parameters: ParameterRow[] }) {
             <td className="border border-gray-200 p-2 font-mono">{p.name ?? '-'}</td>
             <td className="border border-gray-200 p-2 font-mono">{p.type ?? '-'}</td>
             <td className="border border-gray-200 p-2">
-              {p.required ? <Tag color="red">必填</Tag> : <Tag>可选</Tag>}
+              {p.required
+                ? <Tag color="red">{t('share.table.required')}</Tag>
+                : <Tag>{t('share.table.optional')}</Tag>}
             </td>
             <td className="border border-gray-200 p-2 font-mono">
               {Array.isArray(p.example) ? p.example.join(', ') : (p.example ?? '-')}
@@ -128,6 +146,7 @@ function ParameterTable({ parameters }: { parameters: ParameterRow[] }) {
 }
 
 export function ApiDetailView({ data }: { data: unknown }) {
+  const { t } = useTranslation()
   const details = (data ?? {}) as {
     name?: string
     method?: string
@@ -157,7 +176,9 @@ export function ApiDetailView({ data }: { data: unknown }) {
     <div className="space-y-4 p-4">
       <div className="flex items-center gap-3">
         {details.method && <MethodBadge method={details.method} />}
-        <Title className="!my-0 font-mono" level={4}>{details.path ?? details.name ?? '未命名接口'}</Title>
+        <Title className="!my-0 font-mono" level={4}>
+          {details.path ?? details.name ?? t('share.apiDetail.unnamed')}
+        </Title>
       </div>
 
       {details.name && details.path !== details.name && (
@@ -174,7 +195,7 @@ export function ApiDetailView({ data }: { data: unknown }) {
         <Card size="small">
           {details.serverUrl && (
             <Descriptions column={1} size="small">
-              <Descriptions.Item label="前置 URL">{details.serverUrl}</Descriptions.Item>
+              <Descriptions.Item label={t('share.apiDetail.serverUrl')}>{details.serverUrl}</Descriptions.Item>
             </Descriptions>
           )}
           {details.description && (
@@ -184,7 +205,7 @@ export function ApiDetailView({ data }: { data: unknown }) {
       )}
 
       {(['path', 'query', 'header', 'cookie'] as const).some((k) => (parameters[k]?.length ?? 0) > 0) && (
-        <Card size="small" title="请求参数">
+        <Card size="small" title={t('share.apiDetail.requestParams')}>
           {(['path', 'query', 'header', 'cookie'] as const).map((section) => {
             const items = parameters[section] ?? []
 
@@ -192,16 +213,9 @@ export function ApiDetailView({ data }: { data: unknown }) {
               return null
             }
 
-            const sectionNames: Record<string, string> = {
-              path: '路径参数',
-              query: 'Query 参数',
-              header: 'Header 参数',
-              cookie: 'Cookie 参数',
-            }
-
             return (
               <div key={section} className="mb-3 last:mb-0">
-                <div className="mb-1 text-sm font-medium">{sectionNames[section]}</div>
+                <div className="mb-1 text-sm font-medium">{t(PARAM_SECTION_KEYS[section])}</div>
                 <ParameterTable parameters={items} />
               </div>
             )
@@ -210,7 +224,7 @@ export function ApiDetailView({ data }: { data: unknown }) {
       )}
 
       {requestBody?.type && requestBody.type !== 'none' && (
-        <Card size="small" title="请求体">
+        <Card size="small" title={t('share.apiDetail.requestBody')}>
           <div className="mb-2">
             <Tag>{requestBody.type}</Tag>
           </div>
@@ -218,12 +232,14 @@ export function ApiDetailView({ data }: { data: unknown }) {
             <ParameterTable parameters={requestBody.parameters} />
           )}
           {requestBody.rawText && <JsonBlock value={requestBody.rawText} />}
-          {!!requestBody.jsonSchema && <SchemaSection schema={requestBody.jsonSchema} title="请求体结构" />}
+          {!!requestBody.jsonSchema && (
+            <SchemaSection schema={requestBody.jsonSchema} title={t('share.apiDetail.requestBodySchema')} />
+          )}
         </Card>
       )}
 
       {details.responses && details.responses.length > 0 && (
-        <Card size="small" title="响应">
+        <Card size="small" title={t('share.apiDetail.responses')}>
           {details.responses.map((resp) => (
             <div key={`${resp.code}-${resp.name ?? ''}`} className="mb-4 last:mb-0">
               <div className="mb-2 flex items-center gap-2">
@@ -231,7 +247,7 @@ export function ApiDetailView({ data }: { data: unknown }) {
                 <span className="text-sm">{resp.name ?? ''}</span>
                 {resp.contentType && <span className="text-xs text-gray-400">{resp.contentType}</span>}
               </div>
-              <SchemaSection schema={resp.jsonSchema} title="响应结构" />
+              <SchemaSection schema={resp.jsonSchema} title={t('share.apiDetail.responseSchema')} />
             </div>
           ))}
         </Card>

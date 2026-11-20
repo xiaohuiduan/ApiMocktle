@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   type ImperativePanelHandle,
   Panel,
@@ -19,26 +20,34 @@ import { useGlobalContext } from '@/contexts/global'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { BodyType } from '@/enums'
 import { useStyles } from '@/hooks/useStyle'
+import { translateKey } from '@/i18n/translate'
 import type { ApiDetails, Parameter } from '@/types'
 
 import { css } from '@emotion/css'
 
-const statusOptions: SelectProps['options'] = Object.entries(API_STATUS_CONFIG).map(
-  ([method, { text, color }]) => {
-    return {
-      value: method,
-      label: (
-        <span className="flex items-center">
-          <span
-            className="mr-2 inline-block size-[6px] rounded-full"
-            style={{ backgroundColor: `var(${color})` }}
-          />
-          <span>{text}</span>
-        </span>
-      ),
-    }
-  },
-)
+/**
+ * 接口状态下拉选项。
+ *
+ * 函数化而非模块顶层常量：文案随语言变化，模块顶层只会求值一次。
+ */
+function createStatusOptions(): SelectProps['options'] {
+  return Object.entries(API_STATUS_CONFIG).map(
+    ([status, { textKey, color }]) => {
+      return {
+        value: status,
+        label: (
+          <span className="flex items-center">
+            <span
+              className="mr-2 inline-block size-[6px] rounded-full"
+              style={{ backgroundColor: `var(${color})` }}
+            />
+            <span>{translateKey(textKey)}</span>
+          </span>
+        ),
+      }
+    },
+  )
+}
 
 function GroupTitle(props: React.PropsWithChildren<{ className?: string }>) {
   return (
@@ -63,6 +72,7 @@ function BaseInfoItem({ label, value }: { label: string, value?: string }) {
 
 function ApiParameter({ param }: { param: Parameter }) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const isLongDesc = param.description?.includes('\n')
 
@@ -114,7 +124,7 @@ function ApiParameter({ param }: { param: Parameter }) {
       )}
 
       <div className="ml-1 mt-2">
-        <span className="text-xs">示例值：</span>
+        <span className="text-xs">{t('api.doc.exampleValueLabel')}</span>
         <span
           className="text-xs"
           style={{
@@ -242,15 +252,17 @@ function SchemaLayout({ leftPanel, rightPanel, autoSaveId }: SchemaLayoutProps) 
 
 /** 请求/响应 Body 参数结构表：整列共享宽度（字段名/类型/必填按最宽内容自适应，说明占剩余）。 */
 function SchemaFieldTable({ rows }: { rows: SchemaFieldRow[] }) {
+  const { t } = useTranslation()
+
   return (
     <div className="schema-rows">
       <table className="schema-table">
         <thead>
           <tr>
-            <th>字段名</th>
-            <th>类型</th>
-            <th>必填</th>
-            <th>说明</th>
+            <th>{t('api.doc.fieldName')}</th>
+            <th>{t('common.type')}</th>
+            <th>{t('common.required')}</th>
+            <th>{t('common.description')}</th>
           </tr>
         </thead>
         <tbody>
@@ -269,7 +281,7 @@ function SchemaFieldTable({ rows }: { rows: SchemaFieldRow[] }) {
                   </td>
                   <td>
                     <span className={`schema-required${row.required ? ' is-required' : ''}`}>
-                      {row.required ? '必填' : '可选'}
+                      {row.required ? t('common.required') : t('common.optional')}
                     </span>
                   </td>
                   <td>
@@ -281,7 +293,7 @@ function SchemaFieldTable({ rows }: { rows: SchemaFieldRow[] }) {
               ))
             : (
                 <tr>
-                  <td className="schema-empty" colSpan={4}>暂无字段定义</td>
+                  <td className="schema-empty" colSpan={4}>{t('api.doc.noFieldDef')}</td>
                 </tr>
               )}
         </tbody>
@@ -292,10 +304,14 @@ function SchemaFieldTable({ rows }: { rows: SchemaFieldRow[] }) {
 
 export function ApiDoc() {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const { messageApi } = useGlobalContext()
   const { menuRawList } = useMenuHelpersContext()
   const { tabData } = useTabContentContext()
+
+  // t 作为依赖：语言切换时重新生成选项
+  const statusOptions = useMemo(() => createStatusOptions(), [t])
 
   const { docValue, methodConfig } = useMemo(() => {
     const apiDetails = menuRawList?.find(({ id }) => id === tabData.key)?.data as
@@ -546,13 +562,13 @@ export function ApiDoc() {
           <h2 className="text-base font-semibold">{docValue.name}</h2>
 
           <Space className="opacity-60 transition-opacity hover:opacity-100" size="small">
-            <Tooltip title="复制 ID">
+            <Tooltip title={t('api.doc.copyId')}>
               <Button
                 size="small"
                 type="link"
                 onClick={() => {
                   void navigator.clipboard.writeText(docValue.id).then(() => {
-                    messageApi.success('已复制')
+                    messageApi.success(t('common.copied'))
                   })
                 }}
               >
@@ -577,7 +593,7 @@ export function ApiDoc() {
         >
           {docValue.method}
         </span>
-        <Tooltip title="点击复制接口地址">
+        <Tooltip title={t('api.doc.clickCopyPath')}>
           <span
             className="mr-2 cursor-pointer underline-offset-2 hover:underline"
             onClick={() => {
@@ -586,7 +602,7 @@ export function ApiDoc() {
               }
 
               void navigator.clipboard.writeText(docValue.path).then(() => {
-                messageApi.success('接口地址已复制')
+                messageApi.success(t('api.doc.pathCopied'))
               })
             }}
           >
@@ -618,27 +634,27 @@ export function ApiDoc() {
 
       <div>
         <Space wrap size="large">
-          <BaseInfoItem label="创建时间" value={dayjs(docValue.createdAt).format('YYYY年M月D日')} />
-          <BaseInfoItem label="修改时间" value={dayjs(docValue.updatedAt).format('YYYY年M月D日')} />
+          <BaseInfoItem label={t('common.createdAt')} value={dayjs(docValue.createdAt).format(t('api.doc.dateFormat'))} />
+          <BaseInfoItem label={t('common.updatedAt')} value={dayjs(docValue.updatedAt).format(t('api.doc.dateFormat'))} />
         </Space>
       </div>
 
       {docValue.description
         ? (
             <div>
-              <GroupTitle>接口说明</GroupTitle>
+              <GroupTitle>{t('api.doc.apiDescription')}</GroupTitle>
               <Viewer value={docValue.description} />
             </div>
           )
         : null}
 
       <div>
-        <GroupTitle>请求参数</GroupTitle>
+        <GroupTitle>{t('api.doc.requestParams')}</GroupTitle>
         {hasParams
           ? (
               <div className="flex flex-col gap-y-4">
                 {hasPathParams && (
-                  <Card className={styles.card} title="Path 参数">
+                  <Card className={styles.card} title={t('api.doc.pathParams')}>
                     <div className="flex flex-col gap-3">
                       {pathParams?.map((param) => <ApiParameter key={param.id} param={param} />)}
                     </div>
@@ -646,7 +662,7 @@ export function ApiDoc() {
                 )}
 
                 {hasQueryParams && (
-                  <Card className={styles.card} title="Query 参数">
+                  <Card className={styles.card} title={t('api.doc.queryParams')}>
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <code className="overflow-auto rounded border px-2 py-1 text-xs">
                         {queryStringForCopy || '?'}
@@ -656,17 +672,17 @@ export function ApiDoc() {
                         type="link"
                         onClick={() => {
                           if (!queryStringForCopy) {
-                            messageApi.warning('暂无可复制的 Query 参数')
+                            messageApi.warning(t('api.doc.noQueryToCopy'))
 
                             return
                           }
 
                           void navigator.clipboard.writeText(queryStringForCopy).then(() => {
-                            messageApi.success('Query 参数已复制')
+                            messageApi.success(t('api.doc.queryCopied'))
                           })
                         }}
                       >
-                        复制 Query
+                        {t('api.doc.copyQuery')}
                       </Button>
                     </div>
                     <div className="flex flex-col gap-3">
@@ -676,7 +692,7 @@ export function ApiDoc() {
                 )}
 
                 {hasHeaderParams && (
-                  <Card className={styles.card} title="Header 参数">
+                  <Card className={styles.card} title={t('api.doc.headerParams')}>
                     <div className="flex flex-col gap-3">
                       {headerParams?.map((param) => <ApiParameter key={param.id} param={param} />)}
                     </div>
@@ -684,7 +700,7 @@ export function ApiDoc() {
                 )}
 
                 {hasCookieParams && (
-                  <Card className={styles.card} title="Cookie 参数">
+                  <Card className={styles.card} title={t('api.doc.cookieParams')}>
                     <div className="flex flex-col gap-3">
                       {cookieParams?.map((param) => <ApiParameter key={param.id} param={param} />)}
                     </div>
@@ -693,15 +709,15 @@ export function ApiDoc() {
               </div>
             )
           : (
-              '无'
+              t('common.none')
             )}
       </div>
 
       <div>
-        <GroupTitle>请求 Body</GroupTitle>
+        <GroupTitle>{t('api.doc.requestBody')}</GroupTitle>
         {!docValue.requestBody || docValue.requestBody.type === BodyType.None
           ? (
-              '无'
+              t('common.none')
             )
           : (
               <Card
@@ -710,7 +726,7 @@ export function ApiDoc() {
                   <span>
                     {docValue.requestBody.type}
                     {docValue.requestBody.required && (
-                      <span style={{ marginLeft: 6, color: token.colorError }}>必填</span>
+                      <span style={{ marginLeft: 6, color: token.colorError }}>{t('common.required')}</span>
                     )}
                   </span>
                 )}
@@ -726,7 +742,7 @@ export function ApiDoc() {
                 {docValue.requestBody.examples && docValue.requestBody.examples.length > 0 && (
                   <div className="mb-3">
                     <div className="mb-1 text-xs" style={{ color: token.colorTextSecondary }}>
-                      Body 示例
+                      {t('api.doc.bodyExample')}
                     </div>
                     {docValue.requestBody.examples.map((example, idx) => {
                       return (
@@ -751,14 +767,14 @@ export function ApiDoc() {
                   <div className={styles.requestBodySchema}>
                     <div className="schema-header">
                       <span>application/json</span>
-                      <span>Body 参数</span>
+                      <span>{t('api.doc.bodyParams')}</span>
                     </div>
                     <SchemaLayout
                       autoSaveId="api-doc-req-body"
                       leftPanel={(
                         <>
                           <div className="schema-sub-title">
-                            <span>参数结构</span>
+                            <span>{t('api.doc.schemaStructure')}</span>
                             <span>{requestSchemaRows.length} fields</span>
                           </div>
                           <SchemaFieldTable rows={requestSchemaRows} />
@@ -767,7 +783,7 @@ export function ApiDoc() {
                       rightPanel={(
                         <>
                           <div className="schema-sub-title">
-                            <span>示例</span>
+                            <span>{t('api.doc.example')}</span>
                             <Space size={8}>
                               <span>JSON</span>
                               <Button
@@ -780,11 +796,11 @@ export function ApiDoc() {
                                     2,
                                   )
                                   void navigator.clipboard.writeText(bodyExample).then(() => {
-                                    messageApi.success('Body 示例已复制')
+                                    messageApi.success(t('api.doc.bodyExampleCopied'))
                                   })
                                 }}
                               >
-                                复制
+                                {t('common.copy')}
                               </Button>
                             </Space>
                           </div>
@@ -802,7 +818,7 @@ export function ApiDoc() {
 
       {!!docValue.responses && (
         <div>
-          <GroupTitle>返回响应</GroupTitle>
+          <GroupTitle>{t('api.doc.responses')}</GroupTitle>
           <Tabs
             className={styles.tabWithBorder}
             items={docValue.responses.map((res) => {
@@ -819,19 +835,19 @@ export function ApiDoc() {
                   <div>
                     <div className="flex flex-wrap items-center gap-4 p-3">
                       <span>
-                        <span style={{ color: token.colorTextSecondary }}>HTTP 状态码：</span>
+                        <span style={{ color: token.colorTextSecondary }}>{t('api.doc.httpStatusLabel')}</span>
                         <span>{res.code}</span>
                       </span>
 
                       <span>
-                        <span style={{ color: token.colorTextSecondary }}>内容格式：</span>
+                        <span style={{ color: token.colorTextSecondary }}>{t('api.doc.contentTypeLabel')}</span>
                         <span>{res.contentType}</span>
                       </span>
                     </div>
 
                     {res.description && (
                       <div className="px-3 pb-3 text-xs" style={{ color: token.colorTextSecondary }}>
-                        <span>响应说明：</span>
+                        <span>{t('api.doc.responseDescLabel')}</span>
                         <span>{res.description}</span>
                       </div>
                     )}
@@ -839,7 +855,7 @@ export function ApiDoc() {
                     {res.example !== undefined && res.example !== null && (
                       <div className="px-3 pb-3">
                         <div className="mb-1 text-xs" style={{ color: token.colorTextSecondary }}>
-                          响应示例
+                          {t('api.doc.responseExample')}
                         </div>
                         <pre className="schema-code">
                           {typeof res.example === 'string'
@@ -853,14 +869,14 @@ export function ApiDoc() {
                       <div className={styles.requestBodySchema}>
                         <div className="schema-header">
                           <span>{res.contentType}</span>
-                          <span>Body 参数</span>
+                          <span>{t('api.doc.bodyParams')}</span>
                         </div>
                         <SchemaLayout
                           autoSaveId={`api-doc-res-body-${res.id}`}
                           leftPanel={(
                             <>
                               <div className="schema-sub-title">
-                                <span>参数结构</span>
+                                <span>{t('api.doc.schemaStructure')}</span>
                                 <span>{resSchemaRows.length} fields</span>
                               </div>
                               <SchemaFieldTable rows={resSchemaRows} />
@@ -869,7 +885,7 @@ export function ApiDoc() {
                           rightPanel={(
                             <>
                               <div className="schema-sub-title">
-                                <span>示例</span>
+                                <span>{t('api.doc.example')}</span>
                                 <Space size={8}>
                                   <span>JSON</span>
                                   <Button
@@ -882,11 +898,11 @@ export function ApiDoc() {
                                         2,
                                       )
                                       void navigator.clipboard.writeText(bodyExample).then(() => {
-                                        messageApi.success('Body 示例已复制')
+                                        messageApi.success(t('api.doc.bodyExampleCopied'))
                                       })
                                     }}
                                   >
-                                    复制
+                                    {t('common.copy')}
                                   </Button>
                                 </Space>
                               </div>

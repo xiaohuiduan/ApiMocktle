@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router'
 
 import type { ApiMenuData } from '@/components/ApiMenu'
 import type { ApiTabItem } from '@/components/ApiTab'
-import { API_MENU_CONFIG } from '@/configs/static'
 import { CatalogType } from '@/enums'
 import type {
   ApiEnvironment,
@@ -46,11 +45,17 @@ export interface ProjectTabState {
 /*  Helper: default tab items                                          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 默认页签。
+ *
+ * `label` 留空：目录页签的标题在渲染期由 `ApiTabLabel` 按 contentType 翻译。
+ * 这里存翻译结果会随 projectState 持久化，导致切换语言后残留旧文案。
+ */
 function createDefaultTabItems(): ApiTabItem[] {
   return [
     {
       key: CatalogType.Overview,
-      label: API_MENU_CONFIG[CatalogType.Overview].title,
+      label: '',
       contentType: CatalogType.Overview,
     },
   ]

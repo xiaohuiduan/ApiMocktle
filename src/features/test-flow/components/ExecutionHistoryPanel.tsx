@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, Collapse, Empty, message, Modal, Popconfirm, Spin, Tag, Typography } from 'antd'
 import { AlertTriangle, CheckCircle, ChevronRight, Clock, CopyIcon, RefreshCw, Trash2, XCircle } from 'lucide-react'
 
 import { useTestExecutions } from '@/hooks/useTestTask'
+import { t as translate } from '@/i18n'
+import { translateKey } from '@/i18n/translate'
 import type { TestStepResult } from '@/types'
 
 import { useFlowStore } from '../store/useFlowStore'
@@ -37,11 +40,20 @@ const resultBlockClass = css`
   font-size: 12px;
 `
 
-const STEP_STATUS_CONFIG: Record<string, { color: string, icon: React.ReactNode, label: string }> = {
-  passed: { color: 'success', icon: <CheckCircle size={14} />, label: '通过' },
-  failed: { color: 'error', icon: <XCircle size={14} />, label: '失败' },
-  error: { color: 'error', icon: <AlertTriangle size={14} />, label: '错误' },
-  skipped: { color: 'default', icon: null, label: '跳过' },
+/** 状态 → 颜色/图标（label 由渲染期 t() 取词） */
+const STEP_STATUS_CONFIG: Record<string, { color: string, icon: React.ReactNode }> = {
+  passed: { color: 'success', icon: <CheckCircle size={14} /> },
+  failed: { color: 'error', icon: <XCircle size={14} /> },
+  error: { color: 'error', icon: <AlertTriangle size={14} /> },
+  skipped: { color: 'default', icon: null },
+}
+
+/** 状态对应的 i18n key */
+const STEP_STATUS_LABEL_KEYS: Record<string, string> = {
+  passed: 'flow.enum.execStatus.passed',
+  failed: 'flow.enum.execStatus.failed',
+  error: 'flow.enum.execStatus.error',
+  skipped: 'flow.enum.execStatus.skipped',
 }
 
 const EXEC_STATUS_COLORS: Record<string, string> = {
@@ -52,12 +64,12 @@ const EXEC_STATUS_COLORS: Record<string, string> = {
   running: 'var(--ds-highlight-selected)',
 }
 
-const EXEC_STATUS_LABELS: Record<string, string> = {
-  passed: '通过',
-  failed: '失败',
-  aborted: '中止',
-  error: '错误',
-  running: '运行中',
+const EXEC_STATUS_LABEL_KEYS: Record<string, string> = {
+  passed: 'flow.enum.execStatus.passed',
+  failed: 'flow.enum.execStatus.failed',
+  aborted: 'flow.enum.execStatus.aborted',
+  error: 'flow.enum.execStatus.error',
+  running: 'flow.enum.execStatus.running',
 }
 
 // ==================== 工具函数 ====================
@@ -78,11 +90,11 @@ function formatRelativeTime(dateStr: string): string {
   const now = new Date()
   const diff = now.getTime() - date.getTime()
 
-  if (diff < 60000) { return '刚刚' }
+  if (diff < 60000) { return translate('flow.history.justNow') }
 
-  if (diff < 3600000) { return `${Math.floor(diff / 60000)}分钟前` }
+  if (diff < 3600000) { return translate('flow.history.minutesAgo', { count: Math.floor(diff / 60000) }) }
 
-  if (diff < 86400000) { return `${Math.floor(diff / 3600000)}小时前` }
+  if (diff < 86400000) { return translate('flow.history.hoursAgo', { count: Math.floor(diff / 3600000) }) }
 
   return date.toLocaleString()
 }
@@ -105,7 +117,7 @@ function formatRequestText(req: Record<string, unknown>): string {
     catch { lines.push(String(req.body)) }
   }
 
-  return lines.join('\n') || '(无详情)'
+  return lines.join('\n') || translate('flow.shared.noDetail')
 }
 
 function formatResponseText(resp: Record<string, unknown>): string {
@@ -113,7 +125,7 @@ function formatResponseText(resp: Record<string, unknown>): string {
   const status = Number(resp.status ?? 0)
   lines.push(`HTTP ${status} ${status >= 200 && status < 400 ? 'OK' : 'Error'}`)
 
-  if (resp.duration_ms) { lines.push(`耗时: ${resp.duration_ms}ms`) }
+  if (resp.duration_ms) { lines.push(translate('flow.shared.elapsed', { ms: resp.duration_ms })) }
 
   const headers = resp.headers as Record<string, string> | undefined
 
@@ -130,7 +142,7 @@ function formatResponseText(resp: Record<string, unknown>): string {
     catch { lines.push(String(resp.body)) }
   }
 
-  return lines.join('\n') || '(无详情)'
+  return lines.join('\n') || translate('flow.shared.noDetail')
 }
 
 // ==================== 步骤详情 Modal ====================
@@ -142,9 +154,12 @@ interface StepDetailModalProps {
 }
 
 function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
+  const { t } = useTranslation()
+
   if (!step) { return null }
 
   const config = STEP_STATUS_CONFIG[step.status] || STEP_STATUS_CONFIG.skipped
+  const statusLabelKey = STEP_STATUS_LABEL_KEYS[step.status] || STEP_STATUS_LABEL_KEYS.skipped
   const req = step.requestJson
   const resp = step.responseJson
   const hasRequest = req && Object.keys(req).length > 0
@@ -153,7 +168,7 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
   const handleCopyRequest = () => {
     if (req) {
       void navigator.clipboard.writeText(formatRequestText(req)).then(() => {
-        message.success('已复制')
+        message.success(t('flow.detail.copied'))
       })
     }
   }
@@ -161,7 +176,7 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
   const handleCopyResponse = () => {
     if (resp) {
       void navigator.clipboard.writeText(formatResponseText(resp)).then(() => {
-        message.success('已复制')
+        message.success(t('flow.detail.copied'))
       })
     }
   }
@@ -175,7 +190,7 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>{nodeLabel || step.stepId}</span>
           <Tag color={config.color} icon={config.icon} style={{ margin: 0 }}>
-            {config.label}
+            {translateKey(statusLabelKey)}
           </Tag>
           {step.durationMs > 0 && (
             <span style={{ color: 'var(--ds-node-text-muted)', fontSize: 12, fontWeight: 'normal' }}>{step.durationMs}ms</span>
@@ -205,7 +220,7 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
                   ? [
                       {
                         key: 'request',
-                        label: <span style={{ fontSize: 12 }}>请求详情</span>,
+                        label: <span style={{ fontSize: 12 }}>{t('flow.detail.request')}</span>,
                         extra: (
                           <Button
                             icon={<CopyIcon size={12} />}
@@ -225,7 +240,7 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
                   ? [
                       {
                         key: 'response',
-                        label: <span style={{ fontSize: 12 }}>响应详情</span>,
+                        label: <span style={{ fontSize: 12 }}>{t('flow.detail.response')}</span>,
                         extra: (
                           <Button
                             icon={<CopyIcon size={12} />}
@@ -246,7 +261,7 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
             />
           )
         : (
-            !step.errorMessage && <Text style={{ fontSize: 12 }} type="secondary">此步骤无详细数据</Text>
+            !step.errorMessage && <Text style={{ fontSize: 12 }} type="secondary">{t('flow.history.noStepData')}</Text>
           )}
     </Modal>
   )
@@ -255,6 +270,7 @@ function StepDetailModal({ step, nodeLabel, onClose }: StepDetailModalProps) {
 // ==================== 执行记录详情（步骤列表） ====================
 
 function ExecutionDetail({ executionId, taskId }: { executionId: string, taskId: string }) {
+  const { t } = useTranslation()
   const { getExecutionDetail } = useTestExecutions(taskId)
   const nodes = useFlowStore((s) => s.nodes)
   const [steps, setSteps] = useState<TestStepResult[]>([])
@@ -292,7 +308,7 @@ function ExecutionDetail({ executionId, taskId }: { executionId: string, taskId:
         }
       }
       catch (err) {
-        if (!cancelled) { setError(`加载失败: ${err}`) }
+        if (!cancelled) { setError(t('flow.history.loadFailed', { error: String(err) })) }
       }
 
       if (!cancelled) { setLoading(false) }
@@ -301,14 +317,14 @@ function ExecutionDetail({ executionId, taskId }: { executionId: string, taskId:
     load()
 
     return () => { cancelled = true }
-  }, [executionId, getExecutionDetail])
+  }, [executionId, getExecutionDetail, t])
 
   if (loading) { return <Spin size="small" style={{ display: 'block', margin: '8px auto' }} /> }
 
   if (error) { return <div style={{ padding: 'var(--ds-pad-sm)', color: 'var(--ds-error-color)', fontSize: 11, textAlign: 'center' }}>{error}</div> }
 
   if (!steps.length) {
-    return <div style={{ padding: 'var(--ds-pad-sm)', color: 'var(--ds-node-text-muted)', fontSize: 11, textAlign: 'center' }}>无步骤详情</div>
+    return <div style={{ padding: 'var(--ds-pad-sm)', color: 'var(--ds-node-text-muted)', fontSize: 11, textAlign: 'center' }}>{t('flow.history.noSteps')}</div>
   }
 
   const sorted = [...steps].sort((a, b) => a.sortOrder - b.sortOrder)
@@ -363,6 +379,7 @@ function ExecutionDetail({ executionId, taskId }: { executionId: string, taskId:
 // ==================== 组件 ====================
 
 export default function ExecutionHistoryPanel({ taskId }: { taskId: string }) {
+  const { t } = useTranslation()
   const { executions, loading, fetchExecutions, deleteExecution } = useTestExecutions(taskId)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -402,7 +419,7 @@ export default function ExecutionHistoryPanel({ taskId }: { taskId: string }) {
         {executions.length === 0
           ? (
               <Empty
-                description="暂无执行记录"
+                description={t('flow.history.empty')}
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 style={{ marginTop: 40 }}
               />
@@ -443,11 +460,13 @@ export default function ExecutionHistoryPanel({ taskId }: { taskId: string }) {
                           }}
                         />
                         <Tag color={color} style={{ margin: 0, fontSize: 10, lineHeight: '16px' }}>
-                          {EXEC_STATUS_LABELS[exec.status] || exec.status}
+                          {EXEC_STATUS_LABEL_KEYS[exec.status]
+                            ? translateKey(EXEC_STATUS_LABEL_KEYS[exec.status])
+                            : exec.status}
                         </Tag>
                         <span style={{ flex: 1 }} />
                         <Popconfirm
-                          title="确定删除此执行记录？"
+                          title={t('flow.history.deleteConfirm')}
                           onCancel={(e) => e?.stopPropagation()}
                           onConfirm={(e) => { e?.stopPropagation(); handleDelete(exec.id) }}
                         >

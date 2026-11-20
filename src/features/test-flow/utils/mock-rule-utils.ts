@@ -1,5 +1,7 @@
 import { nanoid } from 'nanoid'
 
+import { t } from '@/i18n'
+
 import type {
   AgentDiscoverResult,
   MockCallLog,
@@ -22,40 +24,40 @@ export function validateMockRule(rule: Partial<MockRule>): ValidationError[] {
   const errors: ValidationError[] = []
 
   if (!rule.className?.trim()) {
-    errors.push({ field: 'className', message: '类名不能为空' })
+    errors.push({ field: 'className', message: t('flow.validation.mockClassNameRequired') })
   }
   else if (!isValidJavaFqn(rule.className)) {
-    errors.push({ field: 'className', message: '类名格式无效，应为全限定名如 com.example.MyClass' })
+    errors.push({ field: 'className', message: t('flow.validation.mockClassNameInvalid') })
   }
 
   if (!rule.methodName?.trim()) {
-    errors.push({ field: 'methodName', message: '方法名不能为空' })
+    errors.push({ field: 'methodName', message: t('flow.validation.mockMethodNameRequired') })
   }
   else if (!isValidJavaIdentifier(rule.methodName)) {
-    errors.push({ field: 'methodName', message: '方法名不是合法的 Java 标识符' })
+    errors.push({ field: 'methodName', message: t('flow.validation.mockMethodNameInvalid') })
   }
 
   if (!rule.targetType) {
-    errors.push({ field: 'targetType', message: '目标类型不能为空' })
+    errors.push({ field: 'targetType', message: t('flow.validation.mockTargetTypeRequired') })
   }
   else if (!['feign', 'mapper', 'custom'].includes(rule.targetType)) {
-    errors.push({ field: 'targetType', message: `不支持的目标类型: ${rule.targetType}` })
+    errors.push({ field: 'targetType', message: t('flow.validation.mockTargetTypeUnsupported', { type: rule.targetType }) })
   }
 
   if (rule.paramTypes) {
     for (let i = 0; i < rule.paramTypes.length; i++) {
       if (!isValidJavaFqn(rule.paramTypes[i])) {
-        errors.push({ field: `paramTypes[${i}]`, message: `参数类型 "${rule.paramTypes[i]}" 不是合法的全限定名` })
+        errors.push({ field: `paramTypes[${i}]`, message: t('flow.validation.mockParamTypeInvalid', { type: rule.paramTypes[i] }) })
       }
     }
   }
 
   if (rule.responseDelay !== undefined && (rule.responseDelay < 0 || !Number.isFinite(rule.responseDelay))) {
-    errors.push({ field: 'responseDelay', message: '响应延迟必须为非负有限数' })
+    errors.push({ field: 'responseDelay', message: t('flow.validation.mockResponseDelayInvalid') })
   }
 
   if (rule.maxTimes !== undefined && (rule.maxTimes < 1 || !Number.isInteger(rule.maxTimes))) {
-    errors.push({ field: 'maxTimes', message: '最大拦截次数必须为正整数' })
+    errors.push({ field: 'maxTimes', message: t('flow.validation.mockMaxTimesInvalid') })
   }
 
   return errors

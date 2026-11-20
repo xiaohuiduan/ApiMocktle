@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router'
 
 import { Space } from 'antd'
@@ -44,6 +45,7 @@ const enum NavPath {
 }
 
 export function NavMenu() {
+  const { t } = useTranslation()
   const { pathname } = useLocation()
   const pathList = pathname.split('/').filter(Boolean)
   const projectId = pathList.at(0) === 'projects' ? pathList.at(1) : undefined
@@ -59,7 +61,7 @@ export function NavMenu() {
             ? pathname === `/projects/${projectId}` || pathname.startsWith(homePath)
             : pathname === NavPath.Projects}
           icon={<FileStack className="size-6" />}
-          name="接口管理"
+          name={t('app.nav.home')}
         />
       </Link>
 
@@ -67,7 +69,7 @@ export function NavMenu() {
         <NavItem
           active={pathname.startsWith(testsPath)}
           icon={<FlaskConical className="size-6" />}
-          name="自动测试"
+          name={t('app.nav.tests')}
         />
       </Link>
 
@@ -75,7 +77,7 @@ export function NavMenu() {
         <NavItem
           active={pathname.startsWith(settingsPath)}
           icon={<Settings className="size-6" />}
-          name="项目配置"
+          name={t('app.nav.settings')}
         />
       </Link>
     </Space>

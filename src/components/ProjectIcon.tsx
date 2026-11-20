@@ -1787,11 +1787,30 @@ export function kebabToPascal(name: string): string {
   return name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')
 }
 
-export interface IconCategory { label: string, icons: string[] }
+/**
+ * 图标分类标识。
+ *
+ * 分类名是界面文案，不写在数据里：`AI` 是技术缩写、中英一致，其余分类名
+ * 由消费点按 `ICON_CATEGORY_LABEL_KEYS` 在渲染期翻译（见 `ProjectsClient`）。
+ */
+export type IconCategoryKey = 'ai' | 'account' | 'media' | 'business' | 'life' | 'doc' | 'tools'
+
+/** 分类标识 → 语言包 key；`ai` 为技术缩写不翻译，故不设 key。 */
+export const ICON_CATEGORY_LABEL_KEYS = {
+  ai: '',
+  account: 'app.iconCategory.account',
+  media: 'app.iconCategory.media',
+  business: 'app.iconCategory.business',
+  life: 'app.iconCategory.life',
+  doc: 'app.iconCategory.doc',
+  tools: 'app.iconCategory.tools',
+} as const
+
+export interface IconCategory { key: IconCategoryKey, icons: string[] }
 
 export const ICON_CATEGORIES: IconCategory[] = [
   {
-    label: 'AI',
+    key: 'ai',
     icons: [
       'bot',
       'brain-circuit',
@@ -1836,7 +1855,7 @@ export const ICON_CATEGORIES: IconCategory[] = [
     ],
   },
   {
-    label: '账号',
+    key: 'account',
     icons: [
       'activity',
       'at-sign',
@@ -1993,7 +2012,7 @@ export const ICON_CATEGORIES: IconCategory[] = [
     ],
   },
   {
-    label: '媒体',
+    key: 'media',
     icons: [
       'play',
       'pause',
@@ -2040,7 +2059,7 @@ export const ICON_CATEGORIES: IconCategory[] = [
     ],
   },
   {
-    label: '商业',
+    key: 'business',
     icons: [
       'briefcase',
       'target',
@@ -2129,7 +2148,7 @@ export const ICON_CATEGORIES: IconCategory[] = [
     ],
   },
   {
-    label: '生活',
+    key: 'life',
     icons: [
       'utensils',
       'utensils-crossed',
@@ -2283,7 +2302,7 @@ export const ICON_CATEGORIES: IconCategory[] = [
     ],
   },
   {
-    label: '文档',
+    key: 'doc',
     icons: [
       'file',
       'file-text',
@@ -2436,7 +2455,7 @@ export const ICON_CATEGORIES: IconCategory[] = [
     ],
   },
   {
-    label: '工具',
+    key: 'tools',
     icons: [
       'arrow-big-down',
       'arrow-big-down-dash',

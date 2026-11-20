@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, Input, Select, Tabs, Tag, theme, Typography } from 'antd'
+import type { TFunction } from 'i18next'
 import { GlobeIcon, KeyRoundIcon, PlusIcon, TrashIcon } from 'lucide-react'
 
 import {
@@ -26,25 +28,36 @@ import { TabValueEditor, ValueEditor } from './ValueEditor'
 export type GlobalSectionKey = 'globalVariables' | 'globalParameters'
 export type EnvironmentSectionKey = `environment:${string}`
 export type SectionKey = GlobalSectionKey | EnvironmentSectionKey
-export const GLOBAL_SECTION_ITEMS: {
+
+export interface GlobalSectionItem {
   key: GlobalSectionKey
   label: string
   icon: React.ReactNode
   description: string
-}[] = [
-  {
-    key: 'globalVariables',
-    label: '全局变量',
-    icon: <GlobeIcon size={14} />,
-    description: '用于维护所有环境共享的通用变量。',
-  },
-  {
-    key: 'globalParameters',
-    label: '全局参数',
-    icon: <KeyRoundIcon size={14} />,
-    description: '用于按 Header、Cookie、Query、Body 分类维护跨环境复用的请求参数。',
-  },
-]
+}
+
+/**
+ * 左侧「全局」分区的条目。
+ *
+ * 必须是函数：标签与说明随语言变化，模块顶层求值会在加载时固定住。
+ * 消费方在渲染期用 `useMemo(() => createGlobalSectionItems(t), [t])`。
+ */
+export function createGlobalSectionItems(t: TFunction): GlobalSectionItem[] {
+  return [
+    {
+      key: 'globalVariables',
+      label: t('settings.environments.globalVariables'),
+      icon: <GlobeIcon size={14} />,
+      description: t('settings.environments.globalVariablesDescription'),
+    },
+    {
+      key: 'globalParameters',
+      label: t('settings.environments.globalParameters'),
+      icon: <KeyRoundIcon size={14} />,
+      description: t('settings.environments.globalParametersDescription'),
+    },
+  ]
+}
 
 export function createEnvironmentKey(environmentId: string): EnvironmentSectionKey {
   return `environment:${environmentId}`
@@ -75,6 +88,7 @@ export function EnvironmentEditor(props: {
   effectiveVarMap?: Map<string, string>
 }) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const { editable, environment, onChange, onDelete, globalParameters, effectiveVarMap } = props
   const baseUrls = environment.baseUrls ?? []
   const variables = environment.variables ?? []
@@ -117,7 +131,7 @@ export function EnvironmentEditor(props: {
         <div className="min-w-0 flex-1 space-y-4">
           <Input
             disabled={!editable}
-            placeholder="环境名称"
+            placeholder={t('settings.environments.namePlaceholder')}
             size="large"
             value={environment.name}
             onChange={(event) => {
@@ -126,7 +140,7 @@ export function EnvironmentEditor(props: {
           />
         </div>
         <Button danger disabled={!editable} icon={<TrashIcon size={14} />} onClick={onDelete}>
-          删除环境
+          {t('settings.environments.deleteEnvironment')}
         </Button>
       </div>
 
@@ -134,7 +148,7 @@ export function EnvironmentEditor(props: {
         allowClear
         addonBefore="Mock Agent"
         disabled={!editable}
-        placeholder="Mock Agent URL（如 http://localhost:19876）"
+        placeholder={t('settings.environments.agentUrlPlaceholder')}
         value={environment.agentUrl ?? ''}
         onChange={(event) => {
           onChange({ ...environment, agentUrl: event.target.value || undefined })
@@ -143,9 +157,9 @@ export function EnvironmentEditor(props: {
 
       <section className="space-y-3">
         <div>
-          <Typography.Title level={5}>前置 URL</Typography.Title>
+          <Typography.Title level={5}>{t('settings.environments.baseUrl')}</Typography.Title>
           <Typography.Paragraph className="!mb-0" type="secondary">
-            环境的基础 URL，用于拼接接口地址。
+            {t('settings.environments.baseUrlDescription')}
           </Typography.Paragraph>
         </div>
         <div className="flex items-center gap-1">
@@ -174,11 +188,11 @@ export function EnvironmentEditor(props: {
       </section>
 
       <ValueEditor
-        description="环境变量支持远程值和本地值，本地值优先，可用于本地调试覆盖。灰色列为实际生效值（会话变量 > 环境变量 > 全局）。"
+        description={t('settings.environments.variablesDescription')}
         editable={editable}
         effectiveVarMap={effectiveVarMap}
         rows={variables}
-        title="环境变量"
+        title={t('settings.environments.variables')}
         onAdd={() => {
           onChange({ ...environment, variables: [...variables, createEnvironmentValue()] })
         }}
@@ -189,9 +203,9 @@ export function EnvironmentEditor(props: {
 
       <section className="space-y-3">
         <div>
-          <Typography.Title level={5}>环境参数</Typography.Title>
+          <Typography.Title level={5}>{t('settings.environments.parameters')}</Typography.Title>
           <Typography.Paragraph className="!mb-0" type="secondary">
-            按 Header、Cookie、Query、Body 分类维护当前环境的请求参数。同名参数将覆盖全局值。
+            {t('settings.environments.parametersDescription')}
           </Typography.Paragraph>
         </div>
 
@@ -214,17 +228,20 @@ export function EnvironmentEditor(props: {
                       style={{ borderColor: token.colorBorderSecondary, backgroundColor: token.colorFillQuaternary }}
                     >
                       <Typography.Text className="text-xs" type="secondary">
-                        全局已设置：
+                        {t('settings.environments.globalSet')}
                       </Typography.Text>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {globalSectionRows.map((g) => {
                           const overridden = envNames.has(g.name)
                           const label = g.value ? `${g.name}: ${g.value}` : g.name
+                          const suffix = overridden
+                            ? t('settings.environments.overriddenSuffix')
+                            : g.value ? '' : t('settings.environments.noValueSuffix')
 
                           return (
                             <Tag key={g.id} color={overridden ? 'default' : 'blue'}>
                               {label}
-                              {overridden ? ' (已覆盖)' : g.value ? '' : ' (未配置值)'}
+                              {suffix}
                             </Tag>
                           )
                         })}
@@ -271,7 +288,7 @@ export function EnvironmentEditor(props: {
           tabBarExtraContent={{
             right: (
               <Button disabled={!editable} icon={<PlusIcon size={14} />} onClick={() => { handleAddParam(activeParamSection) }}>
-                添加
+                {t('common.add')}
               </Button>
             ),
           }}

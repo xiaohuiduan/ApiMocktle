@@ -3,7 +3,22 @@ import { ApiStatus, CatalogType, HttpMethod, ParamType } from '@/enums'
 /** 根目录 ID。 */
 export const ROOT_CATALOG = '_'
 
-/** 有关 HTTP 方法的用于展示配置。 */
+/**
+ * 静态配置模块。
+ *
+ * 本文件只承载**不随语言变化**的数据（颜色、数值、协议常量）与**文案 key**。
+ *
+ * 纪律（违反会导致切换语言后文案不刷新）：
+ * - 文案字段一律以 `*Key` 命名，值是 i18n key 字面量，由消费方在**渲染期**用 `t()` 求值。
+ * - 绝不在本文件存 `t()` 的求值结果，也绝不在模块顶层 `map` 出带文案的数组——
+ *   那样模块加载时求值一次，此后切语言永远不刷新。
+ *
+ * 需要区分两类「中文」：
+ * - `HTTP_METHOD_CONFIG.text` 是 HTTP 协议方法缩写（GET / POST / DEL …），**不翻译**。
+ * - `HTTP_CODE_CONFIG` / `API_STATUS_CONFIG` / `API_MENU_CONFIG` 的文本是纯界面文案，**必须翻译**。
+ */
+
+/** 有关 HTTP 方法的用于展示配置。`text` 为协议缩写，不参与 i18n。 */
 export const HTTP_METHOD_CONFIG = {
   [HttpMethod.Get]: {
     text: HttpMethod.Get,
@@ -45,124 +60,126 @@ export const HTTP_METHOD_CONFIG = {
   }
 >
 
+/** HTTP 状态码配置。`textKey` / `descKey` 为 i18n key，取值见 `menu.httpCode.<code>`。 */
 export const HTTP_CODE_CONFIG = {
   [200]: {
     value: 200,
-    text: '成功',
-    desc: '请求成功',
+    textKey: 'menu.httpCode.200.text',
+    descKey: 'menu.httpCode.200.desc',
   },
   [201]: {
     value: 201,
-    text: '成功',
-    desc: '请求成功，并且创建了一个新资源。这通常是在 POST 请求或部分 PUT 请求后发送的响应',
+    textKey: 'menu.httpCode.201.text',
+    descKey: 'menu.httpCode.201.desc',
   },
   [202]: {
     value: 202,
-    text: '成功',
-    desc: '请求已收到，但尚未采取行动',
+    textKey: 'menu.httpCode.202.text',
+    descKey: 'menu.httpCode.202.desc',
   },
   [204]: {
     value: 204,
-    text: '删除成功',
-    desc: '此请求没有要发送的内容，但标头可能有用',
+    textKey: 'menu.httpCode.204.text',
+    descKey: 'menu.httpCode.204.desc',
   },
   [400]: {
     value: 400,
-    text: '请求有误',
-    desc: '由于被视为客户端错误的某种原因，服务器无法或不愿处理请求',
+    textKey: 'menu.httpCode.400.text',
+    descKey: 'menu.httpCode.400.desc',
   },
   [401]: {
     value: 401,
-    text: '没有权限',
-    desc: '尽管 HTTP 标准指定为“未授权”，但从语义上讲，此响应意味着“未认证”',
+    textKey: 'menu.httpCode.401.text',
+    descKey: 'menu.httpCode.401.desc',
   },
   [403]: {
     value: 403,
-    text: '禁止访问',
-    desc: '客户端没有访问内容的权限；也就是说，它未获授权，因此服务器拒绝提供所请求的资源',
+    textKey: 'menu.httpCode.403.text',
+    descKey: 'menu.httpCode.403.desc',
   },
   [404]: {
     value: 404,
-    text: '记录不存在',
-    desc: '服务器找不到请求的资源。在浏览器中，这意味着 URL 无法识别。在 API 中，这还可能意味着端点是有效的，但资源本身不存在',
+    textKey: 'menu.httpCode.404.text',
+    descKey: 'menu.httpCode.404.desc',
   },
   [410]: {
     value: 410,
-    text: '记录不存在',
-    desc: '当请求的内容已从服务器永久删除且无转发地址时发送此响应',
+    textKey: 'menu.httpCode.410.text',
+    descKey: 'menu.httpCode.410.desc',
   },
   [422]: {
     value: 422,
-    text: '参数错误',
-    desc: '请求格式正确，但由于语义错误无法执行',
+    textKey: 'menu.httpCode.422.text',
+    descKey: 'menu.httpCode.422.desc',
   },
   [500]: {
     value: 500,
-    text: '服务器错误',
-    desc: '服务器遇到无法处理的情况',
+    textKey: 'menu.httpCode.500.text',
+    descKey: 'menu.httpCode.500.desc',
   },
   [502]: {
     value: 502,
-    text: '网关错误',
-    desc: '当服务器作为网关获取处理请求所需响应时，收到无效响应时发送此错误响应',
+    textKey: 'menu.httpCode.502.text',
+    descKey: 'menu.httpCode.502.desc',
   },
   [503]: {
     value: 503,
-    text: '服务器故障',
-    desc: '服务器尚未准备好处理请求',
+    textKey: 'menu.httpCode.503.text',
+    descKey: 'menu.httpCode.503.desc',
   },
   [504]: {
     value: 504,
-    text: '网关超时',
-    desc: '当服务器充当网关时无法及时获取响应时，发送此错误响应',
+    textKey: 'menu.httpCode.504.text',
+    descKey: 'menu.httpCode.504.desc',
   },
-} as const satisfies Record<number, { value: number, text: string, desc: string }>
+} as const satisfies Record<number, { value: number, textKey: string, descKey: string }>
 
+/** 接口状态配置。`color` 不随语言变，`textKey` 为 i18n key（见 `menu.apiStatus`）。 */
 export const API_STATUS_CONFIG = {
   [ApiStatus.Designing]: {
-    text: '设计中',
+    textKey: 'menu.apiStatus.designing',
     color: '--color-lime-6',
   },
   [ApiStatus.Pending]: {
-    text: '待确定',
+    textKey: 'menu.apiStatus.pending',
     color: '--color-yellow-6',
   },
   [ApiStatus.Developing]: {
-    text: '开发中',
+    textKey: 'menu.apiStatus.developing',
     color: '--color-blue-6',
   },
   [ApiStatus.Obsolete]: {
-    text: '已废弃',
+    textKey: 'menu.apiStatus.obsolete',
     color: '--color-grey-6',
   },
   [ApiStatus.Integrating]: {
-    text: '联调中',
+    textKey: 'menu.apiStatus.integrating',
     color: '--color-pink-6',
   },
   [ApiStatus.Testing]: {
-    text: '测试中',
+    textKey: 'menu.apiStatus.testing',
     color: '--color-orange-6',
   },
   [ApiStatus.Tested]: {
-    text: '已测完',
+    textKey: 'menu.apiStatus.tested',
     color: '--color-purple-6',
   },
   [ApiStatus.Released]: {
-    text: '已发布',
+    textKey: 'menu.apiStatus.released',
     color: '--color-green-6',
   },
   [ApiStatus.Deprecated]: {
-    text: '将废弃',
+    textKey: 'menu.apiStatus.deprecated',
     color: '--color-grey-6',
   },
   [ApiStatus.Exception]: {
-    text: '有异常',
+    textKey: 'menu.apiStatus.exception',
     color: '--color-red-6',
   },
 } as const satisfies Record<
   ApiStatus,
   {
-    text: string
+    textKey: string
     color: string
   }
 >
@@ -188,44 +205,51 @@ export const PARAMS_CONFIG = {
   },
 } as const satisfies Record<ParamType, { varColor: string }>
 
+/**
+ * 顶级目录配置。
+ *
+ * 文案字段全部改为 i18n key（`menu.catalog` / `menu.catalogNew` / `menu.catalogTip`），
+ * `accentColor` 保留为数据。`Overview` 与 `Recycle` 没有新建含义，对应 key 为空字符串，
+ * 消费方需判空后再取词。
+ */
 export const API_MENU_CONFIG = {
   [CatalogType.Overview]: {
-    title: '项目概况',
-    newLabel: '',
-    tipTitle: '',
+    titleKey: 'menu.catalog.overview',
+    newLabelKey: '',
+    tipTitleKey: '',
     accentColor: '',
   },
   [CatalogType.Recycle]: {
-    title: '回收站',
-    newLabel: '',
-    tipTitle: '',
+    titleKey: 'menu.catalog.recycle',
+    newLabelKey: '',
+    tipTitleKey: '',
     accentColor: '',
   },
   [CatalogType.Http]: {
-    title: '接口',
-    newLabel: '新建接口',
-    tipTitle: '添加接口',
+    titleKey: 'menu.catalog.http',
+    newLabelKey: 'menu.catalogNew.http',
+    tipTitleKey: 'menu.catalogTip.http',
     accentColor: '#eb2f96',
   },
   [CatalogType.Schema]: {
-    title: '数据模型',
-    newLabel: '新建数据模型',
-    tipTitle: '添加数据模型',
+    titleKey: 'menu.catalog.schema',
+    newLabelKey: 'menu.catalogNew.schema',
+    tipTitleKey: 'menu.catalogTip.schema',
     accentColor: '#9373ee',
   },
   [CatalogType.Request]: {
-    title: '快捷请求',
-    newLabel: '新建快捷请求',
-    tipTitle: '添加快捷请求',
+    titleKey: 'menu.catalog.request',
+    newLabelKey: 'menu.catalogNew.request',
+    tipTitleKey: 'menu.catalogTip.request',
     accentColor: 'rgb(95 128 233)',
   },
   [CatalogType.Markdown]: {
-    title: 'Markdown',
-    newLabel: '新建 Markdown',
-    tipTitle: '添加 Markdown',
+    titleKey: 'menu.catalog.markdown',
+    newLabelKey: 'menu.catalogNew.markdown',
+    tipTitleKey: 'menu.catalogTip.markdown',
     accentColor: '#13c2c2',
   },
 } as const satisfies Record<
   CatalogType,
-  { title: string, tipTitle: string, newLabel: string, accentColor: string }
+  { titleKey: string, tipTitleKey: string, newLabelKey: string, accentColor: string }
 >

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Collapse } from 'antd'
 import {
@@ -15,9 +16,11 @@ import {
 } from 'lucide-react'
 
 import { NODE_TYPE_COLORS } from '../nodes/nodeColors'
-import { FlowNodeType, NODE_TYPE_LABELS } from '../types/flow.types'
+import { FlowNodeType, NODE_TYPE_LABEL_KEYS } from '../types/flow.types'
 
 import { css } from '@emotion/css'
+
+import { translateKey } from '@/i18n/translate'
 
 // ==================== 节点定义 ====================
 
@@ -29,17 +32,28 @@ interface PaletteNodeItem {
   color: string
 }
 
-const PALETTE_NODES: PaletteNodeItem[] = [
-  { type: FlowNodeType.Start, label: NODE_TYPE_LABELS[FlowNodeType.Start], description: '流程起点', icon: Play, color: NODE_TYPE_COLORS[FlowNodeType.Start] },
-  { type: FlowNodeType.End, label: NODE_TYPE_LABELS[FlowNodeType.End], description: '流程终点', icon: CircleStop, color: NODE_TYPE_COLORS[FlowNodeType.End] },
-  { type: FlowNodeType.HttpRequest, label: NODE_TYPE_LABELS[FlowNodeType.HttpRequest], description: '发送 API 请求', icon: Globe, color: NODE_TYPE_COLORS[FlowNodeType.HttpRequest] },
-  { type: FlowNodeType.Condition, label: NODE_TYPE_LABELS[FlowNodeType.Condition], description: 'if/else 分支', icon: GitBranch, color: NODE_TYPE_COLORS[FlowNodeType.Condition] },
-  { type: FlowNodeType.Loop, label: NODE_TYPE_LABELS[FlowNodeType.Loop], description: '重复执行', icon: Repeat, color: NODE_TYPE_COLORS[FlowNodeType.Loop] },
-  { type: FlowNodeType.Parallel, label: NODE_TYPE_LABELS[FlowNodeType.Parallel], description: '同时执行', icon: Split, color: NODE_TYPE_COLORS[FlowNodeType.Parallel] },
-  { type: FlowNodeType.Wait, label: NODE_TYPE_LABELS[FlowNodeType.Wait], description: '延迟执行', icon: Timer, color: NODE_TYPE_COLORS[FlowNodeType.Wait] },
-  { type: FlowNodeType.SetVariable, label: NODE_TYPE_LABELS[FlowNodeType.SetVariable], description: '设置变量', icon: Variable, color: NODE_TYPE_COLORS[FlowNodeType.SetVariable] },
-  { type: FlowNodeType.Assert, label: NODE_TYPE_LABELS[FlowNodeType.Assert], description: '验证变量', icon: ShieldCheck, color: NODE_TYPE_COLORS[FlowNodeType.Assert] },
-]
+/**
+ * 节点面板条目。
+ *
+ * 必须是函数：条目含文案，模块顶层构造会在加载时把文案固定成当时语言。
+ * `label` 取节点类型名（`flow.nodeType.*`），`description` 取面板说明（`flow.palette.*`）。
+ */
+function createPaletteNodes(): PaletteNodeItem[] {
+  const label = (type: FlowNodeType) => translateKey(NODE_TYPE_LABEL_KEYS[type])
+  const desc = (type: FlowNodeType) => translateKey(`flow.palette.${type}`)
+
+  return [
+    { type: FlowNodeType.Start, label: label(FlowNodeType.Start), description: desc(FlowNodeType.Start), icon: Play, color: NODE_TYPE_COLORS[FlowNodeType.Start] },
+    { type: FlowNodeType.End, label: label(FlowNodeType.End), description: desc(FlowNodeType.End), icon: CircleStop, color: NODE_TYPE_COLORS[FlowNodeType.End] },
+    { type: FlowNodeType.HttpRequest, label: label(FlowNodeType.HttpRequest), description: desc(FlowNodeType.HttpRequest), icon: Globe, color: NODE_TYPE_COLORS[FlowNodeType.HttpRequest] },
+    { type: FlowNodeType.Condition, label: label(FlowNodeType.Condition), description: desc(FlowNodeType.Condition), icon: GitBranch, color: NODE_TYPE_COLORS[FlowNodeType.Condition] },
+    { type: FlowNodeType.Loop, label: label(FlowNodeType.Loop), description: desc(FlowNodeType.Loop), icon: Repeat, color: NODE_TYPE_COLORS[FlowNodeType.Loop] },
+    { type: FlowNodeType.Parallel, label: label(FlowNodeType.Parallel), description: desc(FlowNodeType.Parallel), icon: Split, color: NODE_TYPE_COLORS[FlowNodeType.Parallel] },
+    { type: FlowNodeType.Wait, label: label(FlowNodeType.Wait), description: desc(FlowNodeType.Wait), icon: Timer, color: NODE_TYPE_COLORS[FlowNodeType.Wait] },
+    { type: FlowNodeType.SetVariable, label: label(FlowNodeType.SetVariable), description: desc(FlowNodeType.SetVariable), icon: Variable, color: NODE_TYPE_COLORS[FlowNodeType.SetVariable] },
+    { type: FlowNodeType.Assert, label: label(FlowNodeType.Assert), description: desc(FlowNodeType.Assert), icon: ShieldCheck, color: NODE_TYPE_COLORS[FlowNodeType.Assert] },
+  ]
+}
 
 /** 新手常用节点：放前面 */
 const BASIC_NODE_TYPES: FlowNodeType[] = [
@@ -150,8 +164,13 @@ const groupClass = css`
 // ==================== 组件 ====================
 
 export default function NodePalette() {
+  const { t } = useTranslation()
   const [draggingType, setDraggingType] = useState<FlowNodeType | null>(null)
   const [, setGhostPos] = useState({ x: 0, y: 0 })
+
+  // t 作为依赖：语言切换时重新生成面板条目
+  // （createPaletteNodes 内部经 translateKey 读 i18n 单例，需由此订阅驱动重算）
+  const paletteNodes = useMemo(() => createPaletteNodes(), [t])
 
   // 鼠标事件模拟拖拽（绕过 Tauri WebView2 对 HTML5 拖拽 API 的兼容问题）
   const handleMouseDown = useCallback((e: React.MouseEvent, nodeType: FlowNodeType) => {
@@ -215,22 +234,24 @@ export default function NodePalette() {
   return (
     <>
       <div className={panelClass} data-testid="node-palette">
-        <div className={titleClass}>节点面板（点住拖到画布）</div>
+        <div className={titleClass}>{t('flow.palette.title')}</div>
         {BASIC_NODE_TYPES.map((type) => {
-          const item = PALETTE_NODES.find((n) => n.type === type)!
+          const item = paletteNodes.find((n) => n.type === type)!
+
           return renderCard(item)
         })}
         <Collapse
-          className={groupClass}
           ghost
+          className={groupClass}
           items={[
             {
               key: 'advanced',
-              label: '高级节点（按需使用）',
+              label: t('flow.palette.advanced'),
               children: (
                 <div>
                   {ADVANCED_NODE_TYPES.map((type) => {
-                    const item = PALETTE_NODES.find((n) => n.type === type)!
+                    const item = paletteNodes.find((n) => n.type === type)!
+
                     return renderCard(item)
                   })}
                 </div>
@@ -261,7 +282,7 @@ export default function NodePalette() {
             transform: 'translate(-50%, -50%)',
           }}
         >
-          {PALETTE_NODES.find((n) => n.type === draggingType)?.label}
+          {paletteNodes.find((n) => n.type === draggingType)?.label}
         </div>
       )}
     </>

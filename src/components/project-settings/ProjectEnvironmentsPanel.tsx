@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, Tag, theme, Typography } from 'antd'
 import { PlusIcon } from 'lucide-react'
@@ -18,9 +19,9 @@ import type { ApiEnvironment, ProjectEnvironmentConfig } from '@/types'
 
 import {
   createEnvironmentKey,
+  createGlobalSectionItems,
   EnvironmentEditor,
   getFallbackSection,
-  GLOBAL_SECTION_ITEMS,
   resolveEnvironment,
   type SectionKey,
 } from './EnvironmentPanelParts'
@@ -43,6 +44,7 @@ function updateValueSection(
 }
 
 export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
+  const { t } = useTranslation()
   const { editable } = props
   const { token } = theme.useToken()
   const { messageApi, modal } = useGlobalContext()
@@ -52,14 +54,17 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
   const [selectedKey, setSelectedKey] = useState<SectionKey>('globalVariables')
   const [saving, setSaving] = useState(false)
 
+  // t 作为依赖：语言切换时 t 引用变化，触发左侧分区文案重算
+  const globalSectionItems = useMemo(() => createGlobalSectionItems(t), [t])
+
   const handleEnvSave = () => {
     setSaving(true)
     void updateProjectEnvironmentConfig(draftConfig)
       .then(() => {
-        messageApi.success('环境配置已保存')
+        messageApi.success(t('settings.environments.saved'))
       })
       .catch((error: unknown) => {
-        messageApi.error(error instanceof Error ? error.message : '保存环境失败')
+        messageApi.error(error instanceof Error ? error.message : t('settings.environments.saveFailed'))
       })
       .finally(() => {
         setSaving(false)
@@ -70,11 +75,13 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
 
   const handleDeleteEnvironment = (environment: ApiEnvironment) => {
     modal.confirm({
-      title: `删除环境「${environment.name.trim() || '未命名环境'}」？`,
-      content: '该环境的变量、参数与前置 URL 将一并移除。保存前可点击「重置」撤销。',
-      okText: '删除',
+      title: t('settings.environments.deleteTitle', {
+        name: environment.name.trim() || t('settings.environments.unnamed'),
+      }),
+      content: t('settings.environments.deleteContent'),
+      okText: t('common.delete'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('common.cancel'),
       onOk: () => {
         setDraftConfig((current) => {
           const nextEnvironments = current.environments.filter(({ id }) => id !== environment.id)
@@ -97,7 +104,10 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
   }, [projectEnvironmentConfig])
 
   const selectedEnvironment = useMemo(() => resolveEnvironment(draftConfig, selectedKey), [draftConfig, selectedKey])
-  const selectedGlobalSection = useMemo(() => GLOBAL_SECTION_ITEMS.find(({ key }) => key === selectedKey), [selectedKey])
+  const selectedGlobalSection = useMemo(
+    () => globalSectionItems.find(({ key }) => key === selectedKey),
+    [globalSectionItems, selectedKey],
+  )
 
   // 实际生效值映射：会话变量 > 当前环境 > 全局，用于变量面板「实际生效值」预览列
   const { varMap: effectiveVarMap } = useResolvedVarMap({
@@ -116,21 +126,21 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
         style={{ borderBottom: `1px solid ${token.colorBorderSecondary}`, backgroundColor: token.colorFillQuaternary }}
       >
         <div>
-          <Typography.Title level={5}>环境空间</Typography.Title>
+          <Typography.Title level={5}>{t('settings.environments.title')}</Typography.Title>
           <Typography.Paragraph className="!mb-0" type="secondary">
-            把全局变量、密钥和项目环境收拢到一个工作区里，避免设置页内再次分裂。
+            {t('settings.environments.description')}
           </Typography.Paragraph>
         </div>
-        <Tag color="blue">项目级隔离</Tag>
+        <Tag color="blue">{t('settings.environments.projectIsolation')}</Tag>
       </div>
 
       <div className="grid min-h-[620px]" style={{ gridTemplateColumns: '248px minmax(0,1fr)' }}>
         <aside style={{ borderRight: `1px solid ${token.colorBorderSecondary}`, backgroundColor: token.colorFillTertiary }}>
           <div className="px-4 py-3 text-xs font-medium uppercase tracking-[0.08em]" style={{ color: token.colorTextSecondary }}>
-            全局
+            {t('settings.environments.globalSection')}
           </div>
           <div className="space-y-1 px-2">
-            {GLOBAL_SECTION_ITEMS.map((item) => (
+            {globalSectionItems.map((item) => (
               <button
                 key={item.key}
                 className="flex w-full appearance-none items-center gap-2 rounded-lg border-0 px-3 py-2 text-left transition-colors"
@@ -150,7 +160,7 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
           </div>
 
           <div className="mt-5 px-4 py-3 text-xs font-medium uppercase tracking-[0.08em]" style={{ color: token.colorTextSecondary }}>
-            环境
+            {t('settings.environments.environmentSection')}
           </div>
           <div className="space-y-1 px-2">
             {draftConfig.environments.map((environment) => {
@@ -171,12 +181,12 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
                     className="inline-flex size-6 items-center justify-center rounded-md text-xs font-semibold"
                     style={{ color: selected ? token.colorPrimaryText : token.colorPrimary, backgroundColor: selected ? token.colorPrimary : token.colorPrimaryBg }}
                   >
-                    {environment.name.trim().charAt(0) || '环'}
+                    {environment.name.trim().charAt(0) || t('settings.environments.avatarFallback')}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium">{environment.name}</div>
                     <div className="truncate text-xs" style={{ color: token.colorTextSecondary }}>
-                      {getPrimaryEnvironmentUrl(environment) || '未配置前置 URL'}
+                      {getPrimaryEnvironmentUrl(environment) || t('settings.environments.noBaseUrl')}
                     </div>
                   </div>
                 </button>
@@ -195,7 +205,7 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
                 setSelectedKey(createEnvironmentKey(nextEnvironment.id))
               }}
             >
-              新建环境
+              {t('settings.environments.newEnvironment')}
             </Button>
           </div>
         </aside>
@@ -260,7 +270,7 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
             className="flex items-center justify-end gap-3 px-6 py-4"
             style={{ borderTop: `1px solid ${token.colorBorderSecondary}`, backgroundColor: token.colorBgLayout }}
           >
-            {!editable && <Typography.Text type="secondary">你当前是查看者，不能修改项目环境。</Typography.Text>}
+            {!editable && <Typography.Text type="secondary">{t('settings.environments.viewerHint')}</Typography.Text>}
             <Button
               disabled={saving}
               onClick={() => {
@@ -268,9 +278,9 @@ export function ProjectEnvironmentsPanel(props: { editable: boolean }) {
                 setSelectedKey(getFallbackSection(projectEnvironmentConfig))
               }}
             >
-              重置
+              {t('common.reset')}
             </Button>
-            <Button disabled={!editable} loading={saving} type="primary" onClick={handleEnvSave}>保存环境</Button>
+            <Button disabled={!editable} loading={saving} type="primary" onClick={handleEnvSave}>{t('settings.environments.save')}</Button>
           </div>
         </section>
       </div>

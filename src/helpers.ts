@@ -1,5 +1,6 @@
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { CatalogType, ContentType, MenuItemType } from '@/enums'
+import { t } from '@/i18n'
 import type { UnsafeAny } from '@/types'
 
 export function getCatalogType(type: MenuItemType): CatalogType {
@@ -46,7 +47,7 @@ export function getCreateType(
     return MenuItemType.HttpRequest
   }
   else {
-    throw new Error(`未处理的类型：${type}`)
+    throw new Error(t('app.errors.unhandledType', { type }))
   }
 }
 

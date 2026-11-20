@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Input, type InputProps } from 'antd'
 import { nanoid } from 'nanoid'
@@ -16,6 +17,7 @@ export interface PathInputProps {
 
 export function PathInput(props: PathInputProps) {
   const { value, onChange, onValueChange, onParseQueryParams } = props
+  const { t } = useTranslation()
 
   const { messageApi } = useGlobalContext()
   const msgKey = useRef<string>()
@@ -32,9 +34,9 @@ export function PathInput(props: PathInputProps) {
         key: msgKey.current, // 用户可能会重复键入 “?”，因此需要避免重复显示提示。
         content: (
           <span>
-            Query&nbsp;参数请在下方
-            <strong>请求参数</strong>
-            中填写
+            {t('api.doc.queryInPathHintPrefix')}
+            <strong>{t('api.doc.requestParams')}</strong>
+            {t('api.doc.queryInPathHintSuffix')}
           </span>
         ),
         duration: 3,
@@ -51,7 +53,7 @@ export function PathInput(props: PathInputProps) {
 
       messageApi.info({
         key: msgKey.current,
-        content: <span>接口路径不支持填写&nbsp;URL&nbsp;hash(#)</span>,
+        content: <span>{t('api.doc.pathHashUnsupported')}</span>,
         duration: 3,
         onClose: () => {
           msgKey.current = undefined
@@ -109,5 +111,5 @@ export function PathInput(props: PathInputProps) {
     }
   }
 
-  return <Input placeholder="接口路径，“/”起始" value={value} onChange={handleInputChange} />
+  return <Input placeholder={t('api.doc.pathPlaceholder')} value={value} onChange={handleInputChange} />
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, InputNumber, message, Modal, Space, Switch, theme, Typography } from 'antd'
 
@@ -14,6 +15,7 @@ export interface AppRequestConfig {
 }
 
 export function RequestSettingsPanel() {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
   const { sessionId } = useAuth()
   const [msgApi, contextHolder] = message.useMessage()
@@ -73,19 +75,19 @@ export function RequestSettingsPanel() {
     if (!sessionId) { return }
 
     Modal.confirm({
-      title: '清空 Cookie',
-      content: `确定要清空本地已保存的 ${cookieCount} 个 Cookie 吗？此操作不可撤销。`,
-      okText: '清空',
+      title: t('settings.request.clearConfirmTitle'),
+      content: t('settings.request.clearConfirmContent', { count: cookieCount }),
+      okText: t('settings.request.clear'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('common.cancel'),
       onOk: async () => {
         try {
           await api('clear_cookie_jar', { sessionId })
           refreshCookieCount()
-          msgApi.success('Cookie 已清空')
+          msgApi.success(t('settings.request.cleared'))
         }
         catch (err) {
-          msgApi.error(err instanceof Error ? err.message : '清空失败')
+          msgApi.error(err instanceof Error ? err.message : t('settings.request.clearFailed'))
         }
       },
     })
@@ -96,10 +98,10 @@ export function RequestSettingsPanel() {
       {contextHolder}
       <div className="space-y-6">
         <div>
-          <Typography.Text className="mb-1 block text-sm font-medium">全局默认请求超时</Typography.Text>
+          <Typography.Text className="mb-1 block text-sm font-medium">{t('settings.request.timeoutTitle')}</Typography.Text>
           <Space.Compact>
             <InputNumber
-              addonAfter="秒"
+              addonAfter={t('common.seconds')}
               max={3600}
               min={0}
               placeholder="30"
@@ -109,16 +111,16 @@ export function RequestSettingsPanel() {
             />
           </Space.Compact>
           <Typography.Text className="mt-1 block text-sm" type="secondary">
-            单个接口可在运行页的「超时」输入框单独覆盖；0 表示不限时，留空使用默认 30 秒。
+            {t('settings.request.timeoutHint')}
           </Typography.Text>
         </div>
 
         <div style={{ borderTop: `1px solid ${token.colorBorderSecondary}`, paddingTop: 20 }}>
           <div className="flex items-center justify-between">
             <div>
-              <Typography.Text className="block text-sm font-medium">Cookie 自动管理</Typography.Text>
+              <Typography.Text className="block text-sm font-medium">{t('settings.request.cookieTitle')}</Typography.Text>
               <Typography.Text className="block text-sm" type="secondary">
-                自动保存响应中的 Set-Cookie 并在后续请求中按域名自动携带；运行页手动填写的 Cookie 优先。
+                {t('settings.request.cookieDescription')}
               </Typography.Text>
             </div>
             <Switch
@@ -132,13 +134,10 @@ export function RequestSettingsPanel() {
 
           <div className="mt-4 flex items-center gap-3">
             <Typography.Text className="text-sm" type="secondary">
-              已保存 Cookie：
-              <Typography.Text strong>{cookieCount}</Typography.Text>
-              {' '}
-              个
+              {t('settings.request.savedCookies', { count: cookieCount })}
             </Typography.Text>
             <Button danger disabled={cookieCount === 0} size="small" onClick={handleClearCookies}>
-              清空 Cookie
+              {t('settings.request.clearCookies')}
             </Button>
           </div>
         </div>

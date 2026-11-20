@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, message, Modal, Typography } from 'antd'
 import { DownloadIcon, GlobeIcon } from 'lucide-react'
@@ -19,6 +20,7 @@ interface ProjectInfo {
 }
 
 export function ExportPanel({ projectId }: { projectId?: string }) {
+  const { t } = useTranslation()
   const { sessionId } = useAuth()
   const { menuRawList } = useMenuHelpersContext()
   const [msgApi, contextHolder] = message.useMessage()
@@ -34,7 +36,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
     }
 
     if (checkedApiIds.size === 0) {
-      msgApi.error('请至少选择一个接口')
+      msgApi.error(t('settings.export.selectAtLeastOne'))
 
       return
     }
@@ -60,7 +62,7 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
         }))
 
       if (apiItems.length === 0) {
-        msgApi.error('所选接口暂无数据')
+        msgApi.error(t('settings.export.noSelectedData'))
 
         return
       }
@@ -90,13 +92,13 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
         : await downloadMhtml(projectName, treeInput)
 
       if (saved) {
-        msgApi.success(`已导出 ${treeInput.totalCount} 个接口`)
+        msgApi.success(t('settings.export.exported', { count: treeInput.totalCount }))
         setExportModalOpen(false)
       }
     }
     catch (err) {
       const msg = typeof err === 'string' ? err : (err as Error).message || String(err)
-      msgApi.error(msg || '导出失败，请重试')
+      msgApi.error(msg || t('settings.export.failed'))
     }
     finally {
       setExporting(false)
@@ -115,26 +117,26 @@ export function ExportPanel({ projectId }: { projectId?: string }) {
 
       <div className="flex items-center gap-2">
         <Button icon={<DownloadIcon size={14} />} type="primary" onClick={() => { openExportModal('markdown') }}>
-          导出 Markdown
+          {t('settings.export.exportMarkdown')}
         </Button>
         <Button icon={<GlobeIcon size={14} />} onClick={() => { openExportModal('mhtml') }}>
-          导出 MHTML
+          {t('settings.export.exportMhtml')}
         </Button>
       </div>
 
       <Modal
         destroyOnClose
         confirmLoading={exporting}
-        okText="导出"
+        okText={t('settings.export.ok')}
         open={exportModalOpen}
-        title={exportFormat === 'markdown' ? '导出 Markdown 文档' : '导出 MHTML 文档'}
+        title={exportFormat === 'markdown' ? t('settings.export.markdownTitle') : t('settings.export.mhtmlTitle')}
         width={640}
         onCancel={() => { setExportModalOpen(false) }}
         onOk={() => void handleExport(exportFormat)}
       >
         <div className="flex flex-col gap-4">
           <div>
-            <Typography.Text className="mb-2 block text-sm">选择要导出的接口</Typography.Text>
+            <Typography.Text className="mb-2 block text-sm">{t('settings.transfer.selectExportApis')}</Typography.Text>
             <ExportTreeSelect checkedApiIds={checkedApiIds} onChange={setCheckedApiIds} />
           </div>
         </div>

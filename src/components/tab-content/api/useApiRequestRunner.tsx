@@ -5,6 +5,7 @@ import { api } from '@/api-client'
 import { useAuth } from '@/contexts/auth'
 import { useGlobalContext } from '@/contexts/global'
 import { useProxyConfig } from '@/contexts/proxy-config'
+import { t } from '@/i18n'
 import type { ApiRunResult } from '@/types'
 
 import { parseQueryPairsFromUrl } from './historyUtils'
@@ -37,7 +38,7 @@ export function useApiRequestRunner() {
     timeoutMs?: number,
   ): Promise<ApiRunResult | undefined> => {
     if (!projectId || !sessionId) {
-      const msg = '当前不在项目页面，无法运行请求'
+      const msg = t('api.run.notInProject')
       messageApi.error(msg)
       setError(msg)
 
@@ -51,6 +52,7 @@ export function useApiRequestRunner() {
     setResult(undefined)
 
     const isStale = () => requestId !== requestIdRef.current
+
     const finish = () => {
       runningCountRef.current = Math.max(0, runningCountRef.current - 1)
 
@@ -103,7 +105,7 @@ export function useApiRequestRunner() {
       return apiResult
     }
     catch (err) {
-      const msg = err instanceof Error ? err.message : '运行失败'
+      const msg = err instanceof Error ? err.message : t('api.run.runFailed')
 
       if (!isStale()) {
         messageApi.error({ content: msg, duration: 4 })
@@ -141,7 +143,7 @@ export function useApiRequestRunner() {
             errorType: 'application_error',
             errorMessage: msg,
             errorDetail: err instanceof Error ? err.stack ?? '' : String(err),
-            suggestion: '请检查操作是否正确，如果问题持续请尝试重新登录',
+            suggestion: t('api.run.genericSuggestion'),
           },
         }
         api('save_request_history', {

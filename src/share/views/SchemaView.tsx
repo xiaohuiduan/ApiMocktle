@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Card, Table, Tag } from 'antd'
 
 import { schemaExample, schemaTree, type SchemaTreeNode } from '../schema-example'
@@ -19,6 +21,7 @@ function JsonBlock({ value }: { value: unknown }) {
 }
 
 export function SchemaView({ data }: { data: unknown }) {
+  const { t } = useTranslation()
   const schema = (data ?? {}) as Record<string, unknown>
 
   const name = typeof schema.name === 'string' ? schema.name : undefined
@@ -40,24 +43,26 @@ export function SchemaView({ data }: { data: unknown }) {
                   className="mb-3"
                   columns={[
                     {
-                      title: '字段',
+                      title: t('share.table.field'),
                       dataIndex: 'name',
                       render: (value: string) => <span className="font-mono">{value}</span>,
                     },
                     {
-                      title: '类型',
+                      title: t('share.table.type'),
                       dataIndex: 'type',
                       width: 140,
                       render: (value: string) => <span className="font-mono">{value}</span>,
                     },
                     {
-                      title: '必填',
+                      title: t('share.table.required'),
                       dataIndex: 'required',
                       width: 80,
-                      render: (value: boolean) => (value ? <Tag color="red">必填</Tag> : <Tag>可选</Tag>),
+                      render: (value: boolean) => (value
+                        ? <Tag color="red">{t('share.table.required')}</Tag>
+                        : <Tag>{t('share.table.optional')}</Tag>),
                     },
                     {
-                      title: '说明',
+                      title: t('share.table.description'),
                       dataIndex: 'description',
                       render: (value?: string) => value ?? '-',
                     },
@@ -69,7 +74,7 @@ export function SchemaView({ data }: { data: unknown }) {
                   size="small"
                 />
               )}
-              <div className="mb-1 text-xs text-gray-500">示例</div>
+              <div className="mb-1 text-xs text-gray-500">{t('share.schema.example')}</div>
               <JsonBlock value={example} />
             </Card>
           )

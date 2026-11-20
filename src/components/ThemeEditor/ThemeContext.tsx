@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
 import { setTwoToneColor } from '@ant-design/icons'
-import { ConfigProvider, theme, type ThemeConfig } from 'antd'
-import zhCN from 'antd/locale/zh_CN'
+import { App as AntdApp, ConfigProvider, theme, type ThemeConfig } from 'antd'
+
+import { useAntdLocale } from '@/i18n/use-language'
 
 import { designStylePresets, getDensityToken, presetThemes } from './theme-data'
 import { restoreThemeSetting } from './ThemeEditor.helper'
@@ -292,6 +293,8 @@ interface ThemeProviderProps {
 
 export function ThemeProvider(props: React.PropsWithChildren<ThemeProviderProps>) {
   const { token } = theme.useToken()
+  // antd 内置文案（分页器、空状态、Modal 默认按钮等）跟随当前界面语言
+  const antdLocale = useAntdLocale()
 
   const { children, initialValue, autoSaveId } = props
 
@@ -395,14 +398,24 @@ export function ThemeProvider(props: React.PropsWithChildren<ThemeProviderProps>
   return (
     <ThemeContext.Provider value={{ themeSetting, setThemeSetting, autoSaveId, isDarkMode }}>
       <ConfigProvider
-        locale={zhCN}
+        locale={antdLocale}
         theme={{
           algorithm,
           token: { ...themePresetTokens, ...designStyleToken },
           components: mergedComponents,
         }}
       >
-        {children}
+        {/*
+          <App> 提供 message / Modal / notification 的上下文。
+          项目里有 18 处 Modal.confirm/info 与 59 处 message.* 静态调用，
+          静态方法无法消费 ConfigProvider 的 locale —— 没有这层包裹，
+          它们的内置按钮文案（确定/取消）会退回 antd 默认的英文。
+
+          component={false}：默认会渲染 <div class="ant-app">，插入一层会打断
+          根节点 h-full 的高度链（App 之外的布局依赖 h-full 撑满视口）。
+          关闭包裹元素后仍提供 Context，且不产生额外 DOM。
+        */}
+        <AntdApp component={false}>{children}</AntdApp>
       </ConfigProvider>
     </ThemeContext.Provider>
   )

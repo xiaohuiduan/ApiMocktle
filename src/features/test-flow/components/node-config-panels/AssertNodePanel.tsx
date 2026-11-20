@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Collapse, Typography } from 'antd'
 
@@ -14,6 +15,8 @@ const { Text } = Typography
 // ==================== 组件 ====================
 
 export default function AssertNodePanel({ data, onChange }: PanelProps<AssertNodeData>) {
+  const { t } = useTranslation()
+
   // 更新变量断言列表
   const handleAssertionsChange = useCallback(
     (assertions: VariableAssertion[]) => {
@@ -33,7 +36,7 @@ export default function AssertNodePanel({ data, onChange }: PanelProps<AssertNod
   const collapseItems = [
     {
       key: 'variableAssertions',
-      label: '变量断言规则',
+      label: t('flow.nodeConfig.assert.variableRules'),
       children: (
         <VariableAssertionListEditor
           assertions={(data.assertions as unknown as VariableAssertion[]) || []}
@@ -43,11 +46,11 @@ export default function AssertNodePanel({ data, onChange }: PanelProps<AssertNod
     },
     {
       key: 'script',
-      label: '脚本断言（高级）',
+      label: t('flow.nodeConfig.assert.scriptRules'),
       children: (
         <div>
           <Text className="mb-2 block text-xs" type="secondary">
-            使用 pm.test() / pm.expect() 编写自定义断言，可访问 variables 对象
+            {t('flow.nodeConfig.assert.scriptHint')}
           </Text>
           <MonacoEditor
             height="180px"
@@ -61,7 +64,7 @@ export default function AssertNodePanel({ data, onChange }: PanelProps<AssertNod
             onChange={handleScriptChange}
           />
           <Text className="mt-2 block text-xs" style={{ color: 'var(--ds-node-text-muted)' }} type="secondary">
-            示例: pm.test('token已获取', () =&gt; {'{'} pm.expect(variables.token).toBeDefined() {'}'})
+            {t('flow.nodeConfig.assert.example')}
           </Text>
         </div>
       ),
@@ -71,7 +74,7 @@ export default function AssertNodePanel({ data, onChange }: PanelProps<AssertNod
   return (
     <div className="space-y-4">
       <Text className="block text-xs" type="secondary">
-        断言验证（检查变量值）
+        {t('flow.nodeConfig.assert.title')}
       </Text>
       <Collapse defaultActiveKey={['variableAssertions']} items={collapseItems} size="small" />
     </div>

@@ -3,11 +3,11 @@ import { nanoid } from 'nanoid'
 import type { ApiMenuData } from '@/components/ApiMenu/ApiMenu.type'
 import { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
 import type { ApiTabItem } from '@/components/ApiTab/ApiTab.type'
-import { API_MENU_CONFIG } from '@/configs/static'
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useMenuTabHelpers } from '@/contexts/menu-tab-settings'
 import { initialCreateApiDetailsData } from '@/data/remote'
-import { BodyType, CatalogType, MenuItemType } from '@/enums'
+import { BodyType, MenuItemType } from '@/enums'
+import { t } from '@/i18n'
 import type { ApiDetails } from '@/types'
 
 /** 构造一条空的快捷请求详情，作为新建草稿的初始数据。 */
@@ -39,7 +39,9 @@ export function useHelpers() {
     config?: { autoActive?: boolean, replaceTab?: ApiTabItem['key'] },
     parentId?: string,
   ) => {
-    const { newLabel } = API_MENU_CONFIG[CatalogType.Http]
+    // 默认名按当前语言取词：它会作为「新建当时的名字」写进草稿与数据库，
+    // 之后切语言不回改（属内容数据）。default-names.ts 收录中英两套用于空草稿判定。
+    const newLabel = t('app.defaultNames.api')
     // 用同一个 id 作为 tab key / 草稿 id / 将来入库的 DB id，保证全程一致。
     const id = nanoid(6)
 
@@ -70,7 +72,7 @@ export function useHelpers() {
     config?: { autoActive?: boolean, replaceTab?: ApiTabItem['key'] },
     parentId?: string,
   ) => {
-    const { newLabel } = API_MENU_CONFIG[CatalogType.Request]
+    const newLabel = t('app.defaultNames.quickRequest')
     // 用同一个 id 作为 tab key / 草稿 id / 将来入库的 DB id，保证全程一致。
     const id = nanoid(6)
 
@@ -105,7 +107,7 @@ export function useHelpers() {
       {
         ...payload,
         key: nanoid(6),
-        label: '新建 Markdown',
+        label: t('app.defaultNames.doc'),
         contentType: MenuItemType.Doc,
         data: { tabStatus: PageTabStatus.Create, ...(parentId ? { parentId } : {}) },
       },
@@ -118,7 +120,7 @@ export function useHelpers() {
     config?: { autoActive?: boolean, replaceTab?: ApiTabItem['key'] },
     parentId?: string,
   ) => {
-    const { newLabel } = API_MENU_CONFIG[CatalogType.Schema]
+    const newLabel = t('app.defaultNames.schema')
 
     addTabItem(
       {

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Form } from 'antd'
 
@@ -20,6 +21,8 @@ interface ThemeEditorProps {
  */
 export function ThemeEditor(props: ThemeEditorProps) {
   const { value, onChange, autoSaveId } = props
+
+  const { t } = useTranslation()
 
   const [form] = Form.useForm<ThemeSetting>()
 
@@ -44,15 +47,15 @@ export function ThemeEditor(props: ThemeEditorProps) {
           onChange?.(newThemeSetting)
         }}
       >
-        <Form.Item label="主题" name="themeMode">
+        <Form.Item label={t('ui.theme.label')} name="themeMode">
           <ThemePicker />
         </Form.Item>
 
-        <Form.Item label="设计风格" name="designStyle">
+        <Form.Item label={t('ui.designStyle.label')} name="designStyle">
           <DesignStylePicker />
         </Form.Item>
 
-        <Form.Item label="界面密度" name="density">
+        <Form.Item label={t('ui.density.label')} name="density">
           <DensityPicker />
         </Form.Item>
       </Form>

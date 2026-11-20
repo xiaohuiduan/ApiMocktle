@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, Form, Popconfirm, Space, theme } from 'antd'
 import { nanoid } from 'nanoid'
@@ -21,6 +22,7 @@ type ApiSchemaForm = ApiSchema & { name?: ApiMenuData['name'] }
 
 export function Schema() {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const [form] = Form.useForm<ApiSchemaForm>()
 
@@ -73,7 +75,7 @@ export function Schema() {
         form={form}
         onFinish={(values) => {
           void (async () => {
-            const menuName = values.name ?? '未命名数据模型'
+            const menuName = values.name ?? t('api.schema.defaultName')
 
             if (isCreating) {
               const menuItemId = nanoid(6)
@@ -94,7 +96,7 @@ export function Schema() {
                 },
                 { replaceTab: tabData.key },
               )
-              messageApi.success('保存成功')
+              messageApi.success(t('api.save.success'))
             }
             else {
               try {
@@ -103,10 +105,10 @@ export function Schema() {
                   name: menuName,
                   data: values,
                 })
-                messageApi.success('保存成功')
+                messageApi.success(t('api.save.success'))
               }
               catch (err) {
-                messageApi.error((err as Error).message || '保存失败，请检查权限')
+                messageApi.error((err as Error).message || t('api.save.failedWithPermission'))
               }
             }
           })()
@@ -119,24 +121,24 @@ export function Schema() {
       >
         <div className="mb-3 flex items-center" style={{ gap: `${token.padding}px` }}>
           <Form.Item noStyle name="name">
-            <InputUnderline placeholder="数据模型名称，建议使用代码模型名称或同义词" />
+            <InputUnderline placeholder={t('api.schema.namePlaceholder')} />
           </Form.Item>
 
           <Space>
             <Button htmlType="submit" type="primary">
-              保存
+              {t('common.save')}
             </Button>
 
             {!isCreating && (
               <Popconfirm
                 placement="bottom"
-                title={`确定删除数据模型“${schemaName ?? ''}”？`}
+                title={t('api.schema.confirmDelete', { name: schemaName ?? '' })}
                 onConfirm={() => {
                   removeTabItem({ key: tabData.key })
                   removeMenuItem({ id: tabData.key })
                 }}
               >
-                <Button>删除</Button>
+                <Button>{t('common.delete')}</Button>
               </Popconfirm>
             )}
           </Space>

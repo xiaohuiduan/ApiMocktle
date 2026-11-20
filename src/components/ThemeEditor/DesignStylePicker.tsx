@@ -1,6 +1,9 @@
+import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { Space, theme } from 'antd'
 
-import { designStylePresets, presetDesignStyles } from './theme-data'
+import { designStylePresetKeys, designStylePresets, getDesignStylePresets } from './theme-data'
 import type { DesignStyle } from './ThemeEditor.type'
 
 interface DesignStylePickerProps {
@@ -93,19 +96,24 @@ const innerDecorations: Record<
 export function DesignStylePicker(props: DesignStylePickerProps) {
   const { token } = theme.useToken()
 
+  const { t } = useTranslation()
+
   const { value, onChange } = props
+
+  // t 作为依赖：语言切换时重新取展示名与说明
+  const designStyleOptions = useMemo(() => getDesignStylePresets(), [t])
 
   return (
     <Space wrap size={token.paddingLG}>
-      {Object.entries(presetDesignStyles).map(([styleKey, { name, description }]) => {
-        const style = styleKey as DesignStyle
+      {(Object.keys(designStylePresetKeys) as DesignStyle[]).map((style) => {
         const matched = style === (value ?? 'default')
+        const { name, description } = designStyleOptions[style]
         const preview = stylePreviews[style]
         const deco = innerDecorations[style]
 
         return (
           <Space
-            key={styleKey}
+            key={style}
             align="center"
             className={matched ? 'cursor-default' : 'cursor-pointer'}
             direction="vertical"

@@ -1,4 +1,7 @@
+import { useTranslation } from 'react-i18next'
+
 import { Button, Input, Switch, theme, Tooltip, Typography } from 'antd'
+import type { TFunction } from 'i18next'
 import { PlusIcon, TrashIcon } from 'lucide-react'
 
 import { useStyles } from '@/hooks/useStyle'
@@ -36,19 +39,23 @@ interface ValueColumn {
   align?: 'center'
 }
 
-/** 表头与数据行共用同一列定义，避免列宽/列数不一致导致错位 */
-function buildValueColumns(showEffective: boolean, showEnable: boolean): ValueColumn[] {
+/**
+ * 表头与数据行共用同一列定义，避免列宽/列数不一致导致错位。
+ *
+ * 必须是函数：表头文案随语言变化，模块顶层求值会在加载时固定住。
+ */
+function createValueColumns(t: TFunction, showEffective: boolean, showEnable: boolean): ValueColumn[] {
   const columns: ValueColumn[] = [
-    { key: 'name', title: '变量名', width: 'minmax(0,1fr)' },
-    { key: 'value', title: '值', width: 'minmax(0,1.2fr)' },
+    { key: 'name', title: t('settings.valueTable.name'), width: 'minmax(0,1fr)' },
+    { key: 'value', title: t('settings.valueTable.value'), width: 'minmax(0,1.2fr)' },
   ]
 
   if (showEffective) {
-    columns.push({ key: 'effective', title: '实际生效值', width: 'minmax(0,1.2fr)' })
+    columns.push({ key: 'effective', title: t('settings.valueTable.effective'), width: 'minmax(0,1.2fr)' })
   }
 
   if (showEnable) {
-    columns.push({ key: 'enable', title: '启用', width: '60px', align: 'center' })
+    columns.push({ key: 'enable', title: t('settings.valueTable.enable'), width: '60px', align: 'center' })
   }
 
   columns.push({ key: 'remove', title: '', width: '56px', align: 'center' })
@@ -67,7 +74,17 @@ function ValueRowsTable(props: {
   effectiveVarMap?: Map<string, string>
 }) {
   const { token } = theme.useToken()
-  const { editable, rows, gridTemplateColumns, dividerClass, onChange, emptyText = '当前还没有内容，点击右上角"添加"开始配置。', showEnable, effectiveVarMap } = props
+  const { t } = useTranslation()
+  const {
+    editable,
+    rows,
+    gridTemplateColumns,
+    dividerClass,
+    onChange,
+    emptyText = t('settings.valueTable.emptyText'),
+    showEnable,
+    effectiveVarMap,
+  } = props
 
   if (rows.length === 0) {
     return (
@@ -92,7 +109,7 @@ function ValueRowsTable(props: {
       >
         <Input
           disabled={!editable}
-          placeholder="添加变量"
+          placeholder={t('settings.valueTable.addVariable')}
           value={row.name}
           variant="borderless"
           onChange={(event) => {
@@ -101,7 +118,7 @@ function ValueRowsTable(props: {
         />
         <Input
           disabled={!editable}
-          placeholder="值"
+          placeholder={t('settings.valueTable.value')}
           value={row.value}
           variant="borderless"
           onChange={(event) => {
@@ -109,7 +126,7 @@ function ValueRowsTable(props: {
           }}
         />
         {effectiveVarMap && (
-          <Tooltip title={overridden ? '已被更高优先级变量覆盖' : '当前值即为生效值'}>
+          <Tooltip title={overridden ? t('settings.valueTable.overridden') : t('settings.valueTable.effectiveNow')}>
             <div
               className="flex items-center truncate px-3 text-xs"
               style={{ color: overridden ? token.colorPrimary : token.colorTextSecondary }}
@@ -155,8 +172,9 @@ function ValueTable(props: {
   effectiveVarMap?: Map<string, string>
 }) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const { editable, rows, onChange, emptyText, showEnable, effectiveVarMap } = props
-  const columns = buildValueColumns(!!effectiveVarMap, !!showEnable)
+  const columns = createValueColumns(t, !!effectiveVarMap, !!showEnable)
   const gridTemplateColumns = columns.map((column) => column.width).join(' ')
   const { styles } = useStyles(({ token: t }, cssFn) => ({
     columnDivider: cssFn({
@@ -203,6 +221,7 @@ export function ValueEditor(props: {
   showEnable?: boolean
   effectiveVarMap?: Map<string, string>
 }) {
+  const { t } = useTranslation()
   const { editable, title, description, rows, onAdd, onChange, showEnable, effectiveVarMap } = props
 
   return (
@@ -213,7 +232,7 @@ export function ValueEditor(props: {
           <Typography.Paragraph className="!mb-0" type="secondary">{description}</Typography.Paragraph>
         </div>
         <Button disabled={!editable} icon={<PlusIcon size={14} />} onClick={onAdd}>
-          添加
+          {t('common.add')}
         </Button>
       </div>
 
@@ -237,6 +256,7 @@ export function TabValueEditor(props: {
   showEnable?: boolean
   showAdd?: boolean
 }) {
+  const { t } = useTranslation()
   const { editable, rows, onAdd, onChange, emptyText, showEnable, showAdd = true } = props
 
   return (
@@ -244,7 +264,7 @@ export function TabValueEditor(props: {
       {showAdd && (
         <div className="flex justify-end">
           <Button disabled={!editable} icon={<PlusIcon size={14} />} onClick={onAdd}>
-            添加
+            {t('common.add')}
           </Button>
         </div>
       )}

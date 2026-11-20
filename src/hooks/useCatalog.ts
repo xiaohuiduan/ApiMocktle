@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { CascaderProps } from 'antd'
 import arrayToTree from 'array-to-tree'
@@ -26,6 +27,7 @@ export interface UseCatalogParmas {
 export function useCatalog({ type, exclued }: UseCatalogParmas): {
   catalogOptions: CascaderOptions
 } {
+  const { t } = useTranslation()
   const { menuRawList } = useMenuHelpersContext()
 
   const catalogOptions = useMemo<CascaderOptions>(() => {
@@ -43,13 +45,13 @@ export function useCatalog({ type, exclued }: UseCatalogParmas): {
     return [
       {
         value: ROOT_CATALOG,
-        label: '根目录',
+        label: t('app.catalog.root'),
       },
       ...(Array.isArray(menuList)
         ? arrayToTree(menuList, { customID: 'value', parentProperty: 'parentId' })
         : []),
     ]
-  }, [menuRawList, type, exclued])
+  }, [t, menuRawList, type, exclued])
 
   return { catalogOptions }
 }

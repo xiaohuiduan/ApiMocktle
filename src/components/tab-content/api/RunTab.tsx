@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router'
 
 import {
@@ -108,6 +109,7 @@ function mergeParams(
 
 export function RunTab() {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const { tabData } = useTabContentContext()
 
   const { messageApi, modal } = useGlobalContext()
@@ -299,10 +301,10 @@ export function RunTab() {
     if (!hasSavedRunTab) {
       // 没有保存的运行时信息，直接复原到文档定义
       Modal.confirm({
-        title: '一键复原',
-        content: '确定要放弃所有临时修改，恢复为文档定义的原始值吗？',
-        okText: '确认复原',
-        cancelText: '取消',
+        title: t('api.run.resetTitle'),
+        content: t('api.run.resetConfirm'),
+        okText: t('api.run.resetConfirmOk'),
+        cancelText: t('common.cancel'),
         onOk: () => { doReset('define') },
       })
 
@@ -310,13 +312,13 @@ export function RunTab() {
     }
 
     const modal = Modal.info({
-      title: '一键复原',
-      content: '请选择复原来源：',
+      title: t('api.run.resetTitle'),
+      content: t('api.run.resetSource'),
       footer: (
         <div className="mt-4 flex justify-end gap-2">
-          <Button onClick={() => { modal.destroy() }}>关闭</Button>
-          <Button onClick={() => { modal.destroy(); doReset('define') }}>复原到文档定义</Button>
-          <Button type="primary" onClick={() => { modal.destroy(); doReset('saved') }}>复原到保存点</Button>
+          <Button onClick={() => { modal.destroy() }}>{t('common.close')}</Button>
+          <Button onClick={() => { modal.destroy(); doReset('define') }}>{t('api.run.resetToDoc')}</Button>
+          <Button type="primary" onClick={() => { modal.destroy(); doReset('saved') }}>{t('api.run.resetToSaved')}</Button>
         </div>
       ),
       icon: null,
@@ -332,13 +334,13 @@ export function RunTab() {
       // 复原到最新保存的运行时信息
       const merged = mergeRunTabInfo(originalDocRef.current!, savedRunTabInfo)
       setWorkCopy(merged)
-      messageApi.success('已复原到上次保存点')
+      messageApi.success(t('api.run.resetToSavedPointDone'))
     }
     else {
       // 复原到文档定义
       const fresh = cloneApiDetails(originalDocRef.current!)
       setWorkCopy(fresh)
-      messageApi.success('已复原为文档原始值')
+      messageApi.success(t('api.run.resetToDocDone'))
     }
 
     resetResult()
@@ -449,14 +451,14 @@ export function RunTab() {
 
         if (!preResult.success) {
           setPreScriptRunning(false)
-          messageApi.error(`前置脚本执行失败: ${preResult.error}`)
+          messageApi.error(t('api.script.preFailed', { error: preResult.error }))
 
           return
         }
       }
       catch (err) {
         setPreScriptRunning(false)
-        messageApi.error(`前置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
+        messageApi.error(t('api.script.preError', { error: err instanceof Error ? err.message : String(err) }))
 
         return
       }
@@ -550,11 +552,11 @@ export function RunTab() {
         }
 
         if (!postResult.success) {
-          messageApi.error(`后置脚本执行失败: ${postResult.error}`)
+          messageApi.error(t('api.script.postFailed', { error: postResult.error }))
         }
       }
       catch (err) {
-        messageApi.error(`后置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
+        messageApi.error(t('api.script.postError', { error: err instanceof Error ? err.message : String(err) }))
       }
 
       setPostScriptRunning(false)
@@ -604,19 +606,19 @@ export function RunTab() {
         runTabInfo,
       })
       setTabItemEditStatus({ key: tabData.key }, 'saved')
-      messageApi.success('已保存到接口文档')
+      messageApi.success(t('api.run.savedToDoc'))
     }
     catch (err) {
-      messageApi.error(err instanceof Error ? err.message : '保存失败')
+      messageApi.error(err instanceof Error ? err.message : t('api.save.failed'))
     }
   }
 
   // 「保存到文档」会覆盖文档定义,先列出将覆盖的字段再执行
   const confirmSaveToDoc = () => {
     modal.confirm({
-      title: '保存到接口文档？',
-      content: '将用当前运行时配置覆盖文档定义:Query/Header/Cookie 参数、请求体、前置/后置脚本与超时设置。',
-      okText: '覆盖保存',
+      title: t('api.run.saveToDocTitle'),
+      content: t('api.run.saveToDocContent'),
+      okText: t('api.run.saveToDocOk'),
       okButtonProps: { danger: true },
       onOk: () => handleSaveToDoc(),
     })
@@ -634,7 +636,7 @@ export function RunTab() {
     setWorkCopy(next)
     persist(next)
     setHistoryOpen(false)
-    messageApi.success('已回填历史请求')
+    messageApi.success(t('api.history.applied'))
   }
 
   // 判断是否显示 JSON 输入框
@@ -786,16 +788,16 @@ export function RunTab() {
         </div>
 
         {proxyInfo && (
-          <Tooltip title={`代理: ${proxyInfo.tooltip}`}>
-            <Tag className="shrink-0" color="blue">{proxyInfo.label} 代理</Tag>
+          <Tooltip title={t('api.run.proxyTooltip', { value: proxyInfo.tooltip })}>
+            <Tag className="shrink-0" color="blue">{t('api.run.proxyLabel', { type: proxyInfo.label })}</Tag>
           </Tooltip>
         )}
 
         {(/^https:\/\//i.test(workCopy.path ?? '') || /^https:\/\//i.test(envBaseUrl)) && (
-          <Tooltip title={insecureSkipVerify ? '不校验 HTTPS 证书：可调试自签名证书接口，但不推荐用于生产环境' : '校验 HTTPS 证书：验证服务器证书有效性'}>
+          <Tooltip title={insecureSkipVerify ? t('api.run.sslOffHint') : t('api.run.sslOnHint')}>
             <label className="flex shrink-0 cursor-pointer items-center gap-1.5" style={{ userSelect: 'none' }}>
               <span className="text-xs" style={{ color: insecureSkipVerify ? 'var(--ant-color-warning)' : 'var(--ant-color-success)' }}>
-                校验证书
+                {t('api.run.verifyCert')}
               </span>
               <Switch
                 checked={!insecureSkipVerify}
@@ -806,13 +808,13 @@ export function RunTab() {
           </Tooltip>
         )}
 
-        <Tooltip title="请求超时（秒），留空使用全局默认，0 表示不限时">
+        <Tooltip title={t('api.run.timeoutHint')}>
           <InputNumber
-            addonAfter="秒"
+            addonAfter={t('common.seconds')}
             className="shrink-0"
             max={3600}
             min={0}
-            placeholder="超时"
+            placeholder={t('api.run.timeoutPlaceholder')}
             size="small"
             style={{ width: 110 }}
             value={timeoutSeconds}
@@ -821,10 +823,10 @@ export function RunTab() {
         </Tooltip>
 
         <Space className="shrink-0" style={{ marginLeft: 'auto' }}>
-          <Tooltip title="历史记录">
+          <Tooltip title={t('api.history.title')}>
             <Button icon={<ClockIcon size={14} />} onClick={() => { setHistoryOpen(true) }} />
           </Tooltip>
-          <Tooltip title="保存到文档">
+          <Tooltip title={t('api.run.saveToDoc')}>
             <Button
               icon={<SaveIcon size={14} />}
               onClick={() => { confirmSaveToDoc() }}
@@ -836,9 +838,9 @@ export function RunTab() {
             type="primary"
             onClick={() => void handleRun()}
           >
-            运行
+            {t('api.run.run')}
           </Button>
-          <Tooltip title="复原为文档原始值（清除所有临时修改：参数、请求头、Body、脚本等）">
+          <Tooltip title={t('api.run.resetHint')}>
             <Button
               icon={<RotateCcwIcon size={14} />}
               onClick={handleReset}
@@ -969,7 +971,7 @@ export function RunTab() {
                       if (oldType && oldType !== type && oldText?.trim()) {
                         const oldLabel = getBodyTypeLabel(oldType)
 
-                        messageApi.info(`已保留 ${oldLabel} 的内容，切回 ${oldLabel} 可恢复`)
+                        messageApi.info(t('api.body.preservedHint', { type: oldLabel }))
                       }
 
                       const nextText = type === oldType ? oldText : bodyTextsRef.current[type]
@@ -1031,7 +1033,7 @@ export function RunTab() {
                       size="small"
                       type="text"
                       onClick={() => {
-                        void navigator.clipboard.writeText(curlCommands.windows).then(() => message.success('已复制'))
+                        void navigator.clipboard.writeText(curlCommands.windows).then(() => message.success(t('common.copied')))
                       }}
                     />
                   </div>
@@ -1047,7 +1049,7 @@ export function RunTab() {
                       size="small"
                       type="text"
                       onClick={() => {
-                        void navigator.clipboard.writeText(curlCommands.linux).then(() => message.success('已复制'))
+                        void navigator.clipboard.writeText(curlCommands.linux).then(() => message.success(t('common.copied')))
                       }}
                     />
                   </div>

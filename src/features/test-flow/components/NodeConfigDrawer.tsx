@@ -1,10 +1,13 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { invoke } from '@tauri-apps/api/core'
 import { Button, Collapse, Divider, Drawer, Input, message, Modal, Select, Spin, Tag, Typography } from 'antd'
 import { AlertTriangle, CheckCircle, Clock, CopyIcon, Play, XCircle } from 'lucide-react'
 
 import { useAuth } from '@/contexts/auth'
+import { t as translate } from '@/i18n'
+import { translateKey } from '@/i18n/translate'
 
 import { FlowEditorContext } from '../contexts/FlowEditorContext'
 import { usePathHighlightContext } from '../contexts/PathHighlightContext'
@@ -58,12 +61,12 @@ const codeBlockClass = css`
   margin: var(--ds-pad-xs) 0;
 `
 
-const STATUS_CONFIG: Record<string, { color: string, icon: React.ReactNode, label: string }> = {
-  passed: { color: 'success', icon: <CheckCircle size={14} />, label: '通过' },
-  failed: { color: 'error', icon: <XCircle size={14} />, label: '失败' },
-  error: { color: 'warning', icon: <AlertTriangle size={14} />, label: '错误' },
-  running: { color: 'processing', icon: <Clock size={14} />, label: '运行中' },
-  skipped: { color: 'default', icon: null, label: '跳过' },
+const STATUS_CONFIG: Record<string, { color: string, icon: React.ReactNode, labelKey: string }> = {
+  passed: { color: 'success', icon: <CheckCircle size={14} />, labelKey: 'flow.enum.execStatus.passed' },
+  failed: { color: 'error', icon: <XCircle size={14} />, labelKey: 'flow.enum.execStatus.failed' },
+  error: { color: 'warning', icon: <AlertTriangle size={14} />, labelKey: 'flow.enum.execStatus.error' },
+  running: { color: 'processing', icon: <Clock size={14} />, labelKey: 'flow.enum.execStatus.running' },
+  skipped: { color: 'default', icon: null, labelKey: 'flow.enum.execStatus.skipped' },
 }
 
 // ==================== 变量提取 ====================
@@ -139,6 +142,7 @@ function saveSavedVars(nodeId: string, vars: Record<string, string>) {
 // ==================== 组件 ====================
 
 export default function NodeConfigDrawer() {
+  const { t } = useTranslation()
   const selectedNodeId = useFlowStore((s) => s.selectedNodeId)
   const nodes = useFlowStore((s) => s.nodes)
   const drawerOpen = useFlowStore((s) => s.drawerOpen)
@@ -273,7 +277,7 @@ export default function NodeConfigDrawer() {
     const menuItemId = nodeData.menuItemId as string
 
     if (!menuItemId) {
-      message.error('节点未配置 API 接口')
+      message.error(t('flow.nodeConfig.nodeNoApi'))
 
       return
     }
@@ -332,7 +336,7 @@ export default function NodeConfigDrawer() {
       }
 
       if (!result.ok || !result.data) {
-        const errMsg = result.error ?? '请求失败'
+        const errMsg = result.error ?? t('flow.nodeConfig.requestFailed')
 
         // 写入节点数据
         if (selectedNodeId) {
@@ -367,7 +371,7 @@ export default function NodeConfigDrawer() {
       }
     }
     catch (err) {
-      const errMsg = `请求异常: ${err}`
+      const errMsg = t('flow.nodeConfig.requestException', { error: String(err) })
 
       if (selectedNodeId) {
         updateNodeData(selectedNodeId, {
@@ -381,7 +385,7 @@ export default function NodeConfigDrawer() {
     finally {
       setSingleRunLoading(false)
     }
-  }, [selectedNode, nodeData, selectedNodeId, projectId, updateNodeData])
+  }, [selectedNode, nodeData, selectedNodeId, projectId, updateNodeData, t])
 
   return (
     <>
@@ -390,7 +394,7 @@ export default function NodeConfigDrawer() {
         open={drawerOpen && !!selectedNode}
         placement="right"
         styles={{ body: { position: 'relative' } }}
-        title="节点配置"
+        title={t('flow.nodeConfig.drawerTitle')}
         width={drawerWidth}
         onClose={handleClose}
       >
@@ -422,7 +426,7 @@ export default function NodeConfigDrawer() {
                   type="primary"
                   onClick={handleRunClick}
                 >
-                  {singleRunLoading ? '运行中...' : '单独运行'}
+                  {singleRunLoading ? t('flow.nodeConfig.running') : t('flow.nodeConfig.runSingle')}
                 </Button>
               )}
             </div>
@@ -467,15 +471,15 @@ export default function NodeConfigDrawer() {
 
       {/* 运行配置弹窗 */}
       <Modal
-        cancelText="取消"
-        okText="运行"
+        cancelText={t('common.cancel')}
+        okText={t('flow.nodeConfig.run')}
         open={runModalOpen}
-        title="单独运行"
+        title={t('flow.nodeConfig.runSingle')}
         width={480}
         onCancel={() => { setRunModalOpen(false) }}
         onOk={() => {
           if (!selectedEnvName) {
-            message.warning('请选择运行环境')
+            message.warning(t('flow.run.environmentRequired'))
 
             return
           }
@@ -488,14 +492,14 @@ export default function NodeConfigDrawer() {
           {/* 环境选择 */}
           <div>
             <Text style={{ display: 'block', fontSize: 12, marginBottom: 4 }} type="secondary">
-              运行环境
+              {t('flow.run.environment')}
             </Text>
             <Select
               options={environments.map((e) => ({
                 value: e.name,
                 label: `${e.name}${e.baseUrls?.[0]?.url ? ` (${e.baseUrls[0].url})` : ''}`,
               }))}
-              placeholder="选择运行环境"
+              placeholder={t('flow.run.selectEnvironment')}
               size="small"
               style={{ width: '100%' }}
               value={selectedEnvName || undefined}
@@ -508,7 +512,7 @@ export default function NodeConfigDrawer() {
             <>
               <Divider style={{ margin: 'var(--ds-pad-sm) 0' }} />
               <Text style={{ display: 'block', fontSize: 12 }} type="secondary">
-                该请求包含变量，请填写：
+                {t('flow.nodeConfig.variablesToFill')}
               </Text>
               {runVarNames.map((varName) => (
                 <div key={varName}>
@@ -516,7 +520,7 @@ export default function NodeConfigDrawer() {
                     {`{{${varName}}}`}
                   </Text>
                   <Input
-                    placeholder={`输入 ${varName} 的值`}
+                    placeholder={t('flow.nodeConfig.varValuePlaceholder', { name: varName })}
                     size="small"
                     value={runVariables[varName] || ''}
                     onChange={(e) => { setRunVariables((prev) => ({ ...prev, [varName]: e.target.value })) }}
@@ -592,6 +596,7 @@ interface ExecResultProps {
 }
 
 function ExecResultSection({ status, error, durationMs, request, response }: ExecResultProps) {
+  const { t } = useTranslation()
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.error
 
   const collapseItems = []
@@ -599,7 +604,7 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
   if (request) {
     collapseItems.push({
       key: 'request',
-      label: '请求详情',
+      label: t('flow.detail.request'),
       extra: (
         <Button
           icon={<CopyIcon size={12} />}
@@ -608,7 +613,7 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
           onClick={(e) => {
             e.stopPropagation()
             void navigator.clipboard.writeText(formatRequest(request)).then(() => {
-              message.success('已复制')
+              message.success(t('flow.detail.copied'))
             })
           }}
         />
@@ -624,7 +629,7 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
   if (response) {
     collapseItems.push({
       key: 'response',
-      label: '响应详情',
+      label: t('flow.detail.response'),
       defaultActiveKey: true,
       extra: (
         <Button
@@ -634,7 +639,7 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
           onClick={(e) => {
             e.stopPropagation()
             void navigator.clipboard.writeText(formatResponse(response)).then(() => {
-              message.success('已复制')
+              message.success(t('flow.detail.copied'))
             })
           }}
         />
@@ -650,9 +655,9 @@ function ExecResultSection({ status, error, durationMs, request, response }: Exe
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ds-gap-sm)', marginBottom: 'var(--ds-pad-sm)' }}>
-        <Text strong style={{ fontSize: 13 }}>运行结果</Text>
+        <Text strong style={{ fontSize: 13 }}>{t('flow.nodeConfig.runResult')}</Text>
         <Tag color={config.color} icon={config.icon}>
-          {config.label}
+          {translateKey(config.labelKey)}
         </Tag>
         {durationMs !== undefined && (
           <Text style={{ fontSize: 12 }} type="secondary">{durationMs}ms</Text>
@@ -713,7 +718,7 @@ function formatRequest(req: Record<string, unknown>): string {
     }
   }
 
-  return parts.join('\n') || '(无详情)'
+  return parts.join('\n') || translate('flow.shared.noDetail')
 }
 
 function formatResponse(resp: Record<string, unknown>): string {
@@ -725,7 +730,7 @@ function formatResponse(resp: Record<string, unknown>): string {
     parts.push(`HTTP ${status} ${statusText}`)
   }
 
-  if (resp.duration_ms !== undefined) { parts.push(`耗时: ${resp.duration_ms}ms`) }
+  if (resp.duration_ms !== undefined) { parts.push(translate('flow.shared.elapsed', { ms: resp.duration_ms })) }
 
   parts.push('')
 
@@ -752,7 +757,7 @@ function formatResponse(resp: Record<string, unknown>): string {
     }
   }
 
-  return parts.join('\n') || '(无详情)'
+  return parts.join('\n') || translate('flow.shared.noDetail')
 }
 
 // ==================== 路径面包屑组件 ====================

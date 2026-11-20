@@ -1,37 +1,43 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Radio, Select, Typography } from 'antd'
+import { Plus, Trash2 } from 'lucide-react'
 
 import type { ConditionBranch, ConditionNodeData } from '../../types/flow.types'
 
 import type { PanelProps } from './shared/panelRegistry'
 import { useDraft } from './shared/useDraft'
 
+import { translateKey } from '@/i18n/translate'
+
 const { Text } = Typography
 
 // ==================== 条件类型选项 ====================
 
+/** 条件类型选项（label 为 i18n key，渲染期取词） */
 const CONDITION_TYPE_OPTIONS = [
-  { value: 'expression', label: '表达式' },
-  { value: 'variable_check', label: '变量检查' },
-  { value: 'status_code', label: '状态码' },
+  { value: 'expression', labelKey: 'flow.enum.conditionType.expression' },
+  { value: 'variable_check', labelKey: 'flow.enum.conditionType.variableCheck' },
+  { value: 'status_code', labelKey: 'flow.enum.conditionType.statusCode' },
 ]
 
 // ==================== 操作符选项 ====================
 
 const OPERATOR_OPTIONS = [
-  { value: 'equals', label: '等于' },
-  { value: 'not_equals', label: '不等于' },
-  { value: 'exists', label: '存在' },
-  { value: 'greater_than', label: '大于' },
-  { value: 'less_than', label: '小于' },
-  { value: 'contains', label: '包含' },
+  { value: 'equals', labelKey: 'flow.enum.operator.equals' },
+  { value: 'not_equals', labelKey: 'flow.enum.operator.notEquals' },
+  { value: 'exists', labelKey: 'flow.enum.operator.exists' },
+  { value: 'greater_than', labelKey: 'flow.enum.operator.greaterThan' },
+  { value: 'less_than', labelKey: 'flow.enum.operator.lessThan' },
+  { value: 'contains', labelKey: 'flow.enum.operator.contains' },
 ]
 
 // ==================== 组件 ====================
 
 export default function ConditionNodePanel({ data, onChange }: PanelProps<ConditionNodeData>) {
+  const { t } = useTranslation()
+
   // 表达式（受控草稿 + blur 提交；status_code 模式共用 data.expression）
   const { draft: expressionDraft, setDraft: setExpressionDraft, commit: commitExpression } = useDraft(
     data.expression ?? '',
@@ -79,9 +85,9 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
     const conditions = data.conditions ?? []
     const newId = `cond-${Date.now()}`
     onChange({
-      conditions: [...conditions, { id: newId, expression: '', label: `分支 ${conditions.length + 1}` }],
+      conditions: [...conditions, { id: newId, expression: '', label: t('flow.nodeConfig.condition.branch', { index: conditions.length + 1 }) }],
     })
-  }, [data.conditions, onChange])
+  }, [data.conditions, onChange, t])
 
   // 删除条件分支
   const handleRemoveCondition = useCallback(
@@ -123,13 +129,13 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
   return (
     <div className="space-y-4">
       <Text className="block text-xs" type="secondary">
-        条件配置
+        {t('flow.nodeConfig.condition.title')}
       </Text>
 
       {/* 条件类型 */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          条件类型
+          {t('flow.nodeConfig.condition.conditionType')}
         </Text>
         <Radio.Group
           data-testid="condition-type"
@@ -139,7 +145,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
         >
           {CONDITION_TYPE_OPTIONS.map((option) => (
             <Radio.Button key={option.value} value={option.value}>
-              {option.label}
+              {translateKey(option.labelKey)}
             </Radio.Button>
           ))}
         </Radio.Group>
@@ -149,11 +155,11 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
       {data.conditionType === 'expression' && (
         <div>
           <Text className="mb-1 block text-xs" type="secondary">
-            JavaScript 表达式
+            {t('flow.nodeConfig.condition.expression')}
           </Text>
           <Input.TextArea
             data-testid="condition-expression"
-            placeholder="例如: variables.token && variables.count > 0"
+            placeholder={t('flow.nodeConfig.condition.expressionPlaceholder')}
             rows={3}
             size="small"
             value={expressionDraft}
@@ -169,11 +175,11 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
       {data.conditionType === 'status_code' && (
         <div>
           <Text className="mb-1 block text-xs" type="secondary">
-            预期状态码
+            {t('flow.nodeConfig.condition.statusCode')}
           </Text>
           <Input
             data-testid="condition-status-code"
-            placeholder="例如: 200、201、404"
+            placeholder={t('flow.nodeConfig.condition.statusCodePlaceholder')}
             size="small"
             value={expressionDraft}
             onBlur={commitExpression}
@@ -188,11 +194,11 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
       {showOperator && (
         <div>
           <Text className="mb-1 block text-xs" type="secondary">
-            变量名
+            {t('flow.nodeConfig.condition.variableName')}
           </Text>
           <Input
             data-testid="condition-variable-name"
-            placeholder="例如: token"
+            placeholder={t('flow.nodeConfig.condition.variableNamePlaceholder')}
             size="small"
             value={variableNameDraft}
             onBlur={commitVariableName}
@@ -207,11 +213,11 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
       {showOperator && (
         <div>
           <Text className="mb-1 block text-xs" type="secondary">
-            操作符
+            {t('flow.nodeConfig.condition.operator')}
           </Text>
           <Select
             data-testid="condition-operator"
-            options={OPERATOR_OPTIONS}
+            options={OPERATOR_OPTIONS.map((o) => ({ value: o.value, label: translateKey(o.labelKey) }))}
             size="small"
             style={{ width: '100%' }}
             value={data.operator}
@@ -224,11 +230,11 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
       {showCompareValue && (
         <div>
           <Text className="mb-1 block text-xs" type="secondary">
-            比较值
+            {t('flow.nodeConfig.condition.compareValue')}
           </Text>
           <Input
             data-testid="condition-compare-value"
-            placeholder="期望值"
+            placeholder={t('flow.nodeConfig.condition.compareValuePlaceholder')}
             size="small"
             value={compareValueDraft}
             onBlur={commitCompareValue}
@@ -243,7 +249,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
       <div className="mt-4 border-t border-gray-200 pt-4">
         <div className="mb-3 flex items-center justify-between">
           <Text className="text-xs" type="secondary">
-            多条件分支（可选）
+            {t('flow.nodeConfig.condition.multiBranch')}
           </Text>
           {(!data.conditions || data.conditions.length < 8) && (
             <Button
@@ -253,7 +259,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
               type="dashed"
               onClick={handleAddCondition}
             >
-              添加分支
+              {t('flow.nodeConfig.condition.addBranch')}
             </Button>
           )}
         </div>
@@ -269,7 +275,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
                   >
                     <div className="flex items-center justify-between">
                       <Text strong className="text-xs">
-                        分支 {index + 1}
+                        {t('flow.nodeConfig.condition.branch', { index: index + 1 })}
                       </Text>
                       <Button
                         danger
@@ -283,7 +289,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
 
                     <Input
                       data-testid={`condition-branch-label-${index}`}
-                      placeholder="分支标签（如：状态码200）"
+                      placeholder={t('flow.nodeConfig.condition.branchLabelPlaceholder')}
                       size="small"
                       value={condition.label}
                       onChange={(e) => { handleConditionChange(index, 'label', e.target.value) }}
@@ -291,7 +297,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
 
                     <Input.TextArea
                       data-testid={`condition-branch-expression-${index}`}
-                      placeholder="条件表达式（如：variables.status === '200'）"
+                      placeholder={t('flow.nodeConfig.condition.branchExpressionPlaceholder')}
                       rows={2}
                       size="small"
                       value={condition.expression}
@@ -303,11 +309,11 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
                 {/* 默认分支 */}
                 <div className="rounded-md border border-dashed border-[color:var(--ds-node-border-color)] bg-[color:var(--ds-node-bg)] p-3">
                   <Text className="mb-2 block text-xs" type="secondary">
-                    默认分支（当所有条件都不满足时）
+                    {t('flow.nodeConfig.condition.defaultBranch')}
                   </Text>
                   <Input
                     data-testid="condition-default-label"
-                    placeholder="默认分支标签"
+                    placeholder={t('flow.nodeConfig.condition.defaultBranchPlaceholder')}
                     size="small"
                     value={data.defaultLabel ?? 'default'}
                     onChange={(e) => { handleDefaultLabelChange(e) }}
@@ -317,7 +323,7 @@ export default function ConditionNodePanel({ data, onChange }: PanelProps<Condit
             )
           : (
               <Text className="text-xs italic" type="secondary">
-                添加条件分支以支持多分支判断，否则使用简单的 true/false 双分支
+                {t('flow.nodeConfig.condition.noBranchHint')}
               </Text>
             )}
       </div>

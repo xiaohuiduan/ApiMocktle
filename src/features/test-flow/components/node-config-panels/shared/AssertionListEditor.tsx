@@ -1,8 +1,10 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Select, Space, Typography } from 'antd'
+import { Plus, Trash2 } from 'lucide-react'
 
+import { translateKey } from '@/i18n/translate'
 import type { TestAssertion } from '@/types'
 
 const { Text } = Typography
@@ -10,24 +12,24 @@ const { Text } = Typography
 // ==================== 断言类型选项 ====================
 
 const ASSERTION_TYPE_OPTIONS = [
-  { value: 'status', label: '状态码' },
-  { value: 'json_path', label: 'JSON 路径' },
-  { value: 'header', label: '响应头' },
-  { value: 'response_time', label: '响应时间' },
-  { value: 'body_contains', label: '响应体包含' },
+  { value: 'status', labelKey: 'flow.enum.assertionType.status' },
+  { value: 'json_path', labelKey: 'flow.enum.assertionType.jsonPath' },
+  { value: 'header', labelKey: 'flow.enum.assertionType.header' },
+  { value: 'response_time', labelKey: 'flow.enum.assertionType.responseTime' },
+  { value: 'body_contains', labelKey: 'flow.enum.assertionType.bodyContains' },
 ]
 
 // ==================== 操作符选项 ====================
 
 const OPERATOR_OPTIONS = [
-  { value: 'equals', label: '等于' },
-  { value: 'not_equals', label: '不等于' },
-  { value: 'exists', label: '存在' },
-  { value: 'not_exists', label: '不存在' },
-  { value: 'contains', label: '包含' },
-  { value: 'not_contains', label: '不包含' },
-  { value: 'greater_than', label: '大于' },
-  { value: 'less_than', label: '小于' },
+  { value: 'equals', labelKey: 'flow.enum.operator.equals' },
+  { value: 'not_equals', labelKey: 'flow.enum.operator.notEquals' },
+  { value: 'exists', labelKey: 'flow.enum.operator.exists' },
+  { value: 'not_exists', labelKey: 'flow.enum.operator.notExists' },
+  { value: 'contains', labelKey: 'flow.enum.operator.contains' },
+  { value: 'not_contains', labelKey: 'flow.enum.operator.notContains' },
+  { value: 'greater_than', labelKey: 'flow.enum.operator.greaterThan' },
+  { value: 'less_than', labelKey: 'flow.enum.operator.lessThan' },
 ]
 
 // ==================== 组件 Props ====================
@@ -40,6 +42,8 @@ interface AssertionListEditorProps {
 // ==================== 组件 ====================
 
 export default function AssertionListEditor({ assertions, onChange }: AssertionListEditorProps) {
+  const { t } = useTranslation()
+
   // 添加新断言
   const handleAdd = useCallback(() => {
     const newAssertion: TestAssertion = {
@@ -90,7 +94,7 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Text className="text-xs" type="secondary">
-          断言列表
+          {t('flow.nodeConfig.editor.assertionList')}
         </Text>
         <Button
           icon={<Plus size={14} />}
@@ -98,14 +102,14 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
           type="dashed"
           onClick={handleAdd}
         >
-          添加断言
+          {t('flow.nodeConfig.editor.assertionAdd')}
         </Button>
       </div>
 
       {assertions.length === 0
         ? (
             <Text className="text-xs italic" type="secondary">
-              暂无断言
+              {t('flow.nodeConfig.editor.assertionEmpty')}
             </Text>
           )
         : (
@@ -118,8 +122,8 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
                   {/* 第一行：类型、路径 */}
                   <Space.Compact block>
                     <Select
-                      options={ASSERTION_TYPE_OPTIONS}
-                      placeholder="断言类型"
+                      options={ASSERTION_TYPE_OPTIONS.map((o) => ({ value: o.value, label: translateKey(o.labelKey) }))}
+                      placeholder={t('flow.nodeConfig.editor.assertionTypePlaceholder')}
                       size="small"
                       style={{ width: '40%' }}
                       value={assertion.type}
@@ -148,8 +152,8 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
                   {/* 第二行：操作符、期望值、删除按钮 */}
                   <Space.Compact block>
                     <Select
-                      options={OPERATOR_OPTIONS}
-                      placeholder="操作符"
+                      options={OPERATOR_OPTIONS.map((o) => ({ value: o.value, label: translateKey(o.labelKey) }))}
+                      placeholder={t('flow.nodeConfig.editor.operatorPlaceholder')}
                       size="small"
                       style={{ width: '35%' }}
                       value={assertion.operator}
@@ -157,7 +161,7 @@ export default function AssertionListEditor({ assertions, onChange }: AssertionL
                     />
                     {shouldShowExpected(assertion.operator) && (
                       <Input
-                        placeholder="期望值"
+                        placeholder={t('flow.nodeConfig.editor.expectedPlaceholder')}
                         size="small"
                         style={{ width: '55%' }}
                         value={

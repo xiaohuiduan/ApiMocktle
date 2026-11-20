@@ -1,6 +1,7 @@
 'use client'
 
 import { type ReactNode, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { type ImperativePanelHandle, Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 
 import { theme, Typography } from 'antd'
@@ -19,6 +20,7 @@ interface ResponsePanelProps {
 
 export function ResponsePanel({ paramsArea, resultArea, hasResult, autoSaveId }: ResponsePanelProps) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const resultPanelRef = useRef<ImperativePanelHandle>(null)
   const prevHasResultRef = useRef(hasResult)
 
@@ -84,7 +86,7 @@ export function ResponsePanel({ paramsArea, resultArea, hasResult, autoSaveId }:
                 <div className="flex h-full flex-col items-center justify-center gap-2">
                   <TerminalIcon size={22} style={{ color: token.colorTextTertiary }} />
                   <Typography.Text className="text-xs" type="secondary">
-                    填写请求后点击“运行”查看响应
+                    {t('api.run.emptyHint')}
                   </Typography.Text>
                 </div>
               )}

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { show } from '@ebay/nice-modal-react'
 import { Button, theme } from 'antd'
@@ -13,6 +14,7 @@ import { useDesignStyle } from '@/hooks/useDesignStyle'
 import { NavMenu } from './NavMenu'
 
 export function SideNav() {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
   const { isGlassStyle, isSkeuomorphism, isNeumorphism } = useDesignStyle()
 
@@ -94,7 +96,7 @@ export function SideNav() {
         <Button
           icon={<SettingsIcon size={16} />}
           size="small"
-          title="全局设置"
+          title={t('app.shell.globalSettings')}
           type="text"
           onClick={() => void show(ModalSettings)}
         />

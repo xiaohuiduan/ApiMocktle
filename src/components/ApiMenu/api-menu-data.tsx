@@ -185,10 +185,10 @@ export function useMenuData(): MenuState {
           },
           title: (node) => (
             <ApiMenuTitle
-              leadingIcon={!isDraft ? typeIcon : undefined}
               actions={
                 item.isLeaf ? <FileAction catalog={catalog} /> : <FolderAction catalog={catalog} />
               }
+              leadingIcon={!isDraft ? typeIcon : undefined}
               name={
                 catalog.type === MenuItemType.ApiDetail
                   ? apiDetailDisplay === 'name'

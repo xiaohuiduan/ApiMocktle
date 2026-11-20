@@ -3,15 +3,21 @@ import { useEvent } from 'react-use-event-hook'
 
 import type { ApiTabItem, EditStatus } from '@/components/ApiTab'
 import type { PageTabStatus } from '@/components/ApiTab/ApiTab.enum'
-import { API_MENU_CONFIG } from '@/configs/static'
 import { useProjectTabsContext } from '@/contexts/project-tabs'
 import { CatalogType } from '@/enums'
+import { t } from '@/i18n'
 
+/**
+ * 默认页签。
+ *
+ * `label` 存的是目录名占位（渲染时由 `ApiTabLabel` 按 contentType 翻译），
+ * 不存翻译结果——页签状态会进 projectState 并被持久化，存文案会残留旧语言。
+ */
 function createDefaultTabItems(): ApiTabItem[] {
   return [
     {
       key: CatalogType.Overview,
-      label: API_MENU_CONFIG[CatalogType.Overview].title,
+      label: '',
       contentType: CatalogType.Overview,
     },
   ]
@@ -149,7 +155,7 @@ export function useMenuTabHelpers(): MenuTabHelpers {
       const isSameTabPresent = tabItems.some((item) => item.key === payload.key)
 
       if (isSameTabPresent) {
-        throw new Error('已存在相同的页签。')
+        throw new Error(t('app.errors.tabExists'))
       }
       else {
         if (replaceTab) {

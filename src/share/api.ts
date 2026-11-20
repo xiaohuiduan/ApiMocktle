@@ -1,5 +1,7 @@
 /** 访客只读应用的 API 封装：同源 fetch，不依赖 Tauri IPC */
 
+import { t } from '@/i18n'
+
 const TOKEN_KEY = 'apimocktle_share_token'
 
 export class ShareApiError extends Error {
@@ -74,7 +76,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const json = (await res.json().catch(() => null)) as ApiEnvelope<T> | null
 
   if (!res.ok || !json || json.errcode !== 0) {
-    throw new ShareApiError(json?.errmsg ?? `请求失败(${res.status})`, res.status)
+    // 函数体内取词：模块顶层求值会在切换语言后残留旧语言
+    throw new ShareApiError(json?.errmsg ?? t('share.error.requestFailed', { status: res.status }), res.status)
   }
 
   return json.data

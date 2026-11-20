@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { show } from '@ebay/nice-modal-react'
 import { Dropdown, type DropDownProps, type MenuProps, Modal, Table, Tag, theme } from 'antd'
@@ -39,6 +40,7 @@ type MenuClickInfo = Parameters<NonNullable<MenuProps['onClick']>>[0]
  */
 export function DropdownActions(props: React.PropsWithChildren<DropdownActionsProps>) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const { children, catalog, isFolder = false, ...dropdownProps } = props
 
@@ -64,18 +66,19 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
   const notifyDeleted = useCallback(() => {
     messageApi.success({
       type: 'success',
-      content: '已移入回收站，30 天内可恢复，可在左侧“回收站”查看',
+      content: t('api.menu.movedToRecycleBin'),
       duration: 6,
     })
-  }, [messageApi])
+  }, [messageApi, t])
 
-  const { tipTitle } = API_MENU_CONFIG[getCatalogType(catalog.type)]
+  const { tipTitleKey } = API_MENU_CONFIG[getCatalogType(catalog.type)]
+  const tipTitle = tipTitleKey ? t(tipTitleKey) : ''
   const createType = getCreateType(catalog.type)
 
   const commonActionMenuItems: MenuProps['items'] = [
     {
       key: 'rename',
-      label: '重命名',
+      label: t('api.menu.rename'),
       icon: <PencilIcon size={14} />,
       onClick: (ev) => {
         ev.domEvent.stopPropagation()
@@ -87,7 +90,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
     },
     {
       key: 'copy',
-      label: '复制',
+      label: t('common.copy'),
       icon: <CopyIcon size={14} />,
       onClick: (ev) => {
         ev.domEvent.stopPropagation()
@@ -97,7 +100,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
     },
     {
       key: 'move',
-      label: '移动到',
+      label: t('api.menu.moveTo'),
       icon: <FolderInputIcon size={14} />,
       onClick: (ev) => {
         ev.domEvent.stopPropagation()
@@ -124,7 +127,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
       ? [
           {
             key: 'run-all',
-            label: '运行全部',
+            label: t('api.menu.runAll'),
             icon: <PlayIcon size={14} />,
             onClick: (ev: MenuClickInfo) => {
               ev.domEvent.stopPropagation()
@@ -137,7 +140,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
       ? [
           {
             key: 'importCurl',
-            label: '导入 cURL',
+            label: t('api.menu.importCurl'),
             icon: <FolderInputIcon size={14} />,
             onClick: (ev: MenuClickInfo) => {
               ev.domEvent.stopPropagation()
@@ -165,7 +168,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
 
     {
       key: 'new',
-      label: '添加子目录',
+      label: t('api.menu.addSubCatalog'),
       icon: <FolderPlusIcon size={14} />,
       onClick: (ev) => {
         ev.domEvent.stopPropagation()
@@ -180,21 +183,21 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
 
     {
       key: 'delete',
-      label: '删除',
+      label: t('common.delete'),
       icon: <TrashIcon size={14} />,
       onClick: (ev) => {
         ev.domEvent.stopPropagation()
 
         modal.confirm({
-          title: <span className="font-normal">删除目录“{catalog.name}”？</span>,
+          title: <span className="font-normal">{t('api.menu.deleteFolderTitle', { name: catalog.name })}</span>,
           content: `${
             catalog.type === MenuItemType.ApiDetailFolder
-              ? '该目录及该目录下的接口和用例都'
+              ? t('api.menu.deleteFolderWithApisPrefix')
               : catalog.type === MenuItemType.ApiSchemaFolder
-                ? '该目录及该目录下的数据模型都'
+                ? t('api.menu.deleteFolderWithSchemasPrefix')
                 : ''
-          }将移至回收站，30 天后自动彻底删除。`,
-          okText: '删除',
+          }${t('api.menu.moveToRecycleBinSuffix')}`,
+          okText: t('common.delete'),
           okButtonProps: { danger: true },
           maskClosable: true,
           onOk: async () => {
@@ -217,29 +220,30 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
 
     {
       key: 'delete',
-      label: '删除',
+      label: t('common.delete'),
       icon: <TrashIcon size={14} />,
       onClick: (ev) => {
         ev.domEvent.stopPropagation()
 
-        const { title } = API_MENU_CONFIG[getCatalogType(catalog.type)]
+        const { titleKey } = API_MENU_CONFIG[getCatalogType(catalog.type)]
+        const title = titleKey ? t(titleKey) : ''
 
         modal.confirm({
           title: (
             <span className="font-normal">
-              删除{title}“{catalog.name}”？
+              {t('api.menu.deleteFileTitle', { kind: title, name: catalog.name })}
             </span>
           ),
           content: `${
             catalog.type === MenuItemType.ApiDetail
-              ? '该接口和该接口下的用例都'
+              ? t('api.menu.deleteApiPrefix')
               : catalog.type === MenuItemType.Doc
-                ? '文档'
+                ? t('api.menu.deleteDocPrefix')
                 : catalog.type === MenuItemType.ApiSchema
-                  ? '该数据模型'
+                  ? t('api.menu.deleteSchemaPrefix')
                   : ''
-          }将移至回收站，30 天后自动彻底删除。`,
-          okText: '删除',
+          }${t('api.menu.moveToRecycleBinSuffix')}`,
+          okText: t('common.delete'),
           okButtonProps: { danger: true },
           maskClosable: true,
           onOk: async () => {
@@ -258,7 +262,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
   const draftActionMenu: MenuProps['items'] = [
     {
       key: 'discard-draft',
-      label: '删除草稿',
+      label: t('api.menu.discardDraft'),
       icon: <TrashIcon size={14} />,
       onClick: (ev) => {
         ev.domEvent.stopPropagation()
@@ -273,7 +277,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
     const apis = collectFolderApis(catalog.id, menuRawList ?? [])
 
     if (!apis.length) {
-      messageApi.warning('该目录下没有可运行的接口')
+      messageApi.warning(t('api.menu.noRunnableApi'))
 
       return
     }
@@ -291,7 +295,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
       const details = api.data as ApiDetails
 
       if (!details) {
-        results.push({ name: api.name, status: 0, durationMs: 0, error: '缺少接口数据' })
+        results.push({ name: api.name, status: 0, durationMs: 0, error: t('api.menu.missingApiData') })
         continue
       }
 
@@ -308,8 +312,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
         resolveVars,
         buildBodyExample,
         // 批量运行没有 Body 编辑界面，无法手动「一键填充」，保持按文档定义发送的旧行为
-        fallbackBodyExample: true,
-        apiDetails: details,
+        fallbackBodyExample: true, apiDetails: details,
         menuRawList,
         insecureSkipVerify: false,
       })
@@ -321,7 +324,7 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
           results.push({ name: api.name, status: r.status, durationMs: r.durationMs })
         }
         else {
-          results.push({ name: api.name, status: 0, durationMs: 0, error: '运行失败' })
+          results.push({ name: api.name, status: 0, durationMs: 0, error: t('api.menu.runFailed') })
         }
       }
       catch (err) {
@@ -349,29 +352,31 @@ export function DropdownActions(props: React.PropsWithChildren<DropdownActionsPr
       <Modal
         footer={null}
         open={!!batchResult}
-        title={`批量运行结果（${batchResult?.length ?? 0}）`}
+        title={t('api.menu.batchRunResult', { count: batchResult?.length ?? 0 })}
         width={640}
         onCancel={() => { setBatchResult(undefined) }}
       >
         {batchResult && (
           <>
             <div style={{ marginBottom: 12 }}>
-              成功 {batchResult.filter((r) => !r.error && r.status !== 0 && r.status < 400).length} / 失败{' '}
-              {batchResult.filter((r) => r.error ?? r.status >= 400).length}
+              {t('api.menu.batchRunSummary', {
+                success: batchResult.filter((r) => !r.error && r.status !== 0 && r.status < 400).length,
+                failed: batchResult.filter((r) => r.error ?? r.status >= 400).length,
+              })}
             </div>
             <Table
               columns={[
-                { title: '接口', dataIndex: 'name', key: 'name' },
+                { title: t('api.menu.columnApi'), dataIndex: 'name', key: 'name' },
                 {
-                  title: '状态',
+                  title: t('api.menu.columnStatus'),
                   dataIndex: 'status',
                   key: 'status',
                   render: (status: number, row: { error?: string }) => row.error
-                    ? <Tag color="error">错误</Tag>
+                    ? <Tag color="error">{t('api.menu.errorTag')}</Tag>
                     : <Tag color={status !== 0 && status < 400 ? 'success' : 'error'}>{status}</Tag>,
                 },
-                { title: '耗时', dataIndex: 'durationMs', key: 'durationMs', render: (v: number) => `${v} ms` },
-                { title: '信息', dataIndex: 'error', key: 'error', render: (v?: string) => v ?? '-' },
+                { title: t('api.menu.columnDuration'), dataIndex: 'durationMs', key: 'durationMs', render: (v: number) => `${v} ms` },
+                { title: t('api.menu.columnInfo'), dataIndex: 'error', key: 'error', render: (v?: string) => v ?? '-' },
               ]}
               dataSource={batchResult.map((r, i) => ({ ...r, key: i }))}
               pagination={false}

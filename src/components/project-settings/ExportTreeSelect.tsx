@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Checkbox, Input, Tree, Typography } from 'antd'
 import type { CheckboxChangeEvent } from 'antd/es/checkbox'
@@ -118,6 +119,7 @@ function buildExportTree(menuRawList: ApiMenuData[], query: string): ExportTree 
  * 搜索只影响树的显示，导出范围始终是已选集合的全集。
  */
 export function ExportTreeSelect(props: ExportTreeSelectProps) {
+  const { t } = useTranslation()
   const { checkedApiIds, onChange } = props
   const { menuRawList } = useMenuHelpersContext()
   const [query, setQuery] = useState('')
@@ -165,7 +167,7 @@ export function ExportTreeSelect(props: ExportTreeSelectProps) {
     <div className="flex flex-col gap-2">
       <Input
         allowClear
-        placeholder="搜索接口名称、路径或请求方法"
+        placeholder={t('settings.export.searchPlaceholder')}
         prefix={<SearchIcon size={14} />}
         value={query}
         onChange={(e) => { setQuery(e.target.value) }}
@@ -179,16 +181,16 @@ export function ExportTreeSelect(props: ExportTreeSelectProps) {
             onChange(e.target.checked ? new Set(allApiIds) : new Set())
           }}
         >
-          全选 / 取消全选
+          {t('settings.export.selectAll')}
         </Checkbox>
         <Typography.Text className="text-xs" type="secondary">
-          已选 {checkedApiIds.size} / 共 {allApiIds.length}
+          {t('settings.export.selectedSummary', { selected: checkedApiIds.size, total: allApiIds.length })}
         </Typography.Text>
       </div>
 
       {hasQuery && (
         <Typography.Text className="text-xs" type="secondary">
-          导出范围以「已选 {checkedApiIds.size}」为准，搜索只影响树的显示
+          {t('settings.export.rangeHint', { selected: checkedApiIds.size })}
         </Typography.Text>
       )}
 
@@ -210,7 +212,7 @@ export function ExportTreeSelect(props: ExportTreeSelectProps) {
           )
         : (
             <Typography.Text type="secondary">
-              {hasQuery ? '没有匹配的接口' : '暂无接口数据'}
+              {hasQuery ? t('settings.export.noMatch') : t('settings.export.empty')}
             </Typography.Text>
           )}
     </div>

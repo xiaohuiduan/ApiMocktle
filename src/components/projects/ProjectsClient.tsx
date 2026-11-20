@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
 
 import { show } from '@ebay/nice-modal-react'
@@ -9,7 +10,15 @@ import { Search, SettingsIcon } from 'lucide-react'
 
 import { ModalSettings } from '@/components/modals/ModalSettings'
 import { ParticleCanvas } from '@/components/ParticleCanvas'
-import { getIconColor, ICON_CATEGORIES, ICON_MAP, ICON_OPTIONS, kebabToPascal, ProjectIcon } from '@/components/ProjectIcon'
+import {
+  getIconColor,
+  ICON_CATEGORIES,
+  ICON_CATEGORY_LABEL_KEYS,
+  ICON_MAP,
+  ICON_OPTIONS,
+  kebabToPascal,
+  ProjectIcon,
+} from '@/components/ProjectIcon'
 import {
   ApiRequestError,
   type ProjectItem,
@@ -35,28 +44,37 @@ type ProjectDialogState
     | { mode: 'edit', project: ProjectItem }
     | null
 
-const roleText: Record<ProjectItem['role'], string> = {
-  owner: '拥有者',
-  editor: '编辑者',
-  viewer: '查看者',
-}
+const ALL_CATEGORY_VALUE = '__all__'
 
 function IconPicker({ value, onChange }: { value?: string, onChange?: (val: string) => void }) {
-  const [category, setCategory] = useState('全部')
+  const { t } = useTranslation()
+  const [category, setCategory] = useState<string>(ALL_CATEGORY_VALUE)
   const [searchText, setSearchText] = useState('')
+
+  const categoryLabel = useMemo(() => {
+    return (cat: (typeof ICON_CATEGORIES)[number]): string => {
+      const key = ICON_CATEGORY_LABEL_KEYS[cat.key]
+
+      return key ? t(key) : cat.key === 'ai' ? 'AI' : cat.key
+    }
+  }, [t])
 
   const filteredCategories = useMemo(() => {
     if (!searchText) { return ICON_CATEGORIES }
 
-    const t = searchText.toLowerCase()
+    const keyword = searchText.toLowerCase()
 
-    return ICON_CATEGORIES.filter((c) => c.label.includes(t) || c.icons.some((name) => name.toLowerCase().includes(t)))
-  }, [searchText])
+    return ICON_CATEGORIES.filter((c) => {
+      const label = categoryLabel(c).toLowerCase()
+
+      return label.includes(keyword) || c.icons.some((name) => name.toLowerCase().includes(keyword))
+    })
+  }, [searchText, categoryLabel])
 
   const shownIcons = useMemo(() => {
-    if (category === '全部') { return ICON_OPTIONS }
+    if (category === ALL_CATEGORY_VALUE) { return ICON_OPTIONS }
 
-    const cat = ICON_CATEGORIES.find((c) => c.label === category)
+    const cat = ICON_CATEGORIES.find((c) => c.key === category)
 
     if (!cat) { return [] }
 
@@ -71,7 +89,7 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
       <div className="flex shrink-0 flex-col" style={{ width: 140 }}>
         <div className="mb-1.5 px-1">
           <Input
-            placeholder="搜索..."
+            placeholder={t('app.projects.iconPicker.searchPlaceholder')}
             prefix={<Search size={14} style={{ color: 'var(--ds-node-text-muted)' }} />}
             size="small"
             style={{ background: 'var(--ds-bg-elevated)', borderRadius: 6, padding: '0 8px' }}
@@ -85,43 +103,43 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
             style={{
               display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 10px',
               textAlign: 'left', fontSize: 12, transition: 'background 0.15s',
-              background: category === '全部' ? 'color-mix(in srgb, var(--ds-highlight-selected) 15%, transparent)' : 'transparent',
-              color: category === '全部' ? 'var(--ds-highlight-selected)' : 'var(--ds-node-text-secondary)',
-              fontWeight: category === '全部' ? 600 : 400,
+              background: category === ALL_CATEGORY_VALUE ? 'color-mix(in srgb, var(--ds-highlight-selected) 15%, transparent)' : 'transparent',
+              color: category === ALL_CATEGORY_VALUE ? 'var(--ds-highlight-selected)' : 'var(--ds-node-text-secondary)',
+              fontWeight: category === ALL_CATEGORY_VALUE ? 600 : 400,
               border: 'none', cursor: 'pointer', borderRadius: 4,
             }}
             type="button"
-            onClick={() => { setCategory('全部'); setSearchText('') }}
-            onMouseEnter={(e) => { if (category !== '全部') { e.currentTarget.style.background = 'var(--ds-bg-elevated)' } }}
-            onMouseLeave={(e) => { if (category !== '全部') { e.currentTarget.style.background = 'transparent' } }}
+            onClick={() => { setCategory(ALL_CATEGORY_VALUE); setSearchText('') }}
+            onMouseEnter={(e) => { if (category !== ALL_CATEGORY_VALUE) { e.currentTarget.style.background = 'var(--ds-bg-elevated)' } }}
+            onMouseLeave={(e) => { if (category !== ALL_CATEGORY_VALUE) { e.currentTarget.style.background = 'transparent' } }}
           >
-            <span style={{ flex: 1 }}>全部</span>
+            <span style={{ flex: 1 }}>{t('app.projects.iconPicker.all')}</span>
             <span style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums', color: 'var(--ds-node-text-muted)' }}>
               {ICON_OPTIONS.length}
             </span>
           </button>
           {filteredCategories.map((cat) => {
-            const availableInMap = category === cat.label
+            const availableInMap = category === cat.key
               ? shownIcons.length
               : cat.icons.map(kebabToPascal).filter((n) => n in ICON_MAP).length
 
             return (
               <button
-                key={cat.label}
+                key={cat.key}
                 style={{
                   display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '6px 10px',
                   textAlign: 'left', fontSize: 12, transition: 'background 0.15s',
-                  background: category === cat.label ? 'color-mix(in srgb, var(--ds-highlight-selected) 15%, transparent)' : 'transparent',
-                  color: category === cat.label ? 'var(--ds-highlight-selected)' : 'var(--ds-node-text-secondary)',
-                  fontWeight: category === cat.label ? 600 : 400,
+                  background: category === cat.key ? 'color-mix(in srgb, var(--ds-highlight-selected) 15%, transparent)' : 'transparent',
+                  color: category === cat.key ? 'var(--ds-highlight-selected)' : 'var(--ds-node-text-secondary)',
+                  fontWeight: category === cat.key ? 600 : 400,
                   border: 'none', cursor: 'pointer', borderRadius: 4,
                 }}
                 type="button"
-                onClick={() => { setCategory(cat.label) }}
-                onMouseEnter={(e) => { if (category !== cat.label) { e.currentTarget.style.background = 'var(--ds-bg-elevated)' } }}
-                onMouseLeave={(e) => { if (category !== cat.label) { e.currentTarget.style.background = 'transparent' } }}
+                onClick={() => { setCategory(cat.key) }}
+                onMouseEnter={(e) => { if (category !== cat.key) { e.currentTarget.style.background = 'var(--ds-bg-elevated)' } }}
+                onMouseLeave={(e) => { if (category !== cat.key) { e.currentTarget.style.background = 'transparent' } }}
               >
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cat.label}</span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{categoryLabel(cat)}</span>
                 <span style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums', color: 'var(--ds-node-text-muted)' }}>
                   {availableInMap}
                 </span>
@@ -135,7 +153,7 @@ function IconPicker({ value, onChange }: { value?: string, onChange?: (val: stri
       <div className="flex-1 rounded-lg p-2.5" style={{ minHeight: 260, maxHeight: 340, background: 'var(--ds-bg-elevated)' }}>
         {shownIcons.length === 0
           ? (
-              <div className="flex h-full items-center justify-center text-xs" style={{ color: 'var(--ds-node-text-muted)' }}>暂无图标</div>
+              <div className="flex h-full items-center justify-center text-xs" style={{ color: 'var(--ds-node-text-muted)' }}>{t('app.projects.iconPicker.empty')}</div>
             )
           : (
               <div className="h-full overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
@@ -172,15 +190,8 @@ function isUnauthorized(error: unknown) {
   return error instanceof ApiRequestError && error.status === 401
 }
 
-function getDialogTitle(dialog: ProjectDialogState) {
-  return dialog?.mode === 'edit' ? '编辑项目' : '新建项目'
-}
-
-function getSubmitErrorTitle(dialog: ProjectDialogState) {
-  return dialog?.mode === 'edit' ? '更新失败' : '创建失败'
-}
-
 export function ProjectsClient() {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
   const { isGlassStyle, isNeumorphism, isSkeuomorphism } = useDesignStyle()
   const navigate = useNavigate()
@@ -195,6 +206,18 @@ export function ProjectsClient() {
   })
   const [form] = Form.useForm<ProjectFormValues>()
   const [messageApi, contextHolder] = message.useMessage()
+
+  const roleText = useMemo<Record<ProjectItem['role'], string>>(
+    () => ({
+      owner: t('app.projects.role.owner'),
+      editor: t('app.projects.role.editor'),
+      viewer: t('app.projects.role.viewer'),
+    }),
+    [t],
+  )
+
+  const dialogTitle = dialog?.mode === 'edit' ? t('app.projects.editTitle') : t('app.projects.createTitle')
+  const submitErrorTitle = dialog?.mode === 'edit' ? t('app.projects.updateFailed') : t('app.projects.createFailed')
 
   const fetchProjects = async () => {
     if (!sessionId) { return }
@@ -212,7 +235,7 @@ export function ProjectsClient() {
       }
 
       Modal.error({
-        title: '加载失败',
+        title: t('app.projects.loadFailed'),
         content: (error as Error).message,
       })
     }
@@ -250,7 +273,7 @@ export function ProjectsClient() {
         await requestUpdateProject(sessionId, dialog.project.id, values)
         closeDialog()
         await fetchProjects()
-        messageApi.success('项目已更新')
+        messageApi.success(t('app.projects.updated'))
 
         return
       }
@@ -274,7 +297,7 @@ export function ProjectsClient() {
       }
 
       Modal.error({
-        title: getSubmitErrorTitle(dialog),
+        title: submitErrorTitle,
         content: (error as Error).message,
       })
     }
@@ -285,11 +308,11 @@ export function ProjectsClient() {
 
   const confirmDeleteProject = (project: ProjectItem) => {
     Modal.confirm({
-      title: `删除项目"${project.name}"？`,
-      content: '项目下的成员、接口、环境和回收站数据都会被彻底删除。',
-      okText: '删除',
+      title: t('app.projects.deleteConfirmTitle', { name: project.name }),
+      content: t('app.projects.deleteConfirmContent'),
+      okText: t('common.delete'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('common.cancel'),
       maskClosable: true,
       onOk: async () => {
         if (!sessionId) { return }
@@ -297,7 +320,7 @@ export function ProjectsClient() {
         try {
           await requestDeleteProject(sessionId, project.id)
           await fetchProjects()
-          messageApi.success('项目已删除')
+          messageApi.success(t('app.projects.deleted'))
         }
         catch (error) {
           if (isUnauthorized(error)) {
@@ -307,7 +330,7 @@ export function ProjectsClient() {
           }
 
           Modal.error({
-            title: '删除失败',
+            title: t('app.projects.deleteFailed'),
             content: (error as Error).message,
           })
         }
@@ -323,11 +346,11 @@ export function ProjectsClient() {
 
         <div className="mb-6 flex items-center">
           <Typography.Title level={3} style={{ margin: 0 }}>
-            项目列表
+            {t('app.projects.title')}
           </Typography.Title>
 
           <Space className="ml-auto">
-            <Tooltip title="全局设置">
+            <Tooltip title={t('app.shell.globalSettings')}>
               <Button
                 icon={<SettingsIcon size={16} />}
                 type="text"
@@ -336,7 +359,7 @@ export function ProjectsClient() {
             </Tooltip>
             <UserMenu />
             <Button type="primary" onClick={openCreateDialog}>
-              新建项目
+              {t('app.projects.create')}
             </Button>
           </Space>
         </div>
@@ -345,9 +368,9 @@ export function ProjectsClient() {
           {!loading && projects.length === 0
             ? (
                 <div className="flex flex-col items-center gap-4 py-20">
-                  <Empty description="还没有项目" />
+                  <Empty description={t('app.projects.empty')} />
                   <Button type="primary" onClick={openCreateDialog}>
-                    新建项目
+                    {t('app.projects.create')}
                   </Button>
                 </div>
               )
@@ -395,7 +418,9 @@ export function ProjectsClient() {
                       <Card
                         key={project.id}
                         hoverable
+                        aria-label={t('app.projects.openAria', { name: project.name })}
                         className={`group ${isNeumorphism ? '' : cardHoverClass}`}
+                        role="button"
                         style={{
                           ...cardBaseStyle,
                           transition: 'all 0.2s',
@@ -406,8 +431,14 @@ export function ProjectsClient() {
                         }}
                         styles={{ body: { padding: '16px' } }}
                         tabIndex={0}
-                        role="button"
-                        aria-label={`打开项目 ${project.name}`}
+                        onClick={() => {
+                          openProject({
+                            projectId: project.id,
+                            name: project.name,
+                            icon: project.icon,
+                            role: project.role,
+                          })
+                        }}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault()
@@ -418,14 +449,6 @@ export function ProjectsClient() {
                               role: project.role,
                             })
                           }
-                        }}
-                        onClick={() => {
-                          openProject({
-                            projectId: project.id,
-                            name: project.name,
-                            icon: project.icon,
-                            role: project.role,
-                          })
                         }}
                       >
                         <div className="relative">
@@ -450,7 +473,7 @@ export function ProjectsClient() {
                                   openEditDialog(project)
                                 }}
                               >
-                                编辑
+                                {t('common.edit')}
                               </Button>
                               <Button
                                 danger
@@ -461,7 +484,7 @@ export function ProjectsClient() {
                                   confirmDeleteProject(project)
                                 }}
                               >
-                                删除
+                                {t('common.delete')}
                               </Button>
                             </div>
                           )}
@@ -481,13 +504,13 @@ export function ProjectsClient() {
                               {roleText[project.role]}
                             </Typography.Text>
                             <div className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--ds-node-text-muted)' }}>
-                              <span>API {project.apiCount}</span>
+                              <span>{t('app.projects.stat.api', { count: project.apiCount })}</span>
                               <span style={{ color: 'var(--ds-divider-color)' }}>|</span>
-                              <span>模型 {project.schemaCount}</span>
+                              <span>{t('app.projects.stat.schema', { count: project.schemaCount })}</span>
                               <span style={{ color: 'var(--ds-divider-color)' }}>|</span>
-                              <span>快捷请求 {project.requestCount}</span>
+                              <span>{t('app.projects.stat.request', { count: project.requestCount })}</span>
                               <span style={{ color: 'var(--ds-divider-color)' }}>|</span>
-                              <span>自测 {project.testCount}</span>
+                              <span>{t('app.projects.stat.test', { count: project.testCount })}</span>
                             </div>
                           </div>
                         </div>
@@ -501,7 +524,7 @@ export function ProjectsClient() {
         <Modal
           confirmLoading={submitting}
           open={dialog !== null}
-          title={getDialogTitle(dialog)}
+          title={dialogTitle}
           onCancel={closeDialog}
           onOk={() => {
             void form.validateFields().then(submitProject).catch(() => undefined)
@@ -509,13 +532,13 @@ export function ProjectsClient() {
         >
           <Form form={form} layout="vertical">
             <Form.Item
-              label="项目名称"
+              label={t('app.projects.name')}
               name="name"
-              rules={[{ required: true, message: '请输入项目名称' }]}
+              rules={[{ required: true, message: t('app.projects.nameRequired') }]}
             >
-              <Input placeholder="请输入项目名称" />
+              <Input placeholder={t('app.projects.namePlaceholder')} />
             </Form.Item>
-            <Form.Item label="项目图标" name="icon">
+            <Form.Item label={t('app.projects.icon')} name="icon">
               <IconPicker />
             </Form.Item>
           </Form>

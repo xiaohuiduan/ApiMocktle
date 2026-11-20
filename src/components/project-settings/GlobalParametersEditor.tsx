@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Tabs, Typography } from 'antd'
 
 import { createEnvironmentValue } from '@/project-environment-utils'
@@ -9,6 +11,7 @@ import {
 
 import { TabValueEditor } from './ValueEditor'
 
+/** 参数分区名是 HTTP 报文字段专有名词（Header/Cookie/Query/Body），不翻译。 */
 export const GLOBAL_PARAMETER_LABELS: Record<ApiEnvironmentGlobalParameterSection, string> = {
   header: 'Header',
   cookie: 'Cookie',
@@ -34,6 +37,7 @@ export function GlobalParametersEditor(props: {
   value: ProjectEnvironmentConfig['globalParameters']
   onChange: (nextValue: ProjectEnvironmentConfig['globalParameters']) => void
 }) {
+  const { t } = useTranslation()
   const { editable, title, description, value, onChange } = props
 
   return (
@@ -42,7 +46,7 @@ export function GlobalParametersEditor(props: {
         <Typography.Title level={5}>{title}</Typography.Title>
         <Typography.Paragraph className="!mb-1" type="secondary">{description}</Typography.Paragraph>
         <Typography.Text type="secondary">
-          Body 参数仅在 `form-data` 和 `x-www-form-urlencoded` 请求体中生效。
+          {t('settings.environments.bodyParamHint')}
         </Typography.Text>
       </div>
 

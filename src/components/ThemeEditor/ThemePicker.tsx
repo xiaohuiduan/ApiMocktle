@@ -1,6 +1,9 @@
+import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { Space, theme } from 'antd'
 
-import { presetThemes } from './theme-data'
+import { presetThemeNameKeys, presetThemes } from './theme-data'
 
 interface ThemePickerProps {
   value?: string
@@ -10,12 +13,23 @@ interface ThemePickerProps {
 export function ThemePicker(props: ThemePickerProps) {
   const { token } = theme.useToken()
 
+  const { t } = useTranslation()
+
   const { value, onChange } = props
+
+  // t 作为依赖：语言切换时重新取配色模式展示名
+  const themeNames = useMemo(() => {
+    return {
+      lightDefault: t(presetThemeNameKeys.lightDefault),
+      darkDefault: t(presetThemeNameKeys.darkDefault),
+    }
+  }, [t])
 
   return (
     <Space wrap size={token.paddingLG}>
-      {Object.entries(presetThemes).map(([themeName, { preview, name }]) => {
+      {Object.entries(presetThemes).map(([themeName, { preview }]) => {
         const matched = themeName === value
+        const name = themeNames[themeName as keyof typeof themeNames]
 
         return (
           <Space

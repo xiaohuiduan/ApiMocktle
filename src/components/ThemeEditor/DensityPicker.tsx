@@ -1,6 +1,9 @@
+import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { Space, theme } from 'antd'
 
-import { densityPresets } from './theme-data'
+import { densityPresetKeys, getDensityPresets } from './theme-data'
 import type { Density } from './ThemeEditor.type'
 
 interface DensityPickerProps {
@@ -18,11 +21,16 @@ const densityPreview: Record<Density, { rowHeight: number, rowGap: number, fontS
 export function DensityPicker(props: DensityPickerProps) {
   const { token } = theme.useToken()
 
+  const { t } = useTranslation()
+
   const { value, onChange } = props
+
+  // t 作为依赖：语言切换时重新取展示名与说明
+  const densityPresets = useMemo(() => getDensityPresets(), [t])
 
   return (
     <Space wrap size={token.paddingLG}>
-      {(Object.keys(densityPresets) as Density[]).map((densityKey) => {
+      {(Object.keys(densityPresetKeys) as Density[]).map((densityKey) => {
         const matched = densityKey === (value ?? 'compact')
         const { name, description } = densityPresets[densityKey]
         const preview = densityPreview[densityKey]

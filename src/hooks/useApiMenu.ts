@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { api } from '@/api-client'
 import { useAuth } from '@/contexts/auth'
+import { t } from '@/i18n'
 
 // ==================== 类型 ====================
 
@@ -68,14 +69,14 @@ function resolveSchema(schema: unknown, schemaMap: SchemaMap, visited = new Set<
   if (obj.$ref && typeof obj.$ref === 'string') {
     const refPath = obj.$ref
 
-    if (visited.has(refPath)) { return { type: 'object', description: '(循环引用)' } }
+    if (visited.has(refPath)) { return { type: 'object', description: t('app.document.circularReference') } }
 
     visited.add(refPath)
     const resolved = schemaMap.get(refPath)
 
     if (resolved) { return resolveSchema(resolved, schemaMap, visited) }
 
-    return { type: 'object', description: `(未找到: ${refPath})` }
+    return { type: 'object', description: t('app.document.unresolvedRef', { ref: refPath }) }
   }
 
   if (obj.allOf && Array.isArray(obj.allOf)) {
@@ -342,7 +343,7 @@ function stringifyWithRequired(
     const key = keys[i]
     const val = obj[key]
     const comma = i < keys.length - 1 ? ',' : ''
-    const req = reqSet.has(key) ? '  // (必填)' : ''
+    const req = reqSet.has(key) ? t('app.document.requiredComment') : ''
 
     if (val !== null && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0) {
       // 嵌套对象：递归并传递子 schema
@@ -350,7 +351,7 @@ function stringifyWithRequired(
       const inner = stringifyWithRequired(val, indent + 1, childSchema, schemaMap)
 
       if (req) {
-        lines.push(`${pad1}"${key}": ${inner}${comma}  // (必填)`)
+        lines.push(`${pad1}"${key}": ${inner}${comma}${req}`)
       }
       else {
         lines.push(`${pad1}"${key}": ${inner}${comma}`)
@@ -367,7 +368,7 @@ function stringifyWithRequired(
       }
 
       const inner = stringifyWithRequired(val[0], indent + 2, itemSchema, schemaMap)
-      lines.push(`${pad1}"${key}": [\n${'  '.repeat(indent + 2)}${inner}\n${pad1}]${comma}${req ? '  // (必填)' : ''}`)
+      lines.push(`${pad1}"${key}": [\n${'  '.repeat(indent + 2)}${inner}\n${pad1}]${comma}${req}`)
     }
     else {
       // 标量/空值
@@ -386,7 +387,7 @@ function formatParams(params: unknown): string | undefined {
   const items = params
     .filter((p: Record<string, unknown>) => p?.name)
     .map((p: Record<string, unknown>) => {
-      const req = p.required === '1' || p.required === 1 || p.required === true ? '必填' : '可选'
+      const req = p.required === '1' || p.required === 1 || p.required === true ? t('common.required') : t('common.optional')
       const desc = p.desc ? `(${p.desc})` : ''
 
       return `    - ${p.name}: ${req}${desc ? ' ' + desc : ''}`
@@ -406,10 +407,10 @@ function formatOpenApiParams(parameters: unknown, schemaMap: SchemaMap): string 
 
     if (!Array.isArray(rawItems) || rawItems.length === 0) { continue }
 
-    const label = section === 'query' ? 'Query 参数' : section === 'path' ? '路径参数' : '请求头'
+    const label = section === 'query' ? t('app.document.sectionQuery') : section === 'path' ? t('app.document.sectionPath') : t('app.document.sectionHeader')
     const lines = rawItems.map((p) => {
       const resolved = resolveSchema(p, schemaMap)
-      const req = resolved.required === true || resolved.required === 'true' ? '必填' : '可选'
+      const req = resolved.required === true || resolved.required === 'true' ? t('common.required') : t('common.optional')
       const schema = resolved.schema as Record<string, unknown> | undefined
       const type = schema?.type as string || resolved.type as string || 'any'
       const desc = resolved.description ? `(${resolved.description})` : ''
@@ -453,7 +454,7 @@ function formatOpenApiResponses(responses: unknown, schemaMap: SchemaMap): strin
     schema = resolveSchema(schema, schemaMap)
     const json = buildSchemaJson(schema, schemaMap)
     lines.push(`  HTTP ${code}:`)
-    lines.push(json ?? '    (无字段定义)')
+    lines.push(json ?? t('app.document.noFieldDefinition'))
   }
 
   return lines.length > 0 ? lines.join('\n') : undefined

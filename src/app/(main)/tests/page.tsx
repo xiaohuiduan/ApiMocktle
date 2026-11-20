@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { useNavigate, useParams } from 'react-router'
 
@@ -14,6 +15,7 @@ const ALL_KEY = '__all__'
 const DEFAULT_KEY = '__default__'
 
 export default function TestTaskListPage() {
+  const { t } = useTranslation()
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
 
@@ -50,8 +52,8 @@ export default function TestTaskListPage() {
   const menuItems = useMemo(() => {
     const defaultCount = tasks.filter((t) => !t.folderId).length
     const items: { key: string, label: string, count: number, icon?: React.ReactNode }[] = [
-      { key: ALL_KEY, label: '全部任务', count: tasks.length },
-      { key: DEFAULT_KEY, label: '默认', count: defaultCount },
+      { key: ALL_KEY, label: t('app.tests.allTasks'), count: tasks.length },
+      { key: DEFAULT_KEY, label: t('app.tests.defaultFolder'), count: defaultCount },
     ]
     folders.forEach((f) => {
       items.push({
@@ -62,7 +64,7 @@ export default function TestTaskListPage() {
     })
 
     return items
-  }, [tasks, folders])
+  }, [t, tasks, folders])
 
   // Filter tasks by selected folder
   const filteredTasks = useMemo(() => {
@@ -87,7 +89,7 @@ export default function TestTaskListPage() {
       const task = await createTask(payload)
 
       if (task) {
-        message.success('测试任务创建成功')
+        message.success(t('app.tests.created'))
         setCreateModalOpen(false)
         createForm.resetFields()
       }
@@ -120,7 +122,7 @@ export default function TestTaskListPage() {
       const updated = await updateTask(editingTask.id, payload)
 
       if (updated) {
-        message.success('任务信息已更新')
+        message.success(t('app.tests.updated'))
         setEditModalOpen(false)
         setEditingTask(null)
         editForm.resetFields()
@@ -134,7 +136,7 @@ export default function TestTaskListPage() {
   const handleDelete = async (taskId: string) => {
     const success = await deleteTask(taskId)
 
-    if (success) { message.success('删除成功') }
+    if (success) { message.success(t('app.tests.deleted')) }
   }
 
   // ===== Folder CRUD =====
@@ -149,7 +151,7 @@ export default function TestTaskListPage() {
       const folder = await createFolder(values.name.trim())
 
       if (folder) {
-        message.success('文件夹已创建')
+        message.success(t('app.tests.folderCreated'))
         setFolderModalOpen(false)
         folderForm.resetFields()
       }
@@ -171,7 +173,7 @@ export default function TestTaskListPage() {
     const ok = await deleteFolder(folderId)
 
     if (ok) {
-      message.success('文件夹已删除，其中的任务已移回默认')
+      message.success(t('app.tests.folderDeleted'))
 
       if (selectedFolderKey === folderId) { setSelectedFolderKey(ALL_KEY) }
     }
@@ -180,17 +182,17 @@ export default function TestTaskListPage() {
   const handleMoveToFolder = async (taskId: string, folderId: string | null) => {
     const result = await moveTaskToFolder(taskId, folderId)
 
-    if (result) { message.success('已移动') }
+    if (result) { message.success(t('app.tests.moved')) }
   }
 
   // ===== Status Tag =====
   const getStatusTag = (status: TestTask['status']) => {
     const statusMap: Record<TestTask['status'], { color: string, text: string }> = {
-      idle: { color: 'default', text: '待执行' },
-      running: { color: 'processing', text: '执行中' },
-      passed: { color: 'success', text: '通过' },
-      failed: { color: 'error', text: '失败' },
-      aborted: { color: 'warning', text: '已中止' },
+      idle: { color: 'default', text: t('app.tests.statusLabel.idle') },
+      running: { color: 'processing', text: t('app.tests.statusLabel.running') },
+      passed: { color: 'success', text: t('app.tests.statusLabel.passed') },
+      failed: { color: 'error', text: t('app.tests.statusLabel.failed') },
+      aborted: { color: 'warning', text: t('app.tests.statusLabel.aborted') },
     }
     const { color, text } = statusMap[status] || { color: 'default', text: status }
 
@@ -200,7 +202,7 @@ export default function TestTaskListPage() {
   // Build folder move submenu for task context
   const getMoveMenuItems = (record: TestTask) => {
     const items = [
-      { key: '__default__', label: '默认' },
+      { key: '__default__', label: t('app.tests.defaultFolder') },
       ...folders.map((f) => ({ key: f.id, label: f.name })),
     ]
 
@@ -214,7 +216,7 @@ export default function TestTaskListPage() {
 
   const columns: ColumnsType<TestTask> = [
     {
-      title: '任务名称',
+      title: t('app.tests.taskName'),
       dataIndex: 'name',
       key: 'name',
       render: (text, record) => (
@@ -224,7 +226,7 @@ export default function TestTaskListPage() {
       ),
     },
     {
-      title: '描述',
+      title: t('app.tests.description'),
       dataIndex: 'description',
       key: 'description',
       ellipsis: { showTitle: false },
@@ -233,19 +235,19 @@ export default function TestTaskListPage() {
       ),
     },
     {
-      title: '状态',
+      title: t('app.tests.status'),
       dataIndex: 'status',
       key: 'status',
       render: (status: TestTask['status']) => getStatusTag(status),
     },
     {
-      title: '创建时间',
+      title: t('app.tests.createdAt'),
       dataIndex: 'createdAt',
       key: 'createdAt',
       render: (text: string) => (text ? dayjs(text).format('YYYY-MM-DD HH:mm') : '-'),
     },
     {
-      title: '操作',
+      title: t('app.tests.action'),
       key: 'action',
       width: 240,
       render: (_, record) => (
@@ -256,21 +258,21 @@ export default function TestTaskListPage() {
             type="link"
             onClick={() => { openEditModal(record) }}
           >
-            编辑
+            {t('app.tests.edit')}
           </Button>
           <Dropdown menu={getMoveMenuItems(record)} trigger={['click']}>
             <Button icon={<Folder size={14} />} size="small" type="link">
-              移动
+              {t('app.tests.move')}
             </Button>
           </Dropdown>
           <Popconfirm
-            cancelText="取消"
-            okText="确定"
-            title="确定要删除这个测试任务吗？"
+            cancelText={t('common.cancel')}
+            okText={t('common.ok')}
+            title={t('app.tests.deleteConfirm')}
             onConfirm={() => { void handleDelete(record.id) }}
           >
             <Button danger icon={<Trash2 size={14} />} size="small" type="link">
-              删除
+              {t('app.tests.delete')}
             </Button>
           </Popconfirm>
         </Space>
@@ -283,7 +285,7 @@ export default function TestTaskListPage() {
     items: [
       {
         key: 'rename',
-        label: '重命名',
+        label: t('app.tests.rename'),
         onClick: () => {
           setEditingFolderId(folder.id)
           setEditingFolderName(folder.name)
@@ -291,13 +293,13 @@ export default function TestTaskListPage() {
       },
       {
         key: 'delete',
-        label: '删除',
+        label: t('app.tests.delete'),
         danger: true,
         onClick: () => {
           Modal.confirm({
-            title: '删除文件夹',
-            content: `确定删除「${folder.name}」？其中的任务将移回默认。`,
-            okText: '删除',
+            title: t('app.tests.deleteFolderTitle'),
+            content: t('app.tests.deleteFolderContent', { name: folder.name }),
+            okText: t('common.delete'),
             okButtonProps: { danger: true },
             onOk: () => handleDeleteFolder(folder.id),
           })
@@ -308,14 +310,14 @@ export default function TestTaskListPage() {
 
   // Compute dynamic title based on selected folder
   const pageTitle = useMemo(() => {
-    if (selectedFolderKey === ALL_KEY) { return '自动化测试' }
+    if (selectedFolderKey === ALL_KEY) { return t('app.tests.title') }
 
-    if (selectedFolderKey === DEFAULT_KEY) { return '默认' }
+    if (selectedFolderKey === DEFAULT_KEY) { return t('app.tests.defaultFolder') }
 
     const folder = folders.find((f) => f.id === selectedFolderKey)
 
-    return folder?.name ?? '自动化测试'
-  }, [selectedFolderKey, folders])
+    return folder?.name ?? t('app.tests.title')
+  }, [selectedFolderKey, folders, t])
 
   return (
     <div className="flex h-full">
@@ -324,7 +326,7 @@ export default function TestTaskListPage() {
         <Panel defaultSize={20} maxSize={35} minSize={15}>
           <div className="flex h-full flex-col border-r border-[color:var(--ds-panel-border)] bg-[color:var(--ds-panel-bg)]">
             <div className="flex items-center justify-between border-b border-[color:var(--ds-divider-color)] px-3 py-2">
-              <span className="text-xs font-medium text-[color:var(--ds-node-text-secondary)]">文件夹</span>
+              <span className="text-xs font-medium text-[color:var(--ds-node-text-secondary)]">{t('app.tests.folderLabel')}</span>
               <Button
                 icon={<FolderPlus size={14} />}
                 size="small"
@@ -416,14 +418,14 @@ export default function TestTaskListPage() {
                   icon={<FolderPlus size={14} />}
                   onClick={handleAddFolder}
                 >
-                  新建文件夹
+                  {t('app.tests.newFolder')}
                 </Button>
                 <Button
                   icon={<Plus size={14} />}
                   type="primary"
                   onClick={() => { setCreateModalOpen(true) }}
                 >
-                  创建测试任务
+                  {t('app.tests.createTask')}
                 </Button>
               </Space>
             </div>
@@ -431,7 +433,7 @@ export default function TestTaskListPage() {
             {filteredTasks.length === 0 && !tasksLoading
               ? (
                   <Empty
-                    description="暂无测试任务"
+                    description={t('app.tests.empty')}
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                   >
                     <Button
@@ -439,7 +441,7 @@ export default function TestTaskListPage() {
                       type="primary"
                       onClick={() => { setCreateModalOpen(true) }}
                     >
-                      创建第一个测试任务
+                      {t('app.tests.createFirstTask')}
                     </Button>
                   </Empty>
                 )
@@ -448,7 +450,7 @@ export default function TestTaskListPage() {
                     columns={columns}
                     dataSource={filteredTasks}
                     loading={tasksLoading}
-                    pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 条` }}
+                    pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => t('app.tests.total', { total }) }}
                     rowKey="id"
                   />
                 )}
@@ -458,10 +460,10 @@ export default function TestTaskListPage() {
 
       {/* Create Modal */}
       <Modal
-        cancelText="取消"
-        okText="创建"
+        cancelText={t('common.cancel')}
+        okText={t('app.tests.confirmCreate')}
         open={createModalOpen}
-        title="创建测试任务"
+        title={t('app.tests.createTask')}
         onCancel={() => {
           setCreateModalOpen(false)
           createForm.resetFields()
@@ -474,16 +476,16 @@ export default function TestTaskListPage() {
           layout="vertical"
         >
           <Form.Item
-            label="任务名称"
+            label={t('app.tests.taskName')}
             name="name"
-            rules={[{ required: true, message: '请输入任务名称' }]}
+            rules={[{ required: true, message: t('app.tests.taskNameRequired') }]}
           >
-            <Input placeholder="请输入任务名称" />
+            <Input placeholder={t('app.tests.taskNamePlaceholder')} />
           </Form.Item>
-          <Form.Item label="描述" name="description">
-            <Input.TextArea placeholder="请输入任务描述" rows={3} />
+          <Form.Item label={t('app.tests.description')} name="description">
+            <Input.TextArea placeholder={t('app.tests.descriptionPlaceholder')} rows={3} />
           </Form.Item>
-          <Form.Item label="失败即停" name="failFast" valuePropName="checked">
+          <Form.Item label={t('app.tests.failFast')} name="failFast" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
@@ -491,10 +493,10 @@ export default function TestTaskListPage() {
 
       {/* Edit Modal */}
       <Modal
-        cancelText="取消"
-        okText="保存"
+        cancelText={t('common.cancel')}
+        okText={t('common.save')}
         open={editModalOpen}
-        title="编辑测试任务"
+        title={t('app.tests.editTitle')}
         onCancel={() => {
           setEditModalOpen(false)
           setEditingTask(null)
@@ -504,16 +506,16 @@ export default function TestTaskListPage() {
       >
         <Form form={editForm} layout="vertical">
           <Form.Item
-            label="任务名称"
+            label={t('app.tests.taskName')}
             name="name"
-            rules={[{ required: true, message: '请输入任务名称' }]}
+            rules={[{ required: true, message: t('app.tests.taskNameRequired') }]}
           >
-            <Input placeholder="请输入任务名称" />
+            <Input placeholder={t('app.tests.taskNamePlaceholder')} />
           </Form.Item>
-          <Form.Item label="描述" name="description">
-            <Input.TextArea placeholder="请输入任务描述" rows={3} />
+          <Form.Item label={t('app.tests.description')} name="description">
+            <Input.TextArea placeholder={t('app.tests.descriptionPlaceholder')} rows={3} />
           </Form.Item>
-          <Form.Item label="失败即停" name="failFast" valuePropName="checked">
+          <Form.Item label={t('app.tests.failFast')} name="failFast" valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
@@ -521,10 +523,10 @@ export default function TestTaskListPage() {
 
       {/* 新建文件夹 Modal */}
       <Modal
-        cancelText="取消"
-        okText="创建"
+        cancelText={t('common.cancel')}
+        okText={t('app.tests.confirmCreate')}
         open={folderModalOpen}
-        title="新建文件夹"
+        title={t('app.tests.newFolder')}
         onCancel={() => {
           setFolderModalOpen(false)
           folderForm.resetFields()
@@ -533,11 +535,11 @@ export default function TestTaskListPage() {
       >
         <Form form={folderForm} layout="vertical">
           <Form.Item
-            label="文件夹名称"
+            label={t('app.tests.folderName')}
             name="name"
-            rules={[{ required: true, whitespace: true, message: '请输入文件夹名称' }]}
+            rules={[{ required: true, whitespace: true, message: t('app.tests.folderNameRequired') }]}
           >
-            <Input autoFocus placeholder="请输入文件夹名称" onPressEnter={() => { void handleCreateFolder() }} />
+            <Input autoFocus placeholder={t('app.tests.folderNamePlaceholder')} onPressEnter={() => { void handleCreateFolder() }} />
           </Form.Item>
         </Form>
       </Modal>

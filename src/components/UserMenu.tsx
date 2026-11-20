@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 
 import { Button, Dropdown, Form, Input, message, Modal } from 'antd'
@@ -11,6 +12,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ showUsername = true }: UserMenuProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user, logout, changePassword } = useAuth()
 
@@ -20,7 +22,7 @@ export function UserMenu({ showUsername = true }: UserMenuProps) {
 
   const handleChangePassword = async (v: { oldPassword: string, newPassword: string, confirmPassword: string }) => {
     if (v.newPassword !== v.confirmPassword) {
-      message.error('两次新密码不一致')
+      message.error(t('app.auth.changePassword.mismatch'))
 
       return
     }
@@ -29,7 +31,7 @@ export function UserMenu({ showUsername = true }: UserMenuProps) {
 
     try {
       await changePassword(v.oldPassword, v.newPassword)
-      message.success('密码修改成功')
+      message.success(t('app.auth.changePassword.success'))
       setPwdOpen(false)
       pwdForm.resetFields()
     }
@@ -41,20 +43,25 @@ export function UserMenu({ showUsername = true }: UserMenuProps) {
     }
   }
 
+  const menuItems = useMemo(
+    () => [
+      { key: 'user', label: user?.username, icon: <UserCircle2Icon size={16} />, disabled: true },
+      { type: 'divider' as const },
+      { key: 'projects', label: t('app.userMenu.projects'), icon: <UserCircle2Icon size={16} /> },
+      { key: 'changePassword', label: t('app.userMenu.changePassword'), icon: <KeyIcon size={16} /> },
+      { type: 'divider' as const },
+      { key: 'logout', label: t('app.userMenu.logout'), icon: <LogOutIcon size={16} /> },
+    ],
+    [t, user?.username],
+  )
+
   if (!user) { return null }
 
   return (
     <>
       <Dropdown
         menu={{
-          items: [
-            { key: 'user', label: user.username, icon: <UserCircle2Icon size={16} />, disabled: true },
-            { type: 'divider' as const },
-            { key: 'projects', label: '项目列表', icon: <UserCircle2Icon size={16} /> },
-            { key: 'changePassword', label: '修改密码', icon: <KeyIcon size={16} /> },
-            { type: 'divider' as const },
-            { key: 'logout', label: '退出登录', icon: <LogOutIcon size={16} /> },
-          ],
+          items: menuItems,
           onClick: ({ key }) => {
             if (key === 'projects') { navigate('/projects') }
 
@@ -77,29 +84,40 @@ export function UserMenu({ showUsername = true }: UserMenuProps) {
         destroyOnClose
         footer={null}
         open={pwdOpen}
-        title="修改密码"
+        title={t('app.auth.changePassword.title')}
         onCancel={() => {
           setPwdOpen(false)
           pwdForm.resetFields()
         }}
       >
         <Form form={pwdForm} layout="vertical" onFinish={(v) => void handleChangePassword(v)}>
-          <Form.Item label="旧密码" name="oldPassword" rules={[{ required: true, message: '请输入旧密码' }]}>
-            <Input.Password placeholder="请输入旧密码" />
+          <Form.Item
+            label={t('app.auth.changePassword.oldPassword')}
+            name="oldPassword"
+            rules={[{ required: true, message: t('app.auth.changePassword.oldPasswordRequired') }]}
+          >
+            <Input.Password placeholder={t('app.auth.changePassword.oldPasswordPlaceholder')} />
           </Form.Item>
           <Form.Item
-            label="新密码"
+            label={t('app.auth.changePassword.newPassword')}
             name="newPassword"
-            rules={[{ required: true, message: '请输入新密码' }, { min: 6, message: '至少 6 个字符' }]}
+            rules={[
+              { required: true, message: t('app.auth.changePassword.newPasswordRequired') },
+              { min: 6, message: t('app.validation.minChars', { count: 6 }) },
+            ]}
           >
-            <Input.Password placeholder="请输入新密码" />
+            <Input.Password placeholder={t('app.auth.changePassword.newPasswordPlaceholder')} />
           </Form.Item>
-          <Form.Item label="确认新密码" name="confirmPassword" rules={[{ required: true, message: '请确认新密码' }]}>
-            <Input.Password placeholder="请再次输入新密码" />
+          <Form.Item
+            label={t('app.auth.changePassword.confirmPassword')}
+            name="confirmPassword"
+            rules={[{ required: true, message: t('app.auth.changePassword.confirmPasswordRequired') }]}
+          >
+            <Input.Password placeholder={t('app.auth.changePassword.confirmPasswordPlaceholder')} />
           </Form.Item>
           <Form.Item>
             <Button block htmlType="submit" loading={pwdSubmitting} type="primary">
-              确认修改
+              {t('app.auth.changePassword.submit')}
             </Button>
           </Form.Item>
         </Form>

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Tabs } from 'antd'
 
 import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
@@ -16,6 +18,7 @@ export interface ScriptTabProps {
 }
 
 export function ScriptTab(props: ScriptTabProps) {
+  const { t } = useTranslation()
   const {
     preScript, postScript,
     onPreScriptChange, onPostScriptChange,
@@ -30,7 +33,7 @@ export function ScriptTab(props: ScriptTabProps) {
       items={[
         {
           key: 'pre',
-          label: '前置脚本',
+          label: t('api.script.preScript'),
           children: (
             <ScriptEditor
               consoleEntries={preScriptConsole}
@@ -42,7 +45,7 @@ export function ScriptTab(props: ScriptTabProps) {
         },
         {
           key: 'post',
-          label: '后置脚本',
+          label: t('api.script.postScript'),
           children: (
             <ScriptEditor
               consoleEntries={postScriptConsole}

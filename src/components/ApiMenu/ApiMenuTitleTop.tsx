@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { ChevronRight } from 'lucide-react'
 import { show } from '@ebay/nice-modal-react'
 import { Dropdown, type DropdownProps, type MenuProps, theme, Tooltip } from 'antd'
-import {
-  CheckIcon,
+import { CheckIcon,
+  ChevronRight,
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
   FolderInputIcon,
@@ -40,6 +40,7 @@ interface ApiMenuTopTitleProps {
  */
 export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const { topMenuType, extraDropdownMenuItems = [] } = props
 
@@ -70,7 +71,9 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
     return menuFolderKeys.every((key) => expandedMenuKeys.includes(key))
   }, [menuFolderKeys, expandedMenuKeys])
 
-  const { title, newLabel } = API_MENU_CONFIG[topMenuType]
+  const { titleKey, newLabelKey } = API_MENU_CONFIG[topMenuType]
+  const title = t(titleKey)
+  const newLabel = newLabelKey ? t(newLabelKey) : ''
 
   const noActions = topMenuType === CatalogType.Overview || topMenuType === CatalogType.Recycle
 
@@ -110,7 +113,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
                 },
                 {
                   key: 'newCatalog',
-                  label: '新建目录',
+                  label: t('api.menu.newCatalog'),
                   icon: <FolderPlusIcon size={14} />,
                   onClick: (ev) => {
                     ev.domEvent.stopPropagation()
@@ -132,7 +135,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
                   ? [
                       {
                         key: 'importCurl',
-                        label: '导入 cURL',
+                        label: t('api.menu.importCurl'),
                         icon: <FolderInputIcon size={14} />,
                         onClick: (ev: MenuClickInfo) => {
                           ev.domEvent.stopPropagation()
@@ -154,7 +157,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
                   ? [
                       {
                         key: 'importCurl',
-                        label: '从 cURL 导入',
+                        label: t('api.menu.importFromCurl'),
                         icon: <FolderInputIcon size={14} />,
                         onClick: (ev: MenuClickInfo) => {
                           ev.domEvent.stopPropagation()
@@ -197,7 +200,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
             />
           </Dropdown>
 
-          <Tooltip title={allExpanded ? '全部收起' : '全部展开'}>
+          <Tooltip title={allExpanded ? t('api.menu.collapseAll') : t('api.menu.expandAll')}>
             <MenuActionButton
               icon={
                 allExpanded ? <ChevronsDownUpIcon size={14} /> : <ChevronsUpDownIcon size={14} />
@@ -223,7 +226,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
                 items: [
                   {
                     key: 'displayName',
-                    label: '接口显示为名称',
+                    label: t('api.menu.displayAsName'),
                     icon: (
                       <CheckIcon
                         size={14}
@@ -240,7 +243,7 @@ export function ApiMenuTitleTop(props: ApiMenuTopTitleProps) {
                   },
                   {
                     key: 'displayPath',
-                    label: '接口显示为 URL',
+                    label: t('api.menu.displayAsUrl'),
                     icon: (
                       <CheckIcon
                         size={14}

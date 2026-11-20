@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Table } from 'antd'
 
@@ -14,6 +15,7 @@ interface DataSource extends ApiDetails {
 }
 
 export function FolderApiList() {
+  const { t } = useTranslation()
   const { menuRawList } = useMenuHelpersContext()
   const { tabData } = useTabContentContext()
 
@@ -42,16 +44,16 @@ export function FolderApiList() {
     <div>
       <Table<DataSource>
         columns={[
-          { title: '接口名称', dataIndex: 'name' },
+          { title: t('api.folder.apiName'), dataIndex: 'name' },
           {
-            title: '请求类型',
+            title: t('api.folder.method'),
             dataIndex: 'method',
             render: (method) => (
               <HttpMethodText className="text-xs font-semibold" method={method} />
             ),
           },
-          { title: '接口路径', dataIndex: 'path' },
-          { title: '接口分组', dataIndex: 'groupPath' },
+          { title: t('api.folder.path'), dataIndex: 'path' },
+          { title: t('api.folder.group'), dataIndex: 'groupPath' },
         ]}
         dataSource={dataSource}
         rowKey="id"

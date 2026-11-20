@@ -1,6 +1,7 @@
 'use client'
 
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, ConfigProvider, Dropdown, Flex, Skeleton, theme } from 'antd'
 import { PlusIcon } from 'lucide-react'
@@ -39,6 +40,7 @@ function LoadingPlaceholder() {
 
 function HomeContent() {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const [showHeavyContent, setShowHeavyContent] = useState(false)
 
   const { createTabItem } = useHelpers()
@@ -55,7 +57,7 @@ function HomeContent() {
 
   return (
     <PanelLayout
-      layoutName="接口管理"
+      layoutName={t('app.nav.home')}
       left={(
         <>
           <Flex gap={token.paddingXXS} style={{ padding: token.paddingXS }}>
@@ -79,15 +81,16 @@ function HomeContent() {
                       MenuItemType.HttpRequest,
                       MenuItemType.Doc,
                       MenuItemType.ApiSchema,
-                    ].map((t) => {
-                      const { newLabel } = API_MENU_CONFIG[getCatalogType(t)]
+                    ].map((itemType) => {
+                      const { newLabelKey } = API_MENU_CONFIG[getCatalogType(itemType)]
+                      const newLabel = newLabelKey ? t(newLabelKey) : t('app.defaultNames.doc')
 
                       return {
-                        key: t,
-                        label: t === MenuItemType.Doc ? '新建 Markdown' : newLabel,
-                        icon: <FileIcon size={16} style={{ color: token.colorPrimary }} type={t} />,
+                        key: itemType,
+                        label: newLabel,
+                        icon: <FileIcon size={16} style={{ color: token.colorPrimary }} type={itemType} />,
                         onClick: () => {
-                          createTabItem(t)
+                          createTabItem(itemType)
                         },
                       }
                     }),

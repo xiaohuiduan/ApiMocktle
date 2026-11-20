@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Button, Popconfirm, Select, Space, Tooltip } from 'antd'
 import {
   Download,
@@ -82,6 +84,8 @@ export default function FlowToolbar({
   onAgentUrlChange,
   environments = [],
 }: FlowToolbarProps) {
+  const { t } = useTranslation()
+
   // 从环境列表提取有 agentUrl 的地址，供快速选择
   const agentUrlOptions = environments
     .filter((e) => e.agentUrl)
@@ -114,7 +118,7 @@ export default function FlowToolbar({
       <div className={dividerClass} />
       <Space size={4}>
         {/* 执行组 */}
-        <Tooltip title="运行">
+        <Tooltip title={t('flow.toolbar.run')}>
           <Button
             data-testid="toolbar-run"
             disabled={isRunning}
@@ -123,10 +127,10 @@ export default function FlowToolbar({
             type="primary"
             onClick={onRun}
           >
-            运行
+            {t('flow.toolbar.run')}
           </Button>
         </Tooltip>
-        <Tooltip title="中止">
+        <Tooltip title={t('flow.toolbar.abort')}>
           <Button
             danger
             data-testid="toolbar-abort"
@@ -135,10 +139,10 @@ export default function FlowToolbar({
             size="small"
             onClick={onAbort}
           >
-            中止
+            {t('flow.toolbar.abort')}
           </Button>
         </Tooltip>
-        <Tooltip title="自动布局">
+        <Tooltip title={t('flow.toolbar.autoLayout')}>
           <Button
             data-testid="toolbar-auto-layout"
             icon={<LayoutGrid size={14} />}
@@ -150,7 +154,7 @@ export default function FlowToolbar({
         <div className={dividerClass} />
 
         {/* 历史组 */}
-        <Tooltip title="撤销">
+        <Tooltip title={t('flow.toolbar.undo')}>
           <Button
             data-testid="toolbar-undo"
             disabled={!canUndo}
@@ -159,7 +163,7 @@ export default function FlowToolbar({
             onClick={onUndo}
           />
         </Tooltip>
-        <Tooltip title="重做">
+        <Tooltip title={t('flow.toolbar.redo')}>
           <Button
             data-testid="toolbar-redo"
             disabled={!canRedo}
@@ -168,7 +172,7 @@ export default function FlowToolbar({
             onClick={onRedo}
           />
         </Tooltip>
-        <Tooltip title={isDirty ? '保存 (Ctrl+S)' : '已保存'}>
+        <Tooltip title={isDirty ? t('flow.toolbar.save') : t('flow.toolbar.saved')}>
           <Button
             data-testid="toolbar-save"
             disabled={!isDirty}
@@ -183,7 +187,7 @@ export default function FlowToolbar({
         <div className={dividerClass} />
 
         {/* 文件组 */}
-        <Tooltip title="导出">
+        <Tooltip title={t('flow.toolbar.export')}>
           <Button
             data-testid="toolbar-export"
             icon={<Download size={14} />}
@@ -191,7 +195,7 @@ export default function FlowToolbar({
             onClick={onExport}
           />
         </Tooltip>
-        <Tooltip title="导入">
+        <Tooltip title={t('flow.toolbar.import')}>
           <Button
             data-testid="toolbar-import"
             icon={<Upload size={14} />}
@@ -199,7 +203,7 @@ export default function FlowToolbar({
             onClick={onImport}
           />
         </Tooltip>
-        <Tooltip title="校验流程">
+        <Tooltip title={t('flow.toolbar.validate')}>
           <Button
             data-testid="toolbar-validate"
             icon={<ShieldCheck size={14} />}
@@ -207,13 +211,13 @@ export default function FlowToolbar({
             onClick={onValidate}
           />
         </Tooltip>
-        <Tooltip title="清空画布">
+        <Tooltip title={t('flow.toolbar.clear')}>
           <Popconfirm
-            cancelText="取消"
-            description="将删除所有节点和连线，且不可撤销。确定清空？"
+            cancelText={t('common.cancel')}
+            description={t('flow.toolbar.clearDescription')}
             okButtonProps={{ danger: true }}
-            okText="清空"
-            title="清空画布"
+            okText={t('flow.toolbar.clearOk')}
+            title={t('flow.toolbar.clear')}
             onConfirm={onClear}
           >
             <Button
@@ -231,7 +235,7 @@ export default function FlowToolbar({
       <Select
         allowClear
         options={agentUrlOptions}
-        placeholder="Mock Agent 地址"
+        placeholder={t('flow.toolbar.agentUrlPlaceholder')}
         size="small"
         style={{ minWidth: 240 }}
         value={agentUrl || undefined}

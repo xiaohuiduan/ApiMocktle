@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { invoke } from '@tauri-apps/api/core'
 import { Button, Divider, Modal, Select, Space, Switch, Tag, Typography } from 'antd'
 import { AlertTriangle, CheckCircle, Clock, Play, SkipForward, Square, XCircle } from 'lucide-react'
 
 import { type FlowExecLog, type useFlowExecution, type VariableSource } from '../hooks/useFlowExecution'
-import { type FlowEdge, type FlowNode, NODE_TYPE_LABELS, type NodeExecStatus } from '../types/flow.types'
+import { type FlowEdge, type FlowNode, NODE_TYPE_LABEL_KEYS, type NodeExecStatus } from '../types/flow.types'
 
 import { css } from '@emotion/css'
+
+import { translateKey } from '@/i18n/translate'
 
 export type { VariableSource }
 
@@ -104,6 +107,7 @@ export default function RunFlowModal({
   onNodeStatusChange,
   onRunComplete,
 }: RunFlowModalProps) {
+  const { t } = useTranslation()
   const [selectedEnv, setSelectedEnv] = useState<string>('')
   const [failFast, setFailFast] = useState(true)
   const [logHeight, setLogHeight] = useState(400)
@@ -275,11 +279,11 @@ export default function RunFlowModal({
       footer={(
         <Space>
           <Button onClick={handleClose}>
-            {state.status === 'running' ? '中止并关闭' : '关闭'}
+            {state.status === 'running' ? t('flow.run.abortAndClose') : t('flow.run.close')}
           </Button>
           {state.status === 'running' && (
             <Button danger icon={<Square size={14} />} onClick={abort}>
-              中止
+              {t('flow.toolbar.abort')}
             </Button>
           )}
           {(state.status === 'idle' || state.status === 'passed' || state.status === 'failed' || state.status === 'aborted') && (
@@ -289,13 +293,13 @@ export default function RunFlowModal({
               type="primary"
               onClick={() => { void handleRun() }}
             >
-              {state.status === 'idle' ? '开始运行' : '重新运行'}
+              {state.status === 'idle' ? t('flow.run.start') : t('flow.run.rerun')}
             </Button>
           )}
         </Space>
       )}
       open={open}
-      title="运行测试流程"
+      title={t('flow.run.title')}
       width={720}
       onCancel={handleClose}
     >
@@ -303,7 +307,7 @@ export default function RunFlowModal({
       <div style={{ display: 'flex', gap: 'var(--ds-pad-lg)', marginBottom: 'var(--ds-pad-md)', alignItems: 'center' }}>
         <div style={{ flex: 1 }}>
           <Text style={{ display: 'block', fontSize: 12, marginBottom: 4 }} type="secondary">
-            运行环境
+            {t('flow.run.environment')}
           </Text>
           <Select
             options={environments.map((e) => {
@@ -314,7 +318,7 @@ export default function RunFlowModal({
                 label: `${e.name}${url ? ` (${url})` : ''}`,
               }
             })}
-            placeholder="选择运行环境"
+            placeholder={t('flow.run.selectEnvironment')}
             size="small"
             status={selectedEnv ? undefined : 'warning'}
             style={{ width: '100%' }}
@@ -324,7 +328,7 @@ export default function RunFlowModal({
         </div>
         <div>
           <Text style={{ display: 'block', fontSize: 12, marginBottom: 4 }} type="secondary">
-            快速失败
+            {t('flow.run.failFast')}
           </Text>
           <Switch checked={failFast} size="small" onChange={setFailFast} />
         </div>
@@ -332,8 +336,8 @@ export default function RunFlowModal({
       {!selectedEnv && (
         <Text style={{ display: 'block', fontSize: 12, marginBottom: 'var(--ds-pad-md)' }} type="warning">
           {environments.length === 0
-            ? '当前项目未配置环境。请先在「环境」管理中创建环境（含 Base URL），否则相对路径请求无法解析。'
-            : '请先选择运行环境（需包含 Base URL），否则相对路径请求无法解析。'}
+            ? t('flow.run.noEnvironment')
+            : t('flow.run.environmentHint')}
         </Text>
       )}
 
@@ -341,10 +345,16 @@ export default function RunFlowModal({
       {state.status !== 'idle' && (
         <div style={{ display: 'flex', gap: 'var(--ds-pad-md)', marginBottom: 'var(--ds-pad-md)' }}>
           <Tag color={state.status === 'running' ? 'processing' : state.status === 'passed' ? 'success' : 'error'}>
-            {state.status === 'running' ? '运行中' : state.status === 'passed' ? '通过' : state.status === 'failed' ? '失败' : '中止'}
+            {state.status === 'running'
+              ? t('flow.enum.execStatus.running')
+              : state.status === 'passed'
+                ? t('flow.enum.execStatus.passed')
+                : state.status === 'failed'
+                  ? t('flow.enum.execStatus.failed')
+                  : t('flow.enum.execStatus.aborted')}
           </Tag>
           <Text style={{ fontSize: 12 }} type="secondary">
-            通过 {stats.passed} / 失败 {stats.failed} / 共 {stats.total}
+            {t('flow.run.stats', { passed: stats.passed, failed: stats.failed, total: stats.total })}
             {stats.duration !== undefined && ` · ${(stats.duration / 1000).toFixed(1)}s`}
           </Text>
         </div>
@@ -368,7 +378,7 @@ export default function RunFlowModal({
       {state.status === 'idle' && state.logs.length === 0 && (
         <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ds-node-text-muted)' }}>
           <Play size={32} style={{ marginBottom: 8, opacity: 0.3 }} />
-          <div>选择环境后点击「开始运行」</div>
+          <div>{t('flow.run.idleHint')}</div>
         </div>
       )}
     </Modal>
@@ -378,8 +388,9 @@ export default function RunFlowModal({
 // ==================== 日志行组件 ====================
 
 function LogLine({ log }: { log: FlowExecLog }) {
+  const { t, i18n: i18nInstance } = useTranslation()
   const [expanded, setExpanded] = useState(false)
-  const time = new Date(log.timestamp).toLocaleTimeString('zh-CN', { hour12: false })
+  const time = new Date(log.timestamp).toLocaleTimeString(i18nInstance.resolvedLanguage ?? 'zh-CN', { hour12: false })
 
   const hasDetails = log.requestJson ?? log.responseJson ?? (log.variables && Object.keys(log.variables).length > 0)
 
@@ -388,7 +399,7 @@ function LogLine({ log }: { log: FlowExecLog }) {
       <span style={{ color: 'var(--ds-node-text-secondary)', flexShrink: 0, width: 70 }}>{time}</span>
       <span style={{ flexShrink: 0, width: 16 }}>{statusIconMap[log.status]}</span>
       <span style={{ color: 'var(--ds-node-text-muted)', flexShrink: 0, width: 40 }}>
-        [{NODE_TYPE_LABELS[log.nodeType] || log.nodeType}]
+        [{NODE_TYPE_LABEL_KEYS[log.nodeType] ? translateKey(NODE_TYPE_LABEL_KEYS[log.nodeType]) : log.nodeType}]
       </span>
       <span style={{ fontWeight: 600, color: 'var(--ds-code-color)', flexShrink: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {log.nodeName}
@@ -404,7 +415,7 @@ function LogLine({ log }: { log: FlowExecLog }) {
           style={{ color: 'var(--ds-highlight-selected)', cursor: 'pointer', fontSize: 11 }}
           onClick={() => { setExpanded(!expanded) }}
         >
-          {expanded ? '收起' : '详情'}
+          {expanded ? t('common.collapse') : t('common.detail')}
         </span>
       )}
     </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { invoke } from '@tauri-apps/api/core'
 
+import { t } from '@/i18n'
 import type { TestTask } from '@/types'
 
 // ==================== Hook 返回类型 ====================
@@ -37,7 +38,7 @@ export function useTestTasks(projectId: string): UseTestTasksReturn {
         setTasks(result.data)
       }
       else {
-        setError(result.error ?? '获取测试任务列表失败')
+        setError(result.error ?? t('app.errors.testTasksLoadFailed'))
       }
     }
     catch (err) {

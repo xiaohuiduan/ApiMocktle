@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { ConfigProvider, Menu, Popover, Select, theme, Tooltip } from 'antd'
 import { Settings2Icon, XIcon } from 'lucide-react'
 
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { SchemaType } from '@/components/JsonSchema'
-import { defaultSchemaTypeConfig } from '@/components/JsonSchema/constants'
+import { defaultSchemaTypeConfig, getSchemaTypeLabel } from '@/components/JsonSchema/constants'
 import type { RefSchema } from '@/components/JsonSchema/JsonSchema.type'
 import { MenuItemType } from '@/enums'
 import { useStyles } from '@/hooks/useStyle'
@@ -51,6 +52,8 @@ export function DataTypeSelect(props: DataTypeSelectProps) {
 
   const { token } = theme.useToken()
 
+  const { t } = useTranslation()
+
   const { styles } = useStyles(() => {
     return {
       typeSelect: css({
@@ -68,6 +71,14 @@ export function DataTypeSelect(props: DataTypeSelectProps) {
     return (menuRawList ?? []).filter((item) => item.type === MenuItemType.ApiSchema)
   }, [menuRawList])
 
+  // t 作为依赖：语言切换时重新生成类型展示名
+  const typeOptions = useMemo(() => {
+    return tyepList.map((it) => ({
+      key: it,
+      label: getSchemaTypeLabel(it, t),
+    }))
+  }, [t])
+
   const typeName = useMemo(() => {
     if (type) {
       if ($ref) {
@@ -77,10 +88,10 @@ export function DataTypeSelect(props: DataTypeSelectProps) {
         return schemaModels.find((it) => it.name === name)?.name ?? name
       }
       else {
-        return defaultSchemaTypeConfig[type].text
+        return getSchemaTypeLabel(type, t)
       }
     }
-  }, [type, $ref, schemaModels])
+  }, [type, $ref, schemaModels, t])
 
   if (type) {
     return (
@@ -99,10 +110,7 @@ export function DataTypeSelect(props: DataTypeSelectProps) {
             >
               <div className="w-[160px]">
                 <Menu
-                  items={tyepList.map((it) => ({
-                    key: it,
-                    label: defaultSchemaTypeConfig[it].text,
-                  }))}
+                  items={typeOptions}
                   selectedKeys={[type]}
                   onClick={(menuInfo) => {
                     onTypeSelect?.(menuInfo.key as SchemaType)
@@ -144,7 +152,7 @@ export function DataTypeSelect(props: DataTypeSelectProps) {
                         label: it.name,
                         value: `#/components/schemas/${it.name}`,
                       }))}
-                      placeholder="请选择引用的模型"
+                      placeholder={t('ui.schema.selectRefModel')}
                       value={$ref}
                       onChange={(v) => {
                         onRefSelect?.(v)
@@ -154,9 +162,9 @@ export function DataTypeSelect(props: DataTypeSelectProps) {
                 : (
                     <Select
                       className="[&_.ant-select-selector]:!text-current"
-                      options={tyepList.map((it) => ({
-                        label: defaultSchemaTypeConfig[it].text,
-                        value: it,
+                      options={typeOptions.map((it) => ({
+                        label: it.label,
+                        value: it.key,
                       }))}
                       style={{ color: `var(${defaultSchemaTypeConfig[type].varColor})` }}
                       value={type}
@@ -170,7 +178,7 @@ export function DataTypeSelect(props: DataTypeSelectProps) {
           placement="right"
           trigger="click"
         >
-          <Tooltip title="高级设置">
+          <Tooltip title={t('ui.schema.advancedSettings')}>
             <span className={cssSchemaType} style={{ backgroundColor: token.colorBgLayout }}>
               <Settings2Icon size={12} />
             </span>

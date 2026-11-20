@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Input, Space, Switch, Typography } from 'antd'
 
@@ -18,6 +19,8 @@ interface BaseFieldsProps {
 // ==================== 组件 ====================
 
 export default function BaseFields({ data, onChange }: BaseFieldsProps) {
+  const { t } = useTranslation()
+
   // 标签（受控草稿 + blur 提交）
   const { draft: labelDraft, setDraft: setLabelDraft, commit: commitLabel } = useDraft(
     data.label,
@@ -47,11 +50,11 @@ export default function BaseFields({ data, onChange }: BaseFieldsProps) {
       {/* 标签编辑 */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          标签
+          {t('flow.nodeConfig.base.label')}
         </Text>
         <Input
           data-testid="node-label-input"
-          placeholder="节点标签"
+          placeholder={t('flow.nodeConfig.base.labelPlaceholder')}
           value={labelDraft}
           onBlur={commitLabel}
           onChange={(e) => {
@@ -63,11 +66,11 @@ export default function BaseFields({ data, onChange }: BaseFieldsProps) {
       {/* 描述编辑 */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          描述（可选）
+          {t('flow.nodeConfig.base.description')}
         </Text>
         <Input.TextArea
           data-testid="node-description-input"
-          placeholder="节点描述"
+          placeholder={t('flow.nodeConfig.base.descriptionPlaceholder')}
           rows={2}
           value={descDraft}
           onBlur={commitDesc}
@@ -81,7 +84,7 @@ export default function BaseFields({ data, onChange }: BaseFieldsProps) {
       <div>
         <Space>
           <Text className="text-xs" type="secondary">
-            启用状态
+            {t('flow.nodeConfig.base.enabled')}
           </Text>
           <Switch
             checked={data.enabled ?? true}

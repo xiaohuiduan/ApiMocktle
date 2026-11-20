@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Editor, type EditorProps } from '@monaco-editor/react'
 import { merge } from 'lodash-es'
@@ -103,6 +104,8 @@ function EditorX<ValueType = unknown>(
   props: MonacoEditorProps<ValueType>,
   ref: React.Ref<MonacoEditorRef<ValueType>>,
 ) {
+  const { t } = useTranslation()
+
   const {
     defaultValue,
     value = defaultValue,
@@ -172,7 +175,7 @@ function EditorX<ValueType = unknown>(
     <>
       <Editor
         defaultLanguage="javascript"
-        loading="初次加载可能耗时较久，请耐心等待..."
+        loading={t('ui.monaco.loading')}
         {...editorProps}
         {...valueObj}
         options={merge({ readOnly: false }, defaultEditorOptions, editorProps.options)}

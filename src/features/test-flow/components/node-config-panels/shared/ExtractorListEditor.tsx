@@ -1,8 +1,10 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Select, Space, Typography } from 'antd'
+import { Plus, Trash2 } from 'lucide-react'
 
+import { translateKey } from '@/i18n/translate'
 import type { TestExtractor } from '@/types'
 
 const { Text } = Typography
@@ -10,10 +12,10 @@ const { Text } = Typography
 // ==================== 提取器类型选项 ====================
 
 const EXTRACTOR_TYPE_OPTIONS = [
-  { value: 'json_path', label: 'JSON 路径' },
-  { value: 'header', label: '响应头' },
-  { value: 'regex', label: '正则表达式' },
-  { value: 'status', label: '状态码' },
+  { value: 'json_path', labelKey: 'flow.enum.extractorType.jsonPath' },
+  { value: 'header', labelKey: 'flow.enum.extractorType.header' },
+  { value: 'regex', labelKey: 'flow.enum.extractorType.regex' },
+  { value: 'status', labelKey: 'flow.enum.extractorType.status' },
 ]
 
 // ==================== 组件 Props ====================
@@ -26,6 +28,8 @@ interface ExtractorListEditorProps {
 // ==================== 组件 ====================
 
 export default function ExtractorListEditor({ extractors, onChange }: ExtractorListEditorProps) {
+  const { t } = useTranslation()
+
   // 添加新提取器
   const handleAdd = useCallback(() => {
     const newExtractor: TestExtractor = {
@@ -71,7 +75,7 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Text className="text-xs" type="secondary">
-          提取器列表
+          {t('flow.nodeConfig.editor.extractorList')}
         </Text>
         <Button
           icon={<Plus size={14} />}
@@ -79,14 +83,14 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
           type="dashed"
           onClick={handleAdd}
         >
-          添加提取器
+          {t('flow.nodeConfig.editor.extractorAdd')}
         </Button>
       </div>
 
       {extractors.length === 0
         ? (
             <Text className="text-xs italic" type="secondary">
-              暂无提取器
+              {t('flow.nodeConfig.editor.extractorEmpty')}
             </Text>
           )
         : (
@@ -99,8 +103,8 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
                   {/* 第一行：类型、路径/名称 */}
                   <Space.Compact block>
                     <Select
-                      options={EXTRACTOR_TYPE_OPTIONS}
-                      placeholder="提取类型"
+                      options={EXTRACTOR_TYPE_OPTIONS.map((o) => ({ value: o.value, label: translateKey(o.labelKey) }))}
+                      placeholder={t('flow.nodeConfig.editor.extractorTypePlaceholder')}
                       size="small"
                       style={{ width: '35%' }}
                       value={extractor.type}
@@ -117,7 +121,7 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
                     )}
                     {extractor.type === 'header' && (
                       <Input
-                        placeholder="Header 名称"
+                        placeholder={t('flow.nodeConfig.editor.headerNamePlaceholder')}
                         size="small"
                         style={{ width: '65%' }}
                         value={extractor.name ?? ''}
@@ -129,7 +133,7 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
                   {/* 第二行：变量名、pattern（如果需要）、删除按钮 */}
                   <Space.Compact block>
                     <Input
-                      placeholder="变量名（必填）"
+                      placeholder={t('flow.nodeConfig.editor.extractorVariablePlaceholder')}
                       size="small"
                       style={{ width: shouldShowPattern(extractor.type) ? '50%' : '90%' }}
                       value={extractor.variable}
@@ -137,7 +141,7 @@ export default function ExtractorListEditor({ extractors, onChange }: ExtractorL
                     />
                     {shouldShowPattern(extractor.type) && (
                       <Input
-                        placeholder="提取模式"
+                        placeholder={t('flow.nodeConfig.editor.patternPlaceholder')}
                         size="small"
                         style={{ width: '40%' }}
                         value={extractor.pattern ?? ''}

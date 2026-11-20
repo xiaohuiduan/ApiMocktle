@@ -2,6 +2,8 @@ import type { GlobalToken } from 'antd'
 
 import type { Density, DesignStyle, ThemeMode, ThemeSetting } from './ThemeEditor.type'
 
+import { translateKey } from '@/i18n/translate'
+
 export const defaultThemeSetting: ThemeSetting = {
   themeMode: 'lightDefault',
   designStyle: 'default',
@@ -39,23 +41,46 @@ export const designStylePresets: Record<
   },
 }
 
-/** 每种密度档位的展示信息，用于设置面板预览卡片 */
-export const densityPresets: Record<
+/**
+ * 每种密度档位的 i18n key。
+ *
+ * 只存 key 不存展示文案：模块顶层求值会让切语言永久失效，
+ * 消费方在渲染期用 `getDensityPresets()` 取词。
+ */
+export const densityPresetKeys: Record<
   Density,
-  { name: string, description: string }
+  { nameKey: string, descriptionKey: string }
 > = {
   compact: {
-    name: '紧凑',
-    description: '控件更矮、字号更小、间距更紧，一屏容纳更多信息（默认）',
+    nameKey: 'ui.density.compact.name',
+    descriptionKey: 'ui.density.compact.description',
   },
   standard: {
-    name: '标准',
-    description: '接近系统默认尺寸，兼顾密度与可读性',
+    nameKey: 'ui.density.standard.name',
+    descriptionKey: 'ui.density.standard.description',
   },
   loose: {
-    name: '宽松',
-    description: '控件更高、留白更多，长时间盯屏更护眼',
+    nameKey: 'ui.density.loose.name',
+    descriptionKey: 'ui.density.loose.description',
   },
+}
+
+/** 渲染期取密度档位的展示名与说明，随当前语言变化。 */
+export function getDensityPresets(): Record<Density, { name: string, description: string }> {
+  return {
+    compact: {
+      name: translateKey(densityPresetKeys.compact.nameKey),
+      description: translateKey(densityPresetKeys.compact.descriptionKey),
+    },
+    standard: {
+      name: translateKey(densityPresetKeys.standard.nameKey),
+      description: translateKey(densityPresetKeys.standard.descriptionKey),
+    },
+    loose: {
+      name: translateKey(densityPresetKeys.loose.nameKey),
+      description: translateKey(densityPresetKeys.loose.descriptionKey),
+    },
+  }
 }
 
 /**
@@ -258,44 +283,78 @@ const previewDark = (
   </svg>
 )
 
+/** 配色模式的展示名 i18n key（`preview` 与 `token` 保持非文案字段）。 */
+export const presetThemeNameKeys = {
+  lightDefault: 'ui.theme.light',
+  darkDefault: 'ui.theme.dark',
+} as const satisfies Record<ThemeMode, string>
+
 export const presetThemes = {
   lightDefault: {
     preview: previewDefault,
-    name: '浅色',
+    nameKey: presetThemeNameKeys.lightDefault,
     token: {} as Partial<GlobalToken>,
   },
   darkDefault: {
     preview: previewDark,
-    name: '暗色',
+    nameKey: presetThemeNameKeys.darkDefault,
     token: {} as Partial<GlobalToken>,
   },
 } as const satisfies Record<
   ThemeMode,
   {
     preview: React.ReactElement
-    name: string
+    nameKey: string
     token: Partial<GlobalToken>
   }
 >
 
-export const presetDesignStyles: Record<
+/**
+ * 每种设计风格的 i18n key。
+ *
+ * 与密度同样只存 key：模块顶层求值会让切语言永久失效，
+ * 消费方在渲染期用 `getDesignStylePresets()` 取词。
+ */
+export const designStylePresetKeys: Record<
   DesignStyle,
-  { name: string, description: string }
+  { nameKey: string, descriptionKey: string }
 > = {
   default: {
-    name: '默认',
-    description: '经典 Ant Design 风格，简洁高效，适合日常开发',
+    nameKey: 'ui.designStyle.default.name',
+    descriptionKey: 'ui.designStyle.default.description',
   },
   glassmorphism: {
-    name: '毛玻璃',
-    description: '半透明模糊与光晕背景，质感通透，适合展示与演示',
+    nameKey: 'ui.designStyle.glassmorphism.name',
+    descriptionKey: 'ui.designStyle.glassmorphism.description',
   },
   skeuomorphism: {
-    name: '拟物化',
-    description: '真实材质纹理与立体光影，适合偏好实物质感',
+    nameKey: 'ui.designStyle.skeuomorphism.name',
+    descriptionKey: 'ui.designStyle.skeuomorphism.description',
   },
   neumorphism: {
-    name: '新拟态',
-    description: '柔和浮雕与低对比投影，视觉温和不刺眼',
+    nameKey: 'ui.designStyle.neumorphism.name',
+    descriptionKey: 'ui.designStyle.neumorphism.description',
   },
+}
+
+/** 渲染期取设计风格的展示名与说明，随当前语言变化。 */
+export function getDesignStylePresets(): Record<DesignStyle, { name: string, description: string }> {
+  return {
+    default: {
+      name: translateKey(designStylePresetKeys.default.nameKey),
+      description: translateKey(designStylePresetKeys.default.descriptionKey),
+    },
+    glassmorphism: {
+      name: translateKey(designStylePresetKeys.glassmorphism.nameKey),
+      description: translateKey(designStylePresetKeys.glassmorphism.descriptionKey),
+    },
+    skeuomorphism: {
+      name: translateKey(designStylePresetKeys.skeuomorphism.nameKey),
+      description: translateKey(designStylePresetKeys.skeuomorphism.descriptionKey),
+    },
+    neumorphism: {
+      name: translateKey(designStylePresetKeys.neumorphism.nameKey),
+      description: translateKey(designStylePresetKeys.neumorphism.descriptionKey),
+    },
+  }
 }

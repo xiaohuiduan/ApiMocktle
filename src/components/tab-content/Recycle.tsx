@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, ConfigProvider, Popconfirm, Table, Tabs, theme, Tooltip } from 'antd'
 
@@ -24,11 +25,8 @@ const EMPTY_SELECTED_RECYCLE_IDS: SelectedRecycleIds = {
   [CatalogType.Request]: [],
 }
 
-const RECYCLE_TABS: { key: RecycleCatalogType, label: string }[] = [
-  { key: CatalogType.Http, label: '接口' },
-  { key: CatalogType.Schema, label: '数据模型' },
-  { key: CatalogType.Request, label: '快捷请求' },
-]
+/** 回收站页签顺序；label 在渲染期翻译，避免模块顶层求值。 */
+const RECYCLE_TAB_KEYS: RecycleCatalogType[] = [CatalogType.Http, CatalogType.Schema, CatalogType.Request]
 
 function filterSelectedRecycleIds(
   recycleData: RecycleData | undefined,
@@ -62,6 +60,7 @@ function normalizeSelectedRecycleIds(
 
 function RecycleTable(props: RecycleTableProps) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const { catalogType, selectedRecycleIds, onSelectionChange } = props
 
   const {
@@ -77,30 +76,30 @@ function RecycleTable(props: RecycleTableProps) {
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <span style={{ color: token.colorTextSecondary }}>
-          已选 {selectedRecycleIds.length} 项
+          {t('api.recycle.selectedCount', { count: selectedRecycleIds.length })}
         </span>
         <div className="flex items-center gap-2">
           <Popconfirm
             placement="left"
-            title={`确定恢复选中的 ${selectedRecycleIds.length} 项？`}
+            title={t('api.recycle.confirmRestore', { count: selectedRecycleIds.length })}
             onConfirm={() => {
               onSelectionChange([])
               restoreMenuItems(selectedRecycleIds)
             }}
           >
-            <Button disabled={!hasSelection}>批量恢复</Button>
+            <Button disabled={!hasSelection}>{t('api.recycle.batchRestore')}</Button>
           </Popconfirm>
           <Popconfirm
-            description="彻底删除后无法恢复"
+            description={t('api.recycle.deleteIrreversible')}
             placement="left"
-            title={`确定彻底删除选中的 ${selectedRecycleIds.length} 项？`}
+            title={t('api.recycle.confirmDelete', { count: selectedRecycleIds.length })}
             onConfirm={() => {
               onSelectionChange([])
               deleteRecycleItems(selectedRecycleIds)
             }}
           >
             <Button danger disabled={!hasSelection}>
-              批量删除
+              {t('api.recycle.batchDelete')}
             </Button>
           </Popconfirm>
         </div>
@@ -109,7 +108,7 @@ function RecycleTable(props: RecycleTableProps) {
         className="overflow-hidden [&_.ant-table-row:last-of-type_>_.ant-table-cell]:border-none [&_.ant-table-thead_>_tr_>_.ant-table-cell]:font-normal"
         columns={[
           {
-            title: '文件名称',
+            title: t('api.recycle.fileName'),
             dataIndex: 'deletedItem',
             render: (x: RecycleDataItem['deletedItem']) => {
               const isHttp = x.type === MenuItemType.ApiDetail || x.type === MenuItemType.HttpRequest
@@ -134,29 +133,29 @@ function RecycleTable(props: RecycleTableProps) {
             },
           },
           {
-            title: '操作人',
+            title: t('api.recycle.operator'),
             dataIndex: 'creator',
             width: 150,
             render: (x: RecycleDataItem['creator']) => {
               return <Tooltip title={x.username}>{x.name}</Tooltip>
             },
           },
-          { title: '剩余时间', dataIndex: 'expiredAt', width: 150 },
+          { title: t('api.recycle.remaining'), dataIndex: 'expiredAt', width: 150 },
           {
-            title: '操作',
+            title: t('common.action'),
             width: 100,
             render: (_, record) => {
               return (
                 <Popconfirm
                   placement="left"
-                  title="确定恢复该文件？"
+                  title={t('api.recycle.confirmRestoreOne')}
                   onConfirm={() => {
                     onSelectionChange(selectedRecycleIds.filter((id) => id !== record.id))
                     restoreMenuItem({ restoreId: record.id })
                   }}
                 >
                   <Button size="small" type="link">
-                    恢复
+                    {t('api.recycle.restore')}
                   </Button>
                 </Popconfirm>
               )
@@ -183,6 +182,7 @@ function RecycleTable(props: RecycleTableProps) {
 
 export function Recycle() {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const { recyleRawData } = useMenuHelpersContext()
   const [selectedRecycleIds, setSelectedRecycleIds] = useState<SelectedRecycleIds>(
     EMPTY_SELECTED_RECYCLE_IDS,
@@ -207,9 +207,9 @@ export function Recycle() {
         hideAdd
         className="[&_>_.ant-tabs-nav]:px-tabContent"
         hidden={false}
-        items={RECYCLE_TABS.map(({ key, label }) => ({
+        items={RECYCLE_TAB_KEYS.map((key) => ({
           key,
-          label,
+          label: t(API_MENU_CONFIG[key].titleKey),
           children: (
             <div className="p-tabContent">
               <RecycleTable

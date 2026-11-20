@@ -1,7 +1,8 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Typography } from 'antd'
+import { Plus, Trash2 } from 'lucide-react'
 
 const { Text } = Typography
 
@@ -29,6 +30,8 @@ export default function KVEditor({
   valuePlaceholder = 'Value',
   nameWidth = 120,
 }: KVEditorProps) {
+  const { t } = useTranslation()
+
   const handleAdd = useCallback(() => {
     onChange([...value, { name: '', value: '' }])
   }, [value, onChange])
@@ -106,7 +109,7 @@ export default function KVEditor({
         type="dashed"
         onClick={handleAdd}
       >
-        添加
+        {t('flow.nodeConfig.editor.add')}
       </Button>
     </div>
   )

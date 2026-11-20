@@ -1,13 +1,16 @@
+import { useTranslation } from 'react-i18next'
+
 import { Tag, theme, Typography } from 'antd'
 
 import type { ApiEnvironmentValue } from '@/types'
 
-function getEntryValue(entry: ApiEnvironmentValue) {
+/** 参数值展示元信息；文案在渲染期翻译。 */
+function getEntryValue(entry: ApiEnvironmentValue, t: (key: 'api.params.configured' | 'api.params.notConfigured') => string) {
   if (entry.value) {
-    return { label: '已配置', value: entry.value }
+    return { label: t('api.params.configured'), value: entry.value }
   }
 
-  return { label: '未配置', value: '-' }
+  return { label: t('api.params.notConfigured'), value: '-' }
 }
 
 export function GlobalParametersNotice(props: {
@@ -18,11 +21,12 @@ export function GlobalParametersNotice(props: {
   normalizeName?: (name: string) => string
 }) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const {
     title,
     rows = [],
     overriddenNames = new Set<string>(),
-    description = '运行时会自动带入这些全局参数；同名接口参数优先。',
+    description,
     normalizeName = (name) => name,
   } = props
 
@@ -38,13 +42,13 @@ export function GlobalParametersNotice(props: {
       <div className="mb-2">
         <Typography.Text strong>{title}</Typography.Text>
         <div className="mt-1">
-          <Typography.Text type="secondary">{description}</Typography.Text>
+          <Typography.Text type="secondary">{description ?? t('api.params.globalActive')}</Typography.Text>
         </div>
       </div>
 
       <div className="grid gap-2">
         {rows.map((row) => {
-          const valueMeta = getEntryValue(row)
+          const valueMeta = getEntryValue(row, t)
           const overridden = overriddenNames.has(normalizeName(row.name))
 
           return (
@@ -56,7 +60,9 @@ export function GlobalParametersNotice(props: {
                 gridTemplateColumns: '80px minmax(0,1fr) minmax(0,1fr) 72px',
               }}
             >
-              <Tag color={overridden ? 'default' : 'blue'}>{overridden ? '已覆盖' : '全局生效'}</Tag>
+              <Tag color={overridden ? 'default' : 'blue'}>
+                {overridden ? t('api.params.overridden') : t('api.params.globalEffective')}
+              </Tag>
               <Typography.Text code className="truncate">{row.name}</Typography.Text>
               <Typography.Text className="break-all">{valueMeta.value}</Typography.Text>
               <Typography.Text type="secondary">{valueMeta.label}</Typography.Text>
