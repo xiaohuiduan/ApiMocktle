@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { I18nextProvider } from 'react-i18next'
 import { HashRouter, Routes } from 'react-router'
 
 import { loader } from '@monaco-editor/react'
@@ -8,6 +9,15 @@ import { AuthProvider } from '@/contexts/auth'
 import { ProjectTabsProvider } from '@/contexts/project-tabs'
 import { ProxyConfigProvider } from '@/contexts/proxy-config'
 import { SessionVariablesProvider } from '@/contexts/session-variables'
+import { i18n, initI18n, onLanguageChange, syncDayjs, syncDocument } from '@/i18n'
+
+// 语言必须在首次渲染前同步确定：resources 已打进内存，init 后立即可 t()，
+// 因此不会出现「先中文闪一下再切英文」。
+initI18n()
+onLanguageChange((language) => {
+  syncDocument(language)
+  syncDayjs(language)
+})
 
 // Monaco Editor 本地加载（离线可用）
 loader.config({ paths: { vs: '/monaco-editor/vs' } })
@@ -40,18 +50,20 @@ document.addEventListener('contextmenu', (e) => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <HashRouter>
-      <AuthProvider>
-        <ProxyConfigProvider>
-          <ProjectTabsProvider>
-            <SessionVariablesProvider>
-              <Routes>
-                {appRoutes}
-              </Routes>
-            </SessionVariablesProvider>
-          </ProjectTabsProvider>
-        </ProxyConfigProvider>
-      </AuthProvider>
-    </HashRouter>
+    <I18nextProvider i18n={i18n}>
+      <HashRouter>
+        <AuthProvider>
+          <ProxyConfigProvider>
+            <ProjectTabsProvider>
+              <SessionVariablesProvider>
+                <Routes>
+                  {appRoutes}
+                </Routes>
+              </SessionVariablesProvider>
+            </ProjectTabsProvider>
+          </ProxyConfigProvider>
+        </AuthProvider>
+      </HashRouter>
+    </I18nextProvider>
   </StrictMode>,
 )
