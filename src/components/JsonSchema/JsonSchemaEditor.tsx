@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { theme } from 'antd'
 import { produce } from 'immer'
@@ -26,6 +27,8 @@ export interface JsonSchemaEditorProps extends Pick<JsonSchemaNodeProps, 'value'
 
 export function JsonSchemaEditor(props: JsonSchemaEditorProps) {
   const { token } = theme.useToken()
+
+  const { t } = useTranslation()
 
   const {
     defaultExpandAll = false,
@@ -145,12 +148,12 @@ export function JsonSchemaEditor(props: JsonSchemaEditorProps) {
           },
         })}
       >
-        <span style={{ flex: '0 1 180px' }}>字段名</span>
-        <span style={{ flex: '0 1 182px' }}>类型</span>
-        <span style={{ flex: '0 1 120px' }}>中文名</span>
-        <span style={{ flex: '0 1 120px' }}>示例值</span>
-        <span style={{ flex: '0 0 60px', textAlign: 'center' }}>必填</span>
-        <span style={{ flex: '1 1 280px' }}>说明</span>
+        <span style={{ flex: '0 1 180px' }}>{t('ui.schema.columns.name')}</span>
+        <span style={{ flex: '0 1 182px' }}>{t('ui.schema.columns.type')}</span>
+        <span style={{ flex: '0 1 120px' }}>{t('ui.schema.columns.displayName')}</span>
+        <span style={{ flex: '0 1 120px' }}>{t('ui.schema.columns.example')}</span>
+        <span style={{ flex: '0 0 60px', textAlign: 'center' }}>{t('ui.schema.columns.required')}</span>
+        <span style={{ flex: '1 1 280px' }}>{t('ui.schema.columns.description')}</span>
         <span style={{ flex: '0 0 48px' }} />
       </div>
 

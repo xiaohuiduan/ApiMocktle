@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 
 import { invoke } from '@tauri-apps/api/core'
@@ -43,6 +44,7 @@ interface Environment {
 // ==================== 组件 ====================
 
 export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
+  const { t } = useTranslation()
   const { loadFlow, forceSave, isSaving } = useFlowPersistence(taskId)
   const { sessionId } = useAuth()
   const pathHighlight = usePathHighlight()
@@ -109,21 +111,21 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
     const startNodes = currentNodes.filter((n) => n.type === NT.Start)
     const endNodes = currentNodes.filter((n) => n.type === NT.End)
 
-    if (startNodes.length === 0) { errors.push({ message: '缺少 Start 节点' }) }
+    if (startNodes.length === 0) { errors.push({ message: t('flow.validation.missingStart') }) }
 
-    if (startNodes.length > 1) { errors.push({ message: `有 ${startNodes.length} 个 Start 节点（应只有 1 个）`, nodeId: startNodes[0].id }) }
+    if (startNodes.length > 1) { errors.push({ message: t('flow.validation.multipleStart', { count: startNodes.length }), nodeId: startNodes[0].id }) }
 
-    if (endNodes.length === 0) { errors.push({ message: '缺少 End 节点' }) }
+    if (endNodes.length === 0) { errors.push({ message: t('flow.validation.missingEnd') }) }
 
-    if (endNodes.length > 1) { warnings.push({ message: `有 ${endNodes.length} 个 End 节点`, nodeId: endNodes[0].id }) }
+    if (endNodes.length > 1) { warnings.push({ message: t('flow.validation.multipleEnd', { count: endNodes.length }), nodeId: endNodes[0].id }) }
 
     // 2. 边引用有效性
     const nodeIds = new Set(currentNodes.map((n) => n.id))
 
     for (const edge of currentEdges) {
-      if (!nodeIds.has(edge.source)) { errors.push({ message: `边引用了不存在的源节点: ${edge.source}` }) }
+      if (!nodeIds.has(edge.source)) { errors.push({ message: t('flow.validation.danglingSource', { id: edge.source }) }) }
 
-      if (!nodeIds.has(edge.target)) { errors.push({ message: `边引用了不存在的目标节点: ${edge.target}` }) }
+      if (!nodeIds.has(edge.target)) { errors.push({ message: t('flow.validation.danglingTarget', { id: edge.target }) }) }
     }
 
     // 3. 孤立节点检查
@@ -132,20 +134,20 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
 
     for (const node of currentNodes) {
       if (node.type === NT.Start && !hasOutgoing.has(node.id)) {
-        warnings.push({ message: `Start 节点「${(node.data?.label) || node.id}」没有出边`, nodeId: node.id })
+        warnings.push({ message: t('flow.validation.startNoOutgoing', { label: (node.data?.label) || node.id }), nodeId: node.id })
       }
 
       if (node.type === NT.End && !hasIncoming.has(node.id)) {
-        warnings.push({ message: `End 节点「${(node.data?.label) || node.id}」没有入边`, nodeId: node.id })
+        warnings.push({ message: t('flow.validation.endNoIncoming', { label: (node.data?.label) || node.id }), nodeId: node.id })
       }
 
       if (node.type !== NT.Start && node.type !== NT.End) {
         if (!hasIncoming.has(node.id)) {
-          warnings.push({ message: `节点「${(node.data?.label) || node.id}」没有入边`, nodeId: node.id })
+          warnings.push({ message: t('flow.validation.nodeNoIncoming', { label: (node.data?.label) || node.id }), nodeId: node.id })
         }
 
         if (!hasOutgoing.has(node.id)) {
-          warnings.push({ message: `节点「${(node.data?.label) || node.id}」没有出边`, nodeId: node.id })
+          warnings.push({ message: t('flow.validation.nodeNoOutgoing', { label: (node.data?.label) || node.id }), nodeId: node.id })
         }
       }
     }
@@ -153,13 +155,13 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
     // 4. httpRequest 节点的 menuItemId
     for (const node of currentNodes) {
       if (node.type === NT.HttpRequest && !(node.data?.menuItemId as string)) {
-        errors.push({ message: `HTTP 请求节点「${(node.data?.label) || node.id}」未选择 API`, nodeId: node.id })
+        errors.push({ message: t('flow.validation.httpNoApi', { label: (node.data?.label) || node.id }), nodeId: node.id })
       }
     }
 
     // 结果展示
     if (errors.length === 0 && warnings.length === 0) {
-      message.success('流程校验通过 ✓')
+      message.success(t('flow.validation.passed'))
 
       return
     }
@@ -185,13 +187,13 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
           }
         }}
       >
-        {kind === 'error' ? '✗' : '⚠'} {item.message}{item.nodeId ? '（点击定位）' : ''}
+        {kind === 'error' ? '✗' : '⚠'} {item.message}{item.nodeId ? t('flow.validation.clickToLocate') : ''}
       </div>
     )
 
     if (errors.length > 0) {
       const modal = Modal.error({
-        title: `流程校验失败 (${errors.length} 个错误)`,
+        title: t('flow.validation.failedTitle', { count: errors.length }),
         content: (
           <div>
             {errors.map((e, i) => renderItem(e, i, 'error', modal))}
@@ -210,7 +212,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
     }
     else {
       const modal = Modal.warning({
-        title: `校验通过，但有 ${warnings.length} 个警告`,
+        title: t('flow.validation.warningTitle', { count: warnings.length }),
         content: (
           <div>
             {warnings.map((w, i) => renderItem(w, i, 'warning', modal))}
@@ -218,7 +220,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
         ),
       })
     }
-  }, [])
+  }, [t])
 
   // ==================== 工具栏回调 ====================
 
@@ -246,12 +248,12 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
     const ok = await forceSave()
 
     if (ok) {
-      message.success('已保存')
+      message.success(t('flow.editor.saved'))
     }
     else {
-      message.error('保存失败，请重试')
+      message.error(t('flow.editor.saveFailed'))
     }
-  }, [forceSave])
+  }, [forceSave, t])
 
   // Ctrl+S 快捷键
   useEffect(() => {
@@ -291,10 +293,10 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
 
     if (currentNodes.length > 0) {
       Modal.confirm({
-        title: '确认覆盖',
-        content: '当前画布上已有节点和连线，导入将全部替换。确定继续？',
-        okText: '确定导入',
-        cancelText: '取消',
+        title: t('flow.importModal.overwriteTitle'),
+        content: t('flow.importModal.overwriteDescription'),
+        okText: t('flow.importModal.confirmOk'),
+        cancelText: t('common.cancel'),
         onOk: () => {
           loadGraph(graph)
           setImportModalOpen(false)
@@ -305,7 +307,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
       loadGraph(graph)
       setImportModalOpen(false)
     }
-  }, [loadGraph])
+  }, [loadGraph, t])
 
   const handleClear = useCallback(() => {
     reset()
@@ -392,7 +394,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
                         label: (
                           <span style={{ fontSize: 12 }}>
                             <Layers size={12} style={{ marginRight: 4 }} />
-                            节点
+                            {t('flow.editor.tabNodes')}
                           </span>
                         ),
                         children: <NodePalette />,
@@ -402,7 +404,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
                         label: (
                           <span style={{ fontSize: 12 }}>
                             <ListTree size={12} style={{ marginRight: 4 }} />
-                            大纲
+                            {t('flow.editor.tabOutline')}
                           </span>
                         ),
                         children: <NodeOutlinePanel />,
@@ -412,7 +414,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
                         label: (
                           <span style={{ fontSize: 12 }}>
                             <Database size={12} style={{ marginRight: 4 }} />
-                            变量
+                            {t('flow.editor.tabVariables')}
                           </span>
                         ),
                         children: (
@@ -426,7 +428,7 @@ export function TestFlowEditor({ taskId, projectId }: TestFlowEditorProps) {
                         label: (
                           <span style={{ fontSize: 12 }}>
                             <History size={12} style={{ marginRight: 4 }} />
-                            历史
+                            {t('flow.editor.tabHistory')}
                           </span>
                         ),
                         children: <ExecutionHistoryPanel taskId={taskId} />,

@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Badge, Button, Empty, message, Modal, Tabs, theme, Typography } from 'antd'
 import { AlertTriangleIcon, CheckCircleIcon, CopyIcon, HelpCircleIcon, InfoIcon, XCircleIcon } from 'lucide-react'
 
+import { translateKey } from '@/i18n/translate'
 import { MonacoEditor } from '@/components/MonacoEditor'
 import type { ScriptConsoleEntry, ScriptTestResult } from '@/types'
 
@@ -22,9 +24,10 @@ const MAX_CONSOLE_ENTRIES = 500
 
 function ConsolePanel({ entries }: { entries: ScriptConsoleEntry[] }) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   if (entries.length === 0) {
-    return <Empty className="py-4" description="暂无输出" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+    return <Empty className="py-4" description={t('api.script.noOutput')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
   }
 
   const iconMap = {
@@ -56,7 +59,7 @@ function ConsolePanel({ entries }: { entries: ScriptConsoleEntry[] }) {
       ))}
       {entries.length > MAX_CONSOLE_ENTRIES && (
         <div className="px-3 py-1 text-center opacity-50">
-          ... 还有 {entries.length - MAX_CONSOLE_ENTRIES} 条日志未显示
+          {t('api.script.consoleTruncated', { count: entries.length - MAX_CONSOLE_ENTRIES })}
         </div>
       )}
     </div>
@@ -65,9 +68,10 @@ function ConsolePanel({ entries }: { entries: ScriptConsoleEntry[] }) {
 
 function TestResultsPanel({ results }: { results: ScriptTestResult[] }) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   if (results.length === 0) {
-    return <Empty className="py-4" description="暂无测试结果" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+    return <Empty className="py-4" description={t('api.script.noTestResults')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
   }
 
   const passed = results.filter((r) => r.passed).length
@@ -78,14 +82,14 @@ function TestResultsPanel({ results }: { results: ScriptTestResult[] }) {
       <div className="flex items-center gap-3 border-b px-3 py-1.5" style={{ borderColor: token.colorBorderSecondary }}>
         <span style={{ color: token.colorSuccess }}>
           <CheckCircleIcon className="mr-1 inline" size={12} />
-          通过
+          {t('api.script.passed')}
           {' '}
           {passed}
         </span>
         {failed > 0 && (
           <span style={{ color: token.colorError }}>
             <XCircleIcon className="mr-1 inline" size={12} />
-            失败
+            {t('api.script.failed')}
             {' '}
             {failed}
           </span>
@@ -106,204 +110,96 @@ function TestResultsPanel({ results }: { results: ScriptTestResult[] }) {
   )
 }
 
-const AI_PROMPT = `你是一个 API 测试脚本编写助手。我正在使用 ApiMocktle（一个本地 API 管理桌面应用），它支持在请求前后执行 JavaScript 脚本。
-
-## 脚本类型
-
-- **前置脚本**：在请求发送前执行，可修改请求参数、添加认证头等
-- **后置脚本**：在请求收到响应后执行，可解析响应、提取数据、运行断言
-
-## 可用 API
-
-### 环境变量（会话级共享，可跨请求使用）
-- pm.env.get(key) - 获取
-- pm.env.set(key, value) - 设置
-- pm.env.unset(key) - 删除
-- pm.env.has(key) - 检查是否存在
-
-### 全局变量
-- pm.globals.get(key) / .set(key, value) / .unset(key) / .has(key)
-
-### 临时变量（仅本次请求生命周期）
-- pm.variables.get(key) / .set(key, value)
-
-### 请求操作（前置脚本可用）
-- pm.request.url - 当前请求 URL
-- pm.request.method - 请求方法
-- pm.request.headers.upsert({ key, value }) - 添加/修改请求头
-- pm.request.headers.remove(key) - 删除请求头
-- pm.request.headers.get(key) - 获取请求头
-- pm.request.body.update(newBody) - 更新请求体
-
-### 响应操作（后置脚本可用）
-- pm.response.code - HTTP 状态码
-- pm.response.status - 状态文本
-- pm.response.json() - 解析为 JSON
-- pm.response.text() - 原始文本
-- pm.response.responseTime - 响应时间（ms）
-- pm.response.headers.get(key) - 获取响应头
-
-### 测试断言（后置脚本可用）
-- pm.test(name, fn) - 声明测试用例
-- pm.expect(value).to.equal(expected) - 相等
-- pm.expect(value).to.deep.equal(obj) - 深度相等
-- pm.expect(obj).to.have.property(key) - 包含属性
-- pm.expect(value).to.be.true / .to.be.false
-
-### 控制台输出
-- console.log() / console.warn() / console.error()
-
-### 时间函数（JavaScript 标准 API）
-- Date.now() - 当前时间戳
-- new Date() - 日期对象
-
-## 常见场景示例
-
-### 1. Token 自动刷新
-前置脚本：
-\`\`\`javascript
-const token = pm.env.get('authToken')
-if (token) {
-  pm.request.headers.upsert({ key: 'Authorization', value: \`Bearer \${token}\` })
+/** API 帮助表的分组定义；`category` / `desc` 是 i18n key，渲染期翻译。 */
+interface HelpItem {
+  api: string
+  descKey: string
 }
-\`\`\`
 
-后置脚本（提取 token 并保存）：
-\`\`\`javascript
-const json = pm.response.json()
-if (json.data?.token) {
-  pm.env.set('authToken', json.data.token)
-  console.log('Token 已更新')
+interface HelpGroup {
+  categoryKey: string
+  items: HelpItem[]
 }
-\`\`\`
 
-### 2. 响应断言
-\`\`\`javascript
-pm.test('状态码应为 200', () => {
-  pm.expect(pm.response.code).to.equal(200)
-})
-
-pm.test('应返回 success 字段', () => {
-  const json = pm.response.json()
-  pm.expect(json).to.have.property('success')
-  pm.expect(json.success).to.be.true
-})
-\`\`\`
-
-### 3. 链式请求（从响应提取 ID 用于下一个请求）
-\`\`\`javascript
-const json = pm.response.json()
-if (json.data?.id) {
-  pm.env.set('userId', json.data.id)
-  console.log(\`提取到 userId: \${json.data.id}\`)
-}
-\`\`\`
-
-### 4. 动态签名
-\`\`\`javascript
-const timestamp = Date.now()
-const sign = btoa(\`\${timestamp}:\${pm.request.url}\`)
-pm.request.headers.upsert({ key: 'X-Sign', value: sign })
-pm.request.headers.upsert({ key: 'X-Timestamp', value: String(timestamp) })
-\`\`\`
-
-## 变量使用说明
-
-优先使用环境变量存储需要跨请求共享的数据。在请求参数（Params/Headers/Cookie）或 Body 中，可以直接使用 \`{{变量名}}\` 语法引用变量，请求发送时会自动替换为实际变量值。
-
-示例：
-- Header 中：\`Authorization: Bearer {{authToken}}\`
-- Query 中：\`?userId={{userId}}\`
-- Body 中：\`{ "token": "{{authToken}}" }\`
-
-变量优先级（从高到低）：会话变量 > 环境变量 > 全局变量
-
-内置动态变量（\`{{$xxx}}\`，每次请求时重新生成，无需定义）：
-- \`{{$timestamp}}\` 秒级时间戳 | \`{{$timestampISO}}\` ISO 8601 时间
-- \`{{$guid}}\` UUID（带横线） | \`{{$randomUUID}}\` UUID（无横线）
-- \`{{$randomInt}}\` 0-1000 随机数 | \`{{$randomEmail}}\` 随机邮箱
-- \`{{$randomIP}}\` 随机 IPv4 | \`{{$randomMobile}}\` 随机手机号 | \`{{$randomString}}\` 8 位随机字符串
-
-请根据我的需求编写脚本代码，直接给出可粘贴的代码即可。`
-
-const HELP_ITEMS = [
+const HELP_GROUPS: HelpGroup[] = [
   {
-    category: '环境变量',
+    categoryKey: 'api.script.help.envVariables',
     items: [
-      { api: 'pm.env.get(key)', desc: '获取环境变量值' },
-      { api: 'pm.env.set(key, value)', desc: '设置环境变量（会话级共享，可跨请求使用）' },
-      { api: 'pm.env.unset(key)', desc: '删除环境变量' },
-      { api: 'pm.env.has(key)', desc: '检查环境变量是否存在' },
+      { api: 'pm.env.get(key)', descKey: 'api.script.help.envGet' },
+      { api: 'pm.env.set(key, value)', descKey: 'api.script.help.envSet' },
+      { api: 'pm.env.unset(key)', descKey: 'api.script.help.envUnset' },
+      { api: 'pm.env.has(key)', descKey: 'api.script.help.envHas' },
     ],
   },
   {
-    category: '全局变量',
+    categoryKey: 'api.script.help.globals',
     items: [
-      { api: 'pm.globals.get(key)', desc: '获取全局变量值' },
-      { api: 'pm.globals.set(key, value)', desc: '设置全局变量' },
-      { api: 'pm.globals.unset(key)', desc: '删除全局变量' },
+      { api: 'pm.globals.get(key)', descKey: 'api.script.help.globalsGet' },
+      { api: 'pm.globals.set(key, value)', descKey: 'api.script.help.globalsSet' },
+      { api: 'pm.globals.unset(key)', descKey: 'api.script.help.globalsUnset' },
     ],
   },
   {
-    category: '临时变量',
+    categoryKey: 'api.script.help.variables',
     items: [
-      { api: 'pm.variables.get(key)', desc: '获取临时变量值（仅本次请求生命周期）' },
-      { api: 'pm.variables.set(key, value)', desc: '设置临时变量' },
+      { api: 'pm.variables.get(key)', descKey: 'api.script.help.variablesGet' },
+      { api: 'pm.variables.set(key, value)', descKey: 'api.script.help.variablesSet' },
     ],
   },
   {
-    category: '请求操作（前置脚本）',
+    categoryKey: 'api.script.help.requestOps',
     items: [
-      { api: 'pm.request.url', desc: '当前请求 URL' },
-      { api: 'pm.request.method', desc: '当前请求方法' },
-      { api: 'pm.request.headers.upsert({ key, value })', desc: '添加或修改请求头' },
-      { api: 'pm.request.headers.remove(key)', desc: '删除请求头' },
-      { api: 'pm.request.headers.get(key)', desc: '获取请求头值' },
-      { api: 'pm.request.body.update(newBody)', desc: '更新请求体内容' },
+      { api: 'pm.request.url', descKey: 'api.script.help.requestUrl' },
+      { api: 'pm.request.method', descKey: 'api.script.help.requestMethod' },
+      { api: 'pm.request.headers.upsert({ key, value })', descKey: 'api.script.help.requestHeadersUpsert' },
+      { api: 'pm.request.headers.remove(key)', descKey: 'api.script.help.requestHeadersRemove' },
+      { api: 'pm.request.headers.get(key)', descKey: 'api.script.help.requestHeadersGet' },
+      { api: 'pm.request.body.update(newBody)', descKey: 'api.script.help.requestBodyUpdate' },
     ],
   },
   {
-    category: '响应操作（后置脚本）',
+    categoryKey: 'api.script.help.responseOps',
     items: [
-      { api: 'pm.response.code', desc: 'HTTP 状态码' },
-      { api: 'pm.response.status', desc: '状态文本' },
-      { api: 'pm.response.json()', desc: '解析响应体为 JSON 对象' },
-      { api: 'pm.response.text()', desc: '获取响应体原始文本' },
-      { api: 'pm.response.responseTime', desc: '响应时间（毫秒）' },
-      { api: 'pm.response.headers.get(key)', desc: '获取响应头值' },
+      { api: 'pm.response.code', descKey: 'api.script.help.responseCode' },
+      { api: 'pm.response.status', descKey: 'api.script.help.responseStatus' },
+      { api: 'pm.response.json()', descKey: 'api.script.help.responseJson' },
+      { api: 'pm.response.text()', descKey: 'api.script.help.responseText' },
+      { api: 'pm.response.responseTime', descKey: 'api.script.help.responseTime' },
+      { api: 'pm.response.headers.get(key)', descKey: 'api.script.help.responseHeadersGet' },
     ],
   },
   {
-    category: '测试断言',
+    categoryKey: 'api.script.help.assertions',
     items: [
-      { api: 'pm.test(name, fn)', desc: '声明测试用例，fn 中使用 pm.expect 断言' },
-      { api: 'pm.expect(value).to.equal(expected)', desc: '断言值相等' },
-      { api: 'pm.expect(value).to.deep.equal(obj)', desc: '断言深度相等' },
-      { api: 'pm.expect(obj).to.have.property(key)', desc: '断言对象包含属性' },
-      { api: 'pm.expect(value).to.be.true', desc: '断言为 true' },
-      { api: 'pm.expect(value).to.not.equal(val)', desc: '断言不相等' },
+      { api: 'pm.test(name, fn)', descKey: 'api.script.help.testDeclare' },
+      { api: 'pm.expect(value).to.equal(expected)', descKey: 'api.script.help.expectEqual' },
+      { api: 'pm.expect(value).to.deep.equal(obj)', descKey: 'api.script.help.expectDeepEqual' },
+      { api: 'pm.expect(obj).to.have.property(key)', descKey: 'api.script.help.expectProperty' },
+      { api: 'pm.expect(value).to.be.true', descKey: 'api.script.help.expectTrue' },
+      { api: 'pm.expect(value).to.not.equal(val)', descKey: 'api.script.help.expectNotEqual' },
     ],
   },
   {
-    category: '控制台输出',
+    categoryKey: 'api.script.help.console',
     items: [
-      { api: 'console.log(...args)', desc: '输出日志' },
-      { api: 'console.warn(...args)', desc: '输出警告' },
-      { api: 'console.error(...args)', desc: '输出错误' },
+      { api: 'console.log(...args)', descKey: 'api.script.help.consoleLog' },
+      { api: 'console.warn(...args)', descKey: 'api.script.help.consoleWarn' },
+      { api: 'console.error(...args)', descKey: 'api.script.help.consoleError' },
     ],
   },
 ]
 
 function HelpModal({ open, onClose }: { open: boolean, onClose: () => void }) {
+  const { t } = useTranslation()
   const [messageApi, contextHolder] = message.useMessage()
 
   const handleCopyPrompt = async () => {
     try {
-      await navigator.clipboard.writeText(AI_PROMPT)
-      messageApi.success('已复制到剪贴板，粘贴给 AI 即可')
+      await navigator.clipboard.writeText(t('api.script.aiPrompt'))
+      messageApi.success(t('api.script.promptCopied'))
     }
     catch {
-      messageApi.error('复制失败，请手动复制')
+      messageApi.error(t('api.script.copyFailed'))
     }
   }
 
@@ -311,7 +207,7 @@ function HelpModal({ open, onClose }: { open: boolean, onClose: () => void }) {
     <Modal
       footer={null}
       open={open}
-      title="脚本使用说明"
+      title={t('api.script.helpTitle')}
       width={640}
       onCancel={onClose}
     >
@@ -320,9 +216,9 @@ function HelpModal({ open, onClose }: { open: boolean, onClose: () => void }) {
         <div className="mb-4 rounded-lg border p-3" style={{ borderColor: 'var(--ant-color-primary-border)', backgroundColor: 'var(--ant-color-primary-bg)' }}>
           <div className="flex items-center justify-between">
             <div>
-              <Typography.Text strong>需要 AI 帮你写脚本？</Typography.Text>
+              <Typography.Text strong>{t('api.script.aiTitle')}</Typography.Text>
               <Typography.Text className="mt-0.5 block text-xs" type="secondary">
-                复制下方 Prompt 给 AI，再描述你的需求即可生成代码
+                {t('api.script.aiDesc')}
               </Typography.Text>
             </div>
             <Button
@@ -330,20 +226,20 @@ function HelpModal({ open, onClose }: { open: boolean, onClose: () => void }) {
               type="primary"
               onClick={() => void handleCopyPrompt()}
             >
-              复制 Prompt
+              {t('api.script.copyPrompt')}
             </Button>
           </div>
         </div>
         <Typography.Paragraph className="mb-4" type="secondary">
-          在脚本中使用
+          {t('api.script.introPrefix')}
           {' '}
           <code>pm</code>
           {' '}
-          对象操作变量、修改请求、读取响应、运行断言。
+          {t('api.script.introSuffix')}
         </Typography.Paragraph>
-        {HELP_ITEMS.map((group) => (
-          <div key={group.category} className="mb-4">
-            <Typography.Text strong className="mb-2 block">{group.category}</Typography.Text>
+        {HELP_GROUPS.map((group) => (
+          <div key={group.categoryKey} className="mb-4">
+            <Typography.Text strong className="mb-2 block">{translateKey(group.categoryKey)}</Typography.Text>
             <div className="rounded border" style={{ borderColor: 'var(--ant-color-border-secondary)' }}>
               {group.items.map((item, i) => (
                 <div
@@ -352,7 +248,7 @@ function HelpModal({ open, onClose }: { open: boolean, onClose: () => void }) {
                   style={{ borderBottom: i < group.items.length - 1 ? '1px solid var(--ant-color-border-secondary)' : undefined }}
                 >
                   <code className="shrink-0 text-xs" style={{ color: 'var(--ant-color-primary)' }}>{item.api}</code>
-                  <span className="text-xs opacity-70">{item.desc}</span>
+                  <span className="text-xs opacity-70">{translateKey(item.descKey)}</span>
                 </div>
               ))}
             </div>
@@ -366,6 +262,7 @@ function HelpModal({ open, onClose }: { open: boolean, onClose: () => void }) {
 export function ScriptEditor(props: ScriptEditorProps) {
   const { value, onChange, consoleEntries = [], testResults = [], language = 'javascript' } = props
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const [helpOpen, setHelpOpen] = useState(false)
 
   const failedTestCount = testResults.filter((r) => !r.passed).length
@@ -393,12 +290,12 @@ export function ScriptEditor(props: ScriptEditorProps) {
 
   const testTabLabel = useMemo(() => (
     <span>
-      测试结果
+      {t('api.script.testResults')}
       {failedTestCount > 0 && (
         <Badge className="ml-1" count={failedTestCount} size="small" />
       )}
     </span>
-  ), [failedTestCount])
+  ), [failedTestCount, t])
 
   const hasOutput = consoleEntries.length > 0 || testResults.length > 0
 
@@ -412,7 +309,7 @@ export function ScriptEditor(props: ScriptEditorProps) {
           type="link"
           onClick={() => { setHelpOpen(true) }}
         >
-          使用说明
+          {t('api.script.helpButton')}
         </Button>
       </div>
       <div className="flex flex-col rounded border" style={{ borderColor: token.colorBorderSecondary, height: 200 }}>

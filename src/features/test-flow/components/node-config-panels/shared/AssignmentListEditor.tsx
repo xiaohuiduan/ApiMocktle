@@ -1,7 +1,8 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Select, Space, Typography } from 'antd'
+import { Plus, Trash2 } from 'lucide-react'
 
 const { Text } = Typography
 
@@ -31,6 +32,8 @@ interface AssignmentListEditorProps {
 // ==================== 组件 ====================
 
 export default function AssignmentListEditor({ assignments, onChange }: AssignmentListEditorProps) {
+  const { t } = useTranslation()
+
   // 添加新赋值
   const handleAdd = useCallback(() => {
     const newAssignment: Assignment = {
@@ -67,7 +70,7 @@ export default function AssignmentListEditor({ assignments, onChange }: Assignme
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Text className="text-xs" type="secondary">
-          变量赋值列表
+          {t('flow.nodeConfig.editor.assignmentList')}
         </Text>
         <Button
           icon={<Plus size={14} />}
@@ -75,14 +78,14 @@ export default function AssignmentListEditor({ assignments, onChange }: Assignme
           type="dashed"
           onClick={handleAdd}
         >
-          添加赋值
+          {t('flow.nodeConfig.editor.assignmentAdd')}
         </Button>
       </div>
 
       {assignments.length === 0
         ? (
             <Text className="text-xs italic" type="secondary">
-              暂无赋值
+              {t('flow.nodeConfig.editor.assignmentEmpty')}
             </Text>
           )
         : (
@@ -94,7 +97,7 @@ export default function AssignmentListEditor({ assignments, onChange }: Assignme
                 >
                   <Space.Compact block>
                     <Input
-                      placeholder="变量名"
+                      placeholder={t('flow.nodeConfig.editor.variablePlaceholder')}
                       size="small"
                       style={{ width: '35%' }}
                       value={assignment.variable}
@@ -108,7 +111,7 @@ export default function AssignmentListEditor({ assignments, onChange }: Assignme
                       onChange={(value) => { handleUpdate(index, 'operator', value) }}
                     />
                     <Input
-                      placeholder="值或 {{表达式}}"
+                      placeholder={t('flow.nodeConfig.editor.valueExpressionPlaceholder', { token: t('flow.shared.expressionToken') })}
                       size="small"
                       style={{ width: '40%' }}
                       value={assignment.value}

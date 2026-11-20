@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { InputNumber, Radio, Typography } from 'antd'
 
@@ -11,6 +12,8 @@ const { Text } = Typography
 // ==================== 组件 ====================
 
 export default function ParallelNodePanel({ data, onChange }: PanelProps<ParallelNodeData>) {
+  const { t } = useTranslation()
+
   // 更新分支数量
   const handleBranchCountChange = useCallback(
     (value: number | null) => {
@@ -40,13 +43,13 @@ export default function ParallelNodePanel({ data, onChange }: PanelProps<Paralle
   return (
     <div className="space-y-4">
       <Text className="block text-xs" type="secondary">
-        并行配置
+        {t('flow.nodeConfig.parallel.title')}
       </Text>
 
       {/* 分支数量 */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          并行分支数
+          {t('flow.nodeConfig.parallel.branchCount')}
         </Text>
         <InputNumber
           data-testid="parallel-branch-count"
@@ -61,7 +64,7 @@ export default function ParallelNodePanel({ data, onChange }: PanelProps<Paralle
       {/* 等待模式 */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          等待模式
+          {t('flow.nodeConfig.parallel.waitMode')}
         </Text>
         <Radio.Group
           data-testid="parallel-wait-mode"
@@ -69,20 +72,20 @@ export default function ParallelNodePanel({ data, onChange }: PanelProps<Paralle
           value={data.waitAll}
           onChange={handleWaitAllChange}
         >
-          <Radio.Button value={true}>等待所有完成</Radio.Button>
-          <Radio.Button value={false}>等待第一个完成</Radio.Button>
+          <Radio.Button value={true}>{t('flow.nodeConfig.parallel.waitAll')}</Radio.Button>
+          <Radio.Button value={false}>{t('flow.nodeConfig.parallel.waitFirst')}</Radio.Button>
         </Radio.Group>
       </div>
 
       {/* 超时时间（可选） */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          整体超时时间（毫秒，可选）
+          {t('flow.nodeConfig.parallel.timeout')}
         </Text>
         <InputNumber
           data-testid="parallel-timeout"
           min={0}
-          placeholder="不设置超时"
+          placeholder={t('flow.nodeConfig.parallel.timeoutPlaceholder')}
           size="small"
           style={{ width: '100%' }}
           value={data.timeoutMs}

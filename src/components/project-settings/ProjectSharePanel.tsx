@@ -1,18 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { invoke } from '@tauri-apps/api/core'
-import {
-  Alert,
-  Button,
-  Card,
-  Input,
-  message,
-  Modal,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
+import { Alert, Button, Card, Input, message, Modal, Space, Table, Tag, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { Edit3, Link2, Play, Plus } from 'lucide-react'
 
@@ -27,6 +17,7 @@ interface ShareServerStatus {
 }
 
 export function ProjectSharePanel({ projectId }: { projectId: string }) {
+  const { t } = useTranslation()
   const { sessionId } = useAuth()
   const [status, setStatus] = useState<ShareServerStatus>({ running: false, port: 0 })
   const [lanIps, setLanIps] = useState<string[]>([])
@@ -109,15 +100,15 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
         setStatus(result.data)
 
         if (result.data.running) {
-          msgApi.success('分享服务已启动')
+          msgApi.success(t('settings.shareServer.started'))
         }
         else {
-          msgApi.error('启动失败：端口被占用且无可用端口')
+          msgApi.error(t('settings.shareServer.startFailedBusy'))
         }
       }
     }
     catch (err) {
-      msgApi.error('启动失败: ' + String(err))
+      msgApi.error(t('settings.service.startFailed', { error: String(err) }))
     }
     finally {
       setStarting(false)
@@ -129,22 +120,22 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
       const result = await invoke<{ ok: boolean, error?: string }>('delete_share_link', { sessionId, id })
 
       if (!result.ok) {
-        msgApi.error(result.error ?? '删除失败')
+        msgApi.error(result.error ?? t('settings.shareServer.deleteFailed'))
 
         return
       }
 
-      msgApi.success('已删除，链接即时失效')
+      msgApi.success(t('settings.shareServer.deleted'))
       void fetchLinks()
     }
     catch (err) {
-      msgApi.error('删除失败: ' + String(err))
+      msgApi.error(t('settings.shareServer.deleteFailedDetail', { error: String(err) }))
     }
   }
 
   const handleCopy = async (text: string) => {
     await navigator.clipboard.writeText(text)
-    msgApi.success('链接已复制')
+    msgApi.success(t('settings.shareServer.linkCopied'))
   }
 
   /** 带密码链接：后端返回明文密码时直接复制，否则弹窗手动输入 */
@@ -184,7 +175,7 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
                   ))}
                 </div>
               )}
-              message={`分享服务运行中（端口 ${status.port}）`}
+              message={t('settings.shareServer.runningWithPort', { port: status.port })}
               type="success"
             />
           )
@@ -201,12 +192,12 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
                     void handleStart()
                   }}
                 >
-                  启动服务
+                  {t('settings.projectShare.startService')}
                 </Button>
               )}
               className="mb-3"
-              description="启动后才能生成可访问的分享链接。端口与启停控制可在「全局设置 → 文档分享」中配置。"
-              message="分享服务未启动"
+              description={t('settings.projectShare.notRunningDescription')}
+              message={t('settings.shareServer.notRunning')}
               type="warning"
             />
           )}
@@ -222,57 +213,60 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
               setCreateOpen(true)
             }}
           >
-            新建分享
+            {t('settings.projectShare.newShare')}
           </Button>
         )}
         size="small"
-        title="分享当前项目"
+        title={t('settings.projectShare.title')}
       >
         <Typography.Paragraph className="!mb-0 text-sm">
-          生成带密码的访问链接，同局域网用户可在浏览器中只读查看本项目接口与文档。
-          分享内容默认全部，也可勾选部分；删除链接后已打开的页面立即失效。
+          {t('settings.projectShare.description')}
         </Typography.Paragraph>
       </Card>
 
-      <Card size="small" title="本项目分享链接">
+      <Card size="small" title={t('settings.projectShare.linksTitle')}>
         <Table<ShareLink>
           columns={[
             {
-              title: '标题',
+              title: t('settings.projectShare.colTitle'),
               dataIndex: 'title',
               render: (value?: string) => value ?? '-',
             },
             {
-              title: '范围',
+              title: t('settings.projectShare.colRange'),
               dataIndex: 'apiMenuIds',
-              render: (ids: string[]) => (ids.length === 0 ? <Tag color="blue">全部</Tag> : `${ids.length} 项`),
+              render: (ids: string[]) => (ids.length === 0
+                ? <Tag color="blue">{t('common.all')}</Tag>
+                : t('settings.projectShare.rangeItems', { count: ids.length })),
             },
             {
-              title: '过期时间',
+              title: t('settings.projectShare.colExpiresAt'),
               dataIndex: 'expiresAt',
               render: (value?: string) => {
                 if (!value) {
-                  return <Tag>永久</Tag>
+                  return <Tag>{t('settings.projectShare.permanent')}</Tag>
                 }
 
                 const expired = dayjs(value).isBefore(dayjs())
 
-                return expired ? <Tag color="red">已过期</Tag> : dayjs(value).format('YYYY-MM-DD')
+                return expired ? <Tag color="red">{t('settings.projectShare.expired')}</Tag> : dayjs(value).format('YYYY-MM-DD')
               },
             },
             {
-              title: '创建时间',
+              title: t('common.createdAt'),
               dataIndex: 'createdAt',
               render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm'),
             },
             {
-              title: '密码',
+              title: t('settings.projectShare.colPassword'),
               dataIndex: 'hasPassword',
               width: 70,
-              render: (has: boolean) => (has ? <Tag color="orange">有密码</Tag> : <Tag>无</Tag>),
+              render: (has: boolean) => (has
+                ? <Tag color="orange">{t('settings.projectShare.hasPassword')}</Tag>
+                : <Tag>{t('common.none')}</Tag>),
             },
             {
-              title: '操作',
+              title: t('common.action'),
               width: 320,
               render: (_, record) => (
                 <Space>
@@ -284,7 +278,7 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
                       void handleCopy(buildShareLinkUrl(baseUrl, record, false))
                     }}
                   >
-                    复制链接
+                    {t('settings.projectShare.copyLink')}
                   </Button>
                   {record.hasPassword && (
                     <Button
@@ -295,7 +289,7 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
                         handlePwdLink(record)
                       }}
                     >
-                      带密码链接
+                      {t('settings.projectShare.pwdLink')}
                     </Button>
                   )}
                   <Button
@@ -305,7 +299,7 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
                       setEditingLink(record)
                     }}
                   >
-                    编辑
+                    {t('common.edit')}
                   </Button>
                   <Button
                     danger
@@ -314,14 +308,14 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
                       void handleDelete(record.id)
                     }}
                   >
-                    删除
+                    {t('common.delete')}
                   </Button>
                 </Space>
               ),
             },
           ]}
           dataSource={links}
-          locale={{ emptyText: '暂无分享链接' }}
+          locale={{ emptyText: t('settings.projectShare.emptyLinks') }}
           pagination={false}
           rowKey="id"
           size="small"
@@ -329,10 +323,10 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
       </Card>
 
       <Modal
-        cancelText="取消"
-        okText="复制链接"
+        cancelText={t('common.cancel')}
+        okText={t('settings.projectShare.copyLink')}
         open={Boolean(pwdLinkTarget)}
-        title="生成带密码链接"
+        title={t('settings.projectShare.pwdLinkTitle')}
         width={480}
         onCancel={() => {
           setPwdLinkTarget(undefined)
@@ -343,15 +337,15 @@ export function ProjectSharePanel({ projectId }: { projectId: string }) {
             setPwdLinkTarget(undefined)
           }
           else {
-            msgApi.error('请输入该分享的访问密码')
+            msgApi.error(t('settings.projectShare.pwdRequired'))
           }
         }}
       >
         <Typography.Paragraph className="text-sm">
-          输入该分享链接的访问密码，生成「打开即自动填充密码」的链接，访客无需手动输入。
+          {t('settings.projectShare.pwdLinkDescription')}
         </Typography.Paragraph>
         <Input.Password
-          placeholder="输入该分享的访问密码"
+          placeholder={t('settings.projectShare.pwdPlaceholder')}
           value={pwdLinkInput}
           onChange={(e) => {
             setPwdLinkInput(e.target.value)

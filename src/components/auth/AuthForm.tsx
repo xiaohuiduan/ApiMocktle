@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
 
 import { show } from '@ebay/nice-modal-react'
@@ -18,15 +19,8 @@ interface AuthFormProps {
   mode: 'login' | 'register'
 }
 
-const rememberDayOptions = [
-  { label: '1 天', value: 1 },
-  { label: '3 天', value: 3 },
-  { label: '7 天', value: 7 },
-  { label: '30 天', value: 30 },
-  { label: '永久', value: -1 },
-]
-
 export function AuthForm(props: AuthFormProps) {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
   const { isGlassStyle, isNeumorphism, isSkeuomorphism } = useDesignStyle()
   const [submitting, setSubmitting] = useState(false)
@@ -40,6 +34,17 @@ export function AuthForm(props: AuthFormProps) {
   const { login, register } = useAuth()
   const redirectTo = resolveAuthRedirectTarget(searchParams.get('redirect'))
   const [form] = Form.useForm<{ username: string, password: string }>()
+
+  const rememberDayOptions = useMemo(
+    () => [
+      { label: t('app.auth.rememberDays.one'), value: 1 },
+      { label: t('app.auth.rememberDays.three'), value: 3 },
+      { label: t('app.auth.rememberDays.seven'), value: 7 },
+      { label: t('app.auth.rememberDays.thirty'), value: 30 },
+      { label: t('app.auth.rememberDays.forever'), value: -1 },
+    ],
+    [t],
+  )
 
   useEffect(() => {
     if (mode === 'login') {
@@ -56,7 +61,7 @@ export function AuthForm(props: AuthFormProps) {
     <div className="relative flex min-h-screen items-center justify-center px-4">
       <ParticleCanvas preset="login" primaryColor={token.colorPrimary} variant="fullscreen" />
       <div className="fixed right-4 top-4 z-50">
-        <Tooltip title="全局设置">
+        <Tooltip title={t('app.shell.globalSettings')}>
           <Button
             icon={<SettingsIcon size={18} />}
             type="text"
@@ -106,13 +111,13 @@ export function AuthForm(props: AuthFormProps) {
               className="text-xs"
               style={{ color: token.colorTextSecondary }}
             >
-              本地 API 管理工具
+              {t('app.auth.brandSubtitle')}
             </div>
             <div
               className="mt-1 text-xs leading-5"
               style={{ color: token.colorTextTertiary }}
             >
-              本软件为纯本地应用，你的所有数据（包括账号）仅保存在这台电脑上，不会上传到任何服务器。
+              {t('app.auth.privacyNotice')}
             </div>
           </div>
         </div>
@@ -123,8 +128,8 @@ export function AuthForm(props: AuthFormProps) {
             block
             className="mb-5"
             options={[
-              { label: '登录', value: 'login' },
-              { label: '注册', value: 'register' },
+              { label: t('app.auth.tabLogin'), value: 'login' },
+              { label: t('app.auth.tabRegister'), value: 'register' },
             ]}
             value={mode}
             onChange={(value) => {
@@ -150,7 +155,7 @@ export function AuthForm(props: AuthFormProps) {
                     await register(values.username, values.password)
                   }
 
-                  message.success(mode === 'login' ? '登录成功' : '注册成功')
+                  message.success(mode === 'login' ? t('app.auth.loginSuccess') : t('app.auth.registerSuccess'))
                   navigate(redirectTo, { replace: true })
                 }
                 catch (error) {
@@ -163,16 +168,16 @@ export function AuthForm(props: AuthFormProps) {
             }}
           >
             <Form.Item
-              label="用户名"
+              label={t('app.auth.username')}
               name="username"
               rules={[
-                { required: true, message: '请输入用户名' },
-                { min: 3, message: '至少 3 个字符' },
+                { required: true, message: t('app.auth.usernameRequired') },
+                { min: 3, message: t('app.validation.minChars', { count: 3 }) },
               ]}
             >
               <Input
                 className="border-b"
-                placeholder="请输入用户名"
+                placeholder={t('app.auth.usernamePlaceholder')}
                 style={{
                   borderBottom: `2px solid ${token.colorBorderSecondary}`,
                   borderRadius: 0,
@@ -183,16 +188,16 @@ export function AuthForm(props: AuthFormProps) {
             </Form.Item>
 
             <Form.Item
-              label="密码"
+              label={t('app.auth.password')}
               name="password"
               rules={[
-                { required: true, message: '请输入密码' },
-                { min: 6, message: '至少 6 个字符' },
+                { required: true, message: t('app.auth.passwordRequired') },
+                { min: 6, message: t('app.validation.minChars', { count: 6 }) },
               ]}
             >
               <Input.Password
                 className="border-b"
-                placeholder="请输入密码"
+                placeholder={t('app.auth.passwordPlaceholder')}
                 style={{
                   borderBottom: `2px solid ${token.colorBorderSecondary}`,
                   borderRadius: 0,
@@ -209,7 +214,7 @@ export function AuthForm(props: AuthFormProps) {
                     checked={rememberPassword}
                     onChange={(e) => { setRememberPassword(e.target.checked) }}
                   >
-                    记住账号密码
+                    {t('app.auth.rememberPassword')}
                   </Checkbox>
                 </Form.Item>
 
@@ -218,12 +223,12 @@ export function AuthForm(props: AuthFormProps) {
                     checked={rememberLogin}
                     onChange={(e) => { setRememberLogin(e.target.checked) }}
                   >
-                    保持登录状态
+                    {t('app.auth.keepLoggedIn')}
                   </Checkbox>
                 </Form.Item>
 
                 {/* 常驻渲染，未勾选时禁用——避免条件插入导致卡片高度跳动 */}
-                <Form.Item label="登录状态时长">
+                <Form.Item label={t('app.auth.loginDuration')}>
                   <Select
                     disabled={!rememberLogin}
                     options={rememberDayOptions}
@@ -234,7 +239,7 @@ export function AuthForm(props: AuthFormProps) {
                 </Form.Item>
 
                 <Typography.Text className="block text-xs" type="secondary">
-                  “记住账号密码”会在本机保存凭据；“保持登录状态”会延长会话有效期。
+                  {t('app.auth.rememberHint')}
                 </Typography.Text>
               </>
             )}
@@ -251,20 +256,20 @@ export function AuthForm(props: AuthFormProps) {
                 }}
                 type="primary"
               >
-                {mode === 'login' ? '登录' : '注册'}
+                {mode === 'login' ? t('app.auth.submitLogin') : t('app.auth.submitRegister')}
               </Button>
             </Form.Item>
           </Form>
 
           <Typography.Text type="secondary">
-            {mode === 'login' ? '没有账号？' : '已有账号？'}
+            {mode === 'login' ? t('app.auth.noAccount') : t('app.auth.hasAccount')}
             {' '}
             <Typography.Link
               onClick={() => {
                 setMode(mode === 'login' ? 'register' : 'login')
               }}
             >
-              {mode === 'login' ? '去注册' : '去登录'}
+              {mode === 'login' ? t('app.auth.goRegister') : t('app.auth.goLogin')}
             </Typography.Link>
           </Typography.Text>
         </div>

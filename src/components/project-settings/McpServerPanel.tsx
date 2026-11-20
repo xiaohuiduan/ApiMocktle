@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { invoke } from '@tauri-apps/api/core'
 import { Alert, Button, Card, Form, InputNumber, message, Space, Tag, Typography } from 'antd'
@@ -14,6 +15,7 @@ interface McpServerConfig {
 }
 
 export function McpServerPanel() {
+  const { t } = useTranslation()
   const [status, setStatus] = useState<McpServerStatus>({ running: false, port: 0 })
   const [config, setConfig] = useState<McpServerConfig>({ port: 14203 })
   const [loading, setLoading] = useState(false)
@@ -67,11 +69,11 @@ export function McpServerPanel() {
 
       if (result.ok && result.data) {
         setStatus(result.data)
-        msgApi.success('MCP 服务已启动')
+        msgApi.success(t('settings.mcp.started'))
       }
     }
     catch (err) {
-      msgApi.error('启动失败: ' + String(err))
+      msgApi.error(t('settings.service.startFailed', { error: String(err) }))
     }
     finally {
       setLoading(false)
@@ -86,11 +88,11 @@ export function McpServerPanel() {
 
       if (result.ok && result.data) {
         setStatus(result.data)
-        msgApi.success('MCP 服务已停止')
+        msgApi.success(t('settings.mcp.stopped'))
       }
     }
     catch (err) {
-      msgApi.error('停止失败: ' + String(err))
+      msgApi.error(t('settings.service.stopFailed', { error: String(err) }))
     }
     finally {
       setLoading(false)
@@ -100,10 +102,10 @@ export function McpServerPanel() {
   const handleSaveConfig = async () => {
     try {
       await invoke('save_mcp_server_config', { config })
-      msgApi.success('配置已保存')
+      msgApi.success(t('settings.service.configSaved'))
     }
     catch (err) {
-      msgApi.error('保存失败: ' + String(err))
+      msgApi.error(t('settings.service.saveFailed', { error: String(err) }))
     }
   }
 
@@ -116,21 +118,21 @@ export function McpServerPanel() {
       },
     }
     void navigator.clipboard.writeText(JSON.stringify(mcpConfig, null, 2))
-    msgApi.success('配置已复制到剪贴板')
+    msgApi.success(t('settings.mcp.configCopied'))
   }
 
   return (
     <div>
       {contextHolder}
 
-      <Card className="mb-3" size="small" title="服务状态">
+      <Card className="mb-3" size="small" title={t('settings.service.statusTitle')}>
         <div className="mb-3 flex items-center justify-between">
           <Space>
             <Tag color={status.running ? 'success' : 'default'}>
-              {status.running ? '运行中' : '已停止'}
+              {status.running ? t('settings.service.running') : t('settings.service.stopped')}
             </Tag>
             {status.running && (
-              <Tag>端口: {status.port}</Tag>
+              <Tag>{t('settings.service.port', { port: status.port })}</Tag>
             )}
           </Space>
           <Space>
@@ -145,7 +147,7 @@ export function McpServerPanel() {
                       void handleStop()
                     }}
                   >
-                    停止
+                    {t('settings.service.stop')}
                   </Button>
                 )
               : (
@@ -158,7 +160,7 @@ export function McpServerPanel() {
                       void handleStart()
                     }}
                   >
-                    启动
+                    {t('settings.service.start')}
                   </Button>
                 )}
           </Space>
@@ -176,19 +178,19 @@ export function McpServerPanel() {
                   size="small"
                   onClick={handleCopyConfig}
                 >
-                  复制配置
+                  {t('settings.mcp.copyConfig')}
                 </Button>
               </div>
             )}
-            message="MCP 服务运行中"
+            message={t('settings.mcp.running')}
             type="success"
           />
         )}
       </Card>
 
-      <Card size="small" title="服务配置">
+      <Card size="small" title={t('settings.service.configTitle')}>
         <Form layout="vertical" size="small">
-          <Form.Item label="端口号">
+          <Form.Item label={t('settings.service.portLabel')}>
             <InputNumber
               max={65535}
               min={1024}
@@ -207,24 +209,24 @@ export function McpServerPanel() {
                 void handleSaveConfig()
               }}
             >
-              保存配置
+              {t('settings.service.saveConfig')}
             </Button>
           </Form.Item>
         </Form>
       </Card>
 
-      <Card className="mt-3" size="small" title="使用说明">
+      <Card className="mt-3" size="small" title={t('settings.service.usageTitle')}>
         <Typography.Paragraph className="text-sm">
-          MCP 服务允许 AI 工具（如 Claude Desktop）调用自动化测试功能。
+          {t('settings.mcp.usageIntro')}
         </Typography.Paragraph>
         <Typography.Paragraph className="text-sm">
-          1. 点击"启动"开启服务
+          {t('settings.mcp.usageStep1')}
           <br />
-          2. 点击"复制配置"获取配置
+          {t('settings.mcp.usageStep2')}
           <br />
-          3. 粘贴到 Claude Desktop 配置文件
+          {t('settings.mcp.usageStep3')}
           <br />
-          4. 重启 Claude Desktop
+          {t('settings.mcp.usageStep4')}
         </Typography.Paragraph>
       </Card>
     </div>

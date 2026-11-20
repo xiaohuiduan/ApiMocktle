@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { show } from '@ebay/nice-modal-react'
 import { Col, Row, theme } from 'antd'
 
@@ -54,6 +56,7 @@ function NewItem(props: NewItemProps) {
 }
 
 export function Blank() {
+  const { t } = useTranslation()
   const { createApiDetails, createApiRequest, createDoc, createApiSchema } = useHelpers()
   const { tabData } = useTabContentContext()
   const { addMenuItem } = useMenuHelpersContext()
@@ -65,7 +68,7 @@ export function Blank() {
         <Col lg={4} md={8}>
           <NewItem
             catalogType={CatalogType.Http}
-            label="新建接口"
+            label={t('menu.catalogNew.http')}
             onClick={() => {
               createApiDetails({}, { replaceTab: tabData.key })
             }}
@@ -74,7 +77,7 @@ export function Blank() {
         <Col lg={4} md={8}>
           <NewItem
             catalogType={CatalogType.Request}
-            label="快捷请求"
+            label={t('menu.catalog.request')}
             onClick={() => {
               createApiRequest({}, { replaceTab: tabData.key })
             }}
@@ -83,7 +86,7 @@ export function Blank() {
         <Col lg={4} md={8}>
           <NewItem
             catalogType={CatalogType.Markdown}
-            label="新建 Markdown"
+            label={t('menu.catalogNew.markdown')}
             onClick={() => {
               createDoc({}, { replaceTab: tabData.key })
             }}
@@ -92,7 +95,7 @@ export function Blank() {
         <Col lg={4} md={8}>
           <NewItem
             catalogType={CatalogType.Schema}
-            label="新建数据模型"
+            label={t('menu.catalogNew.schema')}
             onClick={() => {
               createApiSchema({}, { replaceTab: tabData.key })
             }}
@@ -101,7 +104,7 @@ export function Blank() {
         <Col lg={4} md={8}>
           <NewItem
             catalogType={CatalogType.Http}
-            label="新建接口目录"
+            label={t('api.menu.newApiFolder')}
             onClick={() => {
               void show(ModalNewCatalog, { formData: { type: MenuItemType.ApiDetailFolder } })
             }}
@@ -110,7 +113,7 @@ export function Blank() {
         <Col lg={4} md={8}>
           <NewItem
             catalogType={CatalogType.Http}
-            label="导入 cURL"
+            label={t('api.menu.importCurl')}
             onClick={() => {
               void show(ModalImportCurl, {
                 onImport: (menuItem) => {

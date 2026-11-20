@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { ConfigProvider, Tabs, type TabsProps, theme } from 'antd'
 
@@ -16,6 +17,7 @@ export const useApiSubTabContext = () => useContext(ApiSubTabContext)
 
 export function Api() {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const { tabData } = useTabContentContext()
   const [activeKey, setActiveKey] = useState('doc')
@@ -24,7 +26,7 @@ export function Api() {
     return [
       {
         key: 'doc',
-        label: '文档',
+        label: t('api.doc.tabDoc'),
         children: (
           <ApiTabContentWrapper>
             <ApiDoc />
@@ -33,7 +35,7 @@ export function Api() {
       },
       {
         key: 'docEdit',
-        label: '修改文档',
+        label: t('api.doc.tabEdit'),
         children: (
           <ApiTabContentWrapper>
             <ApiDocEditing />
@@ -42,7 +44,7 @@ export function Api() {
       },
       {
         key: 'run',
-        label: '运行',
+        label: t('api.run.run'),
         children: (
           <ApiTabContentWrapper>
             <RunTab />
@@ -50,7 +52,7 @@ export function Api() {
         ),
       },
     ]
-  }, [])
+  }, [t])
 
   return (
     <div className="h-full overflow-hidden">

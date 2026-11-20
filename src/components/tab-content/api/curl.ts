@@ -41,7 +41,7 @@ function enabledParams(params: CurlParam[] | undefined): CurlParam[] {
 
 /** 单引号包裹并转义（linux/macOS 风格） */
 function quoteSingle(s: string): string {
-  return `'${s.replace(/'/g, `'\\''`)}'`
+  return `'${s.replace(/'/g, '\'\\\'\'')}'`
 }
 
 /** 双引号包裹（Windows CMD/PowerShell 风格）：转义反斜杠与双引号 */
@@ -124,13 +124,16 @@ export function generateCurl(input: CurlInput): CurlOutput {
       const contentType = bodyType === BodyType.Raw && body?.rawContentType
         ? body.rawContentType
         : contentTypeForBody(bodyType)
+
       if (!hasCT) {
         linuxArgs.push('-H', quoteSingle(`Content-Type: ${contentType}`))
         windowsArgs.push('-H', quoteWindows(`Content-Type: ${contentType}`))
       }
+
       linuxArgs.push('-d', quoteSingle(payload))
       // Windows CMD 不支持双引号内换行，payload 压为单行
       let payloadForWindows = payload
+
       if (payloadForWindows.includes('\n')) {
         if (bodyType === BodyType.Json) {
           try {
@@ -144,6 +147,7 @@ export function generateCurl(input: CurlInput): CurlOutput {
           payloadForWindows = payloadForWindows.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim()
         }
       }
+
       windowsArgs.push('-d', quoteWindows(payloadForWindows))
     }
   }
@@ -156,6 +160,7 @@ export function generateCurl(input: CurlInput): CurlOutput {
         linuxArgs.push('-H', quoteSingle('Content-Type: application/x-www-form-urlencoded'))
         windowsArgs.push('-H', quoteWindows('Content-Type: application/x-www-form-urlencoded'))
       }
+
       linuxArgs.push('-d', quoteSingle(pairs.join('&')))
       windowsArgs.push('-d', quoteWindows(pairs.join('&')))
     }

@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import {
   Background,
@@ -15,7 +16,6 @@ import {
   reconnectEdge,
   useReactFlow,
 } from '@xyflow/react'
-
 import { Button, Space } from 'antd'
 import { Wand2 } from 'lucide-react'
 
@@ -40,6 +40,7 @@ function getCssVar(name: string, fallback: string): string {
 // 使用 useReactFlow() 的组件必须在 ReactFlowProvider 内部
 
 function FlowCanvasInner() {
+  const { t } = useTranslation()
   const reactFlow = useReactFlow()
   const { screenToFlowPosition } = reactFlow
   const { flowInstanceRef } = useContext(FlowInstanceContext)
@@ -123,26 +124,26 @@ function FlowCanvasInner() {
 
           for (const c of conditions) { handles[c.id] = { label: c.label, color: primaryColor } }
 
-          handles.default = { label: (d.defaultLabel as string) || '默认', color: mutedColor }
+          handles.default = { label: (d.defaultLabel as string) || t('flow.canvas.defaultBranch'), color: mutedColor }
           map[node.id] = handles
         }
         else {
           map[node.id] = {
-            true: { label: '符合', color: successColor },
-            false: { label: '不符合', color: errorColor },
+            true: { label: t('flow.canvas.handleTrue'), color: successColor },
+            false: { label: t('flow.canvas.handleFalse'), color: errorColor },
           }
         }
       }
       else if (node.type === 'loop') {
         map[node.id] = {
-          out: { label: '出口', color: mutedColor },
-          loop: { label: '循环体', color: loopColor },
+          out: { label: t('flow.canvas.handleOut'), color: mutedColor },
+          loop: { label: t('flow.canvas.handleLoop'), color: loopColor },
         }
       }
     }
 
     return map
-  }, [nodes, designStyle])
+  }, [nodes, designStyle, t])
 
   // 为边注入选中状态样式 + 连线标签 + 路径高亮
   const edgesWithSelection = useMemo(() => {
@@ -568,10 +569,10 @@ function FlowCanvasInner() {
             }}
           >
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ds-node-text-primary)' }}>
-              从零开始搭建测试流程
+              {t('flow.canvas.emptyTitle')}
             </div>
             <div style={{ fontSize: 12, color: 'var(--ds-node-text-muted)', margin: '8px 0 20px' }}>
-              从左侧拖入节点，或用模板快速开始
+              {t('flow.canvas.emptyDescription')}
             </div>
             <Space direction="vertical" style={{ width: '100%' }}>
               <Button
@@ -580,13 +581,13 @@ function FlowCanvasInner() {
                 type="primary"
                 onClick={() => { applyTemplate(createRequestAssertTemplate()) }}
               >
-                一键模板：请求 + 断言
+                {t('flow.canvas.templateRequestAssert')}
               </Button>
               <Button
                 block
                 onClick={() => { applyTemplate(createInitialGraph()) }}
               >
-                空白流程（开始/结束）
+                {t('flow.canvas.templateBlank')}
               </Button>
             </Space>
           </div>
@@ -624,7 +625,7 @@ function FlowCanvasInner() {
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ds-bg-elevated)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
           >
-            🗑 删除{contextMenu.type === 'node' ? '节点' : '连线'}
+            🗑 {contextMenu.type === 'node' ? t('flow.canvas.deleteNode') : t('flow.canvas.deleteEdge')}
           </div>
         </div>
       )}

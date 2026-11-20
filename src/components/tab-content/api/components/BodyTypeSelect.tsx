@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Select, theme, Tooltip } from 'antd'
 
 import { BodyType } from '@/enums'
@@ -23,6 +25,12 @@ export interface BodyTypeOption {
   slot: BodySlot
 }
 
+/**
+ * Body 类型选项。
+ *
+ * `label` 与 `mime` 是协议常量（none / form-data / json …），**不参与 i18n**，
+ * 因此可以安全地留在模块顶层。唯一的中文（「无请求体」）由消费方在渲染期翻译。
+ */
 export const BODY_TYPE_OPTIONS: BodyTypeOption[] = [
   { value: BodyType.None, label: 'none', slot: 'none' },
   { value: BodyType.FormData, label: 'form-data', mime: BodyType.FormData, slot: 'parameters' },
@@ -37,23 +45,17 @@ const BODY_TYPE_MAP = new Map<string, BodyTypeOption>(
   BODY_TYPE_OPTIONS.map((option) => [option.value, option]),
 )
 
-/** 内容槽位的展示信息，供分组标题与角标 Tooltip 复用 */
-export const BODY_SLOT_META: Record<Exclude<BodySlot, 'none'>, { title: string, hint: string }> = {
-  parameters: { title: '表单参数', hint: 'form-data / url-encoded' },
-  raw: { title: '正文', hint: 'json / xml / raw / binary' },
+/** 内容槽位的展示信息 key，供分组标题与角标 Tooltip 复用（渲染期翻译）。 */
+export const BODY_SLOT_TITLE_KEY: Record<Exclude<BodySlot, 'none'>, 'api.body.slotParams' | 'api.body.slotRaw'> = {
+  parameters: 'api.body.slotParams',
+  raw: 'api.body.slotRaw',
 }
 
-export interface BodyTypeGroup {
-  slot: BodySlot
-  label: string
-  options: BodyTypeOption[]
+/** 内容槽位的协议提示（MIME 列表），不参与 i18n。 */
+export const BODY_SLOT_HINT: Record<Exclude<BodySlot, 'none'>, string> = {
+  parameters: 'form-data / url-encoded',
+  raw: 'json / xml / raw / binary',
 }
-
-export const BODY_TYPE_GROUPS: BodyTypeGroup[] = [
-  { slot: 'none', label: '无请求体', options: BODY_TYPE_OPTIONS.filter((o) => o.slot === 'none') },
-  { slot: 'parameters', label: BODY_SLOT_META.parameters.title, options: BODY_TYPE_OPTIONS.filter((o) => o.slot === 'parameters') },
-  { slot: 'raw', label: BODY_SLOT_META.raw.title, options: BODY_TYPE_OPTIONS.filter((o) => o.slot === 'raw') },
-]
 
 /** 取类型的短标签；枚举外的历史值原样返回，供提示文案使用 */
 export function getBodyTypeLabel(type: BodyType | string | undefined): string {
@@ -80,6 +82,7 @@ interface BodyTypeSelectProps {
 export function BodyTypeSelect(props: BodyTypeSelectProps) {
   const { value, onChange, filledSlots, disabled, className } = props
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const filled = filledSlots ?? []
   const current = BODY_TYPE_MAP.get(value)
@@ -98,16 +101,27 @@ export function BodyTypeSelect(props: BodyTypeSelectProps) {
     />
   )
 
-  const options = BODY_TYPE_GROUPS.map((group) => ({
-    label: (
-      <span className="inline-flex items-center gap-1" style={{ color: token.colorTextTertiary }}>
-        {group.label}
-        {group.slot !== 'none' && filled.includes(group.slot) ? dot : null}
-      </span>
-    ),
-    title: group.label,
-    options: group.options.map((option) => ({ value: option.value, label: option.label })),
-  }))
+  const options = [
+    {
+      label: (
+        <span className="inline-flex items-center gap-1" style={{ color: token.colorTextTertiary }}>
+          {t('api.body.slotNone')}
+        </span>
+      ),
+      title: t('api.body.slotNone'),
+      options: BODY_TYPE_OPTIONS.filter((o) => o.slot === 'none').map((option) => ({ value: option.value, label: option.label })),
+    },
+    ...(['parameters', 'raw'] as const).map((slot) => ({
+      label: (
+        <span className="inline-flex items-center gap-1" style={{ color: token.colorTextTertiary }}>
+          {t(BODY_SLOT_TITLE_KEY[slot])}
+          {filled.includes(slot) ? dot : null}
+        </span>
+      ),
+      title: t(BODY_SLOT_TITLE_KEY[slot]),
+      options: BODY_TYPE_OPTIONS.filter((o) => o.slot === slot).map((option) => ({ value: option.value, label: option.label })),
+    })),
+  ]
 
   const select = (
     <Select
@@ -137,7 +151,7 @@ export function BodyTypeSelect(props: BodyTypeSelectProps) {
           <span className="flex items-center gap-2">
             <span>{meta.label}</span>
             <span className="text-xs" style={{ color: token.colorTextTertiary }}>
-              {meta.mime ?? '不发送请求体'}
+              {meta.mime ?? t('api.body.noBodySent')}
             </span>
           </span>
         )
@@ -158,14 +172,21 @@ export function BodyTypeSelect(props: BodyTypeSelectProps) {
       {current
         ? select
         : (
-            <Tooltip title={`未知 Body 类型「${String(value)}」，发送时将不带请求体`}>
+            <Tooltip title={t('api.body.unknownType', { type: String(value) })}>
               {select}
             </Tooltip>
           )}
 
       {hiddenSlots.length > 0 && (
         <Tooltip
-          title={`另有内容：${hiddenSlots.map((slot) => `${BODY_SLOT_META[slot].title}（${BODY_SLOT_META[slot].hint}）`).join('、')}`}
+          title={t('api.body.otherSlots', {
+            slots: hiddenSlots
+              .map((slot) => t('api.body.slotBadge', {
+                title: t(BODY_SLOT_TITLE_KEY[slot]),
+                hint: BODY_SLOT_HINT[slot],
+              }))
+              .join(t('api.body.slotJoin')),
+          })}
         >
           <span
             aria-hidden

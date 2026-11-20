@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Input, InputNumber, Radio, Switch, Typography } from 'antd'
 
@@ -7,19 +8,23 @@ import type { LoopNodeData } from '../../types/flow.types'
 import type { PanelProps } from './shared/panelRegistry'
 import { useDraft } from './shared/useDraft'
 
+import { translateKey } from '@/i18n/translate'
+
 const { Text } = Typography
 
 // ==================== 循环类型选项 ====================
 
 const LOOP_TYPE_OPTIONS = [
-  { value: 'count', label: '固定次数' },
-  { value: 'while', label: '条件循环' },
-  { value: 'for_each', label: '遍历集合' },
+  { value: 'count', labelKey: 'flow.enum.loopType.count' },
+  { value: 'while', labelKey: 'flow.enum.loopType.while' },
+  { value: 'for_each', labelKey: 'flow.enum.loopType.forEach' },
 ]
 
 // ==================== 组件 ====================
 
 export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeData>) {
+  const { t } = useTranslation()
+
   // 循环次数（受控草稿 + blur 提交，支持 {{variable}} 表达式）
   const { draft: countDraft, setDraft: setCountDraft, commit: commitCount } = useDraft(
     data.count !== undefined ? String(data.count) : '',
@@ -79,13 +84,13 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
   return (
     <div className="space-y-4">
       <Text className="block text-xs" type="secondary">
-        循环配置
+        {t('flow.nodeConfig.loop.title')}
       </Text>
 
       {/* 循环类型 */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          循环类型
+          {t('flow.nodeConfig.loop.type')}
         </Text>
         <Radio.Group
           data-testid="loop-type"
@@ -95,7 +100,7 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
         >
           {LOOP_TYPE_OPTIONS.map((option) => (
             <Radio.Button key={option.value} value={option.value}>
-              {option.label}
+              {translateKey(option.labelKey)}
             </Radio.Button>
           ))}
         </Radio.Group>
@@ -105,11 +110,11 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
       {data.loopType === 'count' && (
         <div>
           <Text className="mb-1 block text-xs" type="secondary">
-            循环次数
+            {t('flow.nodeConfig.loop.count')}
           </Text>
           <Input
             data-testid="loop-count"
-            placeholder="例如: 5 或 {{maxRetries}}"
+            placeholder={t('flow.nodeConfig.loop.countPlaceholder')}
             size="small"
             value={countDraft}
             onBlur={commitCount}
@@ -118,7 +123,7 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
             }}
           />
           <Text className="mt-1 block text-xs" type="secondary">
-            支持固定数字或 {'{{变量}}'} 表达式
+            {t('flow.nodeConfig.loop.countHint', { token: t('flow.shared.variableToken') })}
           </Text>
         </div>
       )}
@@ -127,11 +132,11 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
       {data.loopType === 'while' && (
         <div>
           <Text className="mb-1 block text-xs" type="secondary">
-            循环条件（为假时停止）
+            {t('flow.nodeConfig.loop.whileCondition')}
           </Text>
           <Input.TextArea
             data-testid="loop-while-expression"
-            placeholder="例如: variables.retryCount < 3"
+            placeholder={t('flow.nodeConfig.loop.whilePlaceholder')}
             rows={2}
             size="small"
             value={whileDraft}
@@ -147,11 +152,11 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
       {data.loopType === 'for_each' && (
         <div>
           <Text className="mb-1 block text-xs" type="secondary">
-            集合变量名（存放数组）
+            {t('flow.nodeConfig.loop.collection')}
           </Text>
           <Input
             data-testid="loop-collection-variable"
-            placeholder="例如: items"
+            placeholder={t('flow.nodeConfig.loop.collectionPlaceholder')}
             size="small"
             value={collectionDraft}
             onBlur={commitCollection}
@@ -166,11 +171,11 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
       {data.loopType === 'for_each' && (
         <div>
           <Text className="mb-1 block text-xs" type="secondary">
-            迭代变量名（每轮当前元素的变量名）
+            {t('flow.nodeConfig.loop.iterator')}
           </Text>
           <Input
             data-testid="loop-iterator-variable"
-            placeholder="默认 item，用 {{item}} 引用当前元素"
+            placeholder={t('flow.nodeConfig.loop.iteratorPlaceholder', { token: '{{item}}' })}
             size="small"
             value={iteratorDraft}
             onBlur={commitIterator}
@@ -184,7 +189,7 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
       {/* 最大迭代次数（始终显示） */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          最大迭代次数（安全限制）
+          {t('flow.nodeConfig.loop.maxIterations')}
         </Text>
         <InputNumber
           data-testid="loop-max-iterations"
@@ -200,7 +205,7 @@ export default function LoopNodePanel({ data, onChange }: PanelProps<LoopNodeDat
       {/* 失败策略 */}
       <div className="flex items-center justify-between">
         <Text className="text-xs" type="secondary">
-          循环体失败时中断
+          {t('flow.nodeConfig.loop.breakOnFailure')}
         </Text>
         <Switch
           checked={data.breakOnFailure !== false}

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import {
   Button,
@@ -10,6 +11,7 @@ import {
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
+import type { TFunction } from 'i18next'
 
 import { api } from '@/api-client'
 import { useAuth } from '@/contexts/auth'
@@ -37,24 +39,28 @@ interface ProjectMembersSectionProps {
   onRefresh: () => Promise<void>
 }
 
-const memberRoleOptions = [
-  { label: '查看者', value: 'viewer' },
-  { label: '编辑者', value: 'editor' },
-]
+/** 可分配的角色选项（拥有者不可通过此下拉分配）。 */
+function createMemberRoleOptions(t: TFunction) {
+  return [
+    { label: t('settings.members.roleViewer'), value: 'viewer' },
+    { label: t('settings.members.roleEditor'), value: 'editor' },
+  ]
+}
 
-function roleText(role: Role) {
+function roleText(t: TFunction, role: Role) {
   if (role === 'owner') {
-    return '拥有者'
+    return t('settings.members.roleOwner')
   }
 
   if (role === 'editor') {
-    return '编辑者'
+    return t('settings.members.roleEditor')
   }
 
-  return '查看者'
+  return t('settings.members.roleViewer')
 }
 
 export function ProjectMembersSection(props: ProjectMembersSectionProps) {
+  const { t } = useTranslation()
   const { projectId, projectOwnerId, canManageMembers, members, loading, onRefresh } = props
   const { sessionId } = useAuth()
   const [msgApi, contextHolder] = message.useMessage()
@@ -76,6 +82,9 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
   const existingUserIds = new Set(members.map((m) => m.userId))
   const availableUsers = allUsers.filter((u) => !existingUserIds.has(u.id))
 
+  // t 作为依赖：语言切换时 t 引用变化，触发角色选项文案重算
+  const memberRoleOptions = useMemo(() => createMemberRoleOptions(t), [t])
+
   const handleAddMember = async (values: { userId: string, role: string }) => {
     if (!projectId || !sessionId) {
       return
@@ -90,7 +99,7 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
         projectId,
         payload: { username, role: values.role },
       })
-      msgApi.success('已添加成员')
+      msgApi.success(t('settings.members.added'))
       addForm.resetFields()
       await onRefresh()
     }
@@ -109,7 +118,7 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
 
     try {
       await api('update_member_role', { sessionId, projectId, userId, payload: { role: nextRole } } as any)
-      msgApi.success('角色已更新')
+      msgApi.success(t('settings.members.roleUpdated'))
       await onRefresh()
     }
     catch (error) {
@@ -124,7 +133,7 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
 
     try {
       await api('remove_project_member', { sessionId, projectId, userId })
-      msgApi.success('已移除成员')
+      msgApi.success(t('settings.members.removed'))
       await onRefresh()
     }
     catch (error) {
@@ -138,7 +147,7 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
 
       {canManageMembers && (
         <>
-          <Typography.Title level={5}>添加成员</Typography.Title>
+          <Typography.Title level={5}>{t('settings.members.addTitle')}</Typography.Title>
           <Form
             className="mb-4"
             form={addForm}
@@ -147,25 +156,25 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
               void handleAddMember(values)
             }}
           >
-            <Form.Item name="userId" rules={[{ required: true, message: '请选择用户' }]}>
+            <Form.Item name="userId" rules={[{ required: true, message: t('settings.members.selectUser') }]}>
               <Select
                 showSearch
                 filterOption={(input, option) =>
                   (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                 loading={loadingUsers}
                 options={availableUsers.map((u) => ({ label: u.username, value: u.id }))}
-                placeholder="搜索用户"
+                placeholder={t('settings.members.searchUser')}
                 style={{ width: 200 }}
               />
             </Form.Item>
 
-            <Form.Item name="role" rules={[{ required: true, message: '请选择角色' }]}>
-              <Select options={memberRoleOptions} placeholder="选择权限" style={{ width: 120 }} />
+            <Form.Item name="role" rules={[{ required: true, message: t('settings.members.selectRole') }]}>
+              <Select options={memberRoleOptions} placeholder={t('settings.members.rolePlaceholder')} style={{ width: 120 }} />
             </Form.Item>
 
             <Form.Item>
               <Button htmlType="submit" loading={submitting} type="primary">
-                添加
+                {t('settings.members.add')}
               </Button>
             </Form.Item>
           </Form>
@@ -174,13 +183,13 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
 
       <Table<MemberItem>
         columns={[
-          { title: '用户名', dataIndex: 'username' },
+          { title: t('settings.members.username'), dataIndex: 'username' },
           {
-            title: '角色',
+            title: t('settings.members.role'),
             dataIndex: 'role',
             render: (value: Role, record) => {
               if (!canManageMembers || record.userId === projectOwnerId || value === 'owner') {
-                return <Tag>{roleText(value)}</Tag>
+                return <Tag>{roleText(t, value)}</Tag>
               }
 
               return (
@@ -194,12 +203,12 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
             },
           },
           {
-            title: '加入时间',
+            title: t('settings.members.joinedAt'),
             dataIndex: 'createdAt',
             render: (value: string) => dayjs(value).format('YYYY-MM-DD HH:mm'),
           },
           {
-            title: '操作',
+            title: t('common.action'),
             render: (_, record) => {
               if (!canManageMembers || record.userId === projectOwnerId) {
                 return '-'
@@ -207,7 +216,7 @@ export function ProjectMembersSection(props: ProjectMembersSectionProps) {
 
               return (
                 <Button danger size="small" onClick={() => void handleMemberDelete(record.userId)}>
-                  移除
+                  {t('settings.members.remove')}
                 </Button>
               )
             },

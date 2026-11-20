@@ -1,5 +1,6 @@
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { MenuItemType } from '@/enums'
+import { t } from '@/i18n'
 
 import { SchemaType } from './constants'
 import type { JsonSchema } from './JsonSchema.type'
@@ -371,7 +372,10 @@ export function getTypeLabel(node?: JsonSchema): string {
     label = node.type ?? 'unknown'
   }
 
-  return node.nullable ? `${label}（可空）` : label
+  // 可空标注是用户可见文案：渲染期取词，避免模块顶层求值
+  return node.nullable
+    ? t('ui.schema.nullable', { label })
+    : label
 }
 
 export function buildSchemaRows(
@@ -396,7 +400,7 @@ export function buildSchemaRows(
         key: 'ref-root',
         name: extractRefName(expanded.$ref),
         typeLabel: `→ ${extractRefName(expanded.$ref)}`,
-        description: '引用模型未找到',
+        description: t('ui.schema.refMissing'),
         depth: 0,
       },
     ]

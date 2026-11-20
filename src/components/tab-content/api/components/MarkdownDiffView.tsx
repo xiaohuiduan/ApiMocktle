@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Empty } from 'antd'
 
@@ -59,6 +60,7 @@ function lineDiff(left: string, right: string): DiffRow[] {
 
 /** 并排 diff 视图（左旧 / 右新），差异行高亮 */
 export function MarkdownDiffView({ leftText, rightText, leftTitle, rightTitle }: MarkdownDiffViewProps) {
+  const { t } = useTranslation()
   const rows = useMemo(() => lineDiff(leftText ?? '', rightText ?? ''), [leftText, rightText])
   const leftRef = useRef<HTMLDivElement>(null)
   const rightRef = useRef<HTMLDivElement>(null)
@@ -86,7 +88,7 @@ export function MarkdownDiffView({ leftText, rightText, leftTitle, rightTitle }:
   }, [])
 
   if (!leftText && !rightText) {
-    return <Empty description="无可对比内容" />
+    return <Empty description={t('api.run.noDiffContent')} />
   }
 
   const renderCol = (ref: React.RefObject<HTMLDivElement>, side: 'left' | 'right') => (
@@ -117,8 +119,8 @@ export function MarkdownDiffView({ leftText, rightText, leftTitle, rightTitle }:
   return (
     <div>
       <div className="text-secondary mb-2 flex gap-2 text-xs">
-        <span className="flex-1 font-medium">{leftTitle ?? '原始'}</span>
-        <span className="flex-1 font-medium">{rightTitle ?? '对比'}</span>
+        <span className="flex-1 font-medium">{leftTitle ?? t('api.run.diffOriginal')}</span>
+        <span className="flex-1 font-medium">{rightTitle ?? t('api.run.diffCompare')}</span>
       </div>
       <div className="flex gap-2">
         {renderCol(leftRef, 'left')}

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Badge, Button, Empty, Popover, Table, Tag, theme, Tooltip, Typography } from 'antd'
 import { DatabaseIcon, Trash2Icon, VariableIcon } from 'lucide-react'
@@ -7,6 +8,7 @@ import { useMenuHelpersContext } from '@/contexts/menu-helpers'
 import { useSessionVariablesContext } from '@/contexts/session-variables'
 
 export function SessionVariablesPanel() {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
   const { sessionVars, removeSessionVar, clearSessionVars } = useSessionVariablesContext()
   const { projectEnvironmentConfig, currentProjectEnvironmentId } = useMenuHelpersContext()
@@ -20,50 +22,56 @@ export function SessionVariablesPanel() {
   const envVars = currentEnv?.variables?.filter((v) => v.name && v.enable !== false) ?? []
   const globalVars = (projectEnvironmentConfig?.globalVariables ?? []).filter((v) => v.name && v.enable !== false)
 
-  const sessionColumns = [
-    {
-      title: '变量名',
-      dataIndex: 'name',
-      key: 'name',
-      render: (name: string) => <code className="text-xs">{name}</code>,
-    },
-    {
-      title: '值',
-      dataIndex: 'value',
-      key: 'value',
-      ellipsis: true,
-      render: (value: string) => <span className="text-xs opacity-70">{value}</span>,
-    },
-    {
-      title: '',
-      key: 'action',
-      width: 32,
-      render: (_: unknown, record: { name: string }) => (
-        <Button
-          icon={<Trash2Icon size={12} />}
-          size="small"
-          type="text"
-          onClick={() => { removeSessionVar(record.name) }}
-        />
-      ),
-    },
-  ]
+  const sessionColumns = useMemo(
+    () => [
+      {
+        title: t('app.sessionVars.nameColumn'),
+        dataIndex: 'name',
+        key: 'name',
+        render: (name: string) => <code className="text-xs">{name}</code>,
+      },
+      {
+        title: t('app.sessionVars.valueColumn'),
+        dataIndex: 'value',
+        key: 'value',
+        ellipsis: true,
+        render: (value: string) => <span className="text-xs opacity-70">{value}</span>,
+      },
+      {
+        title: '',
+        key: 'action',
+        width: 32,
+        render: (_: unknown, record: { name: string }) => (
+          <Button
+            icon={<Trash2Icon size={12} />}
+            size="small"
+            type="text"
+            onClick={() => { removeSessionVar(record.name) }}
+          />
+        ),
+      },
+    ],
+    [t, removeSessionVar],
+  )
 
-  const envColumns = [
-    {
-      title: '变量名',
-      dataIndex: 'name',
-      key: 'name',
-      render: (name: string) => <code className="text-xs">{name}</code>,
-    },
-    {
-      title: '值',
-      dataIndex: 'value',
-      key: 'value',
-      ellipsis: true,
-      render: (value: string) => <span className="text-xs opacity-70">{value}</span>,
-    },
-  ]
+  const envColumns = useMemo(
+    () => [
+      {
+        title: t('app.sessionVars.nameColumn'),
+        dataIndex: 'name',
+        key: 'name',
+        render: (name: string) => <code className="text-xs">{name}</code>,
+      },
+      {
+        title: t('app.sessionVars.valueColumn'),
+        dataIndex: 'value',
+        key: 'value',
+        ellipsis: true,
+        render: (value: string) => <span className="text-xs opacity-70">{value}</span>,
+      },
+    ],
+    [t],
+  )
 
   const content = (
     <div className="max-h-[500px] w-[380px] overflow-auto">
@@ -71,12 +79,12 @@ export function SessionVariablesPanel() {
       <div className="mb-3">
         <div className="mb-2 flex items-center justify-between">
           <Typography.Text strong className="text-sm">
-            会话变量
-            <Tag className="ml-1" color="blue">脚本设置</Tag>
+            {t('app.sessionVars.session')}
+            <Tag className="ml-1" color="blue">{t('app.sessionVars.scriptTag')}</Tag>
           </Typography.Text>
           {sessionCount > 0 && (
             <Button danger size="small" type="text" onClick={clearSessionVars}>
-              清空
+              {t('app.sessionVars.clear')}
             </Button>
           )}
         </div>
@@ -91,7 +99,7 @@ export function SessionVariablesPanel() {
               />
             )
           : (
-              <Empty description="暂无会话变量" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              <Empty description={t('app.sessionVars.emptySession')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
             )}
       </div>
 
@@ -99,7 +107,7 @@ export function SessionVariablesPanel() {
       <div className="mb-3">
         <Typography.Text strong className="mb-2 block text-sm">
           <DatabaseIcon className="mr-1 inline" size={12} />
-          环境变量
+          {t('app.sessionVars.environment')}
           {currentEnv && <Tag className="ml-1">{currentEnv.name}</Tag>}
         </Typography.Text>
         {envVars.length > 0
@@ -113,7 +121,7 @@ export function SessionVariablesPanel() {
               />
             )
           : (
-              <Empty className="py-2" description="暂无环境变量" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              <Empty className="py-2" description={t('app.sessionVars.emptyEnvironment')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
             )}
       </div>
 
@@ -121,7 +129,7 @@ export function SessionVariablesPanel() {
       <div>
         <Typography.Text strong className="mb-2 block text-sm">
           <DatabaseIcon className="mr-1 inline" size={12} />
-          全局变量
+          {t('app.sessionVars.global')}
         </Typography.Text>
         {globalVars.length > 0
           ? (
@@ -134,7 +142,7 @@ export function SessionVariablesPanel() {
               />
             )
           : (
-              <Empty className="py-2" description="暂无全局变量" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              <Empty className="py-2" description={t('app.sessionVars.emptyGlobal')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
             )}
       </div>
     </div>
@@ -146,11 +154,11 @@ export function SessionVariablesPanel() {
         content={content}
         open={open}
         placement="right"
-        title="变量管理"
+        title={t('app.sessionVars.title')}
         trigger="click"
         onOpenChange={setOpen}
       >
-        <Tooltip placement="right" title="查看变量">
+        <Tooltip placement="right" title={t('app.sessionVars.viewTooltip')}>
           <Badge count={sessionCount} offset={[-4, 4]} size="small">
             <Button
               icon={<VariableIcon size={18} />}

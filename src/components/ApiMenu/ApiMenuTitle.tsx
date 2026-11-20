@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { theme, Tooltip } from 'antd'
 
 import { AppMenuControls } from '@/components/ApiMenu/AppMenuControls'
@@ -19,6 +21,7 @@ interface ApiMenuTitleProps {
  */
 export function ApiMenuTitle(props: ApiMenuTitleProps) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const { node, name, leadingIcon, actions } = props
 
@@ -39,7 +42,7 @@ export function ApiMenuTitle(props: ApiMenuTitleProps) {
           <span className="truncate">{name}</span>
 
           {isDraft && (
-            <Tooltip title="未保存">
+            <Tooltip title={t('api.menu.unsaved')}>
               <span className="ml-0.5 shrink-0" style={{ color: token.colorError }}>*</span>
             </Tooltip>
           )}

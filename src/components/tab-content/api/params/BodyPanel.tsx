@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { open } from '@tauri-apps/plugin-dialog'
 import { Button, Modal, Switch, theme, Typography } from 'antd'
@@ -67,6 +68,7 @@ export function BodyPanel(props: BodyPanelProps) {
   } = props
 
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   // 快捷请求的数据可能没有 requestBody 字段（cURL 导入无请求体、历史数据、示例数据），
   // 此时仍要渲染类型选择器，否则用户永远无法切到 json / form-data。
@@ -109,16 +111,16 @@ export function BodyPanel(props: BodyPanelProps) {
     }
 
     Modal.confirm({
-      title: '一键填充 Body？',
-      content: '将覆盖当前已输入的内容，填充后不可撤销。',
-      okText: '填充',
-      cancelText: '取消',
+      title: t('api.body.fillTitle'),
+      content: t('api.body.fillContent'),
+      okText: t('api.body.fill'),
+      cancelText: t('common.cancel'),
       onOk: onFillBody,
     })
   }
 
   if (!requestBody && !onBodyTypeChange) {
-    return <Typography.Text className="px-3 pt-2" type="secondary">无 Body</Typography.Text>
+    return <Typography.Text className="px-3 pt-2" type="secondary">{t('api.body.noBody')}</Typography.Text>
   }
 
   return (
@@ -127,7 +129,7 @@ export function BodyPanel(props: BodyPanelProps) {
       <div className="shrink-0">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs" style={{ color: token.colorTextSecondary }}>Body 类型</span>
+            <span className="text-xs" style={{ color: token.colorTextSecondary }}>{t('api.body.typeLabel')}</span>
             <BodyTypeSelect
               filledSlots={filledSlots}
               value={body.type}
@@ -142,8 +144,8 @@ export function BodyPanel(props: BodyPanelProps) {
                   size="small"
                   onChange={onFillWithCommentsChange}
                 />
-                <span className="text-xs" style={{ color: token.colorTextSecondary }}>注释</span>
-                <Button size="small" onClick={handleFillClick}>一键填充</Button>
+                <span className="text-xs" style={{ color: token.colorTextSecondary }}>{t('api.body.comments')}</span>
+                <Button size="small" onClick={handleFillClick}>{t('api.body.fillButton')}</Button>
               </>
             )}
             <DynamicVariablesHelp />
@@ -187,7 +189,9 @@ export function BodyPanel(props: BodyPanelProps) {
         {(body.type === BodyType.FormData || body.type === BodyType.UrlEncoded) && (
           <div className="h-full overflow-auto">
             <Typography.Text className="mb-2 block text-xs" type="secondary">
-              {body.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded'} 参数
+              {t('api.body.paramsOfType', {
+                type: body.type === BodyType.FormData ? 'form-data' : 'x-www-form-urlencoded',
+              })}
             </Typography.Text>
             <ParamsEditableTable
               showDescriptionColumn={false}
@@ -205,7 +209,7 @@ export function BodyPanel(props: BodyPanelProps) {
             style={{ borderWidth: 1, borderColor: token.colorBorderSecondary }}
           >
             <Typography.Text className="mb-2 block text-xs" type="secondary">
-              选择一个本地文件，其原始字节将作为请求体发送（Content-Type: application/octet-stream）
+              {t('api.body.binaryHint')}
             </Typography.Text>
             <div className="flex items-center gap-2">
               <span
@@ -213,7 +217,7 @@ export function BodyPanel(props: BodyPanelProps) {
                 style={{ color: bodyFilePath ? token.colorText : token.colorTextTertiary }}
                 title={bodyFilePath}
               >
-                {bodyFilePath ? bodyFilePath.split(/[/\\]/).pop() : '未选择文件'}
+                {bodyFilePath ? bodyFilePath.split(/[/\\]/).pop() : t('api.body.noFileSelected')}
               </span>
               <Button
                 size="small"
@@ -227,7 +231,7 @@ export function BodyPanel(props: BodyPanelProps) {
                   })()
                 }}
               >
-                选择文件
+                {t('api.body.selectFile')}
               </Button>
               {bodyFilePath && (
                 <Button
@@ -235,20 +239,20 @@ export function BodyPanel(props: BodyPanelProps) {
                   type="link"
                   onClick={() => { onBodyFilePathChange?.(undefined) }}
                 >
-                  清除
+                  {t('api.body.clear')}
                 </Button>
               )}
             </div>
             {!bodyFilePath && (
               <Typography.Text className="mt-2 block text-xs" type="warning">
-                未选择文件时本次不会发送请求体
+                {t('api.body.noFileWarning')}
               </Typography.Text>
             )}
           </div>
         )}
 
         {body.type === BodyType.None && (
-          <Typography.Text className="text-xs" type="secondary">无请求体</Typography.Text>
+          <Typography.Text className="text-xs" type="secondary">{t('api.body.none')}</Typography.Text>
         )}
       </div>
     </div>

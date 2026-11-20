@@ -82,7 +82,7 @@ function makeItem(url: string, overrides: Record<string, unknown> = {}) {
 }
 
 function mountPanel() {
-  return render(<HistoryPanel menuItemId="api-1" open onClose={() => { /* noop */ }} />)
+  return render(<HistoryPanel open menuItemId="api-1" onClose={() => { /* noop */ }} />)
 }
 
 /** 点开左侧列表里的这条记录 */

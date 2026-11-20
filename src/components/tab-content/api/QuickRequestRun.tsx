@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router'
 import { useEvent } from 'react-use-event-hook'
 
@@ -34,6 +35,7 @@ import { useSessionVariablesContext } from '@/contexts/session-variables'
 import { BodyType, MenuItemType, ParamType } from '@/enums'
 import { useCtrlSave } from '@/hooks/useCtrlSave'
 import { useTabSaveBridge } from '@/hooks/useTabSaveBridge'
+import { t } from '@/i18n'
 import { getPrimaryEnvironmentUrl } from '@/project-environment-utils'
 import { type ApiDetails, type ApiRunResult, type RunTabInfo, type ScriptConsoleEntry, type ScriptTestResult } from '@/types'
 
@@ -89,12 +91,18 @@ function buildBodyFillText(apiDetails: ApiDetails, menuRawList?: unknown): strin
 
 const DEFAULT_METHOD = 'GET'
 
+/**
+ * 新建快捷请求的默认数据。
+ *
+ * `name` 是会被写入数据库的内容字段，按「新建那一刻的语言」落库（i18n 规范允许的例外），
+ * 因此这里在函数体内取词，而不是模块顶层求值。
+ */
 function createEmptyApiDetails(): ApiDetails {
   return {
     id: nanoid(6),
     method: DEFAULT_METHOD as ApiDetails['method'],
     path: '',
-    name: '快捷请求',
+    name: t('app.defaultNames.quickRequestFallback'),
     status: 'developing' as ApiDetails['status'],
     serverUrl: '',
     parameters: {
@@ -132,6 +140,7 @@ function mergeParams(
 
 export function QuickRequestRun() {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const { tabData } = useTabContentContext()
   const { messageApi } = useGlobalContext()
   const {
@@ -321,7 +330,7 @@ export function QuickRequestRun() {
   }), [])
 
   const buildMenuData = useCallback((data: ApiDetails): ApiMenuData => {
-    const menuName = data.name ?? '快捷请求'
+    const menuName = data.name ?? t('app.defaultNames.quickRequestFallback')
 
     return {
       id: tabData.key,
@@ -361,7 +370,7 @@ export function QuickRequestRun() {
 
   // 将当前编辑内容升级为数据库正式记录（运行 / 保存时调用），并清除对应草稿。
   const persistToDb = useEvent(async () => {
-    const menuName = workCopy.name ?? '快捷请求'
+    const menuName = workCopy.name ?? t('app.defaultNames.quickRequestFallback')
     const runTabInfo = buildRunTabInfo(workCopy)
 
     if (isCreating) {
@@ -499,13 +508,13 @@ export function QuickRequestRun() {
         }
 
         if (!preResult.success) {
-          messageApi.error(`前置脚本执行失败: ${preResult.error}`)
+          messageApi.error(t('api.script.preFailed', { error: preResult.error }))
 
           return
         }
       }
       catch (err) {
-        messageApi.error(`前置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
+        messageApi.error(t('api.script.preError', { error: err instanceof Error ? err.message : String(err) }))
 
         return
       }
@@ -542,11 +551,11 @@ export function QuickRequestRun() {
         }
 
         if (!postResult.success) {
-          messageApi.error(`后置脚本执行失败: ${postResult.error}`)
+          messageApi.error(t('api.script.postFailed', { error: postResult.error }))
         }
       }
       catch (err) {
-        messageApi.error(`后置脚本执行异常: ${err instanceof Error ? err.message : String(err)}`)
+        messageApi.error(t('api.script.postError', { error: err instanceof Error ? err.message : String(err) }))
       }
     }
 
@@ -556,7 +565,7 @@ export function QuickRequestRun() {
         await persistToDb()
 
         if (isCreating) {
-          messageApi.success('运行后已保存为快捷请求')
+          messageApi.success(t('api.run.savedAsQuickRequest'))
         }
       }
       catch {
@@ -570,10 +579,10 @@ export function QuickRequestRun() {
 
     try {
       await persistToDb()
-      messageApi.success('保存成功')
+      messageApi.success(t('api.save.success'))
     }
     catch {
-      messageApi.error('保存失败')
+      messageApi.error(t('api.save.failed'))
     }
     finally {
       setSaving(false)
@@ -595,7 +604,7 @@ export function QuickRequestRun() {
       return next
     })
     setHistoryOpen(false)
-    messageApi.success('已回填历史请求')
+    messageApi.success(t('api.history.applied'))
   }
 
   useCtrlSave(() => { void handleSave() }, activeTabKey === tabData.key)
@@ -613,7 +622,7 @@ export function QuickRequestRun() {
   }
 
   const handleTitleConfirm = async () => {
-    const newName = titleDraft.trim() || '快捷请求'
+    const newName = titleDraft.trim() || t('app.defaultNames.quickRequestFallback')
     setEditingTitle(false)
     setWorkCopy((prev) => ({ ...prev, name: newName }))
 
@@ -645,18 +654,18 @@ export function QuickRequestRun() {
                   onChange={(e) => { setTitleDraft(e.target.value) }}
                   onPressEnter={() => void handleTitleConfirm()}
                 />
-                <Button size="small" type="primary" onClick={() => void handleTitleConfirm()}>确认</Button>
-                <Button size="small" onClick={handleTitleCancel}>取消</Button>
+                <Button size="small" type="primary" onClick={() => void handleTitleConfirm()}>{t('common.confirm')}</Button>
+                <Button size="small" onClick={handleTitleCancel}>{t('common.cancel')}</Button>
               </>
             )
           : (
               <>
-                <Typography.Text strong className="text-sm">{workCopy.name ?? '快捷请求'}</Typography.Text>
+                <Typography.Text strong className="text-sm">{workCopy.name ?? t('app.defaultNames.quickRequestFallback')}</Typography.Text>
                 <Button
                   icon={<PencilIcon size={14} />}
                   size="small"
                   type="text"
-                  onClick={() => { setTitleDraft(workCopy.name ?? '快捷请求'); setEditingTitle(true) }}
+                  onClick={() => { setTitleDraft(workCopy.name ?? t('app.defaultNames.quickRequestFallback')); setEditingTitle(true) }}
                 />
               </>
             )}
@@ -692,10 +701,10 @@ export function QuickRequestRun() {
           )}
           <Input
             className="min-w-0 flex-1"
-            placeholder={envBaseUrl ? '输入路径（如 /users）或完整 URL' : '输入完整 URL，如 https://api.example.com/users'}
+            placeholder={envBaseUrl ? t('api.run.pathPlaceholderWithEnv') : t('api.run.urlPlaceholder')}
             title={envBaseUrl
-              ? '两种输入方式：\n1. 输入相对路径（如 /users），请求时自动拼接环境 baseUrl；\n2. 输入完整 URL（以 http:// 或 https:// 开头），请求直接使用该地址，不再拼接环境 baseUrl。'
-              : '请输入完整 URL，如 https://api.example.com/users'}
+              ? t('api.run.urlInputHint')
+              : t('api.run.urlInputHintNoEnv')}
             value={workCopy.path ?? ''}
             variant="borderless"
             onChange={(e) => {
@@ -703,22 +712,22 @@ export function QuickRequestRun() {
             }}
           />
           {/^https?:\/\//i.test(workCopy.path ?? '') && envBaseUrl && (
-            <Tooltip title="已输入完整 URL，请求将直接使用该地址，不再拼接环境 baseUrl">
+            <Tooltip title={t('api.run.fullUrlHint')}>
               <span className="ml-1 shrink-0 select-none text-xs" style={{ color: token.colorWarning }}>
-                完整 URL
+                {t('api.run.fullUrl')}
               </span>
             </Tooltip>
           )}
         </div>
 
         {proxyInfo && (
-          <Tooltip title={`代理: ${proxyInfo.tooltip}`}>
-            <Tag className="shrink-0" color="blue">{proxyInfo.label} 代理</Tag>
+          <Tooltip title={t('api.run.proxyTooltip', { value: proxyInfo.tooltip })}>
+            <Tag className="shrink-0" color="blue">{t('api.run.proxyLabel', { type: proxyInfo.label })}</Tag>
           </Tooltip>
         )}
 
         {/^https:\/\//i.test(workCopy.path ?? '') && (
-          <Tooltip title={insecureSkipVerify ? 'HTTPS 证书验证已关闭，不推荐用于生产环境' : '开启后将验证 HTTPS 证书，关闭可调试自签名证书接口'}>
+          <Tooltip title={insecureSkipVerify ? t('api.run.sslOffShortHint') : t('api.run.sslOnShortHint')}>
             <label className="flex shrink-0 cursor-pointer items-center gap-1.5" style={{ userSelect: 'none' }}>
               <span className="text-xs" style={{ color: insecureSkipVerify ? 'var(--ant-color-warning)' : 'var(--ant-color-success)' }}>
                 SSL
@@ -733,20 +742,20 @@ export function QuickRequestRun() {
         )}
 
         <Space.Compact className="shrink-0">
-          <Button disabled={isCreating} icon={<ClockIcon size={14} />} title="历史记录" onClick={() => { setHistoryOpen(true) }} />
+          <Button disabled={isCreating} icon={<ClockIcon size={14} />} title={t('api.history.title')} onClick={() => { setHistoryOpen(true) }} />
           <Button
             icon={<PlayIcon size={14} />}
             loading={running}
             type="primary"
             onClick={() => void handleRun()}
           >
-            运行
+            {t('api.run.run')}
           </Button>
           <Button
             loading={saving}
             onClick={() => void handleSave()}
           >
-            保存
+            {t('common.save')}
           </Button>
         </Space.Compact>
       </div>
@@ -839,7 +848,7 @@ export function QuickRequestRun() {
                       if (oldType && oldType !== type && oldText?.trim()) {
                         const oldLabel = getBodyTypeLabel(oldType)
 
-                        messageApi.info(`已保留 ${oldLabel} 的内容，切回 ${oldLabel} 可恢复`)
+                        messageApi.info(t('api.body.preservedHint', { type: oldLabel }))
                       }
 
                       const nextText = type === oldType ? oldText : bodyTextsRef.current[type]
@@ -956,7 +965,7 @@ export function QuickRequestRun() {
                         size="small"
                         type="text"
                         onClick={() => {
-                          void navigator.clipboard.writeText(windows).then(() => message.success('已复制'))
+                          void navigator.clipboard.writeText(windows).then(() => message.success(t('common.copied')))
                         }}
                       />
                     </div>
@@ -972,7 +981,7 @@ export function QuickRequestRun() {
                         size="small"
                         type="text"
                         onClick={() => {
-                          void navigator.clipboard.writeText(linux).then(() => message.success('已复制'))
+                          void navigator.clipboard.writeText(linux).then(() => message.success(t('common.copied')))
                         }}
                       />
                     </div>

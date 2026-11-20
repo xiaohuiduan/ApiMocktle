@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { Cable, Plus, Trash2, Zap } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { Button, Empty, Input, InputNumber, Select, Space, Switch, Tag, Tooltip, Typography } from 'antd'
+import { Cable, Plus, Trash2, Zap } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import { MonacoEditor } from '@/components/MonacoEditor/MonacoEditor'
@@ -22,6 +23,7 @@ interface MockRuleEditorProps {
 // ==================== 组件 ====================
 
 export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps) {
+  const { t } = useTranslation()
   const [discoverResult, setDiscoverResult] = useState<AgentDiscoverResult | null>(null)
   const [agentConnected, setAgentConnected] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -139,7 +141,11 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
       {/* Agent 连接状态 */}
       <div className="flex items-center gap-2">
         <Tag color={agentConnected ? 'success' : 'default'} icon={<Cable size={14} />}>
-          {agentConnected ? 'Agent 已连接' : agentUrl ? 'Agent 未连接' : '添加规则后可在顶部工具栏选择 Agent 环境'}
+          {agentConnected
+            ? t('flow.nodeConfig.mock.agentConnected')
+            : agentUrl
+              ? t('flow.nodeConfig.mock.agentDisconnected')
+              : t('flow.nodeConfig.mock.noAgentHint')}
         </Tag>
       </div>
 
@@ -147,7 +153,7 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
       {rules.length === 0
         ? (
             <Empty
-              description="暂无 Mock 规则"
+              description={t('flow.nodeConfig.mock.empty')}
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               style={{ margin: '16px 0' }}
             />
@@ -175,7 +181,7 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
           type="dashed"
           onClick={() => { addRule() }}
         >
-          添加规则
+          {t('flow.nodeConfig.mock.addRule')}
         </Button>
 
         {/* 从 Agent 发现列表添加 */}
@@ -204,7 +210,7 @@ export default function MockRuleEditor({ rules, onChange }: MockRuleEditorProps)
               })()
             }}
           >
-            刷新发现
+            {t('flow.nodeConfig.mock.refreshDiscovery')}
           </Button>
         )}
       </Space>
@@ -223,6 +229,7 @@ interface MockRuleItemProps {
 }
 
 function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: MockRuleItemProps) {
+  const { t } = useTranslation()
   const responseStr = typeof rule.responseTemplate === 'string'
     ? rule.responseTemplate
     : JSON.stringify(rule.responseTemplate, null, 2)
@@ -266,9 +273,9 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
             whiteSpace: 'nowrap',
           }}
         >
-          {rule.className || '(未设置类名)'}{rule.methodName ? `.${rule.methodName}` : ''}
+          {rule.className || t('flow.nodeConfig.mock.classNameUnset')}{rule.methodName ? `.${rule.methodName}` : ''}
         </Text>
-        <Tooltip title="删除">
+        <Tooltip title={t('common.delete')}>
           <Button
             danger
             icon={<Trash2 size={14} />}
@@ -285,12 +292,12 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
           <div className="space-y-2">
             {/* 目标类型 */}
             <div>
-              <Text className="mb-1 block text-xs" type="secondary">目标类型</Text>
+              <Text className="mb-1 block text-xs" type="secondary">{t('flow.nodeConfig.mock.targetType')}</Text>
               <Select
                 options={[
-                  { value: 'feign', label: 'Feign Client' },
-                  { value: 'mapper', label: 'MyBatis Mapper' },
-                  { value: 'custom', label: '自定义方法' },
+                  { value: 'feign', label: t('flow.enum.mockTargetType.feign') },
+                  { value: 'mapper', label: t('flow.enum.mockTargetType.mapper') },
+                  { value: 'custom', label: t('flow.enum.mockTargetType.custom') },
                 ]}
                 size="small"
                 style={{ width: '100%' }}
@@ -301,7 +308,7 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
 
             {/* 类名 */}
             <div>
-              <Text className="mb-1 block text-xs" type="secondary">类名（全限定名）</Text>
+              <Text className="mb-1 block text-xs" type="secondary">{t('flow.nodeConfig.mock.className')}</Text>
               <Input
                 placeholder="com.example.feign.OrderClient"
                 size="small"
@@ -312,7 +319,7 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
 
             {/* 方法名 */}
             <div>
-              <Text className="mb-1 block text-xs" type="secondary">方法名</Text>
+              <Text className="mb-1 block text-xs" type="secondary">{t('flow.nodeConfig.mock.methodName')}</Text>
               <Input
                 placeholder="createOrder"
                 size="small"
@@ -324,7 +331,7 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
             {/* 返回数据模板 */}
             <div>
               <Text className="mb-1 block text-xs" type="secondary">
-                返回数据模板（JSON，支持 {'{{变量}}'} 插值）
+                {t('flow.nodeConfig.mock.template', { token: t('flow.shared.variableToken') })}
               </Text>
               <MonacoEditor
                 deserializeOnChange={false}
@@ -355,7 +362,7 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
             {/* 高级选项 */}
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <Text className="mb-1 block text-xs" type="secondary">模拟延迟 (ms)</Text>
+                <Text className="mb-1 block text-xs" type="secondary">{t('flow.nodeConfig.mock.responseDelay')}</Text>
                 <InputNumber
                   min={0}
                   placeholder="0"
@@ -366,10 +373,10 @@ function MockRuleItem({ rule, expanded, onToggleExpand, onChange, onDelete }: Mo
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <Text className="mb-1 block text-xs" type="secondary">最大拦截次数</Text>
+                <Text className="mb-1 block text-xs" type="secondary">{t('flow.nodeConfig.mock.maxTimes')}</Text>
                 <InputNumber
                   min={1}
-                  placeholder="不限"
+                  placeholder={t('flow.nodeConfig.mock.maxTimesPlaceholder')}
                   size="small"
                   style={{ width: '100%' }}
                   value={rule.maxTimes}
@@ -392,6 +399,7 @@ interface AddFromDiscoveryButtonProps {
 }
 
 function AddFromDiscoveryButton({ discoverResult, onAdd }: AddFromDiscoveryButtonProps) {
+  const { t } = useTranslation()
   const allClasses = [...discoverResult.feignClients, ...discoverResult.mappers]
 
   if (allClasses.length === 0) { return null }
@@ -407,7 +415,7 @@ function AddFromDiscoveryButton({ discoverResult, onAdd }: AddFromDiscoveryButto
           label: `${cls.displayName}.${m.name}`,
         })),
       )}
-      placeholder="从 Agent 发现列表添加"
+      placeholder={t('flow.nodeConfig.mock.addFromDiscovery')}
       size="small"
       style={{ width: 200 }}
       onChange={(value: string) => {

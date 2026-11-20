@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { invoke } from '@tauri-apps/api/core'
 import { Collapse, Select, Spin, Tabs, Typography } from 'antd'
@@ -50,6 +51,7 @@ function getOverride(override: unknown): RequestOverride {
 // ==================== 组件 ====================
 
 export default function HttpRequestNodePanel({ data, onChange, projectId }: PanelProps<HttpRequestNodeData>) {
+  const { t } = useTranslation()
   const { sessionId } = useAuth()
   const { items: apiMenuItems, loading: loadingMenu } = useApiMenu(projectId)
   const override = getOverride(data.requestOverride)
@@ -194,11 +196,11 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
   const advancedItems = [
     {
       key: 'preScript',
-      label: <LabelWithBadge hasData={!!data.preScript} label="前置脚本（可选）" />,
+      label: <LabelWithBadge hasData={!!data.preScript} label={t('flow.nodeConfig.http.preScriptLabel')} />,
       children: (
         <div>
           <Text className="mb-2 block text-xs" type="secondary">
-            请求发送前执行的 JavaScript 脚本
+            {t('flow.nodeConfig.http.preScriptHint')}
           </Text>
           <MonacoEditor
             height="150px"
@@ -212,11 +214,11 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
     },
     {
       key: 'postScript',
-      label: <LabelWithBadge hasData={!!data.postScript} label="后置脚本（可选）" />,
+      label: <LabelWithBadge hasData={!!data.postScript} label={t('flow.nodeConfig.http.postScriptLabel')} />,
       children: (
         <div>
           <Text className="mb-2 block text-xs" type="secondary">
-            请求完成后执行。可用: pm.variables.set('key', value)、pm.response.json()、pm.response.status
+            {t('flow.nodeConfig.http.postScriptHint')}
           </Text>
           <MonacoEditor
             height="150px"
@@ -230,7 +232,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
     },
     {
       key: 'assertions',
-      label: <LabelWithBadge hasData={(data.assertions?.length ?? 0) > 0} label="断言（可选）" />,
+      label: <LabelWithBadge hasData={(data.assertions?.length ?? 0) > 0} label={t('flow.nodeConfig.http.assertionsLabel')} />,
       children: (
         <AssertionListEditor
           assertions={data.assertions ?? []}
@@ -240,7 +242,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
     },
     {
       key: 'extractors',
-      label: <LabelWithBadge hasData={(data.extractors?.length ?? 0) > 0} label="提取器（可选）" />,
+      label: <LabelWithBadge hasData={(data.extractors?.length ?? 0) > 0} label={t('flow.nodeConfig.http.extractorsLabel')} />,
       children: (
         <ExtractorListEditor
           extractors={data.extractors ?? []}
@@ -250,11 +252,18 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
     },
     {
       key: 'mockRules',
-      label: <LabelWithBadge hasData={(data.mockRules?.length ?? 0) > 0} label={'Mock 依赖（可选）' + (data.mockRules?.length ? ` · ${data.mockRules.length} 条` : '')} />,
+      label: (
+        <LabelWithBadge
+          hasData={(data.mockRules?.length ?? 0) > 0}
+          label={data.mockRules?.length
+            ? t('flow.nodeConfig.http.mockRulesLabelCount', { count: data.mockRules.length })
+            : t('flow.nodeConfig.http.mockRulesLabel')}
+        />
+      ),
       children: (
         <div>
           <Text className="mb-2 block text-xs" type="secondary">
-            拦截此请求触发的 Feign/Mapper 调用，返回模拟数据
+            {t('flow.nodeConfig.http.mockRulesHint')}
           </Text>
           <MockRuleEditor
             rules={data.mockRules ?? []}
@@ -268,7 +277,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
   const collapseItems = [
     {
       key: 'requestOverride',
-      label: <LabelWithBadge hasData={hasOverride} label="请求覆盖（可选）" />,
+      label: <LabelWithBadge hasData={hasOverride} label={t('flow.nodeConfig.http.requestOverrideLabel')} />,
       children: (
         <Tabs
           defaultActiveKey="query"
@@ -278,9 +287,9 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
               label: <LabelWithBadge hasData={(override.queryParams?.length ?? 0) > 0} label="Query" />,
               children: (
                 <KVEditor
-                  namePlaceholder="参数名"
+                  namePlaceholder={t('flow.nodeConfig.http.paramName')}
                   value={override.queryParams ?? []}
-                  valuePlaceholder="参数值（支持 {{变量}}）"
+                  valuePlaceholder={t('flow.nodeConfig.http.paramValue', { token: t('flow.shared.variableToken') })}
                   onChange={handleQueryChange}
                 />
               ),
@@ -290,9 +299,9 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
               label: <LabelWithBadge hasData={(override.headers?.length ?? 0) > 0} label="Header" />,
               children: (
                 <KVEditor
-                  namePlaceholder="Header 名"
+                  namePlaceholder={t('flow.nodeConfig.http.headerName')}
                   value={override.headers ?? []}
-                  valuePlaceholder="Header 值（支持 {{变量}}）"
+                  valuePlaceholder={t('flow.nodeConfig.http.headerValue', { token: t('flow.shared.variableToken') })}
                   onChange={handleHeadersChange}
                 />
               ),
@@ -303,12 +312,12 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
               children: (
                 <div>
                   <Text style={{ display: 'block', fontSize: 11, marginBottom: 8 }} type="secondary">
-                    替换路径中的 {'{param}'} 占位符
+                    {t('flow.nodeConfig.http.pathHint')}
                   </Text>
                   <KVEditor
-                    namePlaceholder="参数名"
+                    namePlaceholder={t('flow.nodeConfig.http.paramName')}
                     value={override.pathParams ?? []}
-                    valuePlaceholder="参数值"
+                    valuePlaceholder={t('flow.nodeConfig.http.paramName')}
                     onChange={handlePathChange}
                   />
                 </div>
@@ -320,7 +329,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
               children: (
                 <div>
                   <Text style={{ display: 'block', fontSize: 11, marginBottom: 4 }} type="secondary">
-                    JSON 请求体（支持 {'{{变量}}'} 占位符）
+                    {t('flow.nodeConfig.http.bodyHint', { token: t('flow.shared.variableToken') })}
                   </Text>
                   <MonacoEditor
                     ref={bodyEditorRef}
@@ -342,7 +351,7 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
     },
     {
       key: 'advanced',
-      label: <LabelWithBadge hasData={hasAdvanced} label="高级配置（脚本/断言/提取器/Mock）" />,
+      label: <LabelWithBadge hasData={hasAdvanced} label={t('flow.nodeConfig.http.advancedLabel')} />,
       children: (
         <Collapse
           defaultActiveKey={[]}
@@ -352,16 +361,17 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
       ),
     },
   ]
+
   return (
     <div className="space-y-4">
       <Text className="block text-xs" type="secondary">
-        HTTP 请求配置
+        {t('flow.nodeConfig.http.title')}
       </Text>
 
       {/* API 菜单选择 */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          选择 API 接口
+          {t('flow.nodeConfig.http.selectApi')}
         </Text>
         <Select
           showSearch
@@ -369,9 +379,9 @@ export default function HttpRequestNodePanel({ data, onChange, projectId }: Pane
           filterOption={(input, option) =>
             (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
           loading={loadingMenu}
-          notFoundContent={loadingMenu ? <Spin size="small" /> : '暂无数据'}
+          notFoundContent={loadingMenu ? <Spin size="small" /> : t('flow.shared.noData')}
           options={menuOptions}
-          placeholder={loadingMenu ? '加载中...' : '选择 API 接口'}
+          placeholder={loadingMenu ? t('flow.shared.loading') : t('flow.nodeConfig.http.apiPlaceholder')}
           size="small"
           style={{ width: '100%' }}
           value={data.menuItemId || undefined}

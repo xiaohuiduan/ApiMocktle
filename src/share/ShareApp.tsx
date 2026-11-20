@@ -1,4 +1,5 @@
 import { type Key, useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Alert, Button, Card, Input, Layout, message, Spin, Tree, Typography } from 'antd'
 import { BookOpenText, FileJson2, FolderOpen, Globe2, LockKeyhole } from 'lucide-react'
@@ -87,6 +88,7 @@ function ShareLogin({
   /** 自动登录失败（如带密码链接密码错误）时预置的错误提示 */
   initialError?: string
 }) {
+  const { t } = useTranslation()
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(initialError ?? '')
@@ -94,13 +96,13 @@ function ShareLogin({
 
   const handleLogin = async () => {
     if (!shareId) {
-      setError('链接缺少分享 ID')
+      setError(t('share.error.missingShareId'))
 
       return
     }
 
     if (!password) {
-      setError('请输入密码')
+      setError(t('share.auth.passwordRequired'))
 
       return
     }
@@ -121,7 +123,7 @@ function ShareLogin({
         setError(e.message)
       }
       else {
-        messageApi.error('网络异常，请确认分享服务已启动')
+        messageApi.error(t('share.error.network'))
       }
     }
     finally {
@@ -135,12 +137,12 @@ function ShareLogin({
       <Card className="w-96">
         <div className="mb-4 flex flex-col items-center gap-2">
           <LockKeyhole className="text-blue-500" size={36} />
-          <Title className="!my-0" level={4}>接口文档分享</Title>
-          <Text type="secondary">该分享已设置密码保护</Text>
+          <Title className="!my-0" level={4}>{t('share.page.title')}</Title>
+          <Text type="secondary">{t('share.auth.passwordProtected')}</Text>
         </div>
         <Input.Password
           autoFocus
-          placeholder="请输入访问密码"
+          placeholder={t('share.auth.passwordPlaceholder')}
           value={password}
           onChange={(e) => {
             setPassword(e.target.value)
@@ -159,7 +161,7 @@ function ShareLogin({
             void handleLogin()
           }}
         >
-          进入文档
+          {t('share.auth.enter')}
         </Button>
       </Card>
     </div>
@@ -167,6 +169,7 @@ function ShareLogin({
 }
 
 export function ShareApp() {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<'loading' | 'login' | 'ready'>('loading')
   const [menu, setMenu] = useState<ShareMenuData | null>(null)
   const [overview, setOverview] = useState<ShareOverview | null>(null)
@@ -198,11 +201,11 @@ export function ShareApp() {
         setPhase('login')
       }
       else {
-        setAutoLoginError(e instanceof ShareApiError ? e.message : '自动登录失败，请手动输入密码')
+        setAutoLoginError(e instanceof ShareApiError ? e.message : t('share.error.autoLoginFailed'))
         setPhase('login')
       }
     }
-  }, [shareId, loadMenu])
+  }, [shareId, loadMenu, t])
 
   useEffect(() => {
     // 已有 token 则直接尝试恢复会话
@@ -285,12 +288,12 @@ export function ShareApp() {
       setDetail(item)
     }
     catch (e) {
-      message.error(e instanceof ShareApiError ? e.message : '加载失败')
+      message.error(e instanceof ShareApiError ? e.message : t('share.error.loadFailed'))
     }
     finally {
       setDetailLoading(false)
     }
-  }, [])
+  }, [t])
 
   const renderDetail = () => {
     if (!detail) {
@@ -341,7 +344,7 @@ export function ShareApp() {
       <Header className="flex items-center gap-3 border-b border-gray-200 bg-white !px-4" style={{ height: 48, lineHeight: '48px' }}>
         <Globe2 className="text-blue-500" size={18} />
         <Title className="!my-0" level={5}>
-          {menu?.project.name ?? menu?.title ?? '接口文档分享'}
+          {menu?.project.name ?? menu?.title ?? t('share.page.title')}
         </Title>
         {menu?.title && menu.title !== menu.project.name && (
           <Text className="truncate text-xs" type="secondary">{menu.title}</Text>
@@ -349,11 +352,11 @@ export function ShareApp() {
         <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
           {overview && (
             <>
-              <span>接口 {overview.apiCount}</span>
+              <span>{t('share.header.apiCount', { total: overview.apiCount })}</span>
               <span>·</span>
-              <span>文档 {overview.docCount}</span>
+              <span>{t('share.header.docCount', { total: overview.docCount })}</span>
               <span>·</span>
-              <span>模型 {overview.schemaCount}</span>
+              <span>{t('share.header.schemaCount', { total: overview.schemaCount })}</span>
             </>
           )}
         </div>
@@ -394,7 +397,7 @@ export function ShareApp() {
               : (
                   <div className="flex h-40 flex-col items-center justify-center gap-2 text-gray-400">
                     <Globe2 size={32} />
-                    <span>从左侧选择接口或文档查看</span>
+                    <span>{t('share.tree.emptyHint')}</span>
                   </div>
                 )}
         </Content>

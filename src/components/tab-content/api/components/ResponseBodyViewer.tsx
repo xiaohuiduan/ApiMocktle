@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
@@ -109,6 +110,7 @@ export function ResponseBodyViewer({
   fileName,
 }: ResponseBodyViewerProps) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const isJson = contentType?.toLowerCase().includes('json')
   const bodySizeBytes = bodySize ?? new Blob([body]).size
 
@@ -152,30 +154,33 @@ export function ResponseBodyViewer({
       const baseName = urlName.includes('.') ? urlName : `response.${ext}`
       const filePath = await save({
         defaultPath: baseName,
-        filters: [{ name: '文件', extensions: [ext] }],
+        filters: [{ name: t('api.run.fileFilter'), extensions: [ext] }],
       })
 
       if (!filePath) { return }
 
       await invoke('save_response_file', { path: filePath, dataBase64: bodyBase64 })
-      message.success('文件已保存')
+      message.success(t('api.run.fileSaved'))
     }
     catch (err) {
-      message.error(err instanceof Error ? err.message : '保存失败')
+      message.error(err instanceof Error ? err.message : t('api.run.saveFailed'))
     }
   }
 
   if (isBinary) {
-    const sizeText = `${(bodySizeBytes / 1024).toFixed(1)}KB (${bodySizeBytes} 字节)`
+    const sizeText = t('api.run.binarySize', {
+      size: (bodySizeBytes / 1024).toFixed(1),
+      bytes: bodySizeBytes,
+    })
 
     return (
       <div className="flex h-full min-h-0 flex-col">
         <div className="mb-2 flex shrink-0 items-center justify-between gap-3">
           <Typography.Text style={{ fontSize: token.fontSizeSM }} type="secondary">
-            二进制响应 {contentType ? `(${contentType.split(';')[0].trim()})` : ''}{sizeText && ` · ${sizeText}`}
+            {t('api.run.binaryResponse')} {contentType ? `(${contentType.split(';')[0].trim()})` : ''}{sizeText && ` · ${sizeText}`}
           </Typography.Text>
           <Button icon={<DownloadIcon size={14} />} size="small" onClick={() => void handleSaveBinary()}>
-            保存到本地
+            {t('api.run.saveToLocal')}
           </Button>
         </div>
         <div className={styles.editorContainer}>
@@ -187,7 +192,7 @@ export function ResponseBodyViewer({
                 >
                   { }
                   <img
-                    alt="响应图片"
+                    alt={t('api.run.responseImageAlt')}
                     src={imageSrc}
                     style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                   />
@@ -199,8 +204,8 @@ export function ResponseBodyViewer({
                   style={{ color: token.colorTextTertiary }}
                 >
                   {isSvg
-                    ? <Typography.Text type="secondary">SVG 图片（点击保存按钮下载）</Typography.Text>
-                    : <Typography.Text type="secondary">该响应为二进制内容，不支持文本预览，请保存到本地查看</Typography.Text>}
+                    ? <Typography.Text type="secondary">{t('api.run.svgHint')}</Typography.Text>
+                    : <Typography.Text type="secondary">{t('api.run.binaryPreviewHint')}</Typography.Text>}
                 </div>
               )}
         </div>
@@ -218,16 +223,16 @@ export function ResponseBodyViewer({
         <div className="mb-1 flex shrink-0 items-center gap-2">
           {!showFormatted && formatted && (
             <Typography.Text style={{ fontSize: token.fontSizeSM, color: token.colorTextTertiary }}>
-              响应体
+              {t('api.run.largeBodyRawPrefix')}
               {' '}
               {calcBodySize(body)}
-              ，已显示原始数据，
-              <a onClick={handleToggle}>强制格式化</a>
+              {t('api.run.largeBodyRawSuffix')}
+              <a onClick={handleToggle}>{t('api.run.forceFormat')}</a>
             </Typography.Text>
           )}
           {showFormatted && (
             <Typography.Text style={{ fontSize: token.fontSizeSM, color: token.colorTextTertiary }}>
-              已强制格式化 {calcBodySize(body)} 的响应体，可能影响性能
+              {t('api.run.forceFormatted', { size: calcBodySize(body) })}
             </Typography.Text>
           )}
         </div>

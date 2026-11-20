@@ -1,7 +1,8 @@
-import { CircleX } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+
 import { open } from '@tauri-apps/plugin-dialog'
 import { Button, Input, Popconfirm, Select, Switch, theme, Tooltip } from 'antd'
-import { PlusCircleIcon, TrashIcon, XCircleIcon } from 'lucide-react'
+import { CircleX, PlusCircleIcon, TrashIcon, XCircleIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 
 import { EditableTable, type EditableTableProps } from '@/components/EditableTable'
@@ -14,6 +15,16 @@ import type { Parameter } from '@/types'
 import { VarHighlightInput } from './VarHighlightInput'
 
 import { css } from '@emotion/css'
+
+/** 参数类型选项的展示文案是协议常量（string / integer …），不参与 i18n。 */
+const PARAM_TYPE_LABELS: { label: string, value: ParamType, hidden?: boolean }[] = [
+  { label: 'string', value: ParamType.String },
+  { label: 'integer', value: ParamType.Integer },
+  { label: 'boolean', value: ParamType.Boolean },
+  { label: 'number', value: ParamType.Number },
+  { label: 'array', value: ParamType.Array, hidden: true },
+  { label: 'file', value: ParamType.File },
+]
 
 const transformExampleValue = ({ type, example }: Pick<Parameter, 'type' | 'example'>) => {
   return type === ParamType.Array && !Array.isArray(example)
@@ -36,6 +47,7 @@ interface ParamsEditableTableProps {
 
 export function ParamsEditableTable(props: ParamsEditableTableProps) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const {
     value,
@@ -45,7 +57,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     showRequiredColumn = true,
     showDescriptionColumn = true,
     varMap,
-    exampleColumnTitle = '请求值',
+    exampleColumnTitle,
   } = props
 
   const { styles } = useStyles(({ token }) => {
@@ -86,7 +98,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
 
   const columns: EditableTableProps<Parameter>['columns'] = [
     {
-      title: '参数名',
+      title: t('api.paramTable.name'),
       dataIndex: 'name',
       width: 160,
       render: (text, record, ridx) => {
@@ -96,12 +108,12 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
           <ParamsEditableCell validateError={isDuplicate}>
             <Tooltip
               open={isPathParamsTable ? undefined : false}
-              title="自动提取接口路径里的 {param} 形式参数，请在接口路径中修改。"
+              title={t('api.paramTable.pathParamHint')}
             >
               <div className="flex size-full items-center">
                 <Input
                   className="h-full"
-                  placeholder="添加参数"
+                  placeholder={t('api.paramTable.addRow')}
                   readOnly={isPathParamsTable}
                   value={typeof text === 'string' ? text : ''}
                   variant="borderless"
@@ -111,7 +123,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
                 />
                 {isDuplicate && (
                   <Tooltip
-                    title="此列不能重复"
+                    title={t('api.paramTable.duplicateName')}
                   >
                     <span className="pr-1">
                       <CircleX size={14} style={{ color: token.colorErrorText }} />
@@ -125,7 +137,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
       },
     },
     {
-      title: '类型',
+      title: t('common.type'),
       dataIndex: 'type',
       width: 90,
       render: (text, record, ridx) => {
@@ -133,14 +145,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
           <ParamsEditableCell>
             <Select
               className="w-full [&.ant-select_.ant-select-selector]:text-inherit"
-              options={[
-                { label: 'string', value: ParamType.String },
-                { label: 'integer', value: ParamType.Integer },
-                { label: 'boolean', value: ParamType.Boolean },
-                { label: 'number', value: ParamType.Number },
-                { label: 'array', value: ParamType.Array, hidden: isPathParamsTable },
-                { label: 'file', value: ParamType.File },
-              ].filter((it) => !it.hidden)}
+              options={PARAM_TYPE_LABELS.filter((it) => !(it.hidden && isPathParamsTable))}
               popupClassName="min-w-[90px]"
               style={{
                 color:
@@ -168,7 +173,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     ...(showRequiredColumn
       ? [
           {
-            title: <div className="text-center">必填</div>,
+            title: <div className="text-center">{t('common.required')}</div>,
             dataIndex: 'required',
             width: 60,
             render: (required: boolean, record: Parameter, ridx: number) => {
@@ -189,7 +194,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
           },
         ]
       : []),
-    { title: exampleColumnTitle,
+    { title: exampleColumnTitle ?? t('api.paramTable.requestValue'),
       dataIndex: 'example',
       width: 180,
       render: (exampleVal, record, ridx) => {
@@ -248,7 +253,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
             <ParamsEditableCell>
               <div className="flex items-center gap-1">
                 <span className="max-w-[100px] truncate text-xs text-[color:var(--color-text-secondary,#667085)]" title={record.filePath}>
-                  {record.filePath ? record.filePath.split(/[/\\]/).pop() : '未选择'}
+                  {record.filePath ? record.filePath.split(/[/\\]/).pop() : t('api.paramTable.noFile')}
                 </span>
                 <Button
                   size="small"
@@ -266,7 +271,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
                     })()
                   }}
                 >
-                  选择文件
+                  {t('api.body.selectFile')}
                 </Button>
               </div>
             </ParamsEditableCell>
@@ -301,7 +306,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
     ...(showDescriptionColumn
       ? [
           {
-            title: '说明',
+            title: t('common.description'),
             dataIndex: 'description',
             render: (text: string | undefined, _record: Parameter, ridx: number) => {
               return (
@@ -321,7 +326,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
         ]
       : []),
     {
-      title: <div className="text-center">启用</div>,
+      title: <div className="text-center">{t('common.enabled')}</div>,
       width: 50,
       render: (_, record, ridx) => {
         return (
@@ -340,24 +345,24 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
       },
     },
     {
-      title: <div className="text-center">操作</div>,
+      title: <div className="text-center">{t('common.action')}</div>,
       width: 90,
       render: (_, record, idx) => {
         if (removable) {
           return (
             <div className="flex justify-center p-1 text-xs">
               <Popconfirm
-                cancelText="取消"
+                cancelText={t('common.cancel')}
                 okButtonProps={{ danger: true }}
-                okText="删除"
-                title="删除该参数？"
+                okText={t('common.delete')}
+                title={t('api.paramTable.confirmDelete')}
                 onConfirm={() => {
                   onChange?.(value?.filter((_, i) => i !== idx))
                 }}
               >
                 <Button
                   danger
-                  aria-label="删除参数"
+                  aria-label={t('api.paramTable.deleteRow')}
                   icon={<TrashIcon size={13} />}
                   size="small"
                   type="text"
@@ -380,7 +385,7 @@ export function ParamsEditableTable(props: ParamsEditableTableProps) {
             type="dashed"
             onClick={handleAddRow}
           >
-            添加参数
+            {t('api.paramTable.addRow')}
           </Button>
         </div>
       )}

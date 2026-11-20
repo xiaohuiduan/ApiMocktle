@@ -1,3 +1,4 @@
+import { t } from '@/i18n'
 import type { ScriptExecutionResult } from '@/types'
 
 import type { PmContext, ScriptWorkerRequest, ScriptWorkerResponse } from './pm-types'
@@ -47,12 +48,13 @@ export async function executeScript(
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       resetWorker()
+      const timeoutMsg = t('api.script.timeout', { ms: timeoutMs })
       resolve({
         success: false,
-        consoleEntries: [{ level: 'error', args: [`脚本执行超时（${timeoutMs}ms）`], timestamp: Date.now() }],
+        consoleEntries: [{ level: 'error', args: [timeoutMsg], timestamp: Date.now() }],
         testResults: [],
         variableDeltas: {},
-        error: `脚本执行超时（${timeoutMs}ms）`,
+        error: timeoutMsg,
       })
     }, timeoutMs)
 

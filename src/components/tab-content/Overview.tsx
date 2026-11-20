@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, Col, Empty, Row, Space, theme } from 'antd'
 
@@ -9,6 +10,7 @@ import { useHelpers } from '@/hooks/useHelpers'
 
 export function Overview() {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const { menuRawList } = useMenuHelpersContext()
   const { addTabItem } = useMenuTabHelpers()
   const { createApiDetails, createApiRequest, createDoc, createApiSchema } = useHelpers()
@@ -54,36 +56,36 @@ export function Overview() {
             padding: token.padding,
           }}
         >
-          <div className="mb-4 text-lg">项目统计</div>
+          <div className="mb-4 text-lg">{t('api.overview.stats')}</div>
           <div className="flex flex-wrap">
             <div className="w-1/5">
               <div className="text-2xl">{stats.apiCount}</div>
               <div className="mt-1 text-xs" style={{ color: token.colorTextTertiary }}>
-                接口数
+                {t('api.overview.apiCount')}
               </div>
             </div>
             <div className="w-1/5">
               <div className="text-2xl">{stats.apiCaseCount}</div>
               <div className="mt-1 text-xs" style={{ color: token.colorTextTertiary }}>
-                接口用例数
+                {t('api.overview.apiCaseCount')}
               </div>
             </div>
             <div className="w-1/5">
               <div className="text-2xl">{stats.docCount}</div>
               <div className="mt-1 text-xs" style={{ color: token.colorTextTertiary }}>
-                文档数
+                {t('api.overview.docCount')}
               </div>
             </div>
             <div className="w-1/5">
               <div className="text-2xl">{stats.schemaCount}</div>
               <div className="mt-1 text-xs" style={{ color: token.colorTextTertiary }}>
-                数据模型数
+                {t('api.overview.schemaCount')}
               </div>
             </div>
             <div className="w-1/5">
               <div className="text-2xl">{stats.testScenarioCount}</div>
               <div className="mt-1 text-xs" style={{ color: token.colorTextTertiary }}>
-                测试场景数
+                {t('api.overview.testScenarioCount')}
               </div>
             </div>
           </div>
@@ -98,10 +100,10 @@ export function Overview() {
             padding: token.padding,
           }}
         >
-          <div className="mb-3 text-base">最近编辑</div>
+          <div className="mb-3 text-base">{t('api.overview.recent')}</div>
           {recentItems.length === 0
             ? (
-                <Empty description="暂无接口，从右侧新建开始" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                <Empty description={t('api.overview.recentEmpty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
               )
             : (
                 <div className="flex flex-col gap-2">
@@ -134,12 +136,12 @@ export function Overview() {
             padding: token.padding,
           }}
         >
-          <div className="mb-3 text-base">快捷新建</div>
+          <div className="mb-3 text-base">{t('api.overview.quickCreate')}</div>
           <Space className="w-full" direction="vertical">
-            <Button block onClick={() => { createApiDetails() }}>新建接口</Button>
-            <Button block onClick={() => { createApiRequest() }}>新建快捷请求</Button>
-            <Button block onClick={() => { createDoc() }}>新建 Markdown</Button>
-            <Button block onClick={() => { createApiSchema() }}>新建数据模型</Button>
+            <Button block onClick={() => { createApiDetails() }}>{t('menu.catalogNew.http')}</Button>
+            <Button block onClick={() => { createApiRequest() }}>{t('menu.catalogNew.request')}</Button>
+            <Button block onClick={() => { createDoc() }}>{t('menu.catalogNew.markdown')}</Button>
+            <Button block onClick={() => { createApiSchema() }}>{t('menu.catalogNew.schema')}</Button>
           </Space>
         </div>
       </Col>

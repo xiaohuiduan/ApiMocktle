@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import JsonView from 'react18-json-view'
 
 import { useStyles } from '@/hooks/useStyle'
@@ -25,6 +26,9 @@ function parseJsonValue(value: string) {
 
 export function JsonViewer(props: JsonViewerProps) {
   const { value } = props
+
+  const { t } = useTranslation()
+
   const { styles } = useStyles(({ token }, css) => {
     return {
       invalidJson: css({
@@ -63,7 +67,7 @@ export function JsonViewer(props: JsonViewerProps) {
 
   return (
     <div className={styles.invalidJson}>
-      <div className={styles.invalidJsonHint}>示例不是合法 JSON，按原始文本显示</div>
+      <div className={styles.invalidJsonHint}>{t('ui.jsonViewer.invalidJson')}</div>
       <pre className={styles.invalidJsonBody}>{String(result.parsed)}</pre>
     </div>
   )

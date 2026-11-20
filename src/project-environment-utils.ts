@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid'
 
+import { t } from '@/i18n'
 import type {
   ApiEnvironment,
   ApiEnvironmentBaseUrl,
@@ -43,7 +44,7 @@ export function createEnvironmentBaseUrl(): ApiEnvironmentBaseUrl {
 export function createEnvironment(): ApiEnvironment {
   return {
     id: nanoid(6),
-    name: '新建环境',
+    name: t('app.environment.newEnvironment'),
     url: '',
     baseUrls: [createEnvironmentBaseUrl()],
     variables: [],

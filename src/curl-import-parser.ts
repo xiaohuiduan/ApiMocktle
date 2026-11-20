@@ -1,4 +1,5 @@
 import { HttpMethod } from '@/enums'
+import { t } from '@/i18n'
 
 const COMMON_HEADER_NAMES = new Set([
   'accept',
@@ -131,7 +132,7 @@ function normalizeHttpMethod(value?: string) {
   const method = value?.trim().toUpperCase() as HttpMethod | undefined
 
   if (!method || !SUPPORTED_HTTP_METHODS.has(method)) {
-    throw new Error(`暂不支持的请求方法：${value ?? '未知'}`)
+    throw new Error(t('api.curl.unsupportedMethod', { method: value ?? t('api.curl.unknown') }))
   }
 
   return method
@@ -276,7 +277,7 @@ export function parseCurlCommand(curlText: string): CurlParseState {
   }
 
   if (!state.url) {
-    throw new Error('未识别到有效的请求 URL')
+    throw new Error(t('api.curl.invalidUrl'))
   }
 
   return state
@@ -296,7 +297,7 @@ export function buildExtraQueryPairs(state: CurlParseState) {
   }
 
   if (!looksLikeUrlEncodedBody(queryText)) {
-    throw new Error('GET 形式的 cURL 仅支持 URL 查询参数或 x-www-form-urlencoded 数据')
+    throw new Error(t('api.curl.getOnlyQueryOrForm'))
   }
 
   return parseAmpersandPairs([queryText])
@@ -311,7 +312,7 @@ export function extractHeaders(rawHeaders: string[], ignoreCommonHeaders: boolea
     const { name, value } = splitNameValue(headerLine, ':')
 
     if (!name) {
-      throw new Error(`Header 格式非法：${headerLine}`)
+      throw new Error(t('api.curl.invalidHeader', { line: headerLine }))
     }
 
     const lowerName = name.toLowerCase()

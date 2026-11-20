@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Handle, Position } from '@xyflow/react'
 import { theme } from 'antd'
@@ -207,6 +208,7 @@ function BaseNodeInner({
   summary,
   minWidth,
 }: BaseNodeProps) {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
   const { isGlassStyle, isNeumorphism, isSkeuomorphism } = useDesignStyle()
 
@@ -263,9 +265,9 @@ function BaseNodeInner({
           >
             {execStatus === 'passed' && execDurationMs !== undefined && `${execDurationMs}ms`}
             {execStatus === 'passed' && !execDurationMs && execError}
-            {(execStatus === 'failed' || execStatus === 'error') && (execError ?? '执行失败')}
-            {execStatus === 'skipped' && (execError ?? '已跳过（无详细原因）')}
-            {execStatus === 'running' && '执行中...'}
+            {(execStatus === 'failed' || execStatus === 'error') && (execError ?? t('flow.node.execFailed'))}
+            {execStatus === 'skipped' && (execError ?? t('flow.node.execSkipped'))}
+            {execStatus === 'running' && t('flow.node.execRunning')}
           </span>
         )}
       </div>

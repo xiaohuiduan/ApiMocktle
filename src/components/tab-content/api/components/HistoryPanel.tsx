@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router'
 
 import { Button, Checkbox, Drawer, List, Modal, Spin, Table, Tag, theme, Typography } from 'antd'
@@ -8,6 +9,7 @@ import { Button, Checkbox, Drawer, List, Modal, Spin, Table, Tag, theme, Typogra
 import { api } from '@/api-client'
 import { MonacoEditor } from '@/components/MonacoEditor'
 import { useAuth } from '@/contexts/auth'
+import { getLanguage } from '@/i18n'
 import type { ApiRunResult } from '@/types'
 
 import { buildMarkdownReport, downloadText } from '../exportMarkdown'
@@ -34,11 +36,16 @@ interface HistoryPanelProps {
   onApply?: (item: RequestHistoryItem) => void
 }
 
+/**
+ * 格式化历史时间。
+ *
+ * 使用当前界面语言（i18n 单例）而非硬编码 `zh-CN`，避免英文界面下出现中文日期格式。
+ */
 export function formatTime(iso: string) {
   try {
     const d = new Date(iso)
 
-    return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    return d.toLocaleString(getLanguage(), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
   }
   catch {
     return iso
@@ -47,6 +54,7 @@ export function formatTime(iso: string) {
 
 export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPanelProps) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const { projectId } = useParams()
   const { sessionId } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -118,15 +126,15 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
       open={open}
       placement="right"
       styles={{ body: { padding: 0, display: 'flex', overflow: 'hidden' } }}
-      title="历史记录"
+      title={t('api.history.title')}
       width="60%"
       onClose={onClose}
     >
       {/* 左侧列表 */}
       <div className="flex shrink-0 flex-col" style={{ width: 220, borderRight: `1px solid ${token.colorBorderSecondary}` }}>
         <div className="flex items-center justify-between px-[var(--ds-pad-md)] py-[var(--ds-pad-sm)]">
-          <Typography.Text strong className="text-xs">共 {items.length} 条</Typography.Text>
-          <Button size="small" type="link" onClick={() => void loadHistory()}>刷新</Button>
+          <Typography.Text strong className="text-xs">{t('api.history.total', { count: items.length })}</Typography.Text>
+          <Button size="small" type="link" onClick={() => void loadHistory()}>{t('common.refresh')}</Button>
         </div>
         <div className="flex items-center gap-2 px-[var(--ds-pad-md)] pb-[var(--ds-pad-sm)]">
           <Button
@@ -139,7 +147,7 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
               if (item) { onApply?.(item) }
             }}
           >
-            回填
+            {t('api.history.apply')}
           </Button>
           <Button
             disabled={!selectedId}
@@ -155,18 +163,18 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
                 { url: req.url, method: req.method, headers: req.headers, body: req.body, contentType: req.contentType, query: (effectiveRequestQuery ?? []) as never },
                 { status: r.status, statusText: r.statusText, headers: r.headers, body: r.body, durationMs: r.durationMs, contentType: r.contentType },
               )
-              downloadText(`接口报告-${r.status}-${Date.now()}.md`, md)
+              downloadText(t('api.run.reportFileName', { status: r.status, ts: Date.now() }), md)
             }}
-          >导出 Markdown
+          >{t('api.run.exportMarkdown')}
           </Button>
-          <Button disabled={compareIds.length !== 2} size="small" type="primary" onClick={() => { setDiffOpen(true) }}>对比</Button>
+          <Button disabled={compareIds.length !== 2} size="small" type="primary" onClick={() => { setDiffOpen(true) }}>{t('api.history.compare')}</Button>
         </div>
         <div className="flex-1 overflow-auto">
           <Spin spinning={loading}>
             {items.length === 0
               ? (
                   <div className="px-[var(--ds-pad-md)] py-[var(--ds-pad-lg)] text-center">
-                    <Typography.Text className="text-xs" type="secondary">暂无历史记录</Typography.Text>
+                    <Typography.Text className="text-xs" type="secondary">{t('api.history.empty')}</Typography.Text>
                   </div>
                 )
               : (
@@ -220,7 +228,7 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
         {!selectedItem
           ? (
               <div className="flex flex-1 items-center justify-center">
-                <Typography.Text type="secondary">点击左侧记录查看详情</Typography.Text>
+                <Typography.Text type="secondary">{t('api.history.selectHint')}</Typography.Text>
               </div>
             )
           : (
@@ -233,7 +241,7 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
                 </div>
 
                 {/* 请求区 */}
-                <Typography.Text strong className="mb-2 block text-sm">请求</Typography.Text>
+                <Typography.Text strong className="mb-2 block text-sm">{t('api.history.request')}</Typography.Text>
                 <div className="mb-4 rounded p-2 text-xs" style={{ backgroundColor: token.colorFillTertiary, fontFamily: 'monospace', wordBreak: 'break-all' }}>
                   <span className="font-medium opacity-60">URL: </span>
                   {result?.url ?? '-'}
@@ -241,38 +249,38 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
 
                 {effectiveRequestHeaders && (
                   <div className="mb-3">
-                    <Typography.Text className="mb-1 block text-xs" type="secondary">请求头 ({effectiveRequestHeaders.length})</Typography.Text>
+                    <Typography.Text className="mb-1 block text-xs" type="secondary">{t('api.history.requestHeaders', { count: effectiveRequestHeaders.length })}</Typography.Text>
                     <Table columns={headerTableColumns} dataSource={effectiveRequestHeaders} pagination={false} rowKey="name" size="small" />
                   </div>
                 )}
 
                 {effectiveRequestQuery && (
                   <div className="mb-3">
-                    <Typography.Text className="mb-1 block text-xs" type="secondary">Query 参数 ({effectiveRequestQuery.length})</Typography.Text>
+                    <Typography.Text className="mb-1 block text-xs" type="secondary">{t('api.history.queryParams', { count: effectiveRequestQuery.length })}</Typography.Text>
                     <Table columns={headerTableColumns} dataSource={effectiveRequestQuery} pagination={false} rowKey="name" size="small" />
                   </div>
                 )}
 
                 {effectiveRequestBodyText && (
                   <div className="mb-3" style={{ height: 200 }}>
-                    <Typography.Text className="mb-1 block text-xs" type="secondary">请求体</Typography.Text>
+                    <Typography.Text className="mb-1 block text-xs" type="secondary">{t('api.history.requestBody')}</Typography.Text>
                     <MonacoEditor height="100%" language={detectLanguage(effectiveContentType)} options={monacoOptions} value={effectiveRequestBodyText} />
                   </div>
                 )}
 
                 {result?.requestBodyParameters && result.requestBodyParameters.length > 0 && (
                   <div className="mb-3">
-                    <Typography.Text className="mb-1 block text-xs" type="secondary">请求体参数 ({result.requestBodyParameters.length})</Typography.Text>
+                    <Typography.Text className="mb-1 block text-xs" type="secondary">{t('api.history.requestBodyParams', { count: result.requestBodyParameters.length })}</Typography.Text>
                     <Table columns={headerTableColumns} dataSource={result.requestBodyParameters} pagination={false} rowKey="name" size="small" />
                   </div>
                 )}
 
                 {/* 响应区 */}
-                <Typography.Text strong className="my-2 block text-sm">响应</Typography.Text>
+                <Typography.Text strong className="my-2 block text-sm">{t('api.history.response')}</Typography.Text>
 
                 {result?.headers && result.headers.length > 0 && (
                   <div className="mb-3">
-                    <Typography.Text className="mb-1 block text-xs" type="secondary">响应头 ({result.headers.length})</Typography.Text>
+                    <Typography.Text className="mb-1 block text-xs" type="secondary">{t('api.history.responseHeaders', { count: result.headers.length })}</Typography.Text>
                     <Table columns={headerTableColumns} dataSource={result.headers} pagination={false} rowKey="name" size="small" />
                   </div>
                 )}
@@ -284,7 +292,7 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
                       </div>
                     )
                   : (
-                      <Typography.Text className="text-xs" type="secondary">无响应体</Typography.Text>
+                      <Typography.Text className="text-xs" type="secondary">{t('api.run.noResponseBody')}</Typography.Text>
                     )}
               </div>
             )}
@@ -293,7 +301,7 @@ export function HistoryPanel({ menuItemId, open, onClose, onApply }: HistoryPane
       <Modal
         footer={null}
         open={diffOpen}
-        title="历史记录对比"
+        title={t('api.history.diffTitle')}
         width={900}
         onCancel={() => { setDiffOpen(false) }}
       >

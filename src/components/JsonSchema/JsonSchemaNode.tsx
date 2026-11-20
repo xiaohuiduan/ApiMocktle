@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { theme } from 'antd'
 
 import { useMenuHelpersContext } from '@/contexts/menu-helpers'
@@ -16,6 +18,8 @@ export type JsonSchemaNodeProps = JsonSchemaNodeRowProps
 
 export function JsonSchemaNode(props: JsonSchemaNodeProps) {
   const { token } = theme.useToken()
+
+  const { t } = useTranslation()
 
   const { value, onChange, fieldPath = [], onAddField, ...restProps } = props
 
@@ -143,14 +147,14 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
                     }}
                   >
                     <span style={{ color: token.colorTextTertiary }}>
-                      没有字段，
+                      {t('ui.schema.emptyHint')}
                       <span
                         className={css({ color: token.colorPrimary, cursor: 'pointer' })}
                         onClick={() => {
                           onAddField?.([...fieldPath, KEY_PROPERTIES, '0'])
                         }}
                       >
-                        添加
+                        {t('ui.schema.addField')}
                       </span>
                     </span>
                   </div>
@@ -217,15 +221,18 @@ export function JsonSchemaNode(props: JsonSchemaNodeProps) {
                             }
                           }}
                         >
-                          解除关联
+                          {t('ui.schema.unbind')}
                         </div>
                       )
                     : (
                         <div
                           className={styles.unbind}
-                          style={{ backgroundColor: token.colorWarningBg, color: token.colorWarningText }}
+                          style={{
+                            backgroundColor: token.colorWarningBg,
+                            color: token.colorWarningText,
+                          }}
                         >
-                          模型未找到: {$ref}
+                          {t('ui.schema.refNotFound', { ref: $ref })}
                         </div>
                       )}
 

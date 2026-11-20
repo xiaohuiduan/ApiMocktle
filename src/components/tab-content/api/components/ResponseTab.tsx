@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, Form, Popconfirm, Tabs, theme } from 'antd'
 import { PlusIcon, TrashIcon } from 'lucide-react'
@@ -39,6 +40,7 @@ interface ResponseTabProps {
 export function ResponseTab(props: ResponseTabProps) {
   const { value, onChange } = props
   const { messageApi } = useGlobalContext()
+  const { t } = useTranslation()
 
   const { token } = theme.useToken()
 
@@ -78,16 +80,16 @@ export function ResponseTab(props: ResponseTabProps) {
                     <Popconfirm
                       title={(
                         <span>
-                          确定删除？确定后点击右上角
-                          <strong>保存</strong>
-                          按钮生效
+                          {t('api.response.confirmDeletePrefix')}
+                          <strong>{t('common.save')}</strong>
+                          {t('api.response.confirmDeleteSuffix')}
                         </span>
                       )}
                       onConfirm={() => {
                         const newResponses = value.filter((_, i) => i !== idx)
                         onChange?.(newResponses)
                         setActiveResTabKey(newResponses.at(0)?.id)
-                        messageApi.info('响应已删除，点击右上角保存后生效')
+                        messageApi.info(t('api.response.deleted'))
                       }}
                     >
                       <Button
@@ -115,7 +117,7 @@ export function ResponseTab(props: ResponseTabProps) {
                 setModalOpen(true)
               }}
             >
-              添加
+              {t('api.response.add')}
             </Button>
           </>
         )}

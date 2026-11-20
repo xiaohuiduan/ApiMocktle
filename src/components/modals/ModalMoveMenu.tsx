@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { create, useModal } from '@ebay/nice-modal-react'
 import { Form, Input, Modal, type ModalProps } from 'antd'
@@ -16,6 +17,7 @@ interface ModalMoveMenuProps extends Omit<ModalProps, 'open' | 'onOk'> {
 type FormData = Pick<ApiMenuData, 'id' | 'parentId'>
 
 export const ModalMoveMenu = create(({ menuItemType, formData, ...props }: ModalMoveMenuProps) => {
+  const { t } = useTranslation()
   const modal = useModal()
 
   const [form] = Form.useForm<FormData>()
@@ -35,7 +37,7 @@ export const ModalMoveMenu = create(({ menuItemType, formData, ...props }: Modal
 
   return (
     <Modal
-      title="移动到..."
+      title={t('settings.modal.moveMenu.title')}
       {...props}
       open={modal.visible}
       onCancel={(...parmas) => {
@@ -54,9 +56,9 @@ export const ModalMoveMenu = create(({ menuItemType, formData, ...props }: Modal
           <Input />
         </Form.Item>
 
-        <Form.Item label="目标目录" name="parentId" rules={[{ required: true }]}>
+        <Form.Item label={t('settings.modal.moveMenu.targetCatalog')} name="parentId" rules={[{ required: true }]}>
           <SelectorCatalog
-            placeholder="移动到..."
+            placeholder={t('settings.modal.moveMenu.title')}
             type={
               menuItemType === MenuItemType.ApiDetail
                 ? MenuItemType.ApiDetailFolder

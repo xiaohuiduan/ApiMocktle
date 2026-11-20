@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Switch, Tabs, Tag, theme, Typography } from 'antd'
 
 import type { ApiDetails, ApiEnvironmentValue, ProjectEnvironmentConfig } from '@/types'
@@ -55,6 +57,7 @@ function InheritedParamsBar(props: {
   onToggle: (name: string, enabled: boolean) => void
 }) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const { globalRows, envRows, localParams, sourceLabel, disabledNames, onToggle } = props
 
   const localNames = new Set((localParams ?? []).map((p) => p.name).filter(Boolean))
@@ -86,7 +89,7 @@ function InheritedParamsBar(props: {
     >
       <Typography.Text strong>{sourceLabel}</Typography.Text>
       <Typography.Paragraph className="!mb-2 mt-1" type="secondary">
-        这些参数来自全局/环境配置，同名接口参数优先。
+        {t('api.params.inheritedHint')}
       </Typography.Paragraph>
       <div className="grid gap-2">
         {allRows.map((r) => {
@@ -104,8 +107,8 @@ function InheritedParamsBar(props: {
               }}
             >
               <Tag color={overridden ? 'default' : r.source === 'env' ? 'purple' : 'blue'}>
-                {r.source === 'env' ? '环境' : '全局'}
-                {overridden ? ' (已覆盖)' : ''}
+                {r.source === 'env' ? t('api.params.sourceEnv') : t('api.params.sourceGlobal')}
+                {overridden ? t('api.params.overriddenSuffix') : ''}
               </Tag>
               <Typography.Text code className="truncate">{r.name}</Typography.Text>
               <Typography.Text className="truncate" type="secondary">
@@ -134,6 +137,7 @@ function InheritedParamsBar(props: {
  * 全局/环境参数在独立参考区展示，本地参数在可编辑表格中。
  */
 export function ParamsTab(props: ParamsTabProps) {
+  const { t } = useTranslation()
   const { value: parameters, onChange, globalParameters, envParameters, varMap, disabledInheritedNames, onToggleInheritedParam, exampleColumnTitle } = props
 
   const queryCount = (parameters?.query?.length ?? 0) + (parameters?.path?.length ?? 0)
@@ -164,11 +168,11 @@ export function ParamsTab(props: ParamsTabProps) {
                   envRows={envParameters?.query}
                   globalRows={globalParameters?.query}
                   localParams={parameters?.query}
-                  sourceLabel="当前全局/环境 Query 参数"
+                  sourceLabel={t('api.params.envQueryTitle')}
                   onToggle={(name, enabled) => onToggleInheritedParam?.('query', name, enabled)}
                 />
                 <div className="py-2">
-                  <Typography.Text type="secondary">Query 参数</Typography.Text>
+                  <Typography.Text type="secondary">{t('api.params.queryTitle')}</Typography.Text>
                 </div>
                 <ParamsEditableTable
                   exampleColumnTitle={exampleColumnTitle}
@@ -183,7 +187,7 @@ export function ParamsTab(props: ParamsTabProps) {
                   ? (
                       <>
                         <div className="py-2">
-                          <Typography.Text type="secondary">Path 参数</Typography.Text>
+                          <Typography.Text type="secondary">{t('api.params.pathTitle')}</Typography.Text>
                         </div>
                         <ParamsEditableTable
                           isPathParamsTable
@@ -215,7 +219,7 @@ export function ParamsTab(props: ParamsTabProps) {
                   envRows={envParameters?.header}
                   globalRows={globalParameters?.header}
                   localParams={parameters?.header}
-                  sourceLabel="当前全局/环境 Header 参数"
+                  sourceLabel={t('api.params.envHeaderTitle')}
                   onToggle={(name, enabled) => onToggleInheritedParam?.('header', name, enabled)}
                 />
                 <ParamsEditableTable
@@ -244,7 +248,7 @@ export function ParamsTab(props: ParamsTabProps) {
                   envRows={envParameters?.cookie}
                   globalRows={globalParameters?.cookie}
                   localParams={parameters?.cookie}
-                  sourceLabel="当前全局/环境 Cookie 参数"
+                  sourceLabel={t('api.params.envCookieTitle')}
                   onToggle={(name, enabled) => onToggleInheritedParam?.('cookie', name, enabled)}
                 />
                 <ParamsEditableTable

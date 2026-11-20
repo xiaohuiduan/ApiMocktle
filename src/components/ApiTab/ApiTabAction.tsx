@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, Dropdown, type MenuProps } from 'antd'
 import { MoreHorizontalIcon, PlusIcon } from 'lucide-react'
@@ -9,6 +10,7 @@ import { IconText } from '@/components/IconText'
 import { useMenuTabContext, useMenuTabHelpers } from '../../contexts/menu-tab-settings'
 
 export function useApiTabActions() {
+  const { t } = useTranslation()
   const { removeAllTabItems, removeOtherTabItems } = useMenuTabHelpers()
   const { tabItems, activeTabKey, setTabItems } = useMenuTabContext()
 
@@ -31,7 +33,7 @@ export function useApiTabActions() {
     () => [
       {
         key: 'moveLeft',
-        label: '左移标签',
+        label: t('api.tab.moveLeft'),
         disabled: activeIndex <= 0,
         onClick: () => {
           moveActiveTab(-1)
@@ -39,7 +41,7 @@ export function useApiTabActions() {
       },
       {
         key: 'moveRight',
-        label: '右移标签',
+        label: t('api.tab.moveRight'),
         disabled: activeIndex < 0 || activeIndex >= tabItems.length - 1,
         onClick: () => {
           moveActiveTab(1)
@@ -50,20 +52,20 @@ export function useApiTabActions() {
       },
       {
         key: 'closeAll',
-        label: '关闭所有标签页',
+        label: t('api.tab.closeAll'),
         onClick: () => {
           removeAllTabItems()
         },
       },
       {
         key: 'closeOthers',
-        label: '关闭其他标签页',
+        label: t('api.tab.closeOthers'),
         onClick: () => {
           removeOtherTabItems()
         },
       },
     ],
-    [activeIndex, tabItems.length, removeAllTabItems, removeOtherTabItems],
+    [activeIndex, tabItems.length, removeAllTabItems, removeOtherTabItems, t],
   )
 
   return {
@@ -72,6 +74,7 @@ export function useApiTabActions() {
 }
 
 export function ApiTabAction() {
+  const { t } = useTranslation()
   const { addTabItem } = useMenuTabHelpers()
 
   const { menuItems } = useApiTabActions()
@@ -84,7 +87,7 @@ export function ApiTabAction() {
         onClick={() => {
           addTabItem({
             key: nanoid(6),
-            label: '新建...',
+            label: t('api.tab.newTab'),
             contentType: 'blank',
           })
         }}

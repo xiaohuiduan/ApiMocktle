@@ -1,3 +1,5 @@
+import { t } from '@/i18n'
+
 export interface ExportHeader {
   name?: string
   value?: string
@@ -21,47 +23,50 @@ export interface ExportResponse {
   contentType?: string
 }
 
-function mdTable(headers: ExportHeader[] | undefined): string {
-  if (!headers || headers.length === 0) { return '_无_' }
+function tableBlock(headers: ExportHeader[] | undefined): string {
+  if (!headers || headers.length === 0) { return t('api.run.report.none') }
 
   const rows = headers
     .filter((h) => h.name)
     .map((h) => `| ${h.name} | ${String(h.value ?? '').replace(/\|/g, '\\|')} |`)
     .join('\n')
 
-  return `| 名称 | 值 |\n| --- | --- |\n${rows}`
+  return `${t('api.run.report.tableHeader')}\n${rows}`
 }
 
 function codeBlock(text: string | undefined, lang = ''): string {
-  if (text == null || text === '') { return '_无_' }
+  if (text == null || text === '') { return t('api.run.report.none') }
 
   return `\`\`\`${lang}\n${text}\n\`\`\``
 }
 
-/** 生成接口请求/响应的 Markdown 报告 */
+/**
+ * 生成接口请求/响应的 Markdown 报告。
+ *
+ * 文案在**函数体内**取词（而非模块顶层），因此导出时会使用导出那一刻的语言。
+ */
 export function buildMarkdownReport(request: ExportRequest, response: ExportResponse): string {
   const method = (request.method ?? 'GET').toUpperCase()
   const status = response.status ?? 0
 
-  return `# 接口请求报告
+  return `${t('api.run.report.title')}
 
-## 概览
-- **方法**：${method}
-- **URL**：${request.url ?? '-'}
-- **状态**：${status} ${response.statusText ?? ''}
-- **耗时**：${response.durationMs ?? 0} ms
+${t('api.run.report.overview')}
+${t('api.run.report.method', { method })}
+${t('api.run.report.url', { url: request.url ?? '-' })}
+${t('api.run.report.status', { status, statusText: response.statusText ?? '' })}
+${t('api.run.report.duration', { ms: response.durationMs ?? 0 })}
 
-## 请求头
-${mdTable(request.headers)}
+${t('api.run.report.requestHeaders')}
+${tableBlock(request.headers)}
 
-${request.query?.length ? `## Query 参数\n${mdTable(request.query)}\n` : ''}
-## 请求体
+${request.query?.length ? `${t('api.run.report.query')}\n${tableBlock(request.query)}\n` : ''}${t('api.run.report.requestBody')}
 ${codeBlock(request.body, guessLang(request.contentType))}
 
-## 响应头
-${mdTable(response.headers)}
+${t('api.run.report.responseHeaders')}
+${tableBlock(response.headers)}
 
-## 响应体
+${t('api.run.report.responseBody')}
 ${codeBlock(response.body ?? undefined, guessLang(response.contentType))}
 `
 }

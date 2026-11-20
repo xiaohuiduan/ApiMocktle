@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLocation, useSearchParams } from 'react-router'
 
 import {
@@ -14,6 +15,7 @@ import {
   theme,
   Typography,
 } from 'antd'
+import type { TFunction } from 'i18next'
 import { LayersIcon, SettingsIcon } from 'lucide-react'
 
 import { api } from '@/api-client'
@@ -45,78 +47,87 @@ interface ProjectInfo {
   createdAt: string
 }
 
-const items: MenuItem[] = [
-  {
-    key: 'g1',
-    label: (
-      <div className="flex items-center gap-2">
-        <SettingsIcon size={16} />
-        通用设置
-      </div>
-    ),
-    type: 'group',
-    children: [
-      { key: SettingsSectionKey.Members, label: '成员管理' },
-      { key: SettingsSectionKey.Environments, label: '环境管理' },
-    ],
-  },
-  {
-    key: 'g2',
-    label: (
-      <div className="flex items-center gap-2">
-        <LayersIcon size={16} />
-        项目资源
-      </div>
-    ),
-    type: 'group',
-    children: [
-      { key: SettingsSectionKey.ImportApi, label: '导入导出接口' },
-      { key: SettingsSectionKey.Share, label: '文档分享' },
-    ],
-  },
-]
+/**
+ * 项目设置左侧菜单。
+ *
+ * 必须是函数：分组与条目文案随语言变化，模块顶层求值会在加载时固定住。
+ * 消费方在渲染期用 `useMemo(() => createItems(t), [t])`。
+ */
+function createItems(t: TFunction): MenuItem[] {
+  return [
+    {
+      key: 'g1',
+      label: (
+        <div className="flex items-center gap-2">
+          <SettingsIcon size={16} />
+          {t('settings.page.groupGeneral')}
+        </div>
+      ),
+      type: 'group',
+      children: [
+        { key: SettingsSectionKey.Members, label: t('settings.page.members') },
+        { key: SettingsSectionKey.Environments, label: t('settings.page.environments') },
+      ],
+    },
+    {
+      key: 'g2',
+      label: (
+        <div className="flex items-center gap-2">
+          <LayersIcon size={16} />
+          {t('settings.page.groupResources')}
+        </div>
+      ),
+      type: 'group',
+      children: [
+        { key: SettingsSectionKey.ImportApi, label: t('settings.page.transfer') },
+        { key: SettingsSectionKey.Share, label: t('settings.page.share') },
+      ],
+    },
+  ]
+}
 
-function sectionMeta(section: SettingsSectionKey) {
+function sectionMeta(t: TFunction, section: SettingsSectionKey) {
   if (section === SettingsSectionKey.Members) {
     return {
-      title: '成员管理',
-      description: '管理项目成员及角色权限。',
+      title: t('settings.page.members'),
+      description: t('settings.page.membersDescription'),
     }
   }
 
   if (section === SettingsSectionKey.Environments) {
     return {
-      title: '环境管理',
-      description: '统一维护项目环境、前置 URL、全局变量与密钥。',
+      title: t('settings.page.environments'),
+      description: t('settings.page.environmentsDescription'),
     }
   }
 
   if (section === SettingsSectionKey.Share) {
     return {
-      title: '文档分享',
-      description: '分享当前项目文档，生成带密码的局域网访问链接，供同局域网用户只读查看。',
+      title: t('settings.page.share'),
+      description: t('settings.page.shareDescription'),
     }
   }
 
   return {
-    title: '导入导出接口',
-    description: '导入导出 OpenAPI 或 Swagger 文档，并静默合并到当前项目资源。',
+    title: t('settings.page.transfer'),
+    description: t('settings.page.transferDescription'),
   }
 }
 
-function roleText(role: Role) {
+function roleText(t: TFunction, role: Role) {
   if (role === 'owner') {
-    return '拥有者'
+    return t('settings.members.roleOwner')
   }
 
   if (role === 'editor') {
-    return '编辑者'
+    return t('settings.members.roleEditor')
   }
 
-  return '查看者'
+  return t('settings.members.roleViewer')
 }
 
 export default function SettingsPage() {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
   const { pathname } = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -154,7 +165,9 @@ export default function SettingsPage() {
   const isMembersSection = selectedSection === SettingsSectionKey.Members
   const isEnvironmentsSection = selectedSection === SettingsSectionKey.Environments
   const isShareSection = selectedSection === SettingsSectionKey.Share
-  const currentSectionMeta = sectionMeta(selectedSection)
+  const currentSectionMeta = sectionMeta(t, selectedSection)
+  // t 作为依赖：语言切换时 t 引用变化，触发菜单与分区文案重算
+  const items = useMemo(() => createItems(t), [t])
 
   const fetchData = useCallback(async () => {
     if (!projectId || !sessionId) {
@@ -193,7 +206,7 @@ export default function SettingsPage() {
 
   return (
     <PanelLayout
-      layoutName="项目设置"
+      layoutName={t('settings.page.layoutName')}
       left={(
         <div>
           <ConfigProvider
@@ -235,8 +248,8 @@ export default function SettingsPage() {
               </Typography.Paragraph>
             </div>
             <Space wrap size={8}>
-              <Tag bordered={false}>项目：{project?.name ?? '-'}</Tag>
-              {projectRole ? <Tag color="blue">{roleText(projectRole)}</Tag> : <Tag>-</Tag>}
+              <Tag bordered={false}>{t('settings.page.projectTag', { name: project?.name ?? '-' })}</Tag>
+              {projectRole ? <Tag color="blue">{roleText(t, projectRole)}</Tag> : <Tag>-</Tag>}
             </Space>
           </div>
 
@@ -245,9 +258,9 @@ export default function SettingsPage() {
                 <>
                   {!canManageMembers && (
                     <Alert
-                      className="mb-4"
-                      message="你当前是查看者，仅项目拥有者可以添加或移除成员、调整角色。"
                       showIcon
+                      className="mb-4"
+                      message={t('settings.page.viewerAlert')}
                       type="info"
                     />
                   )}

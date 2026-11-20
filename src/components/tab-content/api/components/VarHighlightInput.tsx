@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Input, type InputRef, Popover, Tag, theme, Tooltip } from 'antd'
 
@@ -37,6 +38,7 @@ function extractVarNames(text: string): string[] {
 export function VarHighlightInput(props: VarHighlightInputProps) {
   const { value = '', onChange, varMap, placeholder, disabled, readOnly } = props
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const inputRef = useRef<InputRef>(null)
   const cursorRef = useRef<number>(value.length)
 
@@ -183,7 +185,7 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
         {referencedVars.length > 0 && (
           <div className="mt-0.5 flex flex-wrap items-center gap-1">
             {definedVars.map((v) => (
-              <Tooltip key={v} title={`实际生效值：${varMap.get(v) ?? '—'}`}>
+              <Tooltip key={v} title={t('api.varHighlight.effectiveValue', { value: varMap.get(v) ?? '—' })}>
                 <Tag className="text-[11px] leading-none" color="blue">
                   {v}={varMap.get(v)}
                 </Tag>
@@ -191,7 +193,7 @@ export function VarHighlightInput(props: VarHighlightInputProps) {
             ))}
             {undefinedVars.map((v) => (
               <Tag key={v} className="text-[11px] leading-none" color="orange">
-                {v} 未定义
+                {t('api.varHighlight.undefinedVar', { name: v })}
               </Tag>
             ))}
           </div>

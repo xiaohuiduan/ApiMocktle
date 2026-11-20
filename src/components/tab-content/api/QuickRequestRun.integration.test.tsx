@@ -281,24 +281,26 @@ describe('快捷请求：Body 落库与回显', () => {
   })
 
   it('进入快捷请求时展示最近一次请求结果', async () => {
-    h.state.history = [{
-      requestJson: { url: 'http://httpbin.org/post', method: 'POST', headers: [], body: '{"a":1}' },
-      responseJson: {
-        url: 'http://httpbin.org/post',
-        method: 'POST',
-        status: 200,
-        statusText: 'OK',
-        durationMs: 12,
-        contentType: 'application/json',
-        headers: [],
-        requestHeaders: [],
-        requestQuery: [],
-        requestCookie: [],
-        requestBodyParameters: [],
-        requestBodyText: '{"a":1}',
-        body: '{"ok":true}',
+    h.state.history = [
+      {
+        requestJson: { url: 'http://httpbin.org/post', method: 'POST', headers: [], body: '{"a":1}' },
+        responseJson: {
+          url: 'http://httpbin.org/post',
+          method: 'POST',
+          status: 200,
+          statusText: 'OK',
+          durationMs: 12,
+          contentType: 'application/json',
+          headers: [],
+          requestHeaders: [],
+          requestQuery: [],
+          requestCookie: [],
+          requestBodyParameters: [],
+          requestBodyText: '{"a":1}',
+          body: '{"ok":true}',
+        },
       },
-    }]
+    ]
 
     render(<QuickRequestRun />)
 
@@ -339,19 +341,21 @@ describe('快捷请求：Body 落库与回显', () => {
       }),
     }
 
-    h.state.history = [{
-      id: 'h1',
-      statusCode: 200,
-      durationMs: 12,
-      createdAt: new Date().toISOString(),
-      requestJson: {
-        url: 'https://dev.a.com/biz/sys?bizSys=1001&bizSysType=MAIN',
-        method: 'GET',
-        headers: [],
-        body: '',
+    h.state.history = [
+      {
+        id: 'h1',
+        statusCode: 200,
+        durationMs: 12,
+        createdAt: new Date().toISOString(),
+        requestJson: {
+          url: 'https://dev.a.com/biz/sys?bizSys=1001&bizSysType=MAIN',
+          method: 'GET',
+          headers: [],
+          body: '',
+        },
+        responseJson: { status: 200, statusText: 'OK', durationMs: 12, body: '{}', headers: [] },
       },
-      responseJson: { status: 200, statusText: 'OK', durationMs: 12, body: '{}', headers: [] },
-    }]
+    ]
 
     render(<QuickRequestRun />)
 
@@ -383,20 +387,22 @@ describe('快捷请求：Body 落库与回显', () => {
       data: makeQuickRequest({ method: 'POST' as ApiDetails['method'], path: '/orders', requestBody: undefined }),
     }
 
-    h.state.history = [{
-      id: 'h1',
-      statusCode: 200,
-      durationMs: 12,
-      createdAt: new Date().toISOString(),
-      requestJson: {
-        url: 'https://dev.a.com/orders',
-        method: 'POST',
-        headers: [],
-        body: '{"amount":5}',
-        contentType: 'application/json',
+    h.state.history = [
+      {
+        id: 'h1',
+        statusCode: 200,
+        durationMs: 12,
+        createdAt: new Date().toISOString(),
+        requestJson: {
+          url: 'https://dev.a.com/orders',
+          method: 'POST',
+          headers: [],
+          body: '{"amount":5}',
+          contentType: 'application/json',
+        },
+        responseJson: { status: 200, statusText: 'OK', durationMs: 12, body: '{}', headers: [] },
       },
-      responseJson: { status: 200, statusText: 'OK', durationMs: 12, body: '{}', headers: [] },
-    }]
+    ]
 
     const view = render(<QuickRequestRun />)
 

@@ -2,6 +2,8 @@ import { useCallback, useRef, useState } from 'react'
 
 import { invoke } from '@tauri-apps/api/core'
 
+import { t } from '@/i18n'
+
 import { type FlowEdge, type FlowNode, type FlowNodeType, FlowNodeType as NT, type NodeExecStatus } from '../types/flow.types'
 import type { MockCallLog, MockRule } from '../types/mock.types'
 import { buildAgentPushPayload } from '../utils/mock-rule-utils'
@@ -126,7 +128,7 @@ export function useFlowExecution() {
     // 记录初始变量来源
     if (initialVariables) {
       for (const [k, v] of Object.entries(initialVariables)) {
-        variableSources[k] = { value: v, source: '环境变量', sourceType: 'init', timestamp: Date.now() }
+        variableSources[k] = { value: v, source: t('flow.exec.source.env'), sourceType: 'init', timestamp: Date.now() }
       }
     }
 
@@ -173,7 +175,7 @@ export function useFlowExecution() {
         nodeDurations,
         nodeRequests,
         nodeResponses,
-        logs: addLog(logs, '', '', NT.Start, 'error', '未找到 Start 节点'),
+        logs: addLog(logs, '', '', NT.Start, 'error', t('flow.exec.log.noStartNode')),
         variables,
         variableSources,
         currentNodeId: null,
@@ -230,7 +232,7 @@ export function useFlowExecution() {
 
       // 节点被禁用时跳过，但不中断后续流程
       if (!(nodeData.enabled as boolean)) {
-        logs = addLog(logs, nodeId, nodeName, nodeType, 'skipped', '节点已禁用，跳过')
+        logs = addLog(logs, nodeId, nodeName, nodeType, 'skipped', t('flow.exec.log.nodeDisabled'))
         nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'skipped')
 
         return { handleId: 'out' }
@@ -244,14 +246,14 @@ export function useFlowExecution() {
       try {
         switch (nodeType) {
           case NT.Start: {
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', '流程开始')
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', t('flow.exec.log.flowStart'))
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
 
             return { handleId: 'out' }
           }
 
           case NT.End: {
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', '流程结束')
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', t('flow.exec.log.flowEnd'))
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
 
             return {}
@@ -269,12 +271,12 @@ export function useFlowExecution() {
               else if (a.operator === '-=') { newVal = (variables[a.variable] || '').replace(val, '') }
               else { continue }
 
-              recordVar(a.variable, newVal, `赋值: ${a.operator} ${a.value}`, 'setVariable', nodeId, nodeName)
+              recordVar(a.variable, newVal, t('flow.exec.source.assignment', { operator: a.operator, value: a.value }), 'setVariable', nodeId, nodeName)
             }
 
             const dur = Date.now() - startMs
             logs = addLog(logs, nodeId, nodeName, nodeType, 'passed',
-              `设置变量: ${assignments.map((a) => `${a.variable}=${a.value}`).join(', ')}`,
+              t('flow.exec.log.setVariables', { assignments: assignments.map((a) => `${a.variable}=${a.value}`).join(', ') }),
               { durationMs: dur, variables: { ...variables } })
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
 
@@ -291,7 +293,7 @@ export function useFlowExecution() {
               const waitStart = Date.now()
 
               if (!conditionExpr) {
-                const errMsg = '条件等待缺少表达式'
+                const errMsg = t('flow.exec.error.conditionWaitMissingExpression')
                 logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
                 nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
                 nodeErrors[nodeId] = errMsg
@@ -299,7 +301,7 @@ export function useFlowExecution() {
                 return { error: true }
               }
 
-              logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `条件等待: 轮询 ${pollInterval}ms, 超时 ${maxWait}ms`)
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'running', t('flow.exec.log.conditionWaitPoll', { interval: pollInterval, maxWait }))
               updateState({})
 
               let conditionMet = false
@@ -308,7 +310,7 @@ export function useFlowExecution() {
                 const elapsed = Date.now() - waitStart
 
                 if (elapsed >= maxWait) {
-                  const errMsg = `条件等待超时 (${maxWait}ms)`
+                  const errMsg = t('flow.exec.error.conditionWaitTimeout', { maxWait })
                   const dur = Date.now() - startMs
                   logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg, { durationMs: dur })
                   nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
@@ -323,7 +325,7 @@ export function useFlowExecution() {
                   conditionMet = fn(variables)
                 }
                 catch (err) {
-                  const errMsg = `条件表达式求值失败: ${err}`
+                  const errMsg = t('flow.exec.error.conditionEvalFailed', { error: String(err) })
                   const dur = Date.now() - startMs
                   logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg, { durationMs: dur })
                   nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
@@ -341,7 +343,7 @@ export function useFlowExecution() {
               if (!conditionMet) {
                 // 被中止（abortRef）
                 const dur = Date.now() - startMs
-                logs = addLog(logs, nodeId, nodeName, nodeType, 'skipped', '条件等待被中止', { durationMs: dur })
+                logs = addLog(logs, nodeId, nodeName, nodeType, 'skipped', t('flow.exec.log.conditionWaitAborted'), { durationMs: dur })
                 nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'skipped')
                 nodeDurations[nodeId] = dur
 
@@ -349,7 +351,7 @@ export function useFlowExecution() {
               }
 
               const dur = Date.now() - startMs
-              logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', `条件满足 (${dur}ms)`, { durationMs: dur })
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', t('flow.exec.log.conditionMet', { duration: dur }), { durationMs: dur })
               nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
 
               return { handleId: 'out' }
@@ -363,13 +365,13 @@ export function useFlowExecution() {
               waitMs = parseInt(variables[varName] || '1000', 10)
             }
 
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `等待 ${waitMs}ms...`)
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', t('flow.exec.log.waiting', { ms: waitMs }))
             updateState({})
             await new Promise((r) => setTimeout(r, waitMs))
 
             if (abortRef.current) {
               const dur = Date.now() - startMs
-              logs = addLog(logs, nodeId, nodeName, nodeType, 'skipped', '等待被中止', { durationMs: dur })
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'skipped', t('flow.exec.log.waitAborted'), { durationMs: dur })
               nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'skipped')
               nodeDurations[nodeId] = dur
 
@@ -377,7 +379,7 @@ export function useFlowExecution() {
             }
 
             const dur = Date.now() - startMs
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', `等待完成 (${waitMs}ms)`, { durationMs: dur })
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', t('flow.exec.log.waitDone', { ms: waitMs }), { durationMs: dur })
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
 
             return { handleId: 'out' }
@@ -387,7 +389,7 @@ export function useFlowExecution() {
             const menuItemId = nodeData.menuItemId as string
 
             if (!menuItemId) {
-              const errMsg = '缺少 menuItemId'
+              const errMsg = t('flow.exec.error.missingMenuItemId')
               logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
               nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
               nodeErrors[nodeId] = errMsg
@@ -426,7 +428,7 @@ export function useFlowExecution() {
               }
               catch (err) {
                 logs = addLog(logs, nodeId, nodeName, nodeType, 'error',
-                  `preScript 执行失败: ${err}`)
+                  t('flow.exec.error.preScriptFailed', { error: String(err) }))
               }
             }
 
@@ -434,12 +436,12 @@ export function useFlowExecution() {
             if (!baseUrl) {
               // 检查节点数据中的 path 是否是绝对 URL
               // 如果没有 base_url 且 API 路径是相对的，给出提示
-              const warnMsg = '未选择运行环境，相对路径可能无法解析。请在运行弹窗中选择一个包含 Base URL 的环境。'
+              const warnMsg = t('flow.exec.warn.noBaseUrl')
               logs = addLog(logs, nodeId, nodeName, nodeType, 'running', warnMsg)
               updateState({})
             }
 
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', '发送请求...')
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', t('flow.exec.log.sendingRequest'))
             updateState({})
 
             // 推送 Mock 规则到 Agent（仅节点级别规则）
@@ -452,12 +454,12 @@ export function useFlowExecution() {
                 if (payload.length > 0) {
                   await invoke('push_mock_rules', { agentUrl, rules: payload })
                   logs = addLog(logs, nodeId, nodeName, nodeType, 'running',
-                    `推送 ${payload.length} 条 Mock 规则到 Agent`)
+                    t('flow.exec.log.mockPushed', { count: payload.length }))
                 }
               }
               catch (err) {
                 logs = addLog(logs, nodeId, nodeName, nodeType, 'running',
-                  `Mock 规则推送失败（不影响请求）: ${err}`)
+                  t('flow.exec.log.mockPushFailed', { error: String(err) }))
               }
             }
 
@@ -477,7 +479,7 @@ export function useFlowExecution() {
             // 请求已发出，但运行已被中止：不再执行提取器/断言，避免中止后节点又变绿
             if (abortRef.current) {
               logs = addLog(logs, nodeId, nodeName, nodeType, 'skipped',
-                '已中止（请求已完成，跳过后续处理）', { durationMs: dur })
+                t('flow.exec.log.abortedAfterRequest'), { durationMs: dur })
               nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'skipped')
               nodeDurations[nodeId] = dur
 
@@ -486,14 +488,14 @@ export function useFlowExecution() {
 
             if (!result.ok || !result.data) {
               const errMsg = result.error?.includes('builder error')
-                ? '请求 URL 无效（需要完整的绝对路径或选择包含 Base URL 的环境）'
-                : `HTTP 请求失败: ${result.error ?? '未知错误'}`
+                ? t('flow.exec.error.invalidRequestUrl')
+                : t('flow.exec.error.httpRequestFailed', { error: result.error ?? t('flow.exec.unknownError') })
               logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg, { durationMs: dur })
               nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
               nodeErrors[nodeId] = errMsg
               nodeDurations[nodeId] = dur
-              recordVar('__last_status__', '0', '请求失败', 'system', nodeId, nodeName)
-              recordVar('__last_error__', result.error ?? '未知错误', '请求失败', 'system', nodeId, nodeName)
+              recordVar('__last_status__', '0', t('flow.exec.source.requestFailed'), 'system', nodeId, nodeName)
+              recordVar('__last_error__', result.error ?? t('flow.exec.unknownError'), t('flow.exec.source.requestFailed'), 'system', nodeId, nodeName)
 
               return { handleId: 'out' }
             }
@@ -501,7 +503,7 @@ export function useFlowExecution() {
             const resp = result.data.response
             const status = resp.status
             recordVar('__last_status__', String(status), `HTTP ${status}`, 'system', nodeId, nodeName)
-            recordVar('__last_duration__', String(resp.responseTime), '响应时间', 'system', nodeId, nodeName)
+            recordVar('__last_duration__', String(resp.responseTime), t('flow.exec.source.responseTime'), 'system', nodeId, nodeName)
 
             // 存储请求/响应用于节点详情展示
             nodeRequests[nodeId] = result.data.request
@@ -526,7 +528,10 @@ export function useFlowExecution() {
 
                   if (mockCallLogs.length > 0) {
                     logs = addLog(logs, nodeId, nodeName, nodeType, 'running',
-                      `捕获 ${mockCallLogs.length} 次 Mock 调用: ${mockCallLogs.map((l) => `${l.className.split('.').pop()}.${l.methodName}`).join(', ')}`)
+                      t('flow.exec.log.mockCallsCaptured', {
+                        count: mockCallLogs.length,
+                        calls: mockCallLogs.map((l) => `${l.className.split('.').pop()}.${l.methodName}`).join(', '),
+                      }))
                   }
                 }
               }
@@ -560,7 +565,7 @@ export function useFlowExecution() {
               }
               catch (err) {
                 logs = addLog(logs, nodeId, nodeName, nodeType, 'error',
-                  `postScript 执行失败: ${err}`, { durationMs: dur })
+                  t('flow.exec.error.postScriptFailed', { error: String(err) }), { durationMs: dur })
               }
             }
 
@@ -594,11 +599,11 @@ export function useFlowExecution() {
                     const extType = (ext.type as string) || 'unknown'
 
                     if (extractedVars[varName] !== undefined) {
-                      recordVar(varName, extractedVars[varName], `提取器 (${extType})`, 'extractor', nodeId, nodeName)
+                      recordVar(varName, extractedVars[varName], t('flow.exec.source.extractor', { type: extType }), 'extractor', nodeId, nodeName)
                     }
                     else {
                       // 提取失败，记录空值
-                      recordVar(varName, '', `提取器 (${extType}) - 未匹配`, 'extractor', nodeId, nodeName)
+                      recordVar(varName, '', t('flow.exec.source.extractorUnmatched', { type: extType }), 'extractor', nodeId, nodeName)
                     }
                   }
                 }
@@ -639,7 +644,7 @@ export function useFlowExecution() {
                   // 断言命令本身执行失败，记录错误
                   assertionResults = assertions.map(() => ({
                     passed: false,
-                    error: `断言执行失败: ${assertResult.error ?? '未知错误'}`,
+                    error: t('flow.exec.error.assertionRunFailed', { error: assertResult.error ?? t('flow.exec.unknownError') }),
                   }))
                 }
               }
@@ -647,7 +652,7 @@ export function useFlowExecution() {
                 // catch 也不应静默吞掉，标记为失败
                 assertionResults = assertions.map(() => ({
                   passed: false,
-                  error: `断言调用异常: ${err}`,
+                  error: t('flow.exec.error.assertionCallError', { error: String(err) }),
                 }))
               }
             }
@@ -661,21 +666,25 @@ export function useFlowExecution() {
             const statusMsg = allAssertsPassed
               ? `HTTP ${status} (${resp.responseTime}ms)`
               : assertionResults.length > 0
-                ? `HTTP ${status} - 断言失败 (${assertionResults.filter((a) => !a.passed).length}/${assertionResults.length})`
-                : `HTTP ${status} - 无断言，4xx/5xx 视为失败`
+                ? t('flow.exec.log.httpAssertFailed', {
+                    status,
+                    failed: assertionResults.filter((a) => !a.passed).length,
+                    total: assertionResults.length,
+                  })
+                : t('flow.exec.log.httpNoAssertion', { status })
 
             // 存储错误信息到节点
             if (!allAssertsPassed) {
               let details: string
 
               if (assertionResults.length === 0) {
-                details = `HTTP ${status} - 未配置断言，按失败处理（4xx/5xx）`
+                details = t('flow.exec.error.httpNoAssertionDetails', { status })
               }
               else {
                 const failedAsserts = assertionResults.filter((a) => !a.passed)
                 details = failedAsserts.map((a) => {
                   const atn = a.assertion
-                  const atype = (atn?.type as string) || '未知'
+                  const atype = (atn?.type as string) || t('flow.exec.unknown')
                   const path = atn?.path as string | undefined
                   const name = atn?.name as string | undefined
                   const op = (atn?.operator as string) || '?'
@@ -693,10 +702,12 @@ export function useFlowExecution() {
                   const actStr = actual !== undefined ? JSON.stringify(actual) : 'undefined'
 
                   if (expStr) {
-                    return `${target} ${op} 失败: 期望 ${expStr}, 实际 ${actStr}`
+                    return t('flow.exec.assertion.failWithExpected', { target, operator: op, expected: expStr, actual: actStr })
                   }
 
-                  return `${target} ${op} 失败: ${a.error ?? `实际 ${actStr}`}`
+                  return a.error
+                    ? t('flow.exec.assertion.failReason', { target, operator: op, reason: a.error })
+                    : t('flow.exec.assertion.failFallback', { target, operator: op, actual: actStr })
                 }).join('\n')
               }
 
@@ -755,7 +766,10 @@ export function useFlowExecution() {
             const handleId = result ? 'true' : 'false'
             const dur = Date.now() - startMs
             logs = addLog(logs, nodeId, nodeName, nodeType, 'passed',
-              `条件 ${result ? '满足' : '不满足'} → ${handleId}`, { durationMs: dur })
+              t('flow.exec.log.conditionBranch', {
+                result: result ? t('flow.exec.log.conditionResultMet') : t('flow.exec.log.conditionResultUnmet'),
+                handle: handleId,
+              }), { durationMs: dur })
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
 
             return { handleId }
@@ -772,7 +786,7 @@ export function useFlowExecution() {
               const whileExpr = nodeData.whileExpression as string
 
               if (!whileExpr) {
-                const errMsg = 'while 循环缺少条件表达式'
+                const errMsg = t('flow.exec.error.whileMissingExpression')
                 logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
                 nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
                 nodeErrors[nodeId] = errMsg
@@ -787,7 +801,7 @@ export function useFlowExecution() {
               const collVar = nodeData.collectionVariable as string
 
               if (!collVar || variables[collVar] === undefined) {
-                const errMsg = `for_each 循环: 变量 ${collVar || '(未设置)'} 不存在`
+                const errMsg = t('flow.exec.error.forEachVariableMissing', { variable: collVar || t('flow.exec.notSet') })
                 logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
                 nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
                 nodeErrors[nodeId] = errMsg
@@ -798,12 +812,12 @@ export function useFlowExecution() {
               try {
                 const parsed = JSON.parse(variables[collVar])
 
-                if (!Array.isArray(parsed)) { throw new Error('变量值不是数组') }
+                if (!Array.isArray(parsed)) { throw new Error(t('flow.exec.error.variableNotArray')) }
 
                 iterations = parsed.slice(0, maxIter)
               }
               catch (err) {
-                const errMsg = `for_each 循环: 解析变量 ${collVar} 失败 - ${err}`
+                const errMsg = t('flow.exec.error.forEachParseFailed', { variable: collVar, error: String(err) })
                 logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
                 nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
                 nodeErrors[nodeId] = errMsg
@@ -822,7 +836,7 @@ export function useFlowExecution() {
             }
 
             const totalIter = iterations.length
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `循环 ${loopType === 'while' ? '(while)' : totalIter} 次`)
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', t('flow.exec.log.loopTimes', { times: loopType === 'while' ? '(while)' : totalIter }))
             updateState({})
 
             let loopBroken = false
@@ -837,12 +851,12 @@ export function useFlowExecution() {
                   const fn = new Function('variables', `return !!(${nodeData.whileExpression})`)
 
                   if (!fn(variables)) {
-                    logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `while 条件不满足，在第 ${i} 次迭代后退出`)
+                    logs = addLog(logs, nodeId, nodeName, nodeType, 'running', t('flow.exec.log.whileConditionUnmet', { index: i }))
                     break
                   }
                 }
                 catch (err) {
-                  const errMsg = `while 条件求值失败: ${err}`
+                  const errMsg = t('flow.exec.error.whileEvalFailed', { error: String(err) })
                   logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
                   nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
                   nodeErrors[nodeId] = errMsg
@@ -852,14 +866,14 @@ export function useFlowExecution() {
               }
 
               variables.__loop_index__ = String(i)
-              variableSources.__loop_index__ = { value: String(i), source: `循环索引 #${i}`, sourceType: 'loop', nodeId, nodeName, timestamp: Date.now() }
+              variableSources.__loop_index__ = { value: String(i), source: t('flow.exec.source.loopIndex', { index: i }), sourceType: 'loop', nodeId, nodeName, timestamp: Date.now() }
 
               // for_each: 设置迭代变量
               if (loopType === 'for_each') {
                 const iterVar = nodeData.iteratorVariable as string
 
                 if (!iterVar) {
-                  const errMsg = 'for_each 循环缺少迭代变量名 (iteratorVariable)'
+                  const errMsg = t('flow.exec.error.forEachMissingIterator')
                   logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
                   nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
                   nodeErrors[nodeId] = errMsg
@@ -869,10 +883,12 @@ export function useFlowExecution() {
 
                 const item = iterations[i]
                 const itemStr = typeof item === 'string' ? item : JSON.stringify(item)
-                recordVar(iterVar, itemStr, `forEach #${i}`, 'loop', nodeId, nodeName)
+                recordVar(iterVar, itemStr, t('flow.exec.source.forEach', { index: i }), 'loop', nodeId, nodeName)
               }
 
-              logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `循环 #${i + 1}${loopType === 'while' ? '' : `/${totalIter}`}`)
+              logs = addLog(logs, nodeId, nodeName, nodeType, 'running', loopType === 'while'
+                ? t('flow.exec.log.loopIteration', { index: i + 1 })
+                : t('flow.exec.log.loopIterationTotal', { index: i + 1, total: totalIter }))
               updateState({})
 
               const loopBodyNodes = getNextNodes(nodeId, 'loop')
@@ -887,7 +903,7 @@ export function useFlowExecution() {
                   }
 
                   // 不中断：记录错误日志但继续下一次迭代
-                  logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `迭代 #${i + 1} 中有节点失败，继续执行`)
+                  logs = addLog(logs, nodeId, nodeName, nodeType, 'running', t('flow.exec.log.iterationFailed', { index: i + 1 }))
                 }
               }
 
@@ -899,14 +915,14 @@ export function useFlowExecution() {
             if (loopBroken) {
               // 循环因失败中断：如果还没有设置 error 状态（如循环体失败而非 while 条件失败），设置之
               if (nodeStatuses[nodeId] !== 'error') {
-                logs = addLog(logs, nodeId, nodeName, nodeType, 'error', '循环因执行失败而中断', { durationMs: dur })
+                logs = addLog(logs, nodeId, nodeName, nodeType, 'error', t('flow.exec.log.loopBroken'), { durationMs: dur })
                 nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
               }
 
               return { error: true }
             }
 
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', `循环完成 (${loopType})`, { durationMs: dur })
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', t('flow.exec.log.loopDone', { loopType }), { durationMs: dur })
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
 
             return { handleId: 'out' }
@@ -930,42 +946,42 @@ export function useFlowExecution() {
 
                 switch (rule.operator) {
                   case 'exists':
-                    if (actual === undefined) { failures.push(`${label}: 变量不存在`) }
+                    if (actual === undefined) { failures.push(`${label}: ${t('flow.exec.assertion.variableNotExists')}`) }
 
                     break
 
                   case 'not_exists':
-                    if (actual !== undefined) { failures.push(`${label}: 变量不应存在`) }
+                    if (actual !== undefined) { failures.push(`${label}: ${t('flow.exec.assertion.variableShouldNotExist')}`) }
 
                     break
 
                   case 'equals':
-                    if (actual !== expected) { failures.push(`${label}: 实际值 "${actual}"`) }
+                    if (actual !== expected) { failures.push(`${label}: ${t('flow.exec.assertion.actualValueQuoted', { actual })}`) }
 
                     break
 
                   case 'not_equals':
-                    if (actual === expected) { failures.push(`${label}: 不应等于`) }
+                    if (actual === expected) { failures.push(`${label}: ${t('flow.exec.assertion.shouldNotEqual')}`) }
 
                     break
 
                   case 'contains':
-                    if (!actual || !String(actual).includes(expected ?? '')) { failures.push(`${label}: 不包含`) }
+                    if (!actual || !String(actual).includes(expected ?? '')) { failures.push(`${label}: ${t('flow.exec.assertion.notContains')}`) }
 
                     break
 
                   case 'not_contains':
-                    if (actual && String(actual).includes(expected ?? '')) { failures.push(`${label}: 不应包含`) }
+                    if (actual && String(actual).includes(expected ?? '')) { failures.push(`${label}: ${t('flow.exec.assertion.shouldNotContain')}`) }
 
                     break
 
                   case 'greater_than':
-                    if (actual === undefined || Number(actual) <= Number(expected)) { failures.push(`${label}: 实际值 ${actual}`) }
+                    if (actual === undefined || Number(actual) <= Number(expected)) { failures.push(`${label}: ${t('flow.exec.assertion.actualValue', { actual })}`) }
 
                     break
 
                   case 'less_than':
-                    if (actual === undefined || Number(actual) >= Number(expected)) { failures.push(`${label}: 实际值 ${actual}`) }
+                    if (actual === undefined || Number(actual) >= Number(expected)) { failures.push(`${label}: ${t('flow.exec.assertion.actualValue', { actual })}`) }
 
                     break
                 }
@@ -1014,13 +1030,15 @@ export function useFlowExecution() {
                 fn(pm, { ...variables })
               }
               catch (err) {
-                failures.push(`脚本执行异常: ${err}`)
+                failures.push(t('flow.exec.assertion.scriptError', { error: String(err) }))
               }
             }
 
             const allPassed = failures.length === 0
             const status: NodeExecStatus = allPassed ? 'passed' : 'failed'
-            const msg = allPassed ? '断言通过' : `断言失败: ${failures.join('; ')}`
+            const msg = allPassed
+              ? t('flow.exec.log.assertPassed')
+              : t('flow.exec.log.assertFailed', { failures: failures.join('; ') })
 
             if (!allPassed) { nodeErrors[nodeId] = msg }
 
@@ -1033,7 +1051,7 @@ export function useFlowExecution() {
 
           case NT.Parallel: {
             const branchCount = (nodeData.branchCount as number) || 2
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `并行执行 ${branchCount} 个分支`)
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', t('flow.exec.log.parallelStart', { count: branchCount }))
             updateState({})
 
             const branchPromises: Promise<void>[] = []
@@ -1052,8 +1070,12 @@ export function useFlowExecution() {
                     // 标记后续节点为 skipped
                     const nextNodes = getNextNodes(current.id, branchResult.handleId ?? 'out')
                     const failedName = (current.data as Record<string, unknown>)?.label as string || current.id
-                    const failedErr = nodeErrors[current.id] || '未知原因'
-                    const reason = `分支${branchIdx + 1}内「${failedName}」失败，后续跳过（${failedErr.substring(0, 60)}）`
+                    const failedErr = nodeErrors[current.id] || t('flow.exec.unknownReason')
+                    const reason = t('flow.exec.log.branchFailedSkip', {
+                      index: branchIdx + 1,
+                      nodeName: failedName,
+                      error: failedErr.substring(0, 60),
+                    })
 
                     for (const nn of nextNodes) {
                       if (nodeStatuses[nn.id] === 'idle') {
@@ -1083,7 +1105,7 @@ export function useFlowExecution() {
             }
 
             const dur = Date.now() - startMs
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', '并行执行完成', { durationMs: dur })
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', t('flow.exec.log.parallelDone'), { durationMs: dur })
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
 
             return { handleId: 'out' }
@@ -1093,7 +1115,7 @@ export function useFlowExecution() {
             const targetTaskId = nodeData.targetTaskId as string
 
             if (!targetTaskId) {
-              const errMsg = '子流程节点缺少目标任务 ID'
+              const errMsg = t('flow.exec.error.subFlowMissingTaskId')
               logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
               nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
               nodeErrors[nodeId] = errMsg
@@ -1101,7 +1123,7 @@ export function useFlowExecution() {
               return { error: true }
             }
 
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', `加载子流程 (${targetTaskId})...`)
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'running', t('flow.exec.log.loadingSubFlow', { taskId: targetTaskId }))
             updateState({})
 
             // 加载子流程图
@@ -1110,12 +1132,12 @@ export function useFlowExecution() {
             try {
               const res = await invoke<{ ok: boolean, data?: string }>('load_test_flow_graph', { taskId: targetTaskId })
 
-              if (!res.ok || !res.data) { throw new Error('加载失败') }
+              if (!res.ok || !res.data) { throw new Error(t('flow.exec.error.loadFailed')) }
 
               subFlowGraph = JSON.parse(res.data)
             }
             catch (err) {
-              const errMsg = `加载子流程失败: ${err}`
+              const errMsg = t('flow.exec.error.loadSubFlowFailed', { error: String(err) })
               logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
               nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
               nodeErrors[nodeId] = errMsg
@@ -1146,9 +1168,13 @@ export function useFlowExecution() {
 
             if (subFailed) {
               const [failId, failStatus] = subFailed
-              const failErr = subResult.nodeErrors[failId] || '未知原因'
+              const failErr = subResult.nodeErrors[failId] || t('flow.exec.unknownReason')
               const failNodeName = subResult.variables.__subflow_fail_name || failId
-              const errMsg = `子流程失败: ${failNodeName} (${failStatus}) - ${failErr.substring(0, 100)}`
+              const errMsg = t('flow.exec.error.subFlowFailed', {
+                nodeName: failNodeName,
+                status: failStatus,
+                error: failErr.substring(0, 100),
+              })
               logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg)
               nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
               nodeErrors[nodeId] = errMsg
@@ -1160,20 +1186,20 @@ export function useFlowExecution() {
             if (mergeVars) {
               for (const [k, v] of Object.entries(subResult.variables)) {
                 if (!preVarKeys.has(k) || variables[k] !== v) {
-                  recordVar(k, v, '子流程', 'setVariable', nodeId, nodeName)
+                  recordVar(k, v, t('flow.exec.source.subFlow'), 'setVariable', nodeId, nodeName)
                 }
               }
             }
 
             const dur = Date.now() - startMs
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', '子流程完成', { durationMs: dur })
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', t('flow.exec.log.subFlowDone'), { durationMs: dur })
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
 
             return { handleId: 'out' }
           }
 
           default: {
-            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', `跳过 (${nodeType})`)
+            logs = addLog(logs, nodeId, nodeName, nodeType, 'passed', t('flow.exec.log.skipped', { nodeType }))
             nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'passed')
 
             return { handleId: 'out' }
@@ -1182,7 +1208,7 @@ export function useFlowExecution() {
       }
       catch (err) {
         const dur = Date.now() - startMs
-        const errMsg = `异常: ${err}`
+        const errMsg = t('flow.exec.error.exception', { error: String(err) })
         logs = addLog(logs, nodeId, nodeName, nodeType, 'error', errMsg, { durationMs: dur })
         nodeStatuses = setNodeStatus(nodeStatuses, nodeId, 'error')
         nodeErrors[nodeId] = errMsg
@@ -1305,8 +1331,11 @@ export function useFlowExecution() {
         if (failFast && result.error) {
           const failedId = currentNode.id
           const failedName = (currentNode.data as Record<string, unknown>)?.label as string || failedId
-          const failedErr = nodeErrors[failedId] || '未知原因'
-          const reason = `因「${failedName}」失败而跳过（${failedErr.substring(0, 80)}）`
+          const failedErr = nodeErrors[failedId] || t('flow.exec.unknownReason')
+          const reason = t('flow.exec.log.failFastSkip', {
+            nodeName: failedName,
+            error: failedErr.substring(0, 80),
+          })
 
           for (const n of nodes) {
             if (nodeStatuses[n.id] === 'idle') {

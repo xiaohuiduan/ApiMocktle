@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 
 import { Button, Dropdown, type MenuProps, Modal, Select, theme, Tooltip } from 'antd'
@@ -50,6 +51,8 @@ function TabItem({
   onCloseAll,
   token,
 }: TabItemProps) {
+  const { t } = useTranslation()
+
   const handleCopyName = useCallback(() => {
     void navigator.clipboard.writeText(tab.info.name).catch(() => undefined)
   }, [tab.info.name])
@@ -65,67 +68,68 @@ function TabItem({
       title,
       content: (
         <div>
-          <p>该项目存在未保存的修改。关闭后内容会保留为草稿，重新打开项目时可继续编辑。</p>
+          <p>{t('app.tabBar.dirtySummary')}</p>
           {dirtyItemNames && dirtyItemNames.length > 0 && (
             <div className="mt-2">
-              <span className="font-medium">未保存内容：</span>
-              <span className="text-[color:var(--ant-color-text-secondary)]">{dirtyItemNames.join('、')}</span>
+              <span className="font-medium">{t('app.tabBar.dirtyNamesLabel')}</span>
+              <span className="text-[color:var(--ant-color-text-secondary)]">{dirtyItemNames.join(t('app.tabBar.dirtyNamesSeparator'))}</span>
             </div>
           )}
         </div>
       ),
-      okText: '关闭',
-      cancelText: '取消',
+      okText: t('common.close'),
+      cancelText: t('common.cancel'),
       onOk: action,
     })
-  }, [])
+  }, [t])
 
   const menuItems = useMemo<MenuProps['items']>(
     () => [
       {
         key: 'close',
-        label: '关闭标签页',
+        label: t('app.tabBar.close'),
         icon: <XIcon size={14} />,
         onClick: () => {
-          confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose, dirtyItemNames)
+          confirmIfDirty(t('app.tabBar.closeConfirmTitle', { name: tab.info.name }), hasUnsaved, onClose, dirtyItemNames)
         },
       },
       {
         key: 'closeOthers',
-        label: '关闭其他标签页',
+        label: t('app.tabBar.closeOthers'),
         icon: <XIcon size={14} />,
         disabled: total <= 1,
         onClick: () => {
-          confirmIfDirty('关闭其他项目？', othersHaveDirty, onCloseOthers)
+          confirmIfDirty(t('app.tabBar.closeOthersConfirmTitle'), othersHaveDirty, onCloseOthers)
         },
       },
       {
         key: 'closeRight',
-        label: '关闭右侧标签页',
+        label: t('app.tabBar.closeRight'),
         icon: <XIcon size={14} />,
         disabled: index >= total - 1,
         onClick: () => {
-          confirmIfDirty('关闭右侧项目？', rightHaveDirty, onCloseRight)
+          confirmIfDirty(t('app.tabBar.closeRightConfirmTitle'), rightHaveDirty, onCloseRight)
         },
       },
       { type: 'divider' },
       {
         key: 'closeAll',
-        label: '全部关闭',
+        label: t('app.tabBar.closeAll'),
         icon: <XIcon size={14} />,
         onClick: () => {
-          confirmIfDirty('关闭全部项目？', hasUnsaved || othersHaveDirty, onCloseAll, dirtyItemNames)
+          confirmIfDirty(t('app.tabBar.closeAllConfirmTitle'), hasUnsaved || othersHaveDirty, onCloseAll, dirtyItemNames)
         },
       },
       { type: 'divider' },
       {
         key: 'copyName',
-        label: '复制项目名称',
+        label: t('app.tabBar.copyName'),
         icon: <CopyIcon size={14} />,
         onClick: handleCopyName,
       },
     ],
     [
+      t,
       onClose,
       onCloseOthers,
       onCloseRight,
@@ -145,10 +149,9 @@ function TabItem({
   return (
     <Dropdown menu={{ items: menuItems }} trigger={['contextMenu']}>
       <div
+        aria-selected={isActive}
         className="group relative flex shrink-0 cursor-pointer select-none items-center gap-1.5"
         role="tab"
-        aria-selected={isActive}
-        tabIndex={0}
         style={{
           height: 38,
           padding: '0 10px',
@@ -161,9 +164,10 @@ function TabItem({
           marginBottom: isActive ? -1 : 0,
           transition: 'color 0.12s, background-color 0.12s',
         }}
+        tabIndex={0}
         onAuxClick={(e) => {
           if (e.button === 1) {
-            confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose, dirtyItemNames)
+            confirmIfDirty(t('app.tabBar.closeConfirmTitle', { name: tab.info.name }), hasUnsaved, onClose, dirtyItemNames)
           }
         }}
         onClick={onSelect}
@@ -192,7 +196,7 @@ function TabItem({
 
         {hasUnsaved && (
           <span
-            aria-label="有未保存修改"
+            aria-label={t('app.tabBar.unsavedBadge')}
             className="size-1.5 shrink-0 rounded-full"
             style={{ backgroundColor: token.colorWarning }}
           />
@@ -200,7 +204,7 @@ function TabItem({
 
         {/* 关闭按钮：活跃标签始终显示，不活跃标签 hover 时显示 */}
         <button
-          aria-label="关闭标签页"
+          aria-label={t('app.tabBar.close')}
           className={`flex size-8 shrink-0 items-center justify-center rounded transition-all duration-100 ${
             isActive ? '' : 'opacity-0 focus-visible:opacity-100 group-hover:opacity-100'
           }`}
@@ -213,7 +217,7 @@ function TabItem({
           type="button"
           onClick={(e) => {
             e.stopPropagation()
-            confirmIfDirty(`关闭项目“${tab.info.name}”？`, hasUnsaved, onClose, dirtyItemNames)
+            confirmIfDirty(t('app.tabBar.closeConfirmTitle', { name: tab.info.name }), hasUnsaved, onClose, dirtyItemNames)
           }}
           onMouseEnter={(e) => {
             (e.currentTarget as HTMLElement).style.backgroundColor = token.colorBgTextHover
@@ -234,6 +238,7 @@ function TabItem({
 /* ------------------------------------------------------------------ */
 
 export function ProjectTabBar() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { token } = theme.useToken()
   const { isGlassStyle } = useDesignStyle()
@@ -331,7 +336,7 @@ export function ProjectTabBar() {
           border: 'none',
           backgroundColor: 'transparent',
         }}
-        title="新建项目"
+        title={t('app.tabBar.newProject')}
         onClick={() => { void navigate('/projects?create=1') }}
       >
         <PlusIcon size={16} />
@@ -341,7 +346,7 @@ export function ProjectTabBar() {
       <div className="ml-auto flex shrink-0 items-center gap-1 px-2">
         <ProjectQuickSwitch />
         <>
-          <span className="shrink-0 text-xs" style={{ color: token.colorTextSecondary }}>环境</span>
+          <span className="shrink-0 text-xs" style={{ color: token.colorTextSecondary }}>{t('app.tabBar.environmentLabel')}</span>
           {projectEnvironments.length > 0 && (
             <Select
               className="min-w-[140px]"
@@ -356,13 +361,13 @@ export function ProjectTabBar() {
                   </span>
                 ),
               }))}
-              placeholder="选择环境"
+              placeholder={t('app.tabBar.environmentPlaceholder')}
               size="small"
               value={currentProjectEnvironmentId}
               onChange={(envId) => { setCurrentProjectEnvironmentId(envId) }}
             />
           )}
-          <Tooltip title="管理环境">
+          <Tooltip title={t('app.tabBar.manageEnvironment')}>
             <Button
               icon={<Settings2Icon size={14} />}
               size="small"
@@ -386,10 +391,10 @@ export function ProjectTabBar() {
             })()
           }}
         >
-          刷新
+          {t('app.tabBar.refresh')}
         </Button>
         <Button icon={<ArrowLeftIcon size={14} />} size="small" onClick={() => { void navigate('/projects') }}>
-          项目列表
+          {t('app.tabBar.projectList')}
         </Button>
       </div>
     </div>

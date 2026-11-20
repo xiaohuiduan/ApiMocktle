@@ -1,4 +1,5 @@
 import { type Key, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { invoke } from '@tauri-apps/api/core'
 import {
@@ -96,6 +97,7 @@ export function CreateShareModal({
   /** 服务器访问地址（如 http://192.168.1.5:14204/）；传入时提交成功后展示链接供复制 */
   baseUrl?: string
 }) {
+  const { t } = useTranslation()
   const { sessionId } = useAuth()
   const [msgApi, contextHolder] = message.useMessage()
 
@@ -192,19 +194,19 @@ export function CreateShareModal({
 
   const handleSubmit = async () => {
     if (!projectId) {
-      msgApi.error('请选择项目')
+      msgApi.error(t('settings.projectShare.selectProject'))
 
       return
     }
 
     if (!shareAll && checkedKeys.length === 0) {
-      msgApi.error('请至少勾选一个内容')
+      msgApi.error(t('settings.projectShare.selectAtLeastOne'))
 
       return
     }
 
     if (passwordMode === 'set' && !password) {
-      msgApi.error('请输入新密码')
+      msgApi.error(t('settings.projectShare.passwordRequired'))
 
       return
     }
@@ -233,12 +235,12 @@ export function CreateShareModal({
         })
 
         if (!result.ok) {
-          msgApi.error(result.error ?? '保存失败')
+          msgApi.error(result.error ?? t('settings.projectShare.saveFailed'))
 
           return
         }
 
-        msgApi.success('分享链接已更新')
+        msgApi.success(t('settings.projectShare.updated'))
         created = result.data
         createdPassword = passwordMode === 'set' ? password : undefined
       }
@@ -253,12 +255,12 @@ export function CreateShareModal({
         })
 
         if (!result.ok) {
-          msgApi.error(result.error ?? '创建失败')
+          msgApi.error(result.error ?? t('settings.projectShare.createFailed'))
 
           return
         }
 
-        msgApi.success('分享链接已创建')
+        msgApi.success(t('settings.projectShare.created'))
         created = result.data
         createdPassword = password || undefined
       }
@@ -274,7 +276,9 @@ export function CreateShareModal({
       }
     }
     catch (err) {
-      msgApi.error(isEditing ? '保存失败: ' + String(err) : '创建失败: ' + String(err))
+      msgApi.error(isEditing
+        ? t('settings.projectShare.saveFailedDetail', { error: String(err) })
+        : t('settings.projectShare.createFailedDetail', { error: String(err) }))
     }
     finally {
       setSubmitting(false)
@@ -288,7 +292,7 @@ export function CreateShareModal({
 
   const handleCopy = async (text: string) => {
     await navigator.clipboard.writeText(text)
-    msgApi.success('链接已复制')
+    msgApi.success(t('settings.shareServer.linkCopied'))
   }
 
   const plainUrl = success && baseUrl ? buildShareLinkUrl(baseUrl, success.link, false) : ''
@@ -309,7 +313,7 @@ export function CreateShareModal({
       }}
     >
       <Modal
-        cancelText={success ? undefined : '取消'}
+        cancelText={success ? undefined : t('common.cancel')}
         confirmLoading={submitting}
         footer={success
           ? (
@@ -317,13 +321,15 @@ export function CreateShareModal({
                 type="primary"
                 onClick={handleFinish}
               >
-                完成
+                {t('common.done')}
               </Button>
             )
           : undefined}
-        okText={isEditing ? '保存' : '创建'}
+        okText={isEditing ? t('common.save') : t('settings.action.create')}
         open={open}
-        title={success ? '分享链接' : isEditing ? '编辑分享链接' : '新建分享链接'}
+        title={success
+          ? t('settings.projectShare.successTitle')
+          : isEditing ? t('settings.projectShare.editTitle') : t('settings.projectShare.createTitle')}
         width={560}
         onCancel={onClose}
         onOk={() => {
@@ -336,11 +342,11 @@ export function CreateShareModal({
               <div className="space-y-3">
                 <Alert
                   showIcon
-                  message={isEditing ? '分享链接已更新' : '分享链接已创建'}
+                  message={isEditing ? t('settings.projectShare.updated') : t('settings.projectShare.created')}
                   type="success"
                 />
                 <div>
-                  <div className="mb-1 text-sm font-medium">访问链接</div>
+                  <div className="mb-1 text-sm font-medium">{t('settings.projectShare.accessUrl')}</div>
                   <div className="flex items-center gap-2">
                     <Typography.Text code className="min-w-0 flex-1 truncate">{plainUrl}</Typography.Text>
                     <Button
@@ -350,13 +356,13 @@ export function CreateShareModal({
                         void handleCopy(plainUrl)
                       }}
                     >
-                      复制
+                      {t('common.copy')}
                     </Button>
                   </div>
                 </div>
                 {pwdUrl && (
                   <div>
-                    <div className="mb-1 text-sm font-medium">带密码链接（打开即自动填充密码）</div>
+                    <div className="mb-1 text-sm font-medium">{t('settings.projectShare.pwdUrl')}</div>
                     <div className="flex items-center gap-2">
                       <Typography.Text code className="min-w-0 flex-1 truncate">{pwdUrl}</Typography.Text>
                       <Button
@@ -366,10 +372,12 @@ export function CreateShareModal({
                           void handleCopy(pwdUrl)
                         }}
                       >
-                        复制
+                        {t('common.copy')}
                       </Button>
                     </div>
-                    <div className="mt-1 text-xs text-gray-500">访问密码：{success.password}</div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      {t('settings.projectShare.accessPassword', { password: success.password })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -377,24 +385,24 @@ export function CreateShareModal({
           : (
               <Form layout="vertical" size="small">
                 {!fixedProjectId && !isEditing && (
-                  <Form.Item required label="项目">
+                  <Form.Item required label={t('settings.projectShare.project')}>
                     <Select
                       options={projects.map((p) => ({ value: p.id, label: p.name }))}
-                      placeholder="选择要分享的项目"
+                      placeholder={t('settings.projectShare.selectProjectPlaceholder')}
                       value={projectId}
                       onChange={setProjectId}
                     />
                   </Form.Item>
                 )}
 
-                <Form.Item label="分享内容">
+                <Form.Item label={t('settings.projectShare.shareContent')}>
                   <Checkbox
                     checked={shareAll}
                     onChange={(e) => {
                       setShareAll(e.target.checked)
                     }}
                   >
-                    分享项目全部内容
+                    {t('settings.projectShare.shareAllContent')}
                   </Checkbox>
                   {!shareAll && menuItems.length > 0 && (
                     <div className="mt-2 max-h-56 overflow-auto rounded-md border border-gray-200 p-2">
@@ -411,22 +419,22 @@ export function CreateShareModal({
                     </div>
                   )}
                   {!shareAll && menuItems.length === 0 && (
-                    <div className="mt-1 text-xs text-gray-400">该项目暂无内容</div>
+                    <div className="mt-1 text-xs text-gray-400">{t('settings.projectShare.projectEmpty')}</div>
                   )}
                 </Form.Item>
 
                 {isEditing
                   ? (
-                      <Form.Item label="访问密码">
+                      <Form.Item label={t('settings.projectShare.accessPasswordLabel')}>
                         <Radio.Group
                           value={passwordMode}
                           onChange={(e) => {
                             setPasswordMode(e.target.value as 'keep' | 'set' | 'remove')
                           }}
                         >
-                          <Radio value="keep">保留原密码</Radio>
-                          <Radio value="set">设置新密码</Radio>
-                          <Radio value="remove">移除密码</Radio>
+                          <Radio value="keep">{t('settings.projectShare.keepPassword')}</Radio>
+                          <Radio value="set">{t('settings.projectShare.setPassword')}</Radio>
+                          <Radio value="remove">{t('settings.projectShare.removePassword')}</Radio>
                         </Radio.Group>
                         {passwordMode === 'set' && (
                           <Input.Password
@@ -436,11 +444,11 @@ export function CreateShareModal({
                                 type="text"
                                 onClick={genRandomPassword}
                               >
-                                随机
+                                {t('settings.projectShare.random')}
                               </Button>
                             )}
                             className="mt-2"
-                            placeholder="输入新密码"
+                            placeholder={t('settings.projectShare.newPasswordPlaceholder')}
                             value={password}
                             onChange={(e) => {
                               setPassword(e.target.value)
@@ -449,13 +457,13 @@ export function CreateShareModal({
                         )}
                         {passwordMode === 'remove' && (
                           <div className="mt-1 text-xs text-orange-500">
-                            移除后，任何人打开链接可直接查看，无需密码
+                            {t('settings.projectShare.removePasswordHint')}
                           </div>
                         )}
                       </Form.Item>
                     )
                   : (
-                      <Form.Item label="访问密码（可选）">
+                      <Form.Item label={t('settings.projectShare.accessPasswordOptional')}>
                         <Input.Password
                           addonAfter={(
                             <Button
@@ -463,10 +471,10 @@ export function CreateShareModal({
                               type="text"
                               onClick={genRandomPassword}
                             >
-                              随机
+                              {t('settings.projectShare.random')}
                             </Button>
                           )}
-                          placeholder="留空则不设密码"
+                          placeholder={t('settings.projectShare.passwordPlaceholder')}
                           value={password}
                           onChange={(e) => {
                             setPassword(e.target.value)
@@ -474,13 +482,13 @@ export function CreateShareModal({
                         />
                         {!password && (
                           <div className="mt-1 text-xs text-orange-500">
-                            不设密码：任何人打开链接即可直接查看
+                            {t('settings.projectShare.noPasswordHint')}
                           </div>
                         )}
                       </Form.Item>
                     )}
 
-                <Form.Item label="过期时间（留空为永久有效）">
+                <Form.Item label={t('settings.projectShare.expiresAtLabel')}>
                   <DatePicker
                     disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
                     value={expiresAt ? dayjs(expiresAt) : undefined}
@@ -491,11 +499,11 @@ export function CreateShareModal({
                 </Form.Item>
 
                 <Form.Item
-                  extra={<Typography.Text type="secondary">留空默认使用项目名</Typography.Text>}
-                  label="分享标题"
+                  extra={<Typography.Text type="secondary">{t('settings.projectShare.titleHint')}</Typography.Text>}
+                  label={t('settings.projectShare.shareTitle')}
                 >
                   <Input
-                    placeholder="如：订单服务接口文档"
+                    placeholder={t('settings.projectShare.shareTitlePlaceholder')}
                     value={title}
                     onChange={(e) => {
                       setTitle(e.target.value)

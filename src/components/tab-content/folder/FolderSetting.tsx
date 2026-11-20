@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, Form, Input } from 'antd'
 
@@ -12,6 +13,7 @@ import { useTabSaveBridge } from '@/hooks/useTabSaveBridge'
 import type { ApiFolder } from '@/types'
 
 export function FolderSetting() {
+  const { t } = useTranslation()
   const { menuRawList, updateMenuItem } = useMenuHelpersContext()
   const { tabData } = useTabContentContext()
 
@@ -48,14 +50,14 @@ export function FolderSetting() {
         }}
       >
         <Form.Item
-          label="目录名称"
+          label={t('api.folder.name')}
           name="name"
-          rules={[{ required: true, message: '目录名称不能为空' }]}
+          rules={[{ required: true, message: t('api.folder.nameRequired') }]}
         >
           <Input />
         </Form.Item>
 
-        <Form.Item label="父级目录" name="parentId" required={false} rules={[{ required: true }]}>
+        <Form.Item label={t('api.folder.parent')} name="parentId" required={false} rules={[{ required: true }]}>
           <SelectorCatalog
             exclued={apiFolder?.id ? [apiFolder.id] : undefined}
             type={MenuItemType.ApiDetailFolder}
@@ -64,7 +66,7 @@ export function FolderSetting() {
 
         <Form.Item wrapperCol={{ offset: 6 }}>
           <Button htmlType="submit" type="primary">
-            保存
+            {t('common.save')}
           </Button>
         </Form.Item>
       </Form>

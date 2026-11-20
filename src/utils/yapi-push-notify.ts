@@ -1,3 +1,5 @@
+import { t } from '@/i18n'
+
 export const YAPI_PUSH_EVENT = 'yapi:api-pushed'
 export const YAPI_PUSH_DEBOUNCE_MS = 1000
 
@@ -37,21 +39,24 @@ export function buildYapiPushNotificationContent(
   const details: string[] = []
 
   if (created > 0) {
-    details.push(`新增 ${created} 条`)
+    details.push(t('app.yapiPush.created', { count: created }))
   }
 
   if (merged > 0) {
-    details.push(`合并 ${merged} 条`)
+    details.push(t('app.yapiPush.merged', { count: merged }))
   }
 
   const summary = created + merged
   // 明细全为 0 时不留下悬空的「：」，退化成一句完整的话
   const description = details.length > 0
-    ? `已接收 ${summary} 次推送：${details.join('，')}，点击刷新后可见`
-    : `已接收 ${summary} 次推送，点击刷新后可见`
+    ? t('app.yapiPush.withDetails', {
+        summary,
+        details: details.join(t('app.yapiPush.detailSeparator')),
+      })
+    : t('app.yapiPush.withoutDetails', { summary })
 
   return {
-    title: `项目 ${projectName} 有更新`,
+    title: t('app.yapiPush.title', { name: projectName }),
     description,
   }
 }

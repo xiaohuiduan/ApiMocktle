@@ -1,4 +1,5 @@
 import { BodyType } from '@/enums'
+import { t } from '@/i18n'
 import type { ApiDetails } from '@/types'
 
 import { stripJsonComments } from './bodyJsonc'
@@ -217,10 +218,10 @@ export async function buildRequest(ctx: BuildRequestContext): Promise<BuildReque
   let bodyWarning: string | undefined
 
   if (isBodylessMethod && hasAnyBody) {
-    bodyWarning = 'GET/HEAD 请求不支持携带请求体，已忽略 Body（如需携带请改用 POST，或把参数放进 Query）'
+    bodyWarning = t('api.body.getHeadWarning')
   }
   else if (body?.type === BodyType.Binary && !bodyFile) {
-    bodyWarning = 'binary 类型未选择文件，本次不发送请求体'
+    bodyWarning = t('api.body.binaryNoFileWarning')
   }
 
   if (isBodylessMethod) {

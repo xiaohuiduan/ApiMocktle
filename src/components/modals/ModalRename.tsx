@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { create, useModal } from '@ebay/nice-modal-react'
 import { Form, Input, type InputRef, Modal, type ModalProps } from 'antd'
@@ -13,6 +14,7 @@ interface ModalRenameProps extends Omit<ModalProps, 'open' | 'onOk'> {
 type FormData = Pick<ApiMenuData, 'id' | 'name'>
 
 export const ModalRename = create(({ formData, ...props }: ModalRenameProps) => {
+  const { t } = useTranslation()
   const modal = useModal()
 
   const [form] = Form.useForm<FormData>()
@@ -34,7 +36,7 @@ export const ModalRename = create(({ formData, ...props }: ModalRenameProps) => 
 
   return (
     <Modal
-      title="重命名"
+      title={t('settings.modal.rename.title')}
       {...props}
       afterOpenChange={(...parmas) => {
         props.afterOpenChange?.(...parmas)
@@ -62,7 +64,7 @@ export const ModalRename = create(({ formData, ...props }: ModalRenameProps) => 
           <Input />
         </Form.Item>
 
-        <Form.Item label="名称" name="name" rules={[{ required: true }]}>
+        <Form.Item label={t('common.name')} name="name" rules={[{ required: true }]}>
           <Input ref={inputRef} />
         </Form.Item>
       </Form>

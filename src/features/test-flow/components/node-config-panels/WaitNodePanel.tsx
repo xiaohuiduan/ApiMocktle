@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Input, InputNumber, Radio, Typography } from 'antd'
 
@@ -7,19 +8,23 @@ import type { WaitNodeData } from '../../types/flow.types'
 import type { PanelProps } from './shared/panelRegistry'
 import { useDraft } from './shared/useDraft'
 
+import { translateKey } from '@/i18n/translate'
+
 const { Text } = Typography
 
 // ==================== 等待类型选项 ====================
 
 const WAIT_TYPE_OPTIONS = [
-  { value: 'fixed', label: '固定时间' },
-  { value: 'variable', label: '变量控制' },
-  { value: 'condition', label: '条件等待' },
+  { value: 'fixed', labelKey: 'flow.enum.waitType.fixed' },
+  { value: 'variable', labelKey: 'flow.enum.waitType.variable' },
+  { value: 'condition', labelKey: 'flow.enum.waitType.condition' },
 ]
 
 // ==================== 组件 ====================
 
 export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeData>) {
+  const { t } = useTranslation()
+
   // 变量名（受控草稿 + blur 提交）
   const { draft: variableDraft, setDraft: setVariableDraft, commit: commitVariable } = useDraft(
     data.durationVariable ?? '',
@@ -71,13 +76,13 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
   return (
     <div className="space-y-4">
       <Text className="block text-xs" type="secondary">
-        等待配置
+        {t('flow.nodeConfig.wait.title')}
       </Text>
 
       {/* 等待类型 */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          等待类型
+          {t('flow.nodeConfig.wait.type')}
         </Text>
         <Radio.Group
           data-testid="wait-type"
@@ -87,7 +92,7 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
         >
           {WAIT_TYPE_OPTIONS.map((option) => (
             <Radio.Button key={option.value} value={option.value}>
-              {option.label}
+              {translateKey(option.labelKey)}
             </Radio.Button>
           ))}
         </Radio.Group>
@@ -97,12 +102,12 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
       {data.waitType === 'fixed' && (
         <div>
           <Text className="mb-1 block text-xs" type="secondary">
-            等待时间（毫秒）
+            {t('flow.nodeConfig.wait.duration')}
           </Text>
           <InputNumber
             data-testid="wait-duration"
             min={0}
-            placeholder="例如: 1000"
+            placeholder={t('flow.nodeConfig.wait.durationPlaceholder')}
             size="small"
             style={{ width: '100%' }}
             value={data.durationMs}
@@ -115,11 +120,11 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
       {data.waitType === 'variable' && (
         <div>
           <Text className="mb-1 block text-xs" type="secondary">
-            变量名（存放毫秒值）
+            {t('flow.nodeConfig.wait.variable')}
           </Text>
           <Input
             data-testid="wait-variable"
-            placeholder="例如: waitTime"
+            placeholder={t('flow.nodeConfig.wait.variablePlaceholder')}
             size="small"
             value={variableDraft}
             onBlur={commitVariable}
@@ -135,11 +140,11 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
         <>
           <div>
             <Text className="mb-1 block text-xs" type="secondary">
-              轮询条件（为真时结束等待）
+              {t('flow.nodeConfig.wait.condition')}
             </Text>
             <Input.TextArea
               data-testid="wait-condition"
-              placeholder="例如: variables.status === 'ready'"
+              placeholder={t('flow.nodeConfig.wait.conditionPlaceholder')}
               rows={2}
               size="small"
               value={conditionDraft}
@@ -152,12 +157,12 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
 
           <div>
             <Text className="mb-1 block text-xs" type="secondary">
-              轮询间隔（毫秒）
+              {t('flow.nodeConfig.wait.pollInterval')}
             </Text>
             <InputNumber
               data-testid="wait-poll-interval"
               min={100}
-              placeholder="例如: 1000"
+              placeholder={t('flow.nodeConfig.wait.pollIntervalPlaceholder')}
               size="small"
               style={{ width: '100%' }}
               value={data.pollIntervalMs}
@@ -167,12 +172,12 @@ export default function WaitNodePanel({ data, onChange }: PanelProps<WaitNodeDat
 
           <div>
             <Text className="mb-1 block text-xs" type="secondary">
-              最大等待时间（毫秒）
+              {t('flow.nodeConfig.wait.maxWait')}
             </Text>
             <InputNumber
               data-testid="wait-max-wait"
               min={0}
-              placeholder="例如: 30000"
+              placeholder={t('flow.nodeConfig.wait.maxWaitPlaceholder')}
               size="small"
               style={{ width: '100%' }}
               value={data.maxWaitMs}

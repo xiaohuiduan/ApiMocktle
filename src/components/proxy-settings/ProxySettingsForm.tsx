@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, Input, InputNumber, Radio, Space, Tag, Typography } from 'antd'
 import { CheckCircleIcon, LoaderIcon, XCircleIcon } from 'lucide-react'
@@ -12,6 +13,7 @@ import { getProxyConfig, setProxyConfig } from '@/utils/app-config'
 const DEFAULT_TEST_URL = 'https://baidu.com'
 
 export function ProxySettingsForm() {
+  const { t } = useTranslation()
   const [proxyType, setProxyType] = useState<'none' | 'socks5' | 'http'>('none')
   const [host, setHost] = useState('127.0.0.1')
   const [port, setPort] = useState(7890)
@@ -79,7 +81,7 @@ export function ProxySettingsForm() {
       })
     }
     catch (err) {
-      setTestResult({ ok: false, error: err instanceof Error ? err.message : '测试失败' })
+      setTestResult({ ok: false, error: err instanceof Error ? err.message : t('settings.proxy.testFailed') })
     }
     finally {
       setTesting(false)
@@ -90,14 +92,14 @@ export function ProxySettingsForm() {
     <div className="max-w-lg">
       <div className="mb-5 space-y-4">
         <div>
-          <Typography.Text className="mb-1 block text-sm font-medium">代理类型</Typography.Text>
+          <Typography.Text className="mb-1 block text-sm font-medium">{t('settings.proxy.type')}</Typography.Text>
           <Radio.Group
             buttonStyle="solid"
             optionType="button"
             value={proxyType}
             onChange={(e) => { setProxyType(e.target.value) }}
           >
-            <Radio value="none">无代理</Radio>
+            <Radio value="none">{t('settings.proxy.none')}</Radio>
             <Radio value="socks5">SOCKS5</Radio>
             <Radio value="http">HTTP(S)</Radio>
           </Radio.Group>
@@ -107,7 +109,7 @@ export function ProxySettingsForm() {
           <>
             <div className="flex gap-3">
               <div className="flex-1">
-                <Typography.Text className="mb-1 block text-sm font-medium">主机地址</Typography.Text>
+                <Typography.Text className="mb-1 block text-sm font-medium">{t('settings.proxy.host')}</Typography.Text>
                 <Input
                   placeholder="127.0.0.1"
                   value={host}
@@ -115,7 +117,7 @@ export function ProxySettingsForm() {
                 />
               </div>
               <div style={{ width: 120 }}>
-                <Typography.Text className="mb-1 block text-sm font-medium">端口</Typography.Text>
+                <Typography.Text className="mb-1 block text-sm font-medium">{t('settings.proxy.port')}</Typography.Text>
                 <InputNumber
                   className="w-full"
                   max={65535}
@@ -129,7 +131,7 @@ export function ProxySettingsForm() {
 
             <div className="flex gap-3">
               <div className="flex-1">
-                <Typography.Text className="mb-1 block text-sm font-medium">用户名（可选）</Typography.Text>
+                <Typography.Text className="mb-1 block text-sm font-medium">{t('settings.proxy.username')}</Typography.Text>
                 <Input
                   placeholder="username"
                   value={username}
@@ -137,7 +139,7 @@ export function ProxySettingsForm() {
                 />
               </div>
               <div className="flex-1">
-                <Typography.Text className="mb-1 block text-sm font-medium">密码（可选）</Typography.Text>
+                <Typography.Text className="mb-1 block text-sm font-medium">{t('settings.proxy.password')}</Typography.Text>
                 <Input.Password
                   placeholder="password"
                   value={password}
@@ -150,7 +152,7 @@ export function ProxySettingsForm() {
       </div>
 
       <div style={{ borderTop: '1px solid var(--ant-color-border-secondary)', paddingTop: 24 }}>
-        <Typography.Text strong className="mb-3 block">测试连接</Typography.Text>
+        <Typography.Text strong className="mb-3 block">{t('settings.proxy.testTitle')}</Typography.Text>
 
         <Space.Compact className="mb-3 w-full">
           <Input
@@ -165,14 +167,14 @@ export function ProxySettingsForm() {
             type="primary"
             onClick={() => { void handleTest() }}
           >
-            测试
+            {t('settings.proxy.test')}
           </Button>
         </Space.Compact>
 
         {testing && (
           <Space>
             <LoaderIcon className="animate-spin" size={14} />
-            <Typography.Text type="secondary">正在测试连接...</Typography.Text>
+            <Typography.Text type="secondary">{t('settings.proxy.testing')}</Typography.Text>
           </Space>
         )}
 
@@ -181,8 +183,8 @@ export function ProxySettingsForm() {
             {testResult.ok
               ? (
                   <Tag color="success" icon={<CheckCircleIcon size={14} />}>
-                    连接成功
-                    {testResult.statusCode != null && ` | 状态码 ${testResult.statusCode}`}
+                    {t('settings.proxy.success')}
+                    {testResult.statusCode != null && t('settings.proxy.statusCode', { code: testResult.statusCode })}
                     {testResult.durationMs != null && ` | ${testResult.durationMs}ms`}
                   </Tag>
                 )
@@ -192,7 +194,7 @@ export function ProxySettingsForm() {
                   )
                 : (
                     <Tag color="error" icon={<XCircleIcon size={14} />}>
-                      连接失败
+                      {t('settings.proxy.failed')}
                       {testResult.error ? ` | ${testResult.error}` : ''}
                     </Tag>
                   )}

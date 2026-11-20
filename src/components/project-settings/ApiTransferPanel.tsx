@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router'
 
 import { invoke } from '@tauri-apps/api/core'
@@ -66,6 +67,7 @@ function countOpenApiPaths(content: string): number | null {
 }
 
 export function ApiTransferPanel() {
+  const { t } = useTranslation()
   const { token } = theme.useToken()
   const { pathname } = useLocation()
   const { sessionId } = useAuth()
@@ -91,13 +93,13 @@ export function ApiTransferPanel() {
 
   const handleSelectiveExport = async (specFormat: 'openapi' | 'swagger') => {
     if (!projectId || !sessionId) {
-      msgApi.error('请在项目页面执行导出')
+      msgApi.error(t('settings.transfer.notInProjectExport'))
 
       return
     }
 
     if (checkedApiIds.size === 0) {
-      msgApi.error('请至少选择一个接口')
+      msgApi.error(t('settings.export.selectAtLeastOne'))
 
       return
     }
@@ -130,7 +132,7 @@ export function ApiTransferPanel() {
 
   const handleExport = async (format: 'json' | 'yaml') => {
     if (!projectId || !sessionId) {
-      msgApi.error('请在项目页面执行导出')
+      msgApi.error(t('settings.transfer.notInProjectExport'))
 
       return
     }
@@ -150,7 +152,7 @@ export function ApiTransferPanel() {
 
   const handleExportSwagger = async () => {
     if (!projectId || !sessionId) {
-      msgApi.error('请在项目页面执行导出')
+      msgApi.error(t('settings.transfer.notInProjectExport'))
 
       return
     }
@@ -170,7 +172,7 @@ export function ApiTransferPanel() {
 
   const doImport = async (file: File) => {
     if (!projectId || !sessionId) {
-      msgApi.error('请在项目页面执行导入')
+      msgApi.error(t('settings.transfer.notInProjectImport'))
 
       return
     }
@@ -178,12 +180,12 @@ export function ApiTransferPanel() {
     setIsImporting(true)
     setImportProgress(0)
     setImportFileName(file.name)
-    msgApi.open({ key: 'api-import', type: 'loading', content: '导入中 0%', duration: 0 })
+    msgApi.open({ key: 'api-import', type: 'loading', content: t('settings.transfer.importing', { percent: 0 }), duration: 0 })
 
     try {
       const content = await file.text()
       setImportProgress(50)
-      msgApi.open({ key: 'api-import', type: 'loading', content: '导入中 50%', duration: 0 })
+      msgApi.open({ key: 'api-import', type: 'loading', content: t('settings.transfer.importing', { percent: 50 }), duration: 0 })
 
       const format = file.name.endsWith('.yaml') || file.name.endsWith('.yml')
         ? 'yaml'
@@ -208,13 +210,13 @@ export function ApiTransferPanel() {
       }
 
       setImportProgress(100)
-      msgApi.open({ key: 'api-import', type: 'success', content: '导入成功！' })
+      msgApi.open({ key: 'api-import', type: 'success', content: t('settings.transfer.importSuccess') })
     }
     catch (error) {
       msgApi.open({
         key: 'api-import',
         type: 'error',
-        content: error instanceof Error ? error.message : '导入失败',
+        content: error instanceof Error ? error.message : t('settings.transfer.importFailed'),
       })
     }
     finally {
@@ -224,7 +226,7 @@ export function ApiTransferPanel() {
 
   const handleImport = async (file: File) => {
     if (!projectId || !sessionId) {
-      msgApi.error('请在项目页面执行导入')
+      msgApi.error(t('settings.transfer.notInProjectImport'))
 
       return
     }
@@ -239,35 +241,35 @@ export function ApiTransferPanel() {
     }
 
     Modal.confirm({
-      title: '导入接口文档？',
+      title: t('settings.transfer.importConfirmTitle'),
       content: pathsCount !== null
-        ? `检测到 ${pathsCount} 个接口路径。导入会静默合并到当前项目，不会清空已有内容，同名接口按导入规则合并覆盖。`
-        : '导入会静默合并到当前项目，不会清空已有内容。同名接口将按导入规则合并覆盖。',
-      okText: '开始导入',
-      cancelText: '取消',
+        ? t('settings.transfer.importConfirmWithPaths', { count: pathsCount })
+        : t('settings.transfer.importConfirmContent'),
+      okText: t('settings.transfer.startImport'),
+      cancelText: t('common.cancel'),
       onOk: () => doImport(file),
     })
   }
 
   const handleImportFromUrl = () => {
     if (!projectId || !sessionId) {
-      msgApi.error('请在项目页面执行导入')
+      msgApi.error(t('settings.transfer.notInProjectImport'))
 
       return
     }
 
     Modal.confirm({
-      title: '从 URL 导入接口文档？',
-      content: '导入会静默合并到当前项目，不会清空已有内容。同名接口将按导入规则合并覆盖。',
-      okText: '开始导入',
-      cancelText: '取消',
+      title: t('settings.transfer.importFromUrlTitle'),
+      content: t('settings.transfer.importConfirmContent'),
+      okText: t('settings.transfer.startImport'),
+      cancelText: t('common.cancel'),
       onOk: () => doImportFromUrl(),
     })
   }
 
   const doImportFromUrl = async () => {
     if (!projectId || !sessionId) {
-      msgApi.error('请在项目页面执行导入')
+      msgApi.error(t('settings.transfer.notInProjectImport'))
 
       return
     }
@@ -275,7 +277,7 @@ export function ApiTransferPanel() {
     const trimmed = importUrl.trim()
 
     if (!trimmed) {
-      msgApi.error('请填写 OpenAPI 或 Postman 文档的 URL')
+      msgApi.error(t('settings.transfer.urlRequired'))
 
       return
     }
@@ -286,25 +288,25 @@ export function ApiTransferPanel() {
       parsed = new URL(trimmed)
     }
     catch {
-      msgApi.error('链接格式不正确')
+      msgApi.error(t('settings.transfer.urlInvalid'))
 
       return
     }
 
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      msgApi.error('仅支持 http 或 https 链接')
+      msgApi.error(t('settings.transfer.urlProtocol'))
 
       return
     }
 
     setIsUrlImporting(true)
-    msgApi.open({ key: 'api-import-url', type: 'loading', content: '正在从链接拉取并导入…', duration: 0 })
+    msgApi.open({ key: 'api-import-url', type: 'loading', content: t('settings.transfer.urlImporting'), duration: 0 })
 
     try {
       const response = await fetch(trimmed)
 
       if (!response.ok) {
-        throw new Error(`下载失败: HTTP ${response.status}`)
+        throw new Error(t('settings.transfer.downloadFailed', { status: response.status }))
       }
 
       const content = await response.text()
@@ -325,13 +327,13 @@ export function ApiTransferPanel() {
         await reloadState()
       }
 
-      msgApi.open({ key: 'api-import-url', type: 'success', content: '导入成功！' })
+      msgApi.open({ key: 'api-import-url', type: 'success', content: t('settings.transfer.importSuccess') })
     }
     catch (error) {
       msgApi.open({
         key: 'api-import-url',
         type: 'error',
-        content: error instanceof Error ? error.message : '导入失败',
+        content: error instanceof Error ? error.message : t('settings.transfer.importFailed'),
       })
     }
     finally {
@@ -347,18 +349,18 @@ export function ApiTransferPanel() {
         className="rounded-xl border border-solid p-5"
         style={{ borderColor: token.colorBorderSecondary, backgroundColor: token.colorFillAlter }}
       >
-        <Typography.Title level={4}>导入接口</Typography.Title>
+        <Typography.Title level={4}>{t('settings.transfer.importSectionTitle')}</Typography.Title>
         <Typography.Paragraph type="secondary">
-          支持导入 OpenAPI 3.x / Swagger 2.0 的 JSON 或 YAML，导入后会静默合并到当前项目里的接口、请求目录与模型数据，不会清空已有内容。
+          {t('settings.transfer.importDescription')}
         </Typography.Paragraph>
         <Typography.Paragraph className="!mb-4" type="secondary">
-          选择文件或从 URL 导入前会先确认合并规则，导入过程不会清空已有内容。URL 需可被本服务访问（例如本机后端请使用局域网 IP 或主机名，勿写浏览器专属地址）。
+          {t('settings.transfer.importUrlHint')}
         </Typography.Paragraph>
 
         <Space className="w-full max-w-2xl" direction="vertical" size={12}>
           <div>
             <Typography.Text className="mb-2 block text-sm" type="secondary">
-              通过文档链接导入（GET 返回 JSON 或 YAML 正文，如 SpringDoc 的 /v3/api-docs 或 Swagger 的 /v2/api-docs）
+              {t('settings.transfer.importUrlLabel')}
             </Typography.Text>
             <Space.Compact className="w-full">
               <Input
@@ -377,7 +379,7 @@ export function ApiTransferPanel() {
                 type="primary"
                 onClick={() => { handleImportFromUrl() }}
               >
-                从 URL 导入
+                {t('settings.transfer.importFromUrl')}
               </Button>
             </Space.Compact>
           </div>
@@ -392,13 +394,13 @@ export function ApiTransferPanel() {
               })
             }}
           >
-            选择文件导入接口文档
+            {t('settings.transfer.selectFile')}
           </Button>
 
           {isImporting && (
             <div className="w-full max-w-md">
               <div className="mb-1 text-xs" style={{ color: token.colorTextSecondary }}>
-                正在导入：{importFileName ?? '接口文档文件'}
+                {t('settings.transfer.importingFile', { name: importFileName ?? t('settings.transfer.importFileFallback') })}
               </div>
               <Progress percent={importProgress} size="small" status="active" />
             </div>
@@ -410,21 +412,25 @@ export function ApiTransferPanel() {
         className="rounded-xl border border-solid p-5"
         style={{ borderColor: token.colorBorderSecondary }}
       >
-        <Typography.Title level={5}>导出文档</Typography.Title>
+        <Typography.Title level={5}>{t('settings.transfer.exportSectionTitle')}</Typography.Title>
         <Typography.Paragraph className="!mb-4" type="secondary">
-          导出 OpenAPI 3.0 或 Swagger 2.0 格式文档。也可通过"选择性导出"仅导出指定接口。
+          {t('settings.transfer.exportDescription')}
         </Typography.Paragraph>
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <Typography.Text className="text-xs" type="secondary">OpenAPI 3.0：</Typography.Text>
+            <Typography.Text className="text-xs" type="secondary">
+              {t('settings.transfer.formatLabel', { format: 'OpenAPI 3.0' })}
+            </Typography.Text>
             <Space size={8}>
-              <Button size="small" onClick={() => void handleExport('json')}>导出 JSON</Button>
-              <Button size="small" onClick={() => void handleExport('yaml')}>导出 YAML</Button>
+              <Button size="small" onClick={() => void handleExport('json')}>{t('settings.transfer.exportJson')}</Button>
+              <Button size="small" onClick={() => void handleExport('yaml')}>{t('settings.transfer.exportYaml')}</Button>
             </Space>
           </div>
           <div className="flex items-center gap-2">
-            <Typography.Text className="text-xs" type="secondary">Swagger 2.0：</Typography.Text>
+            <Typography.Text className="text-xs" type="secondary">
+              {t('settings.transfer.formatLabel', { format: 'Swagger 2.0' })}
+            </Typography.Text>
             <Space size={8}>
               <Button
                 size="small"
@@ -432,13 +438,13 @@ export function ApiTransferPanel() {
                   void handleExportSwagger()
                 }}
               >
-                导出 JSON
+                {t('settings.transfer.exportJson')}
               </Button>
             </Space>
           </div>
           <div>
             <Button size="small" type="primary" onClick={initSelectiveExport}>
-              选择性导出
+              {t('settings.transfer.selectiveExport')}
             </Button>
           </div>
         </div>
@@ -448,9 +454,9 @@ export function ApiTransferPanel() {
         className="rounded-xl border border-solid p-5"
         style={{ borderColor: token.colorBorderSecondary }}
       >
-        <Typography.Title level={5}>导出 Markdown 文档</Typography.Title>
+        <Typography.Title level={5}>{t('settings.transfer.exportMarkdownSectionTitle')}</Typography.Title>
         <Typography.Paragraph className="!mb-4" type="secondary">
-          选择接口导出为 Markdown 文档，可离线查看完整的 API 接口文档。
+          {t('settings.transfer.exportMarkdownDescription')}
         </Typography.Paragraph>
         <ExportPanel projectId={projectId} />
       </section>
@@ -459,7 +465,7 @@ export function ApiTransferPanel() {
         destroyOnClose
         footer={[
           <Button key="cancel" onClick={() => { setSelectModalOpen(false) }}>
-            取消
+            {t('common.cancel')}
           </Button>,
           <Button
             key="openapi"
@@ -467,7 +473,7 @@ export function ApiTransferPanel() {
             type="primary"
             onClick={() => void handleSelectiveExport('openapi')}
           >
-            导出 OpenAPI 3.0
+            {t('settings.transfer.exportOpenApi')}
           </Button>,
           <Button
             key="swagger"
@@ -475,11 +481,11 @@ export function ApiTransferPanel() {
             type="primary"
             onClick={() => void handleSelectiveExport('swagger')}
           >
-            导出 Swagger 2.0
+            {t('settings.transfer.exportSwagger')}
           </Button>,
         ]}
         open={selectModalOpen}
-        title="选择要导出的接口"
+        title={t('settings.transfer.selectExportApis')}
         width={640}
         onCancel={() => { setSelectModalOpen(false) }}
       >

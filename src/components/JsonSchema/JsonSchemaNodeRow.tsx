@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { ChevronRight } from 'lucide-react'
 import { Input, Switch, Tooltip } from 'antd'
 import { omit } from 'lodash-es'
-import { CirclePlusIcon } from 'lucide-react'
+import { ChevronRight, CirclePlusIcon } from 'lucide-react'
 
 import type { ApiMenuData } from '@/components/ApiMenu'
 import { cssSchemaType, DataTypeSelect } from '@/components/DataTypeSelect'
@@ -43,6 +43,8 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
     disabled = false,
     menuRawList,
   } = props
+
+  const { t } = useTranslation()
 
   const { styles } = useStyles(({ token }) => {
     return {
@@ -315,7 +317,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
         >
           {isRoot || isItems
             ? (
-                <span className={styles.tag}>{isItems ? 'ITEMS' : '根节点'}</span>
+                <span className={styles.tag}>{isItems ? 'ITEMS' : t('ui.schema.rootNode')}</span>
               )
             : (
                 <span className={styles.row.nameContent}>
@@ -326,7 +328,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
                     : (
                         <Input
                           disabled={disabled}
-                          placeholder="字段名"
+                          placeholder={t('ui.schema.placeholder.name')}
                           value={name ?? ''}
                           onChange={(ev) => {
                             triggerChange?.({ ...value, name: ev.target.value })
@@ -389,7 +391,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
       <div className={`${styles.row.col} ${styles.row.title} ${styles.row.colHover}`}>
         <Input
           disabled={disabled}
-          placeholder="中文名"
+          placeholder={t('ui.schema.placeholder.displayName')}
           value={displayName ?? ''}
           onChange={(ev) => {
             triggerChange?.({ ...value, displayName: ev.target.value })
@@ -400,10 +402,13 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
       <div className={`${styles.row.col} ${styles.row.title} ${styles.row.colHover}`}>
         <Input
           disabled={disabled}
-          placeholder="示例值"
+          placeholder={t('ui.schema.placeholder.example')}
           value={typeof example === 'string' ? example : (example != null ? JSON.stringify(example) : '')}
           onChange={(ev) => {
-            triggerChange?.({ ...value, example: ev.target.value })
+            triggerChange?.({
+              ...value,
+              example: ev.target.value,
+            })
           }}
         />
       </div>
@@ -411,7 +416,9 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
       <div className={`${styles.row.col} ${styles.row.required}`}>
         {readOnly
           ? (
-              <span style={{ fontSize: 12 }}>{value.required ? '必填' : '可选'}</span>
+              <span style={{ fontSize: 12 }}>
+                {t(value.required ? 'ui.schema.requiredLabel' : 'ui.schema.optionalLabel')}
+              </span>
             )
           : (
               <Switch
@@ -428,7 +435,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
       <div className={`${styles.row.col} ${styles.row.description} ${styles.row.colHover}`}>
         <Input
           disabled={disabled}
-          placeholder="说明"
+          placeholder={t('ui.schema.placeholder.description')}
           value={description ?? ''}
           onChange={(ev) => {
             triggerChange?.({ ...value, description: ev.target.value })
@@ -453,7 +460,7 @@ export function JsonSchemaNodeRow(props: JsonSchemaNodeRowProps) {
 
       <div className={`${styles.row.col} ${styles.row.actions}`}>
         {canAddField && (
-          <Tooltip title={isRoot ? '添加子节点' : '添加相邻节点'}>
+          <Tooltip title={t(isRoot ? 'ui.schema.addChildNode' : 'ui.schema.addSiblingNode')}>
             <span
               className={`${styles.row.action} ${styles.row.actionAdd}`}
               onClick={() => {

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { create, useModal } from '@ebay/nice-modal-react'
 import { Form, Input, Modal, type ModalProps, Switch, Typography } from 'antd'
@@ -18,6 +19,7 @@ interface FormData {
 }
 
 export const ModalImportCurl = create(({ parentId, onImport, ...props }: ModalImportCurlProps) => {
+  const { t } = useTranslation()
   const modal = useModal()
   const [form] = Form.useForm<FormData>()
 
@@ -45,7 +47,7 @@ export const ModalImportCurl = create(({ parentId, onImport, ...props }: ModalIm
         onImport(menuItem)
       }
       catch (error) {
-        messageApi.error(error instanceof Error ? error.message : 'cURL 导入失败')
+        messageApi.error(error instanceof Error ? error.message : t('settings.modal.importCurl.failed'))
 
         return
       }
@@ -56,7 +58,7 @@ export const ModalImportCurl = create(({ parentId, onImport, ...props }: ModalIm
 
   return (
     <Modal
-      title="导入 cURL"
+      title={t('settings.modal.importCurl.title')}
       width={560}
       {...props}
       open={modal.visible}
@@ -68,17 +70,21 @@ export const ModalImportCurl = create(({ parentId, onImport, ...props }: ModalIm
     >
       <Form<FormData> form={form} layout="vertical">
         <Typography.Paragraph type="secondary">
-          粘贴完整 cURL 命令，系统会自动识别 URL、Method、Query、Header、Cookie 和常见 Body。
+          {t('settings.modal.importCurl.description')}
         </Typography.Paragraph>
 
-        <Form.Item label="粘贴 cURL 数据" name="curlText" rules={[{ required: true, message: '请输入 cURL 命令' }]}>
+        <Form.Item
+          label={t('settings.modal.importCurl.pasteLabel')}
+          name="curlText"
+          rules={[{ required: true, message: t('settings.modal.importCurl.pasteRequired') }]}
+        >
           <Input.TextArea
             autoSize={{ minRows: 8, maxRows: 12 }}
             placeholder="curl --request GET --url https://api.example.com/users?page=1"
           />
         </Form.Item>
 
-        <Form.Item label="忽略通用 Header" name="ignoreCommonHeaders" valuePropName="checked">
+        <Form.Item label={t('settings.modal.importCurl.ignoreCommonHeaders')} name="ignoreCommonHeaders" valuePropName="checked">
           <Switch />
         </Form.Item>
       </Form>

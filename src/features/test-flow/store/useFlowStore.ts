@@ -9,7 +9,7 @@ import { create } from 'zustand'
 
 import { getInputHandleIds, getOutputHandleIds } from '../nodes/handleUtils'
 import { migrateGraph } from '../nodes/migrations'
-import { FlowNodeType, type FlowEdge, type FlowGraph, type FlowNode, type FlowNodeData } from '../types/flow.types'
+import { type FlowEdge, type FlowGraph, type FlowNode, type FlowNodeData, FlowNodeType } from '../types/flow.types'
 
 // ==================== 接口定义 ====================
 

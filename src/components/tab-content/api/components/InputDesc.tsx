@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, Input, Modal, theme } from 'antd'
 import { Maximize2Icon } from 'lucide-react'
@@ -17,6 +18,7 @@ export function InputDesc({
   onChange?: (value: string) => void
 }) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
 
   const [open, setOpen] = useState(false)
   const [editorValue, setEditorValue] = useState('')
@@ -24,7 +26,7 @@ export function InputDesc({
   return (
     <div className="relative">
       <Input.TextArea
-        placeholder="支持 Markdown 格式"
+        placeholder={t('api.doc.descPlaceholder')}
         rows={3}
         value={value}
         onChange={(ev) => {
@@ -57,7 +59,7 @@ export function InputDesc({
         }}
         maskClosable={false}
         open={open}
-        title="接口说明"
+        title={t('api.doc.apiDescription')}
         width={1200}
         onCancel={() => {
           setOpen(false)

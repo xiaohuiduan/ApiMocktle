@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { create, useModal } from '@ebay/nice-modal-react'
 import { Form, Input, type InputRef, Modal, type ModalProps } from 'antd'
@@ -16,6 +17,7 @@ interface ModalNewCatalogProps extends Omit<ModalProps, 'open' | 'onOk'> {
 type FormData = Pick<ApiMenuData, 'name' | 'parentId' | 'type'>
 
 export const ModalNewCatalog = create(({ formData, ...props }: ModalNewCatalogProps) => {
+  const { t } = useTranslation()
   const modal = useModal()
 
   const [form] = Form.useForm<FormData>()
@@ -37,7 +39,7 @@ export const ModalNewCatalog = create(({ formData, ...props }: ModalNewCatalogPr
 
   return (
     <Modal
-      title="新建目录"
+      title={t('settings.modal.newCatalog.title')}
       width={400}
       {...props}
       afterOpenChange={(...parmas) => {
@@ -72,11 +74,11 @@ export const ModalNewCatalog = create(({ formData, ...props }: ModalNewCatalogPr
         }}
         layout="vertical"
       >
-        <Form.Item label="名称" name="name" rules={[{ required: true }]}>
+        <Form.Item label={t('common.name')} name="name" rules={[{ required: true }]}>
           <Input ref={inputRef} />
         </Form.Item>
 
-        <Form.Item label="父级目录" name="parentId" required={false} rules={[{ required: true }]}>
+        <Form.Item label={t('settings.modal.newCatalog.parentCatalog')} name="parentId" required={false} rules={[{ required: true }]}>
           <SelectorCatalog hideCreateNew type={formData?.type} />
         </Form.Item>
 

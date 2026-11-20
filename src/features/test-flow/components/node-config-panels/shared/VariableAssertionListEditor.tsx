@@ -1,9 +1,12 @@
 import { useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { Plus, Trash2 } from 'lucide-react'
 import { Button, Input, Select, Space, Typography } from 'antd'
+import { Plus, Trash2 } from 'lucide-react'
 
 import { useFlowStore } from '../../../store/useFlowStore'
+
+import { translateKey } from '@/i18n/translate'
 
 const { Text } = Typography
 
@@ -18,14 +21,14 @@ export interface VariableAssertion {
 // ==================== 操作符选项 ====================
 
 const OPERATOR_OPTIONS = [
-  { value: 'equals', label: '等于' },
-  { value: 'not_equals', label: '不等于' },
-  { value: 'contains', label: '包含' },
-  { value: 'not_contains', label: '不包含' },
-  { value: 'greater_than', label: '大于' },
-  { value: 'less_than', label: '小于' },
-  { value: 'exists', label: '存在' },
-  { value: 'not_exists', label: '不存在' },
+  { value: 'equals', labelKey: 'flow.enum.operator.equals' },
+  { value: 'not_equals', labelKey: 'flow.enum.operator.notEquals' },
+  { value: 'contains', labelKey: 'flow.enum.operator.contains' },
+  { value: 'not_contains', labelKey: 'flow.enum.operator.notContains' },
+  { value: 'greater_than', labelKey: 'flow.enum.operator.greaterThan' },
+  { value: 'less_than', labelKey: 'flow.enum.operator.lessThan' },
+  { value: 'exists', labelKey: 'flow.enum.operator.exists' },
+  { value: 'not_exists', labelKey: 'flow.enum.operator.notExists' },
 ]
 
 // ==================== 从流程图提取已知变量名 ====================
@@ -82,6 +85,7 @@ interface VariableAssertionListEditorProps {
 // ==================== 组件 ====================
 
 export default function VariableAssertionListEditor({ assertions, onChange }: VariableAssertionListEditorProps) {
+  const { t } = useTranslation()
   const nodes = useFlowStore((s) => s.nodes)
 
   // 从流程图中提取已知变量名
@@ -119,17 +123,17 @@ export default function VariableAssertionListEditor({ assertions, onChange }: Va
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Text className="text-xs" type="secondary">
-          变量断言规则（运行时检查变量值）
+          {t('flow.nodeConfig.editor.variableAssertionTitle')}
         </Text>
         <Button icon={<Plus size={14} />} size="small" type="dashed" onClick={handleAdd}>
-          添加
+          {t('flow.nodeConfig.editor.add')}
         </Button>
       </div>
 
       {assertions.length === 0
         ? (
             <Text className="text-xs italic" type="secondary">
-              暂无断言规则
+              {t('flow.nodeConfig.editor.variableAssertionEmpty')}
             </Text>
           )
         : (
@@ -145,21 +149,21 @@ export default function VariableAssertionListEditor({ assertions, onChange }: Va
                           {menu}
                           {knownVars.length === 0 && (
                             <div style={{ padding: '4px 8px', color: 'var(--ds-node-text-muted)', fontSize: 11 }}>
-                              暂无已知变量，请手动输入
+                              {t('flow.nodeConfig.editor.noKnownVars')}
                             </div>
                           )}
                         </>
                       )}
                       mode={undefined}
                       options={varOptions}
-                      placeholder="变量名"
+                      placeholder={t('flow.nodeConfig.editor.variablePlaceholder')}
                       size="small"
                       style={{ width: '40%' }}
                       value={a.variable || undefined}
                       onChange={(val) => { handleUpdate(index, 'variable', val) }}
                     />
                     <Select
-                      options={OPERATOR_OPTIONS}
+                      options={OPERATOR_OPTIONS.map((o) => ({ value: o.value, label: translateKey(o.labelKey) }))}
                       size="small"
                       style={{ width: '30%' }}
                       value={a.operator}
@@ -167,7 +171,7 @@ export default function VariableAssertionListEditor({ assertions, onChange }: Va
                     />
                     {showExpected(a.operator) && (
                       <Input
-                        placeholder="期望值"
+                        placeholder={t('flow.nodeConfig.editor.expectedPlaceholder')}
                         size="small"
                         style={{ width: '30%' }}
                         value={a.expected ?? ''}
