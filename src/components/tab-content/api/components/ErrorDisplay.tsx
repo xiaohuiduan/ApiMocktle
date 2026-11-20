@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button, Space, theme, Typography } from 'antd'
 import {
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react'
 
 import type { RequestErrorInfo } from '@/types'
+import { localizeRequestError } from '@/i18n/request-error'
 
 interface ErrorDisplayProps {
   errorInfo: RequestErrorInfo
@@ -37,7 +39,12 @@ const errorIconMap: Record<string, React.ReactNode> = {
 
 export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
   const { token } = theme.useToken()
+  const { t } = useTranslation()
   const [showDetail, setShowDetail] = useState(false)
+
+  // 后端只回错误码，文案按当前语言渲染（切语言后无需重新请求即可刷新）。
+  // 用 t 作为依赖触发重算——localizeRequestError 内部读 i18n 单例，本身不订阅语言变化。
+  const localized = useMemo(() => localizeRequestError(errorInfo), [errorInfo, t])
 
   return (
     <div
@@ -59,25 +66,25 @@ export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
           className="text-sm"
           style={{ color: token.colorError }}
         >
-          请求失败
+          {t('api.run.requestFailed')}
         </Typography.Text>
       </div>
 
       {/* 错误消息 */}
       <div className="ml-[26px]">
         <Typography.Text className="block text-base leading-relaxed">
-          {errorInfo.errorMessage}
+          {localized.message}
         </Typography.Text>
       </div>
 
       {/* 修复建议 */}
-      {errorInfo.suggestion && (
+      {localized.suggestion.length > 0 && (
         <div className="ml-[26px] mt-3">
           <Typography.Text className="mb-1 block text-sm font-medium" style={{ color: token.colorTextSecondary }}>
-            建议排查方向
+            {t('api.run.suggestions')}
           </Typography.Text>
           <div className="flex flex-col gap-1">
-            {errorInfo.suggestion.split('\n').filter(Boolean).map((line, i) => (
+            {localized.suggestion.map((line, i) => (
               <Space key={i} size={8}>
                 <span
                   className="inline-block size-1.5 shrink-0 rounded-full"
@@ -100,7 +107,7 @@ export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
             onClick={() => { setShowDetail((v) => !v) }}
           >
             {showDetail ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
-            技术详情
+            {t('api.run.technicalDetail')}
           </button>
           {showDetail && (
             <pre
@@ -129,7 +136,7 @@ export function ErrorDisplay({ errorInfo, onRetry }: ErrorDisplayProps) {
             size="small"
             onClick={onRetry}
           >
-            重试
+            {t('common.retry')}
           </Button>
         </div>
       )}

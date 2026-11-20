@@ -10,6 +10,17 @@ use crate::db::{auth_repo, cookie_repo, project_repo};
 use crate::models::*;
 use crate::services::app_config::AppConfigService;
 
+/// 请求失败的结构化信息。
+///
+/// **国际化契约**：`error_type` 是稳定错误码，前端 `src/i18n/request-error.ts`
+/// 据此按当前界面语言渲染 `error_message` 与 `suggestion`，因此这两个字段在
+/// 正常路径下**故意留空**——后端不产出面向用户的文案，避免英文界面显示中文。
+///
+/// 字段仍保留（而非删除）是为了兼容：前端遇到不认识的 `error_type` 时
+/// 用 `error_message` / `suggestion` 兜底，将来后端若需要在特殊场景给出
+/// 语言无关的补充说明也有位置可放。
+///
+/// `error_detail` 是原始技术错误（reqwest 报错文本），不翻译，界面「技术详情」直接展示。
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestErrorInfo {
@@ -27,49 +38,49 @@ fn categorize_request_error(e: &reqwest::Error) -> RequestErrorInfo {
         if msg.contains("dns") || msg.contains("temporary failure in name resolution") || msg.contains("failed to resolve") {
             return RequestErrorInfo {
                 error_type: "dns_failure".into(),
-                error_message: "DNS 解析失败，无法找到服务器地址".into(),
+                error_message: String::new(),
                 error_detail: detail,
-                suggestion: "请检查 URL 中的域名是否正确\n检查网络连接是否正常\n尝试使用 IP 地址代替域名".into(),
+                suggestion: String::new(),
             };
         }
         if msg.contains("connection refused") {
             return RequestErrorInfo {
                 error_type: "connection_refused".into(),
-                error_message: "连接被服务器拒绝".into(),
+                error_message: String::new(),
                 error_detail: detail,
-                suggestion: "请确认目标服务器已启动\n检查端口号是否正确\n确认防火墙未阻止连接".into(),
+                suggestion: String::new(),
             };
         }
         if msg.contains("connection reset") {
             return RequestErrorInfo {
                 error_type: "connection_reset".into(),
-                error_message: "连接被重置".into(),
+                error_message: String::new(),
                 error_detail: detail,
-                suggestion: "请检查网络连接是否稳定\n目标服务器可能主动断开了连接".into(),
+                suggestion: String::new(),
             };
         }
         if msg.contains("network unreachable") || msg.contains("no route to host") {
             return RequestErrorInfo {
                 error_type: "network_unreachable".into(),
-                error_message: "网络不可达".into(),
+                error_message: String::new(),
                 error_detail: detail,
-                suggestion: "请检查网络连接是否正常\n确认目标地址是否在本地网络中".into(),
+                suggestion: String::new(),
             };
         }
         return RequestErrorInfo {
             error_type: "connection_failed".into(),
-            error_message: "无法连接到服务器".into(),
+            error_message: String::new(),
             error_detail: detail,
-            suggestion: "请检查网络连接和 URL 是否正确\n确认目标服务器是否在线".into(),
+            suggestion: String::new(),
         };
     }
 
     if e.is_timeout() {
         return RequestErrorInfo {
             error_type: "timeout".into(),
-            error_message: "请求超时".into(),
+            error_message: String::new(),
             error_detail: detail,
-            suggestion: "目标服务器响应过慢，请稍后重试\n检查网络连接是否稳定\n确认目标服务器是否负载过高".into(),
+            suggestion: String::new(),
         };
     }
 
@@ -78,44 +89,44 @@ fn categorize_request_error(e: &reqwest::Error) -> RequestErrorInfo {
     if msg_lower.contains("tls") || msg_lower.contains("ssl") || msg_lower.contains("certificate") {
         return RequestErrorInfo {
             error_type: "tls_error".into(),
-            error_message: "TLS/SSL 证书验证失败".into(),
+            error_message: String::new(),
             error_detail: detail,
-            suggestion: "请确认服务器 SSL 证书是否有效\n检查系统时间是否准确\n如果使用自签名证书，需要配置信任".into(),
+            suggestion: String::new(),
         };
     }
 
     if e.is_status() {
         return RequestErrorInfo {
             error_type: "http_error".into(),
-            error_message: "HTTP 响应状态异常".into(),
+            error_message: String::new(),
             error_detail: detail,
-            suggestion: "请检查请求参数是否正确".into(),
+            suggestion: String::new(),
         };
     }
 
     if e.is_redirect() {
         return RequestErrorInfo {
             error_type: "redirect_error".into(),
-            error_message: "重定向处理失败".into(),
+            error_message: String::new(),
             error_detail: detail,
-            suggestion: "请检查请求 URL 是否被重定向到无效地址".into(),
+            suggestion: String::new(),
         };
     }
 
     if e.is_body() {
         return RequestErrorInfo {
             error_type: "body_error".into(),
-            error_message: "请求体发送失败".into(),
+            error_message: String::new(),
             error_detail: detail,
-            suggestion: "请检查请求体数据是否过大或格式不正确".into(),
+            suggestion: String::new(),
         };
     }
 
     RequestErrorInfo {
         error_type: "unknown".into(),
-        error_message: "请求异常".into(),
+        error_message: String::new(),
         error_detail: detail,
-        suggestion: "请检查网络和请求配置\n如果问题持续，请查看技术详情进行排查".into(),
+        suggestion: String::new(),
     }
 }
 
