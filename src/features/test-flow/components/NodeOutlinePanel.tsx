@@ -1,28 +1,18 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Badge, Input, Tag } from 'antd'
 import { AlertCircle, Circle, CircleCheck, CircleDot, CircleX, MinusCircle, Search } from 'lucide-react'
 
 import { globalFlowInstanceRef } from '../contexts/FlowInstanceContext'
 import { useFlowStore } from '../store/useFlowStore'
-import { type FlowNodeType, FlowNodeType as NT, type NodeExecStatus } from '../types/flow.types'
+import { type FlowNodeType, FlowNodeType as NT, NODE_TYPE_LABEL_KEYS, type NodeExecStatus } from '../types/flow.types'
+
+import { translateKey } from '@/i18n/translate'
 
 const { Search: SearchInput } = Input
 
-// ==================== 节点类型中文名 ====================
-
-const NODE_TYPE_LABELS: Record<FlowNodeType, string> = {
-  start: '开始',
-  end: '结束',
-  httpRequest: 'HTTP 请求',
-  condition: '条件',
-  loop: '循环',
-  parallel: '并行',
-  wait: '等待',
-  setVariable: '变量赋值',
-  assert: '断言',
-  subFlow: '子流程',
-}
+// 节点类型名统一从 `flow.nodeType.*` 取词，避免与 flow.types.ts 维护两份文案。
 
 const NODE_TYPE_ORDER: FlowNodeType[] = [
   NT.Start, NT.End, NT.HttpRequest, NT.Assert,
@@ -51,6 +41,7 @@ const STATUS_COLOR: Record<NodeExecStatus, string> = {
 // ==================== 组件 ====================
 
 export default function NodeOutlinePanel() {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const nodes = useFlowStore((s) => s.nodes)
   const selectNode = useFlowStore((s) => s.selectNode)
@@ -102,7 +93,7 @@ export default function NodeOutlinePanel() {
       <div style={{ padding: '8px 8px 4px' }}>
         <SearchInput
           allowClear
-          placeholder="搜索节点..."
+          placeholder={t('flow.outline.searchPlaceholder')}
           prefix={<Search size={12} />}
           size="small"
           style={{ fontSize: 12 }}
@@ -115,7 +106,7 @@ export default function NodeOutlinePanel() {
         {groupedNodes.length === 0
           ? (
               <div style={{ padding: 16, textAlign: 'center', color: 'var(--ds-node-text-muted)', fontSize: 12 }}>
-                {nodes.length === 0 ? '画布为空' : '无匹配节点'}
+                {nodes.length === 0 ? t('flow.outline.empty') : t('flow.outline.noMatch')}
               </div>
             )
           : (
@@ -132,7 +123,7 @@ export default function NodeOutlinePanel() {
                       gap: 4,
                     }}
                   >
-                    {NODE_TYPE_LABELS[type]}
+                    {translateKey(NODE_TYPE_LABEL_KEYS[type])}
                     <Badge count={items.length} size="small" style={{ backgroundColor: 'var(--ds-node-text-muted)' }} />
                   </div>
                   {items.map((node) => {
@@ -178,7 +169,9 @@ export default function NodeOutlinePanel() {
       </div>
 
       <div style={{ padding: '4px 8px', fontSize: 11, color: 'var(--ds-node-text-muted)', borderTop: 'var(--ds-divider-color, 1px solid #f0f0f0)' }}>
-        共 {nodes.length} 个节点{search && ` · 显示 ${totalFiltered} 个`}
+        {search
+          ? t('flow.outline.footerFiltered', { count: nodes.length, filtered: totalFiltered })
+          : t('flow.outline.footer', { count: nodes.length })}
       </div>
     </div>
   )

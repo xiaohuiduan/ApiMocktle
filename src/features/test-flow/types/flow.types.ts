@@ -23,19 +23,25 @@ export enum FlowNodeType {
 
 export type NodeExecStatus = 'idle' | 'running' | 'passed' | 'failed' | 'skipped' | 'error'
 
-// ==================== 节点类型中文名（全站统一） ====================
+// ==================== 节点类型名（i18n key，全站统一） ====================
 
-export const NODE_TYPE_LABELS: Record<FlowNodeType, string> = {
-  [FlowNodeType.Start]: '开始',
-  [FlowNodeType.End]: '结束',
-  [FlowNodeType.HttpRequest]: 'HTTP 请求',
-  [FlowNodeType.Condition]: '条件判断',
-  [FlowNodeType.Loop]: '循环',
-  [FlowNodeType.Parallel]: '并行',
-  [FlowNodeType.Wait]: '等待',
-  [FlowNodeType.SetVariable]: '变量赋值',
-  [FlowNodeType.Assert]: '断言',
-  [FlowNodeType.SubFlow]: '子流程',
+/**
+ * 节点类型对应的 i18n key。
+ *
+ * 存 key 而非文案：本文件是纯类型模块，模块顶层求值会在加载时把文案固定成
+ * 当时语言，切换语言后不刷新。消费方用 `t(NODE_TYPE_LABEL_KEYS[type])`。
+ */
+export const NODE_TYPE_LABEL_KEYS: Record<FlowNodeType, string> = {
+  [FlowNodeType.Start]: 'flow.nodeType.start',
+  [FlowNodeType.End]: 'flow.nodeType.end',
+  [FlowNodeType.HttpRequest]: 'flow.nodeType.httpRequest',
+  [FlowNodeType.Condition]: 'flow.nodeType.condition',
+  [FlowNodeType.Loop]: 'flow.nodeType.loop',
+  [FlowNodeType.Parallel]: 'flow.nodeType.parallel',
+  [FlowNodeType.Wait]: 'flow.nodeType.wait',
+  [FlowNodeType.SetVariable]: 'flow.nodeType.setVariable',
+  [FlowNodeType.Assert]: 'flow.nodeType.assert',
+  [FlowNodeType.SubFlow]: 'flow.nodeType.subFlow',
 }
 
 // ==================== 基础节点数据 ====================

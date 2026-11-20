@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
-import { useEvent } from 'react-use-event-hook'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router'
+import { useEvent } from 'react-use-event-hook'
 
 import { Button, ConfigProvider, Empty, Modal, Space, Tree, type TreeProps } from 'antd'
 import useResizeObserver from 'use-resize-observer'
@@ -125,6 +126,7 @@ const TREE_MIN_VIEWPORT_HEIGHT = 240
  * - 文件夹可以包含文件和另一个文件夹，包含的关系以层级递进的形式展示。
  */
 export function ApiMenu() {
+  const { t } = useTranslation()
   const { messageApi } = useGlobalContext()
   const { moveMenuItem, menuRawList, removeMenuItems, menuSearchWord, setMenuSearchWord, discardDraft } = useMenuHelpersContext()
   const { expandedMenuKeys, addExpandedMenuKeys, removeExpandedMenuKeys, menuTree }
@@ -187,7 +189,7 @@ export function ApiMenu() {
     const ids = toDeletableMenuIds(checkedKeys, menuRawList)
 
     if (ids.length === 0) {
-      Modal.warning({ title: '请选择要删除的菜单项（接口、目录、模型等）' })
+      Modal.warning({ title: t('api.menu.selectToDelete') })
 
       return
     }
@@ -197,9 +199,9 @@ export function ApiMenu() {
     const cleanupIds = collectSubtreeIds(rootIds, menuRawList)
 
     Modal.confirm({
-      title: `确定删除所选的 ${ids.length} 项？`,
-      content: '目录会连同子项一并删除，并进入回收站（30 天内可恢复）。',
-      okText: '删除',
+      title: t('api.menu.confirmBatchDelete', { count: ids.length }),
+      content: t('api.menu.batchDeleteDesc'),
+      okText: t('common.delete'),
       okButtonProps: { danger: true },
       maskClosable: true,
       onOk: async () => {
@@ -218,14 +220,19 @@ export function ApiMenu() {
           exitBatchMode()
           messageApi.open({
             type: 'success',
-            content: `已移入回收站 ${outcome.deletedCount} 个条目${outcome.childCount > 0 ? `（含 ${outcome.childCount} 个子项）` : ''}，30 天内可恢复，可在左侧「回收站」查看`,
+            content: outcome.childCount > 0
+              ? t('api.menu.batchDeleteSuccessWithChildren', {
+                  count: outcome.deletedCount,
+                  children: outcome.childCount,
+                })
+              : t('api.menu.batchDeleteSuccess', { count: outcome.deletedCount }),
             duration: 6,
           })
         }
         catch (error) {
           Modal.error({
-            title: '批量删除失败',
-            content: error instanceof Error && error.message ? error.message : '请稍后重试',
+            title: t('api.menu.batchDeleteFailed'),
+            content: error instanceof Error && error.message ? error.message : t('api.menu.retryLater'),
           })
         }
       },
@@ -238,6 +245,7 @@ export function ApiMenu() {
     removeMenuItems,
     removeTabItem,
     messageApi,
+    t,
   ])
 
   const handleMenuSelect = useEvent<TreeOnSelect>((_, { node }) => {
@@ -255,11 +263,11 @@ export function ApiMenu() {
       }
       else {
         if ([CatalogType.Overview, CatalogType.Recycle].includes(menuId as CatalogType)) {
-          const { title } = API_MENU_CONFIG[menuId as CatalogType]
+          const { titleKey } = API_MENU_CONFIG[menuId as CatalogType]
 
           addTabItem({
             key: menuId,
-            label: title,
+            label: titleKey ? t(titleKey) : '',
             contentType: menuId as TabContentType,
           })
         }
@@ -353,7 +361,7 @@ export function ApiMenu() {
 
     if (!isMenuSameGroup(dragCatalog, dropCatalog)) {
       messageApi.warning({
-        content: `「${dragCatalog.name}」不能移入「${dropCatalog.name}」所在分组`,
+        content: t('api.menu.crossGroupRejected', { drag: dragCatalog.name, drop: dropCatalog.name }),
         duration: 4,
       })
 
@@ -403,11 +411,11 @@ export function ApiMenu() {
                 }
               }}
             >
-              {batchMode ? '退出批量' : '批量选择'}
+              {batchMode ? t('api.menu.batchExit') : t('api.menu.batchSelect')}
             </Button>
             {batchMode && (
               <Button danger size="small" type="primary" onClick={handleBatchDelete}>
-                删除所选（{toDeletableMenuIds(checkedKeys, menuRawList).length}）
+                {t('api.menu.deleteSelected', { count: toDeletableMenuIds(checkedKeys, menuRawList).length })}
               </Button>
             )}
           </Space>
@@ -518,7 +526,7 @@ export function ApiMenu() {
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-4">
                   <div className="pointer-events-auto">
                     <Empty
-                      description="还没有接口、模型或快捷请求"
+                      description={t('api.menu.empty')}
                       image={Empty.PRESENTED_IMAGE_SIMPLE}
                     >
                       <Space>
@@ -529,7 +537,7 @@ export function ApiMenu() {
                             createTabItem(MenuItemType.HttpRequest)
                           }}
                         >
-                          新建接口
+                          {t('menu.catalogNew.http')}
                         </Button>
                         <Button
                           size="small"
@@ -539,7 +547,7 @@ export function ApiMenu() {
                             }
                           }}
                         >
-                          导入 OpenAPI
+                          {t('api.menu.importOpenApi')}
                         </Button>
                       </Space>
                     </Empty>
@@ -551,7 +559,7 @@ export function ApiMenu() {
                 <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-4">
                   <div className="pointer-events-auto">
                     <Empty
-                      description={`未找到与 “${menuSearchWord}” 匹配的内容`}
+                      description={t('api.menu.searchNoMatch', { word: menuSearchWord })}
                       image={Empty.PRESENTED_IMAGE_SIMPLE}
                     >
                       <Button
@@ -560,7 +568,7 @@ export function ApiMenu() {
                           setMenuSearchWord?.('')
                         }}
                       >
-                        清除搜索
+                        {t('api.menu.clearSearch')}
                       </Button>
                     </Empty>
                   </div>

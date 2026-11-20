@@ -1,8 +1,12 @@
-import { Clock, GitBranch, Globe, PlayCircle, RefreshCw, ShieldCheck, Split, Square, Variable, Workflow } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+
 import { Tag, Typography } from 'antd'
+import { Clock, GitBranch, Globe, PlayCircle, RefreshCw, ShieldCheck, Split, Square, Variable, Workflow } from 'lucide-react'
 
 import { NODE_TYPE_COLORS } from '../../nodes/nodeColors'
-import { type FlowNodeType, NODE_TYPE_LABELS } from '../../types/flow.types'
+import { type FlowNodeType, NODE_TYPE_LABEL_KEYS } from '../../types/flow.types'
+
+import { translateKey } from '@/i18n/translate'
 
 const { Text } = Typography
 
@@ -31,7 +35,8 @@ interface TypeHeaderProps {
 // ==================== 组件 ====================
 
 export default function TypeHeader({ nodeType, nodeId }: TypeHeaderProps) {
-  const label = NODE_TYPE_LABELS[nodeType]
+  const { t } = useTranslation()
+  const label = translateKey(NODE_TYPE_LABEL_KEYS[nodeType])
   const color = NODE_TYPE_COLORS[nodeType]
   const icon = NODE_TYPE_ICONS[nodeType] ?? null
 
@@ -51,7 +56,7 @@ export default function TypeHeader({ nodeType, nodeId }: TypeHeaderProps) {
       {/* 节点 ID */}
       <div>
         <Text className="mb-1 block text-xs" type="secondary">
-          节点 ID
+          {t('flow.nodeConfig.nodeId')}
         </Text>
         <Text code className="text-xs">
           {nodeId}

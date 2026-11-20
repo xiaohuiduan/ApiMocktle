@@ -1,5 +1,6 @@
 import type { ApiMenuData } from '@/components/ApiMenu/ApiMenu.type'
 import { BodyType } from '@/enums'
+import { isDefaultResponseName, isSystemDefaultName } from '@/i18n/default-names'
 import type { ApiDetails } from '@/types'
 
 /**
@@ -18,13 +19,6 @@ export interface StoredDraft {
 }
 
 const getDraftsKey = (projectId: string) => `project-drafts:${projectId}`
-
-/**
- * 新建草稿的默认名称集合。
- * 仅带这些默认名（快捷请求 / 接口的初始名与保存兜底名）视为“未命名”，不计入非空判定；
- * 用户改成其它名称即视为有意义的编辑。
- */
-const DEFAULT_DRAFT_NAMES = new Set(['新建接口', '未命名接口', '新建快捷请求', '快捷请求'])
 
 /**
  * 已被“显式删除草稿”的新建草稿 id 墓碑集合。
@@ -164,7 +158,9 @@ export function isDraftEmpty(item: ApiMenuData): boolean {
   }
 
   const trimmedName = data.name?.trim()
-  const hasName = Boolean(trimmedName) && !DEFAULT_DRAFT_NAMES.has(trimmedName!)
+  // 默认名判定跨语种进行：默认名会以「新建当时的语言」写进草稿，切语言后不回改，
+  // 因此必须同时认中文与英文的默认名，否则空草稿清理逻辑会随语言漂移。
+  const hasName = !isSystemDefaultName(trimmedName)
   const hasDescription = Boolean(data.description?.trim())
 
   const hasPath = Boolean(data.path?.trim())
@@ -205,8 +201,9 @@ export function isDraftEmpty(item: ApiMenuData): boolean {
   else if (responses.length === 1) {
     const [res] = responses
     const props = (res.jsonSchema as { properties?: unknown[] } | undefined)?.properties
-    const resName = res.name.trim()
-    const nameChanged = Boolean(resName) && resName !== '成功'
+    // 默认响应名会以「新建当时的语言」写入（中文「成功」/ 英文「Success」），
+    // 判定必须跨语种，否则英文界面下新建的草稿会被误判为「已编辑」。
+    const nameChanged = !isDefaultResponseName(res.name)
     hasResponses = res.code !== 200 || nameChanged || Boolean(props?.length)
   }
 

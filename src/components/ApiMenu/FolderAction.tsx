@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Tooltip } from 'antd'
 import { MoreHorizontalIcon, PlusIcon } from 'lucide-react'
 
@@ -14,9 +16,11 @@ import { MenuActionButton } from './MenuActionButton'
  */
 export function FolderAction(props: { catalog: ApiMenuData }) {
   const { catalog } = props
+  const { t } = useTranslation()
 
   const catalogType = getCatalogType(catalog.type)
-  const { tipTitle } = API_MENU_CONFIG[catalogType]
+  const { tipTitleKey } = API_MENU_CONFIG[catalogType]
+  const tipTitle = tipTitleKey ? t(tipTitleKey) : ''
 
   const { createTabItem } = useHelpers()
 

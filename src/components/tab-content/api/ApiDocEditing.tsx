@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useEvent } from 'react-use-event-hook'
 
 import { Button, Form, Input, Select, type SelectProps, Space, Typography } from 'antd'
@@ -28,8 +29,6 @@ import { ParamsBody } from './params/ParamsBody'
 import { ParamsTab } from './params/ParamsTab'
 import { useApiSubTabContext } from './Api'
 
-const DEFAULT_NAME = '未命名接口'
-
 const methodOptions: SelectProps['options'] = Object.entries(HTTP_METHOD_CONFIG).map(
   ([method, { color }]) => {
     return {
@@ -48,6 +47,7 @@ const methodOptions: SelectProps['options'] = Object.entries(HTTP_METHOD_CONFIG)
  */
 export function ApiDocEditing() {
   const [form] = Form.useForm<ApiDetails>()
+  const { t } = useTranslation()
 
   const { messageApi } = useGlobalContext()
   const msgKey = useRef<string>()
@@ -82,7 +82,7 @@ export function ApiDocEditing() {
   }, [dbMenuRawList, tabData.key])
 
   const menuApiName = useMemo(() => {
-    return menuRawList?.find(({ id }) => id === tabData.key)?.name ?? DEFAULT_NAME
+    return menuRawList?.find(({ id }) => id === tabData.key)?.name ?? t('app.defaultNames.apiFallback')
   }, [menuRawList, tabData.key])
 
   useCtrlSave(() => { form.submit() }, isCreating || subTabKey === 'docEdit')
@@ -119,7 +119,7 @@ export function ApiDocEditing() {
   // 构造用于写草稿/入库的菜单数据。
   const buildMenuData = useEvent((values: ApiDetails): ApiMenuData => {
     const rawName = values.name?.trim() ?? ''
-    const menuName = rawName.length > 0 ? rawName : DEFAULT_NAME
+    const menuName = rawName.length > 0 ? rawName : t('app.defaultNames.apiFallback')
 
     return {
       id: tabData.key,
@@ -183,7 +183,7 @@ export function ApiDocEditing() {
   }, [persistDraft])
 
   const handleTitleConfirm = async () => {
-    const newName = titleDraft.trim() || DEFAULT_NAME
+    const newName = titleDraft.trim() || t('app.defaultNames.apiFallback')
     form.setFieldValue('name', newName)
     setEditingTitle(false)
 
@@ -211,7 +211,7 @@ export function ApiDocEditing() {
 
   const handleFinish = async (values: ApiDetails) => {
     const rawName = values.name?.trim() ?? ''
-    const menuName = rawName.length > 0 ? rawName : DEFAULT_NAME
+    const menuName = rawName.length > 0 ? rawName : t('app.defaultNames.apiFallback')
 
     if (isCreating) {
       // 单一 id 原地翻转：复用当前 tab.key 作为 DB id，入库后清草稿并把页签从「新建」翻转为「已保存」。
@@ -235,7 +235,7 @@ export function ApiDocEditing() {
       discardDraft(tabData.key)
       setTabItemStatus({ key: tabData.key }, PageTabStatus.Update)
       setTabItemEditStatus({ key: tabData.key }, 'saved')
-      messageApi.success('保存成功')
+      messageApi.success(t('api.save.success'))
     }
     else {
       try {
@@ -249,11 +249,11 @@ export function ApiDocEditing() {
         })
         discardDraft(tabData.key)
         setTabItemEditStatus({ key: tabData.key }, 'saved')
-        messageApi.success('保存成功')
+        messageApi.success(t('api.save.success'))
       }
       catch (err) {
         setTabItemEditStatus({ key: tabData.key }, 'error')
-        messageApi.error((err as Error).message || '保存失败，请检查权限')
+        messageApi.error((err as Error).message || t('api.save.failedWithPermission'))
       }
     }
   }
@@ -333,11 +333,11 @@ export function ApiDocEditing() {
         key: msgKey.current,
         content: (
           <span>
-            路径中&nbsp;Query&nbsp;参数已自动提取，并填充到下方
-            <strong>请求参数</strong>
-            的&nbsp;
+            {t('api.doc.queryExtractedPrefix')}
+            <strong>{t('api.doc.requestParams')}</strong>
+            {t('api.doc.queryExtractedMiddle')}
             <strong>Param</strong>
-  &nbsp;中
+            {t('api.doc.queryExtractedSuffix')}
           </span>
         ),
         duration: 3,
@@ -377,8 +377,8 @@ export function ApiDocEditing() {
                   onChange={(e) => { setTitleDraft(e.target.value) }}
                   onPressEnter={() => { void handleTitleConfirm() }}
                 />
-                <Button size="small" type="primary" onClick={() => { void handleTitleConfirm() }}>确认</Button>
-                <Button size="small" onClick={handleTitleCancel}>取消</Button>
+                <Button size="small" type="primary" onClick={() => { void handleTitleConfirm() }}>{t('common.confirm')}</Button>
+                <Button size="small" onClick={handleTitleCancel}>{t('common.cancel')}</Button>
               </>
             )
           : (
@@ -414,7 +414,7 @@ export function ApiDocEditing() {
 
         <Space className="ml-auto pl-2">
           <Button htmlType="submit" type="primary">
-            保存
+            {t('common.save')}
           </Button>
 
           {!isCreating && (
@@ -428,9 +428,9 @@ export function ApiDocEditing() {
           <BaseFormItems />
         </div>
 
-        <GroupTitle className="mt-2">请求参数</GroupTitle>
+        <GroupTitle className="mt-2">{t('api.doc.requestParams')}</GroupTitle>
         <Form.Item noStyle name="parameters">
-          <ParamsTab exampleColumnTitle="示例值" />
+          <ParamsTab exampleColumnTitle={t('api.doc.exampleValue')} />
         </Form.Item>
 
         <div className="mt-4">
@@ -440,7 +440,7 @@ export function ApiDocEditing() {
           </Form.Item>
         </div>
 
-        <GroupTitle className="mb-3 mt-8">返回响应</GroupTitle>
+        <GroupTitle className="mb-3 mt-8">{t('api.doc.responses')}</GroupTitle>
         <Form.Item noStyle name="responses">
           <ResponseTab />
         </Form.Item>
